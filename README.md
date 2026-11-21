@@ -8,7 +8,9 @@ boss, bosses drawn from a pool). There is one boss so far, so a run fights it ag
 
 ## Play
 
-Double-click `index.html`, or run a local server:
+**Play in your browser: https://ceddikers.github.io/solfall/**
+
+To run it from this folder instead, double-click `index.html`, or run a local server:
 
 ```
 node tools/serve.js
