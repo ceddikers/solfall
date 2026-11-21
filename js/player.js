@@ -7,10 +7,11 @@
     DASH_SPEED: 940, DASH_T: 0.16, DASH_CD: 0.34, IFRAME: 0.24,
     COYOTE: 0.09, BUFFER: 0.13, HURT_INV: 1.15, HEAL_T: 0.85,
     SEG: 100, SEGS: 3,
-    GAIN_HIT: 9, GAIN_HEAVY: 14, GAIN_PERFECT: 34, GAIN_ORB: 6,
+    GAIN_HIT: 8, GAIN_HEAVY: 16, GAIN_PERFECT: 34, GAIN_ORB: 6,
     LANCE_DMG: 42, LANCE_SPEED: 1700,
   };
   const STAR = G.COL.star, HOT = G.COL.starHot;
+  const GOLD = '255,214,140'; // the finisher's colour
 
   const P = G.player = {};
   G.shots = [];
@@ -35,7 +36,7 @@
       dashT: 0, dashCd: 0, dashDir: 1, iframes: 0, pdDone: false, ghostT: 0,
       inv: 0, stun: 0, hp, maxHp: hp,
       ember: 0, healT: 0, healLock: false,
-      atk: null, atkCd: 0, combo: -1, comboT: 0,
+      atk: null, atkCd: 0, combo: -1, comboT: 0, sinceDash: 9,
       dead: false, deadT: 0, hidden: false,
       squash: 0, runT: 0, hurtFlash: 0, emberFlash: 0,
       scarf: [], ghosts: [], slashes: [],
@@ -73,7 +74,8 @@
     P.iframes = Math.max(0, P.iframes - dt);
     P.dashCd = Math.max(0, P.dashCd - dt);
     P.atkCd = Math.max(0, P.atkCd - dt);
-    P.comboT = Math.max(0, P.comboT - dt);
+    // a dash does not use up the combo window, so you can dodge and still land the finisher
+    if (P.dashT <= 0) { P.comboT = Math.max(0, P.comboT - dt); P.sinceDash += dt; }
     // Buffered presses do not run down during a dash, so anything pressed mid-dash
     // comes out the moment the dash ends instead of being dropped.
     if (P.dashT <= 0) {
@@ -139,7 +141,7 @@
       P.ghostT -= dt;
       if (P.ghostT <= 0) { P.ghostT = 0.028; P.ghosts.push({ x: P.x, y: P.y, f: P.facing, life: 0.26 }); }
       if (G.boon('comet')) cometStep();
-      if (P.dashT <= 0) { P.vx = P.dashDir * C.RUN * (mx === P.dashDir ? 1 : 0.6); P.dashCd = P.dashCdMax; }
+      if (P.dashT <= 0) { P.vx = P.dashDir * C.RUN * (mx === P.dashDir ? 1 : 0.6); P.dashCd = P.dashCdMax; P.sinceDash = 0; }
     } else if (P.stun > 0) {
       P.stun -= dt;
       P.vx *= Math.exp(-2.5 * dt);
@@ -223,26 +225,49 @@
         kind = steep && ay < 0 ? 'up' : (steep && ay > 0 && !P.onGround ? 'down' : 'side');
         if (Math.abs(ax) > 6) P.facing = ax > 0 ? 1 : -1;
       }
-      let idx = 0;
-      if (kind === 'side') { idx = (P.comboT > 0 && P.combo >= 0) ? (P.combo + 1) % 3 : 0; P.combo = idx; P.comboT = 0.6; }
-      else { P.combo = -1; P.comboT = 0; }
-      const heavy = kind === 'side' && idx === 2;
+      // The three-hit combo: two quick cuts, then a finisher worth more than both together.
+      // Side and upward slashes share the count. The downward bounce sits outside it and
+      // does not break the chain, and neither does a dash.
+      let idx = -1;
+      if (kind !== 'down') {
+        idx = (P.comboT > 0 && P.combo >= 0) ? (P.combo + 1) % 3 : 0;
+        P.combo = idx; P.comboT = idx === 2 ? 0 : 0.62;
+      } else if (P.comboT > 0) P.comboT = 0.62; // a bounce keeps the chain alive
+      const heavy = idx === 2;
+      // a slash thrown straight out of a dash becomes a thrust: more damage, more reach
+      const thrust = kind === 'side' && P.sinceDash < 0.2;
+      const base = heavy ? 24 : idx === 1 ? 11 : kind === 'down' ? 11 : 9;
+      const wind = heavy ? 0.09 : 0.02; // the finisher winds up for a beat before it lands
       P.atk = {
-        kind, idx, heavy, t: 0, dur: heavy ? 0.3 : 0.22, a0: 0.02, a1: heavy ? 0.17 : 0.13,
-        hit: new Set(), dir: P.facing,
-        dmg: Math.round((heavy ? 17 : (kind === 'side' ? 10 : 11)) * (1 + 0.25 * G.boon('keen')) * G.dmgMult()),
+        kind, idx, heavy, thrust, t: 0, dur: heavy ? 0.36 : 0.22, a0: wind, a1: wind + (heavy ? 0.15 : 0.11),
+        hit: new Set(), dir: P.facing, swung: false,
+        dmg: Math.round(base * (thrust ? 1.4 : 1) * (1 + 0.25 * G.boon('keen')) * G.dmgMult()),
       };
-      P.atkCd = (heavy ? 0.36 : 0.23) * (1 - 0.18 * G.boon('quick'));
-      P.slashes.push({ kind, dir: P.facing, heavy, idx, t: 0, dur: heavy ? 0.26 : 0.19, reach: 1 + 0.25 * G.boon('reach') });
-      if (heavy && G.boon('crescent')) {
-        G.shots.push({ wave: true, x: P.x + P.facing * 34, y: P.y - 26, vx: P.facing * 980, vy: 0, t: 0, life: 0.42, hit: new Set(), dmg: Math.round(16 * G.dmgMult()) });
-      }
-      G.audio.play(heavy ? 'slash3' : 'slash');
-      if (kind === 'side' && P.onGround && P.stun <= 0) P.vx += P.facing * (heavy ? 240 : 100);
+      P.atkCd = (heavy ? 0.46 : idx === 1 ? 0.24 : 0.22) * (1 - 0.18 * G.boon('quick'));
+      P.slashes.push({ kind, dir: P.facing, heavy, thrust, idx, t: -wind, dur: heavy ? 0.3 : 0.19, reach: 1 + 0.25 * G.boon('reach') });
+      if (heavy) G.fx.burst(P.x - P.facing * 8, P.y - 34, { n: 5, color: GOLD, speed: [30, 140], life: [0.15, 0.35], kind: 'spark', size: [2, 3] });
     }
     if (P.atk) {
       const a = P.atk;
       a.t += dt;
+      if (!a.swung && a.t >= a.a0) {
+        // the swing itself: its sound, a step into the blow, and the Crescent wave on a finisher
+        a.swung = true;
+        G.audio.play(a.heavy ? 'slash3' : 'slash');
+        if (a.kind === 'side' && P.stun <= 0) {
+          if (a.thrust) P.vx = a.dir * Math.max(Math.abs(P.vx), 560);
+          else if (P.onGround) P.vx += a.dir * (a.heavy ? 330 : 100);
+          else if (a.heavy) P.vx += a.dir * 150;
+        }
+        if (a.heavy && a.kind === 'up' && !P.onGround) P.vy = Math.min(P.vy, -240);
+        if (a.heavy && G.boon('crescent')) {
+          const upw = a.kind === 'up';
+          G.shots.push({
+            wave: true, x: P.x + (upw ? 0 : a.dir * 34), y: P.y - (upw ? 70 : 26),
+            vx: upw ? 0 : a.dir * 980, vy: upw ? -980 : 0, t: 0, life: 0.42, hit: new Set(), dmg: Math.round(16 * G.dmgMult()),
+          });
+        }
+      }
       if (a.t >= a.a0 && a.t <= a.a1) checkHits(a);
       if (a.t >= a.dur) P.atk = null;
     }
@@ -277,11 +302,14 @@
 
   function atkBox(a) {
     const r = 1 + 0.3 * G.boon('reach'); // Long Reach stretches each box away from the hero
-    if (a.kind === 'up') return { cx: P.x + a.dir * 6, cy: P.y - 34 - 46 * r, hw: 42, hh: 46 * r };
+    if (a.kind === 'up') {
+      const hh = (a.heavy ? 57 : 46) * r;
+      return { cx: P.x + a.dir * 6, cy: P.y - 34 - hh, hw: a.heavy ? 54 : 42, hh };
+    }
     if (a.kind === 'down') return { cx: P.x, cy: P.y - 28 + 42 * r, hw: 36, hh: 42 * r };
-    return a.heavy
-      ? { cx: P.x + a.dir * (58 * r - 4), cy: P.y - 26, hw: 58 * r, hh: 42 }
-      : { cx: P.x + a.dir * 48 * r, cy: P.y - 26, hw: 48 * r, hh: 36 };
+    // side: the finisher is bigger, a thrust is longer and narrower
+    const hw = ((a.heavy ? 66 : 48) + (a.thrust ? 22 : 0)) * r;
+    return { cx: P.x + a.dir * (hw - (a.heavy ? 4 : 0)), cy: P.y - 26, hw, hh: a.thrust ? 32 : a.heavy ? 48 : 36 };
   }
 
   // Fire one Star Lance (or three with Split Lance) along a unit direction.
@@ -330,11 +358,17 @@
       if (a.hit.has(t.id) || !touch(hb, t)) continue;
       a.hit.add(t.id);
       const c = contact(hb, t);
-      const res = G.boss.damage(a.dmg, t, { x: c.x, y: c.y, heavy: a.heavy, dir: a.dir });
+      const res = G.boss.damage(a.dmg, t, { x: c.x, y: c.y, heavy: a.heavy || a.thrust, finisher: a.heavy, dir: a.dir });
       if (res) {
         P.gain(a.heavy ? C.GAIN_HEAVY : C.GAIN_HIT);
-        G.fx.stop(a.heavy ? 0.07 : 0.026);
-        G.fx.shake(a.heavy ? 6 : 1.6);
+        G.fx.stop(a.heavy ? 0.095 : a.thrust ? 0.05 : 0.026);
+        G.fx.shake(a.heavy ? 8.5 : a.thrust ? 4 : 1.6);
+        if (a.heavy) {
+          // the finisher lands with a gold burst so it reads as the big hit
+          G.fx.punch(0.012);
+          G.fx.ring(c.x, c.y, { r0: 8, r1: 92, life: 0.28, color: GOLD, width: 6 });
+          G.fx.burst(c.x, c.y, { n: 12, color: GOLD, speed: [160, 620], life: [0.15, 0.45], kind: 'spark', size: [2.5, 4.5] });
+        }
         G.audio.play(a.heavy ? 'hitHeavy' : 'hit');
         G.fx.burst(c.x, c.y, { n: a.heavy ? 16 : 9, color: HOT, speed: [120, 520], life: [0.12, 0.35], kind: 'spark', size: [2, 4] });
         G.fx.burst(c.x, c.y, { n: 4, color: STAR, speed: [20, 120], life: [0.2, 0.4], size: [5, 10] });
@@ -344,7 +378,7 @@
       }
       bounced = true;
       // a hit landed in the air holds the hero up for a moment, so air combos stay on target
-      if (a.kind !== 'down' && !P.onGround && !a.stall) { a.stall = true; P.vy = Math.min(P.vy, -95); }
+      if (a.kind !== 'down' && !P.onGround && !a.stall) { a.stall = true; P.vy = Math.min(P.vy, a.heavy ? -150 : -95); }
     }
     for (const o of G.hazards.slashables()) {
       if (G.circleRect(o.x, o.y, o.r + 5, hb)) { o.slash(); P.gain(C.GAIN_ORB); bounced = true; }
@@ -452,9 +486,9 @@
     for (const s of G.shots) {
       if (s.wave) {
         // Crescent: an arc of light that fades as it travels
-        const d = s.vx > 0 ? 1 : -1, k = 1 - s.t / s.life;
+        const k = 1 - s.t / s.life;
         ctx.save();
-        ctx.translate(s.x, s.y); ctx.scale(d, 1);
+        ctx.translate(s.x, s.y); ctx.rotate(Math.atan2(s.vy, s.vx));
         ctx.strokeStyle = G.rgba(STAR, 0.45 * k); ctx.lineWidth = 16;
         ctx.beginPath(); ctx.arc(-26, 0, 44, -0.85, 0.85); ctx.stroke();
         ctx.strokeStyle = G.rgba(HOT, 0.95 * k); ctx.lineWidth = 5;
@@ -506,6 +540,7 @@
   function drawSlashes(ctx) {
     ctx.globalCompositeOperation = 'lighter';
     for (const s of P.slashes) {
+      if (s.t < 0) continue; // a finisher's arc appears when its wind-up ends
       const k = s.t / s.dur;
       const head = G.ease.outCubic(Math.min(1, k * 2.4));
       const alpha = Math.pow(1 - k, 1.3);
@@ -513,21 +548,42 @@
       ctx.save();
       ctx.translate(P.x, P.y);
       const rs = s.reach || 1;
-      if (s.kind === 'up') { cx = 0; cy = -50; R = 62; a0 = -Math.PI + 0.3; a1 = -0.3; if (s.dir < 0) ctx.scale(-1, 1); }
+      if (s.thrust) {
+        // a straight lance of light for the dash thrust
+        ctx.scale(s.dir, 1);
+        const len = (s.heavy ? 158 : 128) * rs * head, h = (s.heavy ? 17 : 11) * (1 - k * 0.7);
+        ctx.fillStyle = G.rgba(s.heavy ? GOLD : STAR, 0.7 * alpha);
+        ctx.beginPath(); ctx.moveTo(2, -26 - h); ctx.lineTo(2 + len, -26); ctx.lineTo(2, -26 + h); ctx.closePath(); ctx.fill();
+        ctx.fillStyle = G.rgba(HOT, alpha);
+        ctx.beginPath(); ctx.moveTo(2, -26 - h * 0.4); ctx.lineTo(2 + len * 0.94, -26); ctx.lineTo(2, -26 + h * 0.4); ctx.closePath(); ctx.fill();
+        ctx.restore();
+        continue;
+      }
+      if (s.kind === 'up') {
+        cx = 0; cy = -50; R = s.heavy ? 82 : 62;
+        a0 = -Math.PI + (s.heavy ? 0.05 : 0.3); a1 = -(s.heavy ? 0.05 : 0.3);
+        if (s.idx === 1) { const t0 = a0; a0 = a1; a1 = t0; }
+        if (s.dir < 0) ctx.scale(-1, 1);
+      }
       else if (s.kind === 'down') { cx = 0; cy = -14; R = 58; a0 = 0.3; a1 = Math.PI - 0.3; if (s.dir < 0) ctx.scale(-1, 1); }
       else {
         ctx.scale(s.dir, 1);
-        cx = 6; cy = -26; R = s.heavy ? 86 : 70;
+        cx = 6; cy = -26; R = s.heavy ? 102 : 70;
         a0 = -1.25; a1 = 1.15;
         if (s.idx === 1) { a0 = 1.2; a1 = -1.2; }
-        if (s.heavy) { a0 = -1.7; a1 = 1.35; }
+        if (s.heavy) { a0 = -1.95; a1 = 1.5; }
       }
       R *= rs;
       const end = G.lerp(a0, a1, head);
       const start = G.lerp(a0, a1, Math.max(0, head - 0.8 + k * 0.5));
-      crescent(ctx, cx, cy, R, start, end, s.heavy ? 36 : 26);
+      crescent(ctx, cx, cy, R, start, end, s.heavy ? 46 : 26);
       ctx.fillStyle = G.rgba(STAR, 0.75 * alpha); ctx.fill();
-      crescent(ctx, cx, cy, R + 2, start, end, s.heavy ? 15 : 10);
+      if (s.heavy) {
+        // a gold inner arc marks the finisher
+        crescent(ctx, cx, cy, R - 12, start, end, 24);
+        ctx.fillStyle = G.rgba(GOLD, 0.85 * alpha); ctx.fill();
+      }
+      crescent(ctx, cx, cy, R + 2, start, end, s.heavy ? 17 : 10);
       ctx.fillStyle = G.rgba(HOT, alpha); ctx.fill();
       ctx.restore();
     }
@@ -566,18 +622,28 @@
 
     // blade: sheathed on the back, or following the swing
     if (!P.atk) {
-      ctx.strokeStyle = G.rgba(STAR, 0.9); ctx.lineWidth = 2.2;
+      // after two cuts the blade glows gold: the next slash is the finisher
+      const primed = P.combo === 1 && P.comboT > 0;
+      if (primed) {
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.drawImage(G.fx.glow(GOLD), -29, -38, 36, 36);
+        ctx.globalCompositeOperation = 'source-over';
+      }
+      ctx.strokeStyle = G.rgba(primed ? GOLD : STAR, primed ? 1 : 0.9); ctx.lineWidth = primed ? 3.2 : 2.2;
       ctx.beginPath(); ctx.moveTo(-5, -32); ctx.lineTo(-17, -7); ctx.stroke();
     } else {
-      const a = P.atk, k = G.ease.outCubic(Math.min(1, a.t / (a.dur * 0.55)));
+      const a = P.atk, k = G.ease.outCubic(G.clamp((a.t - a.a0 + 0.02) / (a.dur * 0.5), 0, 1));
+      const winding = a.heavy && a.t < a.a0;
       let a0 = -1.9, a1 = 1.3;
-      if (a.kind === 'up') { a0 = -2.9; a1 = -0.5; }
+      if (a.thrust) { a0 = -0.05; a1 = -0.05; }
+      else if (a.kind === 'up') { a0 = a.heavy ? 0.5 : -2.9; a1 = a.heavy ? -2.9 : -0.5; }
       else if (a.kind === 'down') { a0 = 0.2; a1 = 2.7; }
+      else if (a.heavy) { a0 = -2.7; a1 = 1.5; }
       else if (a.idx === 1) { a0 = 1.5; a1 = -1.6; }
-      const ang = G.lerp(a0, a1, k);
-      const sx = 3, sy = -31, len = a.heavy ? 44 : 38;
+      const ang = G.lerp(a0, a1, k) + (winding ? G.rand(-0.06, 0.06) : 0);
+      const sx = 3, sy = -31, len = a.thrust ? 50 : a.heavy ? 48 : 38;
       ctx.globalCompositeOperation = 'lighter';
-      ctx.strokeStyle = G.rgba(STAR, 0.5); ctx.lineWidth = 7;
+      ctx.strokeStyle = G.rgba(a.heavy ? GOLD : STAR, a.heavy ? 0.7 : 0.5); ctx.lineWidth = a.heavy ? 9 : 7;
       ctx.beginPath(); ctx.moveTo(sx + Math.cos(ang) * 8, sy + Math.sin(ang) * 8); ctx.lineTo(sx + Math.cos(ang) * len, sy + Math.sin(ang) * len); ctx.stroke();
       ctx.strokeStyle = G.rgba(HOT, 1); ctx.lineWidth = 2.6;
       ctx.beginPath(); ctx.moveTo(sx + Math.cos(ang) * 6, sy + Math.sin(ang) * 6); ctx.lineTo(sx + Math.cos(ang) * len, sy + Math.sin(ang) * len); ctx.stroke();

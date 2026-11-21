@@ -1,7 +1,7 @@
 # Solfall
 
 A side-on boss fight for the browser: one hero, one boss, three phases, played as a run of
-ever-harder trials with a boon after each victory. Version 0.2b.
+ever-harder trials with a boon after each victory. Version 0.2c.
 
 This is the first playable slice of a planned boss-rush roguelite (short runs, a boon after each
 boss, bosses drawn from a pool). There is one boss so far, so a run fights it again and again.
@@ -35,9 +35,15 @@ then open http://localhost:8321. There is no build step and no dependency.
 
 ## The hero
 
-- **Sword:** a three-hit combo on the ground; the third hit is heavier. Hold the button to keep swinging.
-  Slash upward to reach the hands; a hit landed in the air holds you up for a moment, so one jump fits
-  several slashes. Slash downward in the air to bounce off whatever you hit (this gives the jump and dash back).
+- **Sword:** a three-hit combo of 9, 11 and 24 damage. The third hit is the finisher: it winds up for a
+  beat, steps into the blow, has a bigger arc and is worth more than the first two together. The blade
+  glows gold when the next slash will be the finisher. Hold the button to keep the chain going.
+  - Side and upward slashes share the count, so the combo works on the ground and in the air.
+  - The chain resets after 0.6 s without a slash. A dash does not use up that time, and the downward
+    bounce does not break the chain.
+  - A slash thrown straight out of a dash is a **thrust**: 40% more damage and longer reach.
+  - A hit landed in the air holds you up for a moment, so one jump fits a full combo.
+  - Slash downward in the air to bounce off whatever you hit (this gives the jump and dash back).
 - **Dash:** 0.24 s of invulnerability. If an attack would have hit during it, that is a perfect dodge:
   time slows, Starlight fills, and the dash is ready again at once.
 - **Starlight:** three segments, filled by landing hits, perfect dodges and cutting orbs out of the air.
@@ -127,7 +133,7 @@ Most-used tuning numbers: `B.BASE_HP` and `B.poiseMax` in `boss.js`, `G.PLAYER` 
 Open the browser console on the running game.
 
 - **Dodge tests:** `fetch('/tools/dodge-tests.js').then(r => r.text()).then(t => console.log((0, eval)(t)))`
-  runs each attack against a simple scripted player and reports health lost. All 20 lose 0 health as of v0.2a.
+  runs each attack against a simple scripted player and reports health lost. All 20 lose 0 health as of v0.2c.
   Run it after changing any attack.
 - `G.debug.god = true` makes the hero invulnerable. `G.debug.boxes = true` (or `?boxes` in the address)
   draws every hitbox.
@@ -141,6 +147,7 @@ Open the browser console on the running game.
 - **Sound and music have not been heard by anyone.** They are generated in code and run without errors,
   but the mix and the music are untested by ear. Volume sliders are in Settings.
 - **No person has played a run through.** Timings were tuned with scripted players: an invulnerable,
-  always-attacking one beat the first trial on Standard in 78 s (measured at v0.1b), so a real first
-  trial should be about 3 to 4 minutes. Boon strength and the per-trial scaling are first guesses.
+  always-attacking one beat the first trial on Standard in 66 s at v0.2c against 4,800 boss health; the
+  boss was then raised to 5,400 to keep a real first trial at about 3 to 4 minutes. Boon strength and
+  the per-trial scaling are first guesses.
 - **Gamepad support is untested** (no pad was available).

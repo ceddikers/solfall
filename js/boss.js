@@ -6,7 +6,7 @@
   const E = G.ease, FLOOR = G.FLOOR, H = G.hazards, DANGER = G.COL.danger;
   const WL = G.WALL_L, WR = G.WALL_R;
 
-  const B = G.boss = { BASE_HP: 4800 };
+  const B = G.boss = { BASE_HP: 5400 };
   const HOME_Y = [0, 214, 214, 250];
 
   function mkHand(side) {
@@ -77,8 +77,8 @@
     else if (t.ref) t.ref.kx = G.clamp((t.ref.kx || 0) + push, -22, 22);
     if (G.settings.numbers) {
       G.fx.text(info.x + G.rand(-12, 12), info.y - 16, String(dmg), {
-        color: (t.kind === 'core' || B.staggered) ? '255,232,140' : '255,255,255',
-        size: info.heavy ? 23 : 17, life: 0.65,
+        color: (t.kind === 'core' || B.staggered || info.finisher) ? '255,226,140' : '255,255,255',
+        size: info.finisher ? 28 : info.heavy ? 23 : 17, life: info.finisher ? 0.8 : 0.65,
       });
     }
     if (!B.staggered) {
