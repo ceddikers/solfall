@@ -6,7 +6,19 @@
   const E = G.ease, FLOOR = G.FLOOR, H = G.hazards, DANGER = G.COL.danger;
   const WL = G.WALL_L, WR = G.WALL_R;
 
-  const B = G.boss = { BASE_HP: 5400 };
+  const B = G.boss = {
+    BASE_HP: 5400, id: 'warden', name: 'THE ECLIPSED WARDEN', short: 'The Warden', theme: 'warden',
+    blurb: 'A dimmed sun and its two hands',
+    tips: [
+      'Slash downward in the air to bounce off a hand and stay above the shockwaves.',
+      'The hands are stuck after a slam, a clap or a rocket punch. Three slashes fit in that window.',
+      'A Star Lance aimed upward reaches the core from the ground. Hold up and fire.',
+      'When the floor burns, the platforms are safe.',
+      'A hand that takes enough damage breaks, and the Warden is weaker until it mends.',
+    ],
+    hudCols: [null, ['#ff8a3c', '#ffd07a'], ['#ff3c5a', '#ffa2ac'], ['#b6a6ff', '#ffffff']],
+  };
+  G.bosses = { warden: B };
   const HOME_Y = [0, 214, 214, 250];
 
   function mkHand(side) {

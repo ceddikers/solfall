@@ -171,6 +171,41 @@
       tone({ type: 'sawtooth', f0: 900, f1: 200, dur: 0.16, vol: 0.1 });
     },
     orb() { tone({ type: 'sine', f0: 700, f1: 380, dur: 0.12, vol: 0.1 }); },
+    // ---- the Magus, the Veil and the Knight
+    zap() {
+      noise({ dur: 0.16, vol: 0.5, type: 'highpass', f0: 2600 });
+      tone({ type: 'square', f0: 1500, f1: 120, dur: 0.14, vol: 0.16 });
+      tone({ type: 'sine', f0: 100, f1: 36, dur: 0.3, vol: 0.5 });
+    },
+    shard() {
+      tone({ type: 'triangle', f0: 2400, f1: 900, dur: 0.12, vol: 0.14 });
+      noise({ dur: 0.1, vol: 0.2, type: 'highpass', f0: 5200 });
+    },
+    frost() {
+      for (let i = 0; i < 4; i++) tone({ type: 'triangle', f0: 1700 + i * 320, f1: 1200 + i * 200, dur: 0.16, vol: 0.07, delay: i * 0.05 });
+      noise({ dur: 0.5, vol: 0.16, type: 'highpass', f0: 4200, attack: 0.1 });
+    },
+    whoosh() {
+      noise({ dur: 0.5, vol: 0.4, type: 'lowpass', f0: 300, f1: 2200, attack: 0.12 });
+      tone({ type: 'sawtooth', f0: 120, f1: 60, dur: 0.4, vol: 0.12 });
+    },
+    blink() {
+      tone({ type: 'sine', f0: 1300, f1: 300, dur: 0.16, vol: 0.12 });
+      noise({ dur: 0.18, vol: 0.14, f0: 3000, f1: 600, q: 1.5 });
+    },
+    blade() {
+      noise({ dur: 0.14, vol: 0.4, f0: 1500, f1: 6500, q: 0.8 });
+      tone({ type: 'triangle', f0: 1900, f1: 2600, dur: 0.1, vol: 0.06 });
+    },
+    cleave() {
+      noise({ dur: 0.3, vol: 0.5, f0: 300, f1: 2600, q: 0.7, attack: 0.04 });
+      tone({ type: 'sawtooth', f0: 160, f1: 60, dur: 0.3, vol: 0.2 });
+    },
+    bell() {
+      tone({ type: 'sine', f0: 196, f1: 194, dur: 1.6, vol: 0.3 });
+      tone({ type: 'sine', f0: 392.5, f1: 390, dur: 1.2, vol: 0.14 });
+      tone({ type: 'sine', f0: 587, f1: 585, dur: 0.8, vol: 0.07 });
+    },
     boom() {
       tone({ type: 'sine', f0: 90, f1: 30, dur: 0.35, vol: 0.55 });
       noise({ dur: 0.35, vol: 0.42, type: 'lowpass', f0: 1800, f1: 150 });

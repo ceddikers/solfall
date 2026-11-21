@@ -29,7 +29,7 @@
     <div id="timer">0:00.0</div>
     <div id="bhud">
       <div class="brow">
-        <span class="bname">THE ECLIPSED WARDEN <i id="trial"></i></span>
+        <span class="bname"><span id="bname">THE ECLIPSED WARDEN </span><i id="trial"></i></span>
         <span id="bphase"><b>I</b><b>II</b><b>III</b></span>
       </div>
       <div class="bbar">
@@ -53,6 +53,7 @@
         <nav>
           <div class="item" data-act="begin">Begin</div>
           <div class="item opt" data-opt="difficulty"><span class="k">Difficulty</span><span class="v"></span></div>
+          <div class="item opt" data-opt="firstFoe"><span class="k">First foe</span><span class="v"></span></div>
           <div class="item" data-act="how">How to play</div>
           <div class="item" data-act="settings">Settings</div>
         </nav>
@@ -113,10 +114,10 @@
               <li><span class="sw star"></span><b>Dash through an attack</b> at the last moment for a perfect dodge. Time slows and your Starlight fills.</li>
               <li><b>Starlight</b> fills as you land hits. Spend a segment on your hero's special, or hold Mend while standing to restore one health.</li>
               <li><b>Every third attack is a finisher.</b> It hits harder than the first two together, and a dash does not break the chain.</li>
-              <li><b>With the sword or maul, strike downward in the air</b> to bounce off the Warden and get your jump and dash back.</li>
-              <li><b>The core takes extra damage.</b> Fill the stagger bar to bring it down within reach.</li>
-              <li><b>A hand that goes dim and cracked is stuck.</b> That is your opening.</li>
-              <li><b>A run starts with a hero and one of three relics.</b> Each victory grants a boon and leads to a harder trial. Falling ends the run.</li>
+              <li><b>With the sword or maul, strike downward in the air</b> to bounce off a boss and get your jump and dash back.</li>
+              <li><b>Fill the stagger bar</b> under a boss's health and it is helpless for a few seconds, taking extra damage.</li>
+              <li><b>Every boss is open after its big attacks:</b> a stuck fist, a blade in the floor, a caster mid-spell. That is when to strike.</li>
+              <li><b>A run starts with a hero and one of three relics.</b> Each trial is one of four bosses; each victory grants a boon and leads to a harder trial. Falling ends the run.</li>
             </ul>
           </div>
         </div>
@@ -197,10 +198,15 @@
 <script src="js/input.js"></script>
 <script src="js/audio.js"></script>
 <script src="js/fx.js"></script>
+<script src="js/draw.js"></script>
 <script src="js/arena.js"></script>
 <script src="js/hazards.js"></script>
 <script src="js/player.js"></script>
 <script src="js/boss.js"></script>
+<script src="js/bosskit.js"></script>
+<script src="js/mage.js"></script>
+<script src="js/assassin.js"></script>
+<script src="js/knight.js"></script>
 <script src="js/ui.js"></script>
 <script src="js/game.js"></script>
 </body>

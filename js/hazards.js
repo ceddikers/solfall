@@ -4,6 +4,9 @@
 (function () {
   const H = G.hazards = { list: [] };
   const DANGER = G.COL.danger;
+  // A hazard may carry its own colours (tint: { boss, hot }), e.g. the Magus's ice, fire and lightning.
+  // Warnings stay in the one danger colour whatever the tint.
+  const pal = (h) => h.tint || G.pal();
 
   H.add = function (h) {
     h.t = 0; h.dead = false;
@@ -17,7 +20,7 @@
     if (pop) {
       for (const h of H.list) {
         if (h.x != null && h.y != null && h.kind === 'orb') {
-          G.fx.burst(h.x, h.y, { n: 6, color: G.pal().boss, speed: [40, 160], life: [0.2, 0.5] });
+          G.fx.burst(h.x, h.y, { n: 6, color: pal(h).boss, speed: [40, 160], life: [0.2, 0.5] });
         }
       }
     }
@@ -49,19 +52,19 @@
   };
 
   // ------------------------------------------------------------ ground shockwave
-  H.shockwave = function (x, dir, speed, hgt) {
+  H.shockwave = function (x, dir, speed, hgt, tint) {
     return H.add({
-      kind: 'wave', x, y: G.FLOOR, dir, speed, hgt: hgt || 46, srcX: x - dir * 30,
+      kind: 'wave', x, y: G.FLOOR, dir, speed, hgt: hgt || 46, srcX: x - dir * 30, tint,
       update(dt) {
         // waves start slow and build speed, so there is time to jump one that starts beside you
         this.x += this.dir * this.speed * G.lerp(0.35, 1, Math.min(1, this.t / 0.4)) * dt;
         this.srcX = this.x - this.dir * 30;
         if (Math.random() < 0.6) {
-          G.fx.spawn({ x: this.x - this.dir * 10, y: G.FLOOR - G.rand(2, this.hgt * 0.7), vx: -this.dir * G.rand(20, 90), vy: G.rand(-60, -10), life: G.rand(0.15, 0.4), size: G.rand(2, 5), color: G.pal().boss });
+          G.fx.spawn({ x: this.x - this.dir * 10, y: G.FLOOR - G.rand(2, this.hgt * 0.7), vx: -this.dir * G.rand(20, 90), vy: G.rand(-60, -10), life: G.rand(0.15, 0.4), size: G.rand(2, 5), color: pal(this).boss });
         }
         if (this.x < G.WALL_L + 8 || this.x > G.WALL_R - 8) {
           this.dead = true;
-          G.fx.burst(this.x, G.FLOOR - 20, { n: 10, color: G.pal().boss, speed: [60, 260], angle: -Math.PI / 2, spread: 2.4, life: [0.2, 0.5] });
+          G.fx.burst(this.x, G.FLOOR - 20, { n: 10, color: pal(this).boss, speed: [60, 260], angle: -Math.PI / 2, spread: 2.4, life: [0.2, 0.5] });
         }
       },
       hits(P) {
@@ -69,7 +72,7 @@
         return G.rectsOverlap(P.box(), { cx: this.x, cy: G.FLOOR - this.hgt / 2, hw: 14, hh: this.hgt / 2 - 3 });
       },
       draw(ctx) {
-        const P = G.pal();
+        const P = pal(this);
         const s = Math.min(1, this.t / 0.1), h = this.hgt * s * (1 + 0.08 * Math.sin(this.t * 40)), d = this.dir, x = this.x, F = G.FLOOR;
         ctx.globalCompositeOperation = 'lighter';
         ctx.fillStyle = G.rgba(P.boss, 0.3);
@@ -88,26 +91,43 @@
     o = o || {};
     return H.add({
       kind: 'orb', x, y, vx, vy, r: o.r || 13, grav: o.grav || 0, life: o.life || 7,
-      slashable: o.slashable !== false, dmg: o.dmg || 1, srcX: x,
+      slashable: o.slashable !== false, dmg: o.dmg || 1, srcX: x, tint: o.tint, steer: o.steer, onPop: o.onPop,
       update(dt) {
+        if (this.steer) this.steer(this, dt);
         this.vy += this.grav * dt;
         this.x += this.vx * dt; this.y += this.vy * dt;
         this.srcX = this.x - this.vx * 0.05;
         this.life -= dt;
-        if (Math.random() < 0.5) G.fx.spawn({ x: this.x, y: this.y, vx: G.rand(-20, 20), vy: G.rand(-20, 20), life: 0.3, size: this.r * 0.5, color: G.pal().boss });
+        if (Math.random() < 0.5) G.fx.spawn({ x: this.x, y: this.y, vx: G.rand(-20, 20), vy: G.rand(-20, 20), life: 0.3, size: this.r * 0.5, color: pal(this).boss });
         if (this.y + this.r > G.FLOOR && this.vy > 0) { this.pop(); return; }
         if (this.life <= 0 || this.x < -80 || this.x > G.W + 80 || this.y < -700 || this.y > G.H + 80) this.dead = true;
       },
       pop() {
         this.dead = true;
-        G.fx.burst(this.x, this.y, { n: 8, color: G.pal().boss, speed: [60, 220], life: [0.2, 0.45], kind: 'spark', size: [2, 3] });
-        G.fx.ring(this.x, this.y, { r0: 4, r1: this.r * 2.6, life: 0.2, color: G.pal().boss, width: 3 });
+        if (this.onPop) this.onPop(this);
+        G.fx.burst(this.x, this.y, { n: 8, color: pal(this).boss, speed: [60, 220], life: [0.2, 0.45], kind: 'spark', size: [2, 3] });
+        G.fx.ring(this.x, this.y, { r0: 4, r1: this.r * 2.6, life: 0.2, color: pal(this).boss, width: 3 });
       },
       slash() { this.pop(); G.audio.play('orbPop'); },
       hits(P) { return G.circleRect(this.x, this.y, this.r * 0.75, P.box()); },
       draw(ctx) {
-        const P = G.pal(), r = this.r * (1 + 0.1 * Math.sin(this.t * 30));
+        const P = pal(this), r = this.r * (1 + 0.1 * Math.sin(this.t * 30));
         ctx.globalCompositeOperation = 'lighter';
+        if (o.blade) {
+          // a thrown knife: a sliver along its flight
+          const a = Math.atan2(this.vy, this.vx), c = Math.cos(a), s = Math.sin(a), L = this.r * 2.6, w = this.r * 0.55;
+          ctx.drawImage(G.fx.glow(P.boss), this.x - r * 2.4, this.y - r * 2.4, r * 4.8, r * 4.8);
+          ctx.strokeStyle = G.rgba(P.boss, 0.5); ctx.lineWidth = 3; ctx.lineCap = 'round';
+          ctx.beginPath(); ctx.moveTo(this.x - c * L * 2.2, this.y - s * L * 2.2); ctx.lineTo(this.x, this.y); ctx.stroke();
+          ctx.fillStyle = G.rgba(DANGER, 0.95);
+          ctx.beginPath(); ctx.moveTo(this.x + c * L, this.y + s * L); ctx.lineTo(this.x - s * w, this.y + c * w);
+          ctx.lineTo(this.x - c * L, this.y - s * L); ctx.lineTo(this.x + s * w, this.y - c * w); ctx.closePath(); ctx.fill();
+          ctx.fillStyle = G.rgba(P.hot, 1);
+          ctx.beginPath(); ctx.moveTo(this.x + c * L, this.y + s * L); ctx.lineTo(this.x - s * w * 0.4, this.y + c * w * 0.4);
+          ctx.lineTo(this.x - c * L * 0.4, this.y - s * L * 0.4); ctx.lineTo(this.x + s * w * 0.4, this.y - c * w * 0.4); ctx.closePath(); ctx.fill();
+          ctx.globalCompositeOperation = 'source-over';
+          return;
+        }
         ctx.drawImage(G.fx.glow(P.boss), this.x - r * 2.6, this.y - r * 2.6, r * 5.2, r * 5.2);
         ctx.fillStyle = G.rgba(DANGER, 0.9);
         ctx.beginPath(); ctx.arc(this.x, this.y, r, 0, G.TAU); ctx.fill();
@@ -145,7 +165,7 @@
         this.ex = this.ox + c * len; this.ey = this.oy + s * len;
         this.srcX = this.ox;
         if (this.firing && this.grounded && this.ex > 0 && this.ex < G.W) {
-          G.fx.burst(this.ex, this.ey, { n: 2, color: G.pal().hot, speed: [120, 420], angle: -Math.PI / 2, spread: 2.6, life: [0.15, 0.4], kind: 'spark', size: [2, 3.5], grav: 900 });
+          G.fx.burst(this.ex, this.ey, { n: 2, color: pal(this).hot, speed: [120, 420], angle: -Math.PI / 2, spread: 2.6, life: [0.15, 0.4], kind: 'spark', size: [2, 3.5], grav: 900 });
         }
         if (this.t >= this.tele + this.active + this.fade) this.dead = true;
       },
@@ -154,7 +174,7 @@
         return G.distPointSeg(P.x, P.y - 22, this.ox, this.oy, this.ex, this.ey) < this.width / 2 + 9;
       },
       draw(ctx) {
-        const P = G.pal();
+        const P = pal(this);
         ctx.lineCap = 'butt';
         ctx.globalCompositeOperation = 'lighter';
         if (this.t < this.tele) {
@@ -201,10 +221,10 @@
           if (this.onFire) this.onFire(this);
         }
         if (this.firing && this.style === 'tide' && Math.random() < 0.8) {
-          G.fx.spawn({ x: this.x + G.rand(0, this.w), y: G.FLOOR - G.rand(0, 20), vx: G.rand(-20, 20), vy: G.rand(-220, -80), life: G.rand(0.3, 0.7), size: G.rand(3, 7), color: G.pal().boss });
+          G.fx.spawn({ x: this.x + G.rand(0, this.w), y: G.FLOOR - G.rand(0, 20), vx: G.rand(-20, 20), vy: G.rand(-220, -80), life: G.rand(0.3, 0.7), size: G.rand(3, 7), color: pal(this).boss });
         }
         if (this.firing && this.style === 'column' && Math.random() < 0.5) {
-          G.fx.spawn({ x: this.x + G.rand(0, this.w), y: G.FLOOR - 4, vx: G.rand(-120, 120), vy: G.rand(-320, -80), life: G.rand(0.2, 0.5), size: G.rand(2, 3), color: G.pal().hot, kind: 'spark', grav: 800 });
+          G.fx.spawn({ x: this.x + G.rand(0, this.w), y: G.FLOOR - 4, vx: G.rand(-120, 120), vy: G.rand(-320, -80), life: G.rand(0.2, 0.5), size: G.rand(2, 3), color: pal(this).hot, kind: 'spark', grav: 800 });
         }
         if (this.t >= this.tele + this.active + this.fade) this.dead = true;
         this.srcX = this.x + this.w / 2;
@@ -214,7 +234,7 @@
         return G.rectsOverlap(P.box(), { cx: this.x + this.w / 2, cy: this.y + this.h / 2, hw: this.w / 2 - 5, hh: this.h / 2 - 2 });
       },
       draw(ctx) {
-        const P = G.pal();
+        const P = pal(this);
         const x = this.x, y = this.y, w = this.w, h = this.h;
         if (this.t < this.tele) {
           const k = this.t / this.tele;
@@ -262,7 +282,7 @@
         if (this.follow) this.follow(this);
         if (this.t >= this.tele && !this.fired) {
           this.fired = true;
-          const P = G.pal();
+          const P = pal(this);
           G.fx.ring(this.x, this.y, { r0: this.r * 0.3, r1: this.r * 1.25, life: 0.4, color: P.hot, width: 10 });
           G.fx.burst(this.x, this.y, { n: Math.min(60, 14 + this.r * 0.2), color: P.boss, speed: [this.r * 0.6, this.r * 2.4], life: [0.3, 0.8], size: [4, 10], jitter: this.r * 0.3 });
           G.fx.shake(Math.min(22, 6 + this.r * 0.04));
@@ -277,7 +297,7 @@
       draw(ctx) {
         if (this.fired) {
           ctx.globalCompositeOperation = 'lighter';
-          ctx.fillStyle = G.rgba(G.pal().hot, 0.75);
+          ctx.fillStyle = G.rgba(pal(this).hot, 0.75);
           ctx.beginPath(); ctx.arc(this.x, this.y, this.r, 0, G.TAU); ctx.fill();
           ctx.globalCompositeOperation = 'source-over';
           return;
@@ -314,7 +334,7 @@
         return Math.abs(d - this.r) < this.thick / 2 + 8;
       },
       draw(ctx) {
-        const P = G.pal();
+        const P = pal(this);
         const a = Math.min(1, (this.maxR - this.r) / 200);
         ctx.save();
         ctx.beginPath(); ctx.rect(-80, -400, G.W + 160, G.FLOOR + 400); ctx.clip();
@@ -342,11 +362,11 @@
         }
         if (this.t >= this.tele) {
           this.oy += this.fallSpeed * dt;
-          G.fx.spawn({ x: this.x + G.rand(-5, 5), y: this.oy, vx: G.rand(-20, 20), vy: -80, life: 0.25, size: 7, color: G.pal().boss });
+          G.fx.spawn({ x: this.x + G.rand(-5, 5), y: this.oy, vx: G.rand(-20, 20), vy: -80, life: 0.25, size: 7, color: pal(this).boss });
           if (this.oy >= G.FLOOR - 12) {
             this.oy = G.FLOOR - 12;
             this.boomT = 0.08;
-            const P = G.pal();
+            const P = pal(this);
             G.fx.ring(this.x, G.FLOOR - 6, { r0: 10, r1: this.blastR * 1.3, life: 0.3, color: P.hot, width: 6 });
             G.fx.burst(this.x, G.FLOOR - 8, { n: 14, color: P.boss, speed: [80, 380], angle: -Math.PI / 2, spread: 2.8, life: [0.25, 0.6], size: [3, 8] });
             G.fx.burst(this.x, G.FLOOR - 4, { n: 5, color: '20,16,30', speed: [100, 380], angle: -Math.PI / 2, spread: 2, life: [0.5, 1], size: [4, 8], kind: 'chunk', grav: 1500 });
@@ -362,7 +382,7 @@
         return false;
       },
       draw(ctx) {
-        const P = G.pal();
+        const P = pal(this);
         const total = this.tele + (G.FLOOR + 28) / this.fallSpeed;
         const k = Math.min(1, this.t / total);
         if (this.boomT <= 0) {
@@ -415,6 +435,128 @@
           ctx.stroke();
         }
         ctx.restore();
+      },
+    }, o));
+  };
+
+  // ------------------------------------------------------------ melee swing (a slice of a circle)
+  // o: x, y, r, r0 (inner radius), a0 -> a1 (the sweep, canvas angles), tele, active, follow(h, dt), onFire(h)
+  H.arc = function (o) {
+    return H.add(Object.assign({
+      kind: 'arc', r: 150, r0: 0, a0: -1, a1: 1, tele: 0.5, active: 0.12, fade: 0.2, fired: false,
+      get firing() { return this.t >= this.tele && this.t < this.tele + this.active; },
+      update(dt) {
+        if (this.follow) this.follow(this, dt);
+        if (this.t >= this.tele && !this.fired) { this.fired = true; if (this.onFire) this.onFire(this); }
+        if (this.t >= this.tele + this.active + this.fade) this.dead = true;
+        this.srcX = this.x;
+      },
+      hits(P) {
+        if (!this.firing) return false;
+        const lo = Math.min(this.a0, this.a1), span = Math.abs(this.a1 - this.a0);
+        for (const py of [P.y - 21, P.y - 39, P.y - 3]) {
+          const dx = P.x - this.x, dy = py - this.y, d = Math.hypot(dx, dy);
+          if (d > this.r + 6 || d < this.r0 - 6) continue;
+          const a = ((Math.atan2(dy, dx) - lo) % G.TAU + G.TAU) % G.TAU;
+          if (a <= span) return true;
+        }
+        return false;
+      },
+      path(ctx, r) {
+        const lo = Math.min(this.a0, this.a1), hi = Math.max(this.a0, this.a1);
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, r, lo, hi);
+        if (this.r0 > 0) ctx.arc(this.x, this.y, Math.min(this.r0, r), hi, lo, true);
+        else ctx.lineTo(this.x, this.y);
+        ctx.closePath();
+      },
+      draw(ctx) {
+        const P = pal(this);
+        ctx.save();
+        ctx.beginPath(); ctx.rect(-80, -400, G.W + 160, G.FLOOR + 400); ctx.clip();
+        if (this.t < this.tele) {
+          const k = this.t / this.tele;
+          const late = k > 0.75 ? 0.5 + 0.5 * Math.sin(this.t * 55) : 0;
+          ctx.fillStyle = G.rgba(DANGER, 0.07 + 0.07 * k + 0.1 * late);
+          this.path(ctx, this.r); ctx.fill();
+          ctx.fillStyle = G.rgba(DANGER, 0.2);
+          this.path(ctx, Math.max(this.r0, this.r * k)); ctx.fill();
+          ctx.strokeStyle = G.rgba(DANGER, 0.5 + 0.4 * k); ctx.lineWidth = 2;
+          this.path(ctx, this.r); ctx.stroke();
+        } else {
+          // the cut itself: a bright crescent that sweeps from a0 to a1 and fades
+          const e = this.t - this.tele;
+          const k = Math.min(1, e / Math.max(0.01, this.active));
+          const f = e < this.active ? 1 : Math.max(0, 1 - (e - this.active) / this.fade);
+          const N = 18, a0 = this.a0, a1 = G.lerp(this.a0, this.a1, G.ease.outCubic(k));
+          const rm = (this.r + Math.max(this.r0, this.r * 0.45)) / 2, w = this.r - Math.max(this.r0, this.r * 0.45);
+          ctx.globalCompositeOperation = 'lighter';
+          for (const [col, ws, al] of [[P.boss, 1, 0.55], [P.hot, 0.5, 0.95]]) {
+            ctx.fillStyle = G.rgba(col, al * f);
+            ctx.beginPath();
+            for (let i = 0; i <= N; i++) {
+              const q = i / N, a = G.lerp(a0, a1, q), hw = w * ws * 0.5 * Math.pow(Math.sin(Math.PI * q), 0.6) * (0.3 + 0.7 * q);
+              const x = this.x + Math.cos(a) * (rm + w * 0.25 + hw), y = this.y + Math.sin(a) * (rm + w * 0.25 + hw);
+              if (i) ctx.lineTo(x, y); else ctx.moveTo(x, y);
+            }
+            for (let i = N; i >= 0; i--) {
+              const q = i / N, a = G.lerp(a0, a1, q), hw = w * ws * 0.5 * Math.pow(Math.sin(Math.PI * q), 0.6) * (0.3 + 0.7 * q);
+              ctx.lineTo(this.x + Math.cos(a) * (rm + w * 0.25 - hw), this.y + Math.sin(a) * (rm + w * 0.25 - hw));
+            }
+            ctx.closePath(); ctx.fill();
+          }
+        }
+        ctx.restore();
+      },
+    }, o));
+  };
+
+  // ------------------------------------------------------------ lingering pool on the floor
+  // o: x (centre), w, tele (it forms), active (it lasts). Hurts anyone standing in it; jump over or stay off.
+  H.pool = function (o) {
+    return H.add(Object.assign({
+      kind: 'pool', w: 150, hgt: 26, tele: 0.8, active: 5, fade: 0.4, layer: 'under',
+      get firing() { return this.t >= this.tele && this.t < this.tele + this.active; },
+      update() {
+        this.srcX = this.x;
+        if (this.firing && Math.random() < 0.35) {
+          G.fx.spawn({ x: this.x + G.rand(-this.w / 2, this.w / 2), y: G.FLOOR - 2, vx: G.rand(-10, 10), vy: G.rand(-90, -30), life: G.rand(0.3, 0.8), size: G.rand(2, 5), color: pal(this).boss });
+        }
+        if (this.t >= this.tele + this.active + this.fade) this.dead = true;
+      },
+      hits(P) {
+        if (!this.firing) return false;
+        return P.y > G.FLOOR - this.hgt && Math.abs(P.x - this.x) < this.w / 2 - 6;
+      },
+      draw(ctx) {
+        const P = pal(this), x = this.x, w = this.w, F = G.FLOOR;
+        if (this.t < this.tele) {
+          const k = this.t / this.tele;
+          ctx.fillStyle = G.rgba(DANGER, 0.12 + 0.12 * k);
+          ctx.beginPath(); ctx.ellipse(x, F - 1, w / 2, 9, 0, 0, G.TAU); ctx.fill();
+          ctx.fillStyle = G.rgba(DANGER, 0.3);
+          ctx.beginPath(); ctx.ellipse(x, F - 1, w / 2 * k, 9 * k, 0, 0, G.TAU); ctx.fill();
+          ctx.strokeStyle = G.rgba(DANGER, 0.55 + 0.4 * k); ctx.lineWidth = 2;
+          ctx.beginPath(); ctx.ellipse(x, F - 1, w / 2, 9, 0, 0, G.TAU); ctx.stroke();
+          return;
+        }
+        const left = this.tele + this.active - this.t;
+        const f = left > 0 ? Math.min(1, (this.t - this.tele) / 0.15) : Math.max(0, 1 + left / this.fade);
+        const warn = left > 0 && left < 0.8 ? 0.6 + 0.4 * Math.sin(this.t * 30) : 1; // flickers before it goes out
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.fillStyle = G.rgba(DANGER, 0.5 * f * warn);
+        ctx.beginPath(); ctx.moveTo(x - w / 2, F);
+        for (let px = -w / 2; px <= w / 2; px += 10) {
+          const edge = Math.sin(Math.PI * (px + w / 2) / w);
+          const n = 0.6 + 0.4 * Math.sin(px * 0.21 + this.t * 8) * Math.sin(px * 0.07 - this.t * 5);
+          ctx.lineTo(x + px, F - this.hgt * f * edge * n);
+        }
+        ctx.lineTo(x + w / 2, F); ctx.closePath(); ctx.fill();
+        ctx.fillStyle = G.rgba(P.boss, 0.55 * f * warn);
+        ctx.beginPath(); ctx.ellipse(x, F - 1, w / 2, 7, 0, 0, G.TAU); ctx.fill();
+        ctx.fillStyle = G.rgba(P.hot, 0.5 * f * warn);
+        ctx.beginPath(); ctx.ellipse(x, F - 1, w / 2 * 0.7, 3.5, 0, 0, G.TAU); ctx.fill();
+        ctx.globalCompositeOperation = 'source-over';
       },
     }, o));
   };

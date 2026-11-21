@@ -1,11 +1,11 @@
 # Solfall
 
-A side-on boss fight for the browser: three heroes, one three-phase boss, played as a run of
+A side-on boss rush for the browser: three heroes, four three-phase bosses, played as a run of
 ever-harder trials. You pick a hero and a relic before the run and win a boon after each victory.
-Version 0.4a.
+Version 0.5a.
 
-This is the first playable slice of a planned boss-rush roguelite (short runs, a boon after each
-boss, bosses drawn from a pool). There is one boss so far, so a run fights it again and again.
+This is an early slice of a planned boss-rush roguelite (short runs, a boon after each boss,
+bosses drawn from a pool). A run meets the four bosses in a shuffled order, then meets them again, harder.
 
 ## Play
 
@@ -60,9 +60,12 @@ Heroes are defined in `G.HEROES` in `js/run.js` (numbers, colours, text); the we
 ## The run
 
 - A run starts by choosing a **hero**, then **one of three relics** drawn from nine. The relic lasts the whole run.
-- Beating the Warden offers **three boons; you keep one** and go straight into the next trial.
-- Each trial after the first gives the Warden 15% more health, 4% shorter warnings and 6% less rest.
-  From trial IV it also uses its Merciless patterns.
+- Each trial is one boss. The four come in a shuffled order, and when all are beaten the order is
+  shuffled again. **First foe** on the title screen fixes who comes first (handy for practising one boss).
+- Beating a boss offers **three boons; you keep one** and go straight into the next trial. The victory
+  screen names the boss that is next.
+- Each trial after the first gives the boss 15% more health, 4% shorter warnings and 6% less rest.
+  From trial V (the second time round) the bosses also use their Merciless patterns.
 - Health is restored between trials. Falling ends the run; the title screen shows the deepest trial reached.
 
 | Relic | Effect |
@@ -99,9 +102,16 @@ Heroes are defined in `G.HEROES` in `js/run.js` (numbers, colours, text); the we
 
 Relics and boons are defined in `G.RELICS` and `G.BOONS` in `js/run.js`; their effects are applied in `js/player.js` and `js/boss.js` (search for `G.relic(` and `G.boon(`).
 
-## The boss: The Eclipsed Warden
+## The bosses
 
-Every warning is drawn in the same red-orange. It fills up, flashes, then fires.
+Every warning, for every boss, is drawn in the same red-orange. It fills up, flashes, then fires.
+A marked patch of floor means step off it; a lane with arrows means something will cross at that height;
+a line means a cut or a beam along it; a slice of a circle means a weapon will swing through it.
+
+All four have three phases (at two thirds and one third health) and a stagger bar: hits fill it, and
+when it is full the boss is helpless for a few seconds and takes 40% more damage.
+
+### The Eclipsed Warden
 
 | Phase | Attack | The simple answer |
 |---|---|---|
@@ -140,6 +150,68 @@ of its own attack that attack is cut short. Hands are made whole at each new pha
 
 **Resting on a platform** for more than a couple of seconds in phase II brings the Swat.
 
+### The Threefold Magus
+
+A floating caster that blinks away from you before most spells and stands still while casting, which is
+when to reach it. Its platforms are up from the start. Ice is blue, fire orange, lightning violet.
+
+| Phase | Spell | The simple answer |
+|---|---|---|
+| I | Shards (ice): shards over its head aim and fire one after another | keep moving; from far away, jump the shallow ones |
+| | Rime (ice): spikes run along the floor away from it | jump as the ripple reaches you |
+| | Fireball: a slow ball that leans after you and bursts where it lands | get away from where it comes down |
+| | Bolts (lightning): strike after strike on marked columns, the last as three | step out of each column |
+| | Spheres (lightning): bouncing balls that last six seconds | cut them down, or keep clear |
+| II Confluence | Wall of flame: a low wall crosses the floor | stand on a platform, or dash through it |
+| | Crystals: two crystals that burst into rings when their timers empty | break them first (they give Starlight and fill the stagger bar) |
+| | Storm cloud: a cloud trails you and strikes below itself four times, while other spells go on | keep out from under it |
+| | Fireballs now leave burning ground | stay off it for three seconds |
+| III Trinity | Every spell ends with one more from another element: a single strike or shard | watch for it as the spell finishes |
+| | Blizzard: wind pushes you towards a wall while icicles fall | push against the wind, step off the markers |
+| | Cataclysm, once, below 12% health: rime from the centre, a great blast in the middle, three volleys of lightning | jump, run to an edge, change lanes; afterwards it lies spent |
+
+### The Silent Veil
+
+A hooded assassin that vanishes and reappears. It is fast and fragile, and every attack leaves it open
+for a moment afterwards.
+
+| Phase | Attack | The simple answer |
+|---|---|---|
+| I | Lunge: it crouches, a lane lights, it crosses the floor | jump it, or dash through for a perfect dodge |
+| | Flurry: it runs in and cuts three times, stepping forward | back out of reach, or dash past it |
+| | Knives: it springs back and throws a fan along dashed lines | jump the fan, dash through, or cut a knife down |
+| | Ambush: it vanishes, a column follows you, it drops | step out; its blade sticks in the floor and it takes 30% more damage |
+| | Backstab: it vanishes and reappears behind you | dash away as the cut is marked |
+| II Shadows | Pincer: a lunge, and a shadow lunging the other way | jump both |
+| | Mirror: three figures lunge one after another, the last along the platforms | jump, jump, stay down. A shadow dies to one hit |
+| | Knife rain: it hangs overhead and throws fans downward | stand between the lines |
+| | Cross: two diagonal cuts through where you stand | step aside |
+| III Execution | Cuts: seven lines, each through where you are when it is drawn | step off each; jump the flat ones. Then it kneels, spent |
+| | Mark: a circle closes on you and everything inside is cut | dash as it shuts |
+
+### The Unburied Knight
+
+A death knight with a greatsword. Slow and very wide: its swings cover everything in front of and above
+it, and nothing behind it. **Hits on its back deal 30% more.**
+
+| Phase | Attack | The simple answer |
+|---|---|---|
+| I The Oath | Cleave: a huge swing in front | dash through it to its back, or back right off |
+| | Overhead: it strides after you with the blade up, then brings it down (2 damage, two waves) | leave the column, jump the wave, hit it while the sword is stuck |
+| | Charge: wall to wall, too tall for one jump | dash through it or jump twice; the wall stuns it |
+| | Grip: it drags you in with a cleave already coming | dash past it before the blade lands |
+| | Graves: spikes erupt where you stand, one after another | keep walking |
+| II The Host | Wraiths: skulls that drift after you | cut them down |
+| | Desecrate: patches of ground rot for five seconds | fight on what is left |
+| | Whirl: it spins towards you for a couple of seconds | run, take a platform, or jump twice over it; then it is dizzy |
+| | Rend: waves from the blade, low and high in turn | jump the low one, stay on the ground for the high one |
+| III Blood Oath | Leap: it comes down on you (2 damage) | get out of the circle; it is stuck afterwards |
+| | Reap: cleave, back-cut, overhead | stay behind it |
+
+Each of these three is one file (`js/mage.js`, `js/assassin.js`, `js/knight.js`) built on the shared frame in
+`js/bosskit.js`: health, phases, stagger and attack selection live there, and the boss file supplies its
+attacks (one generator function each), movement and drawing.
+
 ## Difficulty
 
 | | Health | Boss health | Warnings | Rest between attacks |
@@ -158,14 +230,17 @@ of its own attack that attack is cut short. Hands are made whole at each new pha
 | `js/input.js` | keyboard, mouse and gamepad mapped to actions |
 | `js/audio.js` | every sound and the music, synthesised in code (no audio files) |
 | `js/fx.js` | particles, screen shake, flashes, hit-freeze, slow motion |
-| `js/arena.js` | backdrops for each phase, platforms |
-| `js/hazards.js` | beams, waves, orbs, zones, rings, meteors and their warnings |
+| `js/draw.js` | drawing helpers shared by heroes and bosses: tapered limbs, joints, cloth |
+| `js/arena.js` | palettes and skylines for each boss and phase (`G.THEMES`), platforms |
+| `js/hazards.js` | beams, waves, orbs, zones, rings, meteors, weapon swings, pools and their warnings |
 | `js/player.js` | the hero: shared movement plus each hero's weapon and special; shared numbers are in `G.PLAYER` |
-| `js/boss.js` | the boss; each attack is one generator function, attack pools are in `BAGS` |
+| `js/boss.js` | the Warden; each attack is one generator function, attack pools are in `BAGS` |
+| `js/bosskit.js` | the frame the other bosses share (`G.makeBoss`), and `G.setBoss` |
+| `js/mage.js`, `js/assassin.js`, `js/knight.js` | the Magus, the Veil and the Knight |
 | `js/ui.js` | menus, health bars, result screens |
 | `js/game.js` | main loop, game states, draw order |
 
-Most-used tuning numbers: `B.BASE_HP` and `B.poiseMax` in `boss.js`, `G.PLAYER` in `player.js`,
+Most-used tuning numbers: `BASE_HP`, `poise0` and `gaps` at the top of each boss file, `G.PLAYER` in `player.js`,
 `G.DIFFS` in `util.js`. Bump `G.VERSION` in `util.js` for each build; it shows on the title screen.
 
 ## Testing without playing
@@ -173,14 +248,20 @@ Most-used tuning numbers: `B.BASE_HP` and `B.poiseMax` in `boss.js`, `G.PLAYER` 
 Open the browser console on the running game.
 
 - **Dodge tests:** `fetch('/tools/dodge-tests.js').then(r => r.text()).then(t => console.log((0, eval)(t)))`
-  runs each attack against a simple scripted player and reports health lost. There are 32 tests. As of
-  v0.4a all pass for every hero on five of six seeds; on seed 3 the scripted Lune walks into a second
-  ember in the rain. Set `window.TEST_HERO = 'aster'` (or `'lune'`) to test another hero and
-  `window.TEST_SEED = 2` for a different, repeatable set of boss choices.
-  Run it after changing any attack.
+  runs each of the Warden's attacks against a simple scripted player and reports health lost. There are
+  32 tests and all lose 0 as of v0.5a. Set `window.TEST_HERO = 'aster'` (or `'lune'`) to test another hero
+  and `window.TEST_SEED = 2` for a different, repeatable set of boss choices.
+- **Tests for the other three bosses:** `fetch('/tools/boss-tests.js').then(r => r.text()).then(t => console.log((0, eval)(t)))`
+  runs every attack of the Magus, the Veil and the Knight in every phase that uses it (134 runs) against one
+  scripted player that follows plain rules: step off marked ground, jump low things, leave a swing's reach,
+  dash when there is no time to walk. As of v0.5a it loses 0 health as Vesper on seed 1. Across three
+  heroes and three seeds it loses between 0 and 6 in 134 runs, in the Veil's Cuts, the Knight's Whirl and,
+  as Lune, things it should cut down but cannot aim at. `window.TEST_BOSSES = ['knight']` limits it to one boss.
+  Run the matching test after changing any attack.
 - `G.debug.god = true` makes the hero invulnerable. `G.debug.boxes = true` (or `?boxes` in the address)
   draws every hitbox.
-- `G.debug.forceAttack = 'wheel'` repeats one attack (names are the keys of `ATTACKS` in `boss.js`;
+- `G.debug.boss = 'knight'` makes every fight that boss (`'warden'`, `'mage'`, `'assassin'`, `'knight'`; `''` to stop).
+- `G.debug.forceAttack = 'wheel'` repeats one attack (names are the keys of `G.boss.ATTACKS`;
   use one that belongs to the current phase). `G.debug.nextPhase()` skips to the next phase.
 - `G.debug.sim(10, { random: true })` runs ten simulated seconds with random inputs, to shake out errors.
 - `G.debug.give('keen')` adds a boon by id; it takes effect in the next fight (`G.startFight()`).
@@ -189,10 +270,15 @@ Open the browser console on the running game.
 
 - **Sound and music have not been heard by anyone.** They are generated in code and run without errors,
   but the mix and the music are untested by ear. Volume sliders are in Settings.
-- **No person has played a run through.** Timings were tuned with scripted players: an invulnerable,
-  always-attacking one beats the first trial on Standard (5,400 boss health) in 70 s as Vesper and 75 s as
-  Aster. Lune takes 129 s firing from the ground, 135 s firing on the move and 97 s at point-blank range
-  (v0.3b; she was 89 s from the ground before a player reported her as too strong). A real first trial
-  should be about 3 to 4 minutes.
-  Hero balance, relic and boon strength and the per-trial scaling are first guesses.
+- **No person has fought the Magus, the Veil or the Knight** (new in v0.5a). Their attacks were checked
+  with scripted players and by looking at captured frames, not by playing. Whether they are fun, readable
+  at speed and the right length is unknown.
+- **Timings were tuned with scripted players.** For the Warden, an invulnerable, always-attacking player
+  wins the first trial on Standard in 67 s as Vesper and 74 s as Aster; Lune takes 129 s firing from the
+  ground and 97 s at point-blank range. A cruder chasing player of the same kind beats the Magus (3,900
+  health) in 88 s as Vesper and 76 s as Aster, the Veil (3,000) in 76 s and 61 s, and the Knight (4,300) in
+  68 s and 64 s. A real fight should be about 3 to 4 minutes.
+  Boss health, hero balance, relic and boon strength and the per-trial scaling are first guesses.
+- **Fastest first trial** on the title screen compares times against whichever boss came first, so it is
+  only a fair record when First foe is set to one boss.
 - **Gamepad support is untested** (no pad was available).

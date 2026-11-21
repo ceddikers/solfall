@@ -2,7 +2,7 @@
 // trial scales the Warden. Heroes, relics and boons are all defined here as plain data.
 'use strict';
 (function () {
-  const R = G.run = { trial: 1, hero: 'vesper', relic: null, boons: {}, order: [], offer: [], relicOffer: [], phoenixUsed: false };
+  const R = G.run = { trial: 1, hero: 'vesper', relic: null, boons: {}, order: [], offer: [], relicOffer: [], phoenixUsed: false, foes: [] };
 
   // ------------------------------------------------------------------ heroes
   // combo: three steps of { dmg, cd (time to the next swing), dur, wind (wind-up), act (active time) }.
@@ -58,7 +58,7 @@
     { id: 'shard', name: 'Comet Shard', desc: 'Finishers deal 50% more damage.' },
     { id: 'moons', name: 'Twin Moons', desc: 'One more Starlight segment, and every trial starts with Starlight full.' },
     { id: 'crown', name: 'Thorn Crown', desc: 'All damage +40%, but 2 less health.' },
-    { id: 'ward', name: 'Wardstone', desc: 'The first hit you take in each of the Warden\'s phases is blocked.' },
+    { id: 'ward', name: 'Wardstone', desc: 'The first hit you take in each phase of a fight is blocked.' },
     { id: 'cloak', name: 'Feather Cloak', desc: 'One more jump in the air, and you move 12% faster.' },
     { id: 'storm', name: 'Stormcaller', desc: 'Every fifth hit calls lightning onto the target for 30 damage.' },
     { id: 'phoenix', name: 'Phoenix Feather', desc: 'Once per run, a killing blow leaves you on 3 health instead.' },
@@ -74,7 +74,7 @@
   G.BOONS = [
     { id: 'wind', name: 'Third Wind', tag: 'Movement', max: 2, desc: 'One more jump in the air.' },
     { id: 'twin', name: 'Twin Dash', tag: 'Movement', max: 1, desc: 'A second dash before landing, and dashes recover 30% faster.' },
-    { id: 'comet', name: 'Comet Step', tag: 'Movement', max: 2, desc: 'Dashing through the Warden cuts it for 24 damage.' },
+    { id: 'comet', name: 'Comet Step', tag: 'Movement', max: 2, desc: 'Dashing through a boss cuts it for 24 damage.' },
     { id: 'reach', name: 'Long Reach', tag: 'Weapon', max: 2, desc: 'Weapon reach +30%.' },
     { id: 'keen', name: 'Keen Edge', tag: 'Weapon', max: 3, desc: 'Weapon damage +25%.' },
     { id: 'quick', name: 'Quick Hands', tag: 'Weapon', max: 2, desc: 'Attack 18% faster.' },
@@ -85,7 +85,7 @@
     { id: 'aftershock', name: 'Aftershock', tag: 'Starlight', max: 1, heroes: ['aster'], desc: 'Starfall strikes a second time at half strength.' },
     { id: 'quiver', name: 'Full Quiver', tag: 'Starlight', max: 1, heroes: ['lune'], desc: 'Moon Volley fires eight arrows instead of five.' },
     { id: 'swift', name: 'Swift Mend', tag: 'Starlight', max: 1, desc: 'Mending takes half as long.' },
-    { id: 'mirror', name: 'Mirror Step', tag: 'Starlight', max: 1, heroes: ['vesper', 'lune'], desc: 'A perfect dodge fires a free shot at the core.' },
+    { id: 'mirror', name: 'Mirror Step', tag: 'Starlight', max: 1, heroes: ['vesper', 'lune'], desc: 'A perfect dodge fires a free shot at the boss.' },
     { id: 'heart', name: 'Steady Heart', tag: 'Survival', max: 3, desc: 'One more health.' },
     { id: 'dawn', name: 'Second Dawn', tag: 'Survival', max: 1, desc: 'Once per trial, a killing blow leaves you on 1 health.' },
     { id: 'glass', name: 'Glass Star', tag: 'Risk', max: 1, desc: 'All damage +35%, but one less health.' },
@@ -108,6 +108,22 @@
   R.reset = function () {
     R.trial = 1; R.boons = {}; R.order = []; R.offer = []; R.relic = null; R.relicOffer = []; R.phoenixUsed = false;
     R.hero = heroById[G.settings.hero] ? G.settings.hero : 'vesper';
+    R.foes = [];
+  };
+
+  // Which boss each trial holds. Every lap of the run meets all of them once, in a shuffled order;
+  // the First foe setting fixes who comes first.
+  R.foe = function (trial) {
+    const ids = G.BOSS_IDS, n = trial || R.trial;
+    while (R.foes.length < n) {
+      let lap = ids.slice();
+      for (let i = lap.length - 1; i > 0; i--) { const j = (Math.random() * (i + 1)) | 0; [lap[i], lap[j]] = [lap[j], lap[i]]; }
+      const want = G.settings.firstFoe;
+      if (!R.foes.length && ids.includes(want)) lap = [want].concat(lap.filter((x) => x !== want));
+      else if (R.foes.length && lap[0] === R.foes[R.foes.length - 1]) lap.push(lap.shift());
+      R.foes = R.foes.concat(lap);
+    }
+    return R.foes[n - 1];
   };
 
   // Health before boons, for deciding whether a health-costing pick may be offered.
@@ -154,6 +170,6 @@
       pace: Math.max(0.55, b.pace * (1 - 0.06 * n)),
     });
   };
-  // From the fourth trial the Warden also uses its Merciless patterns (extra hits in several attacks).
-  G.fierce = () => G.settings.difficulty === 2 || R.trial >= 4;
+  // From the fifth trial (the second lap of the bosses) they also use their Merciless patterns.
+  G.fierce = () => G.settings.difficulty === 2 || R.trial >= 5;
 })();

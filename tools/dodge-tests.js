@@ -5,8 +5,10 @@
 //   fetch('/tools/dodge-tests.js').then(r => r.text()).then(t => console.log((0, eval)(t)))
 // A test that loses 0 health means the simple answer to that attack still works.
 (() => {
-  const I = G.input, P = G.player, B = G.boss, D = 1 / 120;
+  // these are the Warden's tests; the other bosses have tools/boss-tests.js
+  const I = G.input, P = G.player, B = G.setBoss('warden'), D = 1 / 120;
   G.debug.freeze = true;
+  G.debug.boss = 'warden';
   if (!P._orig) {
     P._orig = P.tryHit;
     P.tryHit = function (dmg, sx, src) {
@@ -278,6 +280,7 @@
   }));
 
   G.debug.forceAttack = '';
+  G.debug.boss = '';
   G.debug.freeze = false;
   for (const a in I.down) I.down[a] = false;
   G.toTitle();

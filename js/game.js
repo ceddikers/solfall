@@ -11,7 +11,7 @@
   G.time = 0;          // fight timer
   G.hitstop = 0; G.slowT = 0; G.slowScale = 1;
   G.deadT = 0; G.wonT = 0; G.endShown = false;
-  G.debug = { god: false, boxes: false, forceAttack: '', freeze: false };
+  G.debug = { god: false, boxes: false, forceAttack: '', freeze: false, boss: '' }; // boss: fight this one whatever the run says
   G.cam = { x: 0, y: 0 }; // small view offset that follows the hero
 
   G.canHurt = () => G.state === 'fight' && !G.player.dead && !G.boss.dying && !G.boss.dead;
@@ -56,6 +56,7 @@
 
   G.startFight = function () {
     G.seed((Date.now() ^ (Math.random() * 1e9)) >>> 0);
+    G.setBoss(G.debug.boss || G.run.foe());
     G.arena.reset(); G.hazards.clear(); F.reset();
     G.player.reset(); G.boss.reset(); G.boss.intro();
     G.state = 'fight'; G.paused = false;
@@ -68,6 +69,7 @@
 
   G.toTitle = function () {
     G.run.reset();
+    G.setBoss('warden');
     G.arena.reset(); G.hazards.clear(); F.reset();
     G.player.reset(); G.player.hidden = true;
     G.boss.attract();
@@ -176,9 +178,11 @@
     G.arena.drawBack(ctx);
     G.boss.drawGround(ctx);
     G.player.drawShadow(ctx);
-    G.boss.draw(ctx);
+    // the Warden looms behind the platforms; the duelling bosses stand among them
+    if (!G.boss.kit) G.boss.draw(ctx);
     G.hazards.draw(ctx, 'under');
     G.arena.drawPlatforms(ctx);
+    if (G.boss.kit) G.boss.draw(ctx);
     G.drawShots(ctx);
     G.player.draw(ctx);
     G.hazards.draw(ctx, 'over');

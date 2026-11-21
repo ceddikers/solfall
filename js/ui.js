@@ -10,6 +10,7 @@
     shake: { values: [0, 0.5, 1], label: (v) => (v === 0 ? 'Off' : v === 0.5 ? 'Half' : 'Full') },
     numbers: { values: [false, true], label: (v) => (v ? 'On' : 'Off') },
     hints: { values: [false, true], label: (v) => (v ? 'On' : 'Off') },
+    firstFoe: { values: ['random', 'warden', 'mage', 'assassin', 'knight'], label: (v) => (G.bosses[v] ? G.bosses[v].short : 'Random') },
     music: { slider: true },
     sfx: { slider: true },
   };
@@ -18,17 +19,14 @@
     '5 health. The fight as intended.',
     '4 health. Shorter warnings, less rest, extra attacks.',
   ];
+  // Shown after a defeat: these hold for every boss; each boss adds its own (B.tips).
   const TIPS = [
     'A dash passes straight through any attack. Use it late, not early.',
-    'Slash downward in the air to bounce off a hand and stay above the shockwaves.',
     'Keep one segment of Starlight in reserve for mending.',
-    'The hands are stuck after a slam, a clap or a rocket punch. Three slashes fit in that window.',
-    'A Star Lance aimed upward reaches the core from the ground. Hold up and fire.',
-    'When the floor burns, the platforms are safe.',
-    'Filling the stagger bar drops the core to the floor, where every hit counts for more.',
-    'Falling orbs can be cut out of the air, and each one gives a little Starlight.',
+    'Orbs, knives, skulls and spheres can be cut out of the air, and each one gives a little Starlight.',
+    'Filling the stagger bar drops a boss to its knees, where every hit counts for more.',
+    'Red-orange always means danger: a marked patch of ground, a line, a lane. Read it before you move.',
   ];
-  const PHASE_COLS = [null, ['#ff8a3c', '#ffd07a'], ['#ff3c5a', '#ffa2ac'], ['#b6a6ff', '#ffffff']];
   const ROMAN = ['', 'I', 'II', 'III'];
 
   U.fmtTime = function (t) {
@@ -44,6 +42,7 @@
       'deadTip', 'winStats', 'winBest', 'gradeLetter', 'gradeTitle', 'gradeSub', 'stage']) el[id] = $(id);
     el.segs = Array.from(document.querySelectorAll('#ember .seg'));
     el.bbar = document.querySelector('.bbar');
+    el.bname = document.getElementById('bname');
     el.pbar = document.querySelector('.pbar');
     el.phases = Array.from(el.bphase.children);
     el.ver.textContent = 'v' + G.VERSION;
@@ -258,6 +257,7 @@
 
   U.bossIntro = function () {
     H.introK = 0; H.introDelay = 1.3; H.chip = 0; H.fill = -1; H.phase = 0; H.lastHp = G.boss.maxHp;
+    el.bname.textContent = G.boss.name + ' ';
     el.bfill.style.width = '0%'; el.bchip.style.width = '0%';
   };
 
@@ -374,7 +374,7 @@
     if (cs !== H.chipShown) { H.chipShown = cs; el.bchip.style.width = cs + '%'; }
     if (B.phase !== H.phase) {
       H.phase = B.phase;
-      const cols = PHASE_COLS[B.phase];
+      const cols = B.hudCols[B.phase];
       el.stage.style.setProperty('--bcol1', cols[0]);
       el.stage.style.setProperty('--bcol2', cols[1]);
       el.phases.forEach((b, i) => {
@@ -398,7 +398,7 @@
   U.showDead = function () {
     const P = G.player, B = G.boss;
     const pct = Math.max(1, Math.ceil(B.hp / B.maxHp * 100));
-    el.deadLead.textContent = 'You fell in trial ' + G.roman(G.run.trial) + '. The Warden endured with ' + pct + '% of its strength, in phase ' + ROMAN[B.phase] + '.';
+    el.deadLead.textContent = 'You fell in trial ' + G.roman(G.run.trial) + '. ' + B.short + ' endured with ' + pct + '% of its strength, in phase ' + ROMAN[B.phase] + '.';
     el.deadFill.style.transition = 'none';
     el.deadFill.style.width = '100%';
     void el.deadFill.offsetWidth;
@@ -410,7 +410,7 @@
       [P.stats.perfect, 'Perfect dodges'],
       [G.run.order.length, 'Boons held'],
     ]);
-    el.deadTip.textContent = G.pick(TIPS);
+    el.deadTip.textContent = G.pick(TIPS.concat(B.tips || [], B.tips || []));
     U.hud(false);
     U.lockUntil = performance.now() + 500;
     U.show('dead');
@@ -430,7 +430,8 @@
     el.winOver.textContent = 'Victory \u00b7 trial ' + G.roman(res.trial);
     el.winBest.textContent = res.newBest ? 'New fastest first trial on ' + G.diff().name + '.'
       : res.newDepth ? 'Your deepest trial yet on ' + G.diff().name + '.' : '';
-    el.winPick.textContent = 'Choose a boon to carry into trial ' + G.roman(res.trial + 1);
+    const next = G.bosses[G.run.foe(res.trial + 1)];
+    el.winPick.textContent = 'Choose a boon to carry into trial ' + G.roman(res.trial + 1) + ', against ' + next.short;
     const cards = Array.from(el.winCards.children);
     cards.forEach((c, i) => {
       const b = res.offer[i];
