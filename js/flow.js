@@ -98,7 +98,7 @@
   }
 
   FL.tryUlt = function () {
-    if (P.ulting || P.dead || G.state !== 'fight') return false;
+    if (P.ulting || P.dead || (G.state !== 'fight' && G.state !== 'hub')) return false;
     const t = main();
     if (P.ult < 100 || !t) { G.audio.play('empty'); return false; }
     const H = P.hero;

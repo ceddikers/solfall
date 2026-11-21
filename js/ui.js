@@ -97,6 +97,8 @@
   U.back = function () {
     const prev = U.stack.pop();
     if (prev) { U.show(prev, false); G.audio.play('uiBack'); }
+    // a screen opened from the camp closes back onto it
+    else if (G.state === 'hub' && U.current) { U.close(); G.audio.play('uiBack'); G.input.endStep(); }
   };
 
   function setOpt(opt, v) {
@@ -120,13 +122,13 @@
   }
   function act(name) {
     G.audio.play(name === 'back' ? 'uiBack' : 'uiSelect');
-    if (name === 'begin') G.chooseHero();
+    if (name === 'begin') G.toHub();
     else if (name === 'retry' || name === 'restart') G.newRun();
-    else if (name === 'heroes') { G.toTitle(); G.chooseHero(); }
+    else if (name === 'heroes' || name === 'camp') G.toHub();
     else if (/^hero\d$/.test(name)) G.pickHero(Number(name.slice(4)));
     else if (/^relic\d$/.test(name)) G.pickRelic(Number(name.slice(5)));
     else if (/^boon\d$/.test(name)) G.takeBoon(Number(name.slice(4)));
-    else if (name === 'endrun') G.toTitle();
+    else if (name === 'endrun') G.toHub();
     else if (name === 'reroll') G.rerollBoons();
     else if (name === 'shrine') U.showShrine();
     else if (/^shrine\d$/.test(name)) buy(Number(name.slice(6)));
@@ -160,6 +162,7 @@
     else if (a === 'pause') {
       if (U.stack.length) U.back();
       else if (U.current === 'pause') { G.audio.play('uiBack'); G.resume(); }
+      else if (G.state === 'hub') U.back();
     }
     else if (a === 'retry') {
       if (U.current === 'dead') act('retry');
@@ -230,7 +233,7 @@
         it.querySelector('.v').textContent = Math.round(v * 100) + '%';
       } else it.querySelector('.v').textContent = def.label(v);
     });
-    el.diffNote.textContent = NOTES[G.settings.difficulty] || '';
+    el.diffNote.textContent = ''; // difficulty is now chosen at the brazier in the camp
     const best = G.store.load('best', {})[G.settings.difficulty];
     const depth = G.store.load('depth', {})[G.settings.difficulty];
     el.bestLine.textContent = depth

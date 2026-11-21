@@ -2,7 +2,7 @@
 
 A side-on boss rush for the browser: three heroes, four three-phase bosses, played as a run of
 ever-harder trials. You pick a hero and a relic before the run and win a boon after each victory.
-Version 0.8a.
+Version 0.9a.
 
 This is an early slice of a planned boss-rush roguelite (short runs, a boon after each boss,
 bosses drawn from a pool). A run meets the four bosses in a shuffled order, then meets them again, harder.
@@ -33,7 +33,27 @@ then open http://localhost:8321. There is no build step and no dependency.
 | Dawnbreak (when its bar is full) | Q or I, or middle click | RT |
 | Drop through a platform | S + Space | down + A |
 | Pause | Esc or P | Start |
+| Use something in the camp | E or F, or Enter | LB |
 | Retry (works the moment you fall) | R | |
+
+## The Vigil (new in v0.9a)
+
+The title screen now leads to a camp, the Vigil, where you move your hero about freely. What used to be
+menu options are places in it, left to right:
+
+| Place | Walk up and press E to |
+|---|---|
+| Two echoes on plinths | become that hero. The one you were takes its place on the plinth. |
+| The Shrine | open the Shrine and spend Sunshards |
+| The sparring post | nothing to press: hit it. It shows the damage of your last flurry, cannot be destroyed, and charges Dawnbreak three times as fast, so every move can be tried here. Starlight starts full. |
+| The brazier | step the difficulty: Gentle, Standard, Merciless. The flame grows and changes colour with it. |
+| The banner | choose the first foe: whoever comes, or one of the four bosses. It takes that boss's colour. |
+| The gate | begin a run: choose a relic, then the first trial |
+
+Nothing can hurt you in the camp. Esc opens the menu (settings, how to play, quit to title). After a run,
+**New run** goes straight back to the gate's relic choice, and **Back to camp** returns you to the Vigil.
+The camp is `js/hub.js`; the sparring post is a stand-in boss (`G.bosses.dummy`), which is why every
+weapon, special and Dawnbreak works on it unchanged.
 
 ## The heroes
 
@@ -62,14 +82,14 @@ Heroes are defined in `G.HEROES` in `js/run.js` (numbers, colours, text); the we
 
 - A run starts by choosing a **hero**, then **one of three relics** drawn from nine (up to thirteen once trophies are won). The relic lasts the whole run.
 - Each trial is one boss. The four come in a shuffled order, and when all are beaten the order is
-  shuffled again. **First foe** on the title screen fixes who comes first (handy for practising one boss).
+  shuffled again. The **banner** in the camp fixes who comes first (handy for practising one boss).
 - Beating a boss offers **three boons; you keep one** and go straight into the next trial. The victory
   screen names the boss that is next.
 - Each trial after the first gives the boss 15% more health, 4% shorter warnings and 6% less rest.
   From trial V (the second time round) the bosses also use their Merciless patterns.
-- Health is restored between trials. Falling ends the run; the title screen shows the deepest trial reached.
+- Health is restored between trials. Falling ends the run; the gate in the camp shows the deepest trial reached.
 - From trial II each trial carries an **omen** (two from trial VI), shown at the top right of the fight.
-- Every fight pays **Sunshards**, which buy permanent upgrades at the **Shrine** on the title screen.
+- Every fight pays **Sunshards**, which buy permanent upgrades at the **Shrine** in the camp.
 
 ## Flow and Dawnbreak (new in v0.7a)
 
@@ -128,7 +148,7 @@ warning, so they land while the next attack is still being shown. Defined in `js
 - **Earning:** a victory pays 12 Sunshards, plus 5 for each trial before it, times 1.1 to 1.5 for the
   grade, plus the Flow bonus; then 0.75 on Gentle or 1.4 on Merciless, plus the omen and Prospector bonuses. The first
   victory over each boss pays 25 more. A defeat pays a share for the health taken off the boss.
-- **The Shrine** (title screen) sells permanent upgrades:
+- **The Shrine** (in the camp) sells permanent upgrades:
 
 | Upgrade | Ranks | Cost per rank | Each rank gives |
 |---|---|---|---|
@@ -342,6 +362,7 @@ To use these in a new attack, call the ready-made mixes in `js/fx.js`: `G.fx.hit
 | `js/flow.js` | the Flow rank and each hero's Dawnbreak |
 | `js/omens.js` | the omens (`G.OMENS`) and what each one does during a fight |
 | `js/moments.js` | Reckoning, Riposte, Sunder, Clash, Last Light and the last push |
+| `js/hub.js` | the Vigil: the camp between runs, its places, and the sparring post |
 | `js/input.js` | keyboard, mouse and gamepad mapped to actions |
 | `js/audio.js` | every sound and the music, synthesised in code (no audio files) |
 | `js/fx.js` | particles, smoke, shards, cut marks, floor cracks and scorch marks, screen shake and kick, flashes, hit-freeze, slow motion |
@@ -404,11 +425,15 @@ Open the browser console on the running game.
   68 s and 64 s. A real fight should be about 3 to 4 minutes.
   Boss health, hero balance, relic and boon strength and the per-trial scaling are first guesses.
 - **Fastest first trial** on the title screen compares times against whichever boss came first, so it is
-  only a fair record when First foe is set to one boss.
+  only a fair record when the camp's banner is set to one boss.
 - **Nothing in v0.7a has been played.** The Dawnbreaks, the Shrine, the reward screens and each omen
   were run and looked at in captures, and the numbers above were checked in the running game. Whether
   Flow climbs at a satisfying rate, how often Dawnbreak fills in a real fight (the aim was two to four
   times), and whether Sunshard prices are fair are first guesses.
+- **The camp has not been walked by a person.** Every place in it was used by a scripted hero (swapping
+  hero, the Shrine, brazier, banner, post, gate) and every way in and out was followed (title, pause,
+  defeat, victory). Whether it is pleasant to cross each time, and whether the places are obvious
+  without being told, is unknown. On a gamepad the use button is LB, untested like the rest of the pad.
 - **The v0.8a moments have not been played.** Each one was triggered in the running game and looked at
   in captures: a Reckoning held and broken against all four bosses, a Riposte from a real perfect dodge,
   a Clash against the Knight's cleave, Last Light and the last push. Whether 6.5 seconds and that much

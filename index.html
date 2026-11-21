@@ -54,14 +54,11 @@
         <h1>SOLFALL</h1>
         <p class="tag">A duel beneath a dimmed sun</p>
         <nav>
-          <div class="item" data-act="begin">Begin</div>
-          <div class="item opt" data-opt="difficulty"><span class="k">Difficulty</span><span class="v"></span></div>
-          <div class="item opt" data-opt="firstFoe"><span class="k">First foe</span><span class="v"></span></div>
-          <div class="item" data-act="shrine">Shrine <span id="shardCount"></span></div>
+          <div class="item" data-act="begin">Enter the Vigil</div>
           <div class="item" data-act="how">How to play</div>
           <div class="item" data-act="settings">Settings</div>
         </nav>
-        <p class="note" id="diffNote"></p>
+        <p class="note" id="diffNote"></p><span id="shardCount" hidden></span>
       </div>
       <div class="foot"><span id="bestLine"></span><span>Arrows or W/S to choose · Enter to select</span><span id="ver"></span></div>
     </section>
@@ -89,7 +86,7 @@
           <div class="item card t-relic" data-act="relic2"><span class="ctag">Relic</span><b class="cname"></b><span class="cdesc"></span></div>
           <div class="item card t-relic" data-act="relic3"><span class="ctag">Relic</span><b class="cname"></b><span class="cdesc"></span></div>
         </nav>
-        <nav class="row"><div class="item" data-act="back">Back to heroes</div></nav>
+        <nav class="row"><div class="item" data-act="back">Back</div></nav>
       </div>
     </section>
 
@@ -129,6 +126,7 @@
               <tr><td>Mend</td><td>hold <kbd>E</kbd> or <kbd>F</kbd></td></tr>
               <tr><td>Dawnbreak</td><td><kbd>Q</kbd> or <kbd>I</kbd>, or middle click, when its bar is full</td></tr>
               <tr><td>Drop through a platform</td><td><kbd>S</kbd> + <kbd>Space</kbd></td></tr>
+              <tr><td>Use something in the camp</td><td><kbd>E</kbd> or <kbd>Enter</kbd></td></tr>
               <tr><td>Pause</td><td><kbd>Esc</kbd> or <kbd>P</kbd></td></tr>
             </table>
             <p class="small">Gamepad: stick to move, A jump, X attack, B or RB dash, Y special, LB mend, RT Dawnbreak.</p>
@@ -146,6 +144,7 @@
               <li><b>Dawnbreak</b> fills as you deal damage. When the bar is full, one press unleashes your hero's greatest blow, and nothing can touch you while it plays.</li>
               <li><b>Moments:</b> the first hit after a perfect dodge is a Riposte for double. The first finisher on a staggered boss is a Sunder. When a boss wards itself and a ring starts to close, break the ward before it shuts.</li>
               <li><b>Flow</b> climbs from C to SS while you keep hitting and dodging, and falls when you are hit. Each rank adds 3% damage.</li>
+              <li><b>The Vigil</b> is the camp between runs. Walk up to the echoes to change hero, the Shrine to spend Sunshards, the brazier for difficulty, the banner for the first foe, the post to practise, and the gate to begin.</li>
               <li><b>A run starts with a hero and a relic.</b> Each victory grants a boon and a harder trial; later trials carry an omen that changes the rules. Sunshards from every fight buy lasting upgrades at the Shrine.</li>
             </ul>
           </div>
@@ -175,6 +174,7 @@
         <nav>
           <div class="item" data-act="resume">Resume</div>
           <div class="item" data-act="restart">Restart run</div>
+          <div class="item" data-act="camp">Return to camp</div>
           <div class="item" data-act="how">How to play</div>
           <div class="item" data-act="settings">Settings</div>
           <div class="item" data-act="quit">Quit to title</div>
@@ -194,7 +194,7 @@
         <p class="tip" id="deadTip"></p>
         <nav class="row">
           <div class="item" data-act="retry">New run <kbd>R</kbd></div>
-          <div class="item" data-act="heroes">Change hero</div>
+          <div class="item" data-act="camp">Back to camp</div>
           <div class="item" data-act="quit">Title</div>
         </nav>
       </div>
@@ -216,7 +216,7 @@
         </nav>
         <nav class="row">
           <div class="item" data-act="reroll" id="rerollItem">Redraw boons</div>
-          <div class="item" data-act="endrun">End the run here</div>
+          <div class="item" data-act="endrun">End the run, return to camp</div>
         </nav>
       </div>
     </section>
@@ -242,6 +242,7 @@
 <script src="js/knight.js"></script>
 <script src="js/omens.js"></script>
 <script src="js/moments.js"></script>
+<script src="js/hub.js"></script>
 <script src="js/ui.js"></script>
 <script src="js/game.js"></script>
 </body>

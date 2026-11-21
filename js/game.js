@@ -5,7 +5,7 @@
   const F = G.fx;
   let canvas, ctx, stage, k = 1, last = 0;
 
-  G.state = 'title';   // title | fight | dead | won
+  G.state = 'title';   // title | hub | fight | dead | won
   G.paused = false;
   G.t = 0;             // simulation clock
   G.time = 0;          // fight timer
@@ -16,7 +16,7 @@
   G.cam = { x: 0, y: 0 }; // small view offset that follows the hero
 
   G.canHurt = () => G.state === 'fight' && !G.player.dead && !G.boss.dying && !G.boss.dead;
-  G.playerControl = () => (G.state === 'fight' || G.state === 'won') && !G.paused && !G.ui.current;
+  G.playerControl = () => (G.state === 'fight' || G.state === 'won' || G.state === 'hub') && !G.paused && !G.ui.current;
 
   function resize() {
     const s = Math.min(window.innerWidth / G.W, window.innerHeight / G.H);
@@ -44,11 +44,24 @@
     G.run.relic = r.id;
     G.startFight();
   };
-  // After a fall: same hero, a fresh choice of relics.
-  G.newRun = function () {
-    G.toTitle();
-    G.ui.showHeroes();
-    G.pickHero(Math.max(0, G.HEROES.findIndex((h) => h.id === G.settings.hero)));
+  // After a fall: same hero, straight back to the gate for a fresh choice of relics.
+  G.newRun = function () { G.toHub(); G.openGate(); };
+  // The gate in the camp: choose a relic, then the first trial.
+  G.openGate = function () { G.run.reset(); G.ui.showRelics(G.run.rollRelics()); };
+
+  // The Vigil: the camp between runs, where the hero walks about (see hub.js).
+  G.toHub = function () {
+    G.run.reset();
+    G.setBoss('dummy');
+    G.arena.reset(); G.hazards.clear(); F.reset();
+    G.player.reset(); G.flow.reset(); G.boss.reset(); G.moments.reset();
+    G.player.x = G.clamp(G.hub.lastX || 600, 500, 660);
+    G.player.ember = G.PLAYER.SEG * G.player.segs; // the special can be tried freely here
+    G.state = 'hub'; G.paused = false; G.hitstop = 0; G.slowT = 0;
+    G.ui.resetHud(); G.ui.hud(false); G.ui.close(); G.ui.buildRun();
+    G.ui.fade(); G.ui.mood('fight');
+    G.audio.init(); G.audio.startMusic(); G.audio.setIntensity(0); G.audio.duck(1);
+    G.input.endStep();
   };
   // Straight into a fight with no relic (used by tests and the console).
   G.startRun = function () { G.run.reset(); G.startFight(); };
@@ -84,7 +97,7 @@
   };
 
   G.pause = function () {
-    if (G.state !== 'fight' || G.paused || G.player.dead || G.boss.dying || G.debug.freeze) return;
+    if ((G.state !== 'fight' && G.state !== 'hub') || G.paused || G.ui.current || G.player.dead || G.boss.dying || G.debug.freeze) return;
     G.paused = true;
     G.ui.show('pause');
     G.audio.duck(0.3);
@@ -151,6 +164,7 @@
     const sdt = dt * ts;
     G.t += sdt;
     G.arena.update(sdt);
+    if (G.state === 'hub') G.hub.update(sdt);
     G.player.update(sdt);
     G.input.endStep();
     // while a Dawnbreak plays, the boss and everything it has thrown all but stand still
@@ -203,12 +217,14 @@
     F.drawSmoke(ctx);
     G.hazards.draw(ctx, 'under');
     G.arena.drawPlatforms(ctx);
+    if (G.state === 'hub') G.hub.draw(ctx);
     if (G.boss.kit) drawBoss();
     G.moments.draw(ctx);
     G.drawShots(ctx);
     G.player.draw(ctx);
     G.hazards.draw(ctx, 'over');
     F.draw(ctx);
+    if (G.state === 'hub') G.hub.drawOver(ctx);
     G.arena.drawFront(ctx);
     if (G.debug.boxes) G.boss.drawDebug(ctx);
     ctx.restore();
@@ -280,7 +296,7 @@
     G.arena.init();
     G.ui.init();
     G.input.bindMouse(stage);
-    G.input.mouseBlocked = () => !!G.ui.current || G.paused || (G.state !== 'fight' && G.state !== 'won');
+    G.input.mouseBlocked = () => !!G.ui.current || G.paused || (G.state !== 'fight' && G.state !== 'won' && G.state !== 'hub');
     G.input.onAction = onAction;
     resize();
     window.addEventListener('resize', resize);

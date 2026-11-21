@@ -112,6 +112,16 @@
       }, DAWN],
   };
 
+  // the Vigil: the camp between runs, in the last hour before dawn. One palette for every "phase".
+  const VIGIL = {
+    name: 'VIGIL', scene: 'camp',
+    sky: ['#0a1030', '#2a2858', '#7c4c68', '#f2b684'],
+    far: '#2c2850', near: '#1c1a38', pillar: '#121026', rim: '255,206,150',
+    floorTop: '#40385a', floor: '#181428',
+    boss: '255,214,140', hot: '255,246,225', ember: '255,200,130', stars: 0.55,
+  };
+  G.THEMES.hub = [null, VIGIL, VIGIL, VIGIL, VIGIL];
+
   const PAD = 48; // backdrop bleed so screen shake never shows an edge
   const A = G.arena = {
     phase: 1, prevPhase: 1, fade: 1, fadeDur: 1,
@@ -253,6 +263,26 @@
       for (let k = -1; k <= 1; k++) {
         x.beginPath(); x.moveTo(cx + k * w * 0.22, top + 44); x.lineTo(cx + k * w * 0.22, F - 18); x.stroke();
       }
+    }
+  }
+
+  // a few standing columns, two tents and a watchtower (the Vigil)
+  function camp(x, P, F) {
+    colonnade(x, P, F);
+    x.fillStyle = P.near;
+    // watchtower on the far left, with a lit window
+    x.fillRect(52, F - 330, 44, 334);
+    x.beginPath(); x.moveTo(40, F - 330); x.lineTo(74, F - 384); x.lineTo(108, F - 330); x.closePath(); x.fill();
+    x.fillStyle = G.rgba(P.rim, 0.7); x.fillRect(68, F - 296, 10, 16);
+    // tents
+    for (const [tx, tw, th] of [[560, 150, 96], [770, 120, 78]]) {
+      x.fillStyle = P.near;
+      x.beginPath(); x.moveTo(tx - tw / 2, F + 4); x.lineTo(tx, F - th); x.lineTo(tx + tw / 2, F + 4); x.closePath(); x.fill();
+      x.fillStyle = P.pillar;
+      x.beginPath(); x.moveTo(tx - tw * 0.13, F + 4); x.lineTo(tx, F - th * 0.62); x.lineTo(tx + tw * 0.13, F + 4); x.closePath(); x.fill();
+      x.strokeStyle = G.rgba(P.rim, 0.35); x.lineWidth = 1.5;
+      x.beginPath(); x.moveTo(tx - tw / 2, F + 4); x.lineTo(tx, F - th); x.lineTo(tx + tw / 2, F + 4); x.stroke();
+      x.fillStyle = G.rgba(P.rim, 0.55); x.fillRect(tx - 1, F - th - 16, 2, 16);
     }
   }
 
@@ -418,6 +448,7 @@
     if (P.scene === 'spires') spires(x, P, F);
     else if (P.scene === 'city') city(x, P, F);
     else if (P.scene === 'graves') graves(x, P, F);
+    else if (P.scene === 'camp') camp(x, P, F);
     else colonnade(x, P, F);
 
     // floor slab
@@ -485,9 +516,10 @@
     A.theme = id;
     for (let i = 1; i <= 4; i++) G.PAL[i] = G.THEMES[id][i];
     if (!A.cache[id]) {
-      for (const k of Object.keys(A.cache)) if (k !== 'warden') delete A.cache[k];
+      // the Warden's and the camp's backdrops are kept; one other boss's at a time
+      for (const k of Object.keys(A.cache)) if (k !== 'warden' && k !== 'hub') delete A.cache[k];
       const set = [];
-      for (let i = 1; i <= 4; i++) set[i] = buildBg(i);
+      for (let i = 1; i <= 4; i++) set[i] = i > 1 && G.PAL[i] === G.PAL[1] ? set[1] : buildBg(i);
       A.cache[id] = set;
     }
     A.bgs = A.cache[id];
