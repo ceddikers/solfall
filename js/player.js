@@ -11,7 +11,9 @@
     SEG: 100, SEGS: 3,
     GAIN_HIT: 8, GAIN_HEAVY: 16, GAIN_PERFECT: 34, GAIN_ORB: 6,
     LANCE_DMG: 42, LANCE_SPEED: 1700,
-    ARROW_SPEED: 1350, ARROW_LIFE: 0.4, VOLLEY_DMG: 11,
+    ARROW_SPEED: 1350, ARROW_LIFE: 0.4, VOLLEY_DMG: 10,
+    ARROW_GAIN: 6, ARROW_GAIN_HEAVY: 12, // Starlight per arrow hit: less than a melee hit
+    BOW_SLOW: 0.6,                       // Lune's speed while she is drawing and loosing
     STARFALL_DMG: 46, STARFALL_R: 165,
   };
   const GOLD = '255,214,140'; // the finisher's colour
@@ -172,7 +174,8 @@
       P.stun -= dt;
       P.vx *= Math.exp(-2.5 * dt);
     } else {
-      const target = mx * P.run;
+      // firing the bow slows her, so shooting and dodging cannot both be done at full speed
+      const target = mx * P.run * (P.atk && P.atk.kind === 'shot' ? C.BOW_SLOW : 1);
       const acc = (P.onGround ? C.ACC_G : C.ACC_A) * dt;
       if (P.vx < target) P.vx = Math.min(target, P.vx + acc);
       else if (P.vx > target) P.vx = Math.max(target, P.vx - acc);
@@ -485,7 +488,7 @@
     arrow(a.dx, a.dy, a.dmg, a.heavy);
     G.audio.play(a.heavy ? 'arrowHeavy' : 'arrow');
     // firing downward in the air lifts her
-    if (a.dy > 0.5 && !P.onGround) { P.vy = Math.min(P.vy, -430); P.squash = 0.15; }
+    if (a.dy > 0.5 && !P.onGround) { P.vy = Math.min(P.vy, -370); P.squash = 0.15; }
     if (a.heavy) {
       P.vx -= a.dx * 120;
       G.fx.ring(P.x + a.dx * 22, P.y - 26 + a.dy * 22, { r0: 4, r1: 34, life: 0.2, color: GOLD, width: 4 });
@@ -654,11 +657,14 @@
           if (!touch({ cx: s.x, cy: s.y, hw: half, hh: half }, t)) continue;
           s.hit.add(t.id);
           if (s.arrow) {
-            // arrows hit harder the less distance they have flown: +60% within 120px, nothing extra past 300px
-            const close = 1 + 0.6 * G.clamp((300 - G.dist(s.x, s.y, s.ox, s.oy)) / 180, 0, 1);
-            const res = G.boss.damage(Math.round(s.dmg * close), t, { x: s.x, y: s.y, heavy: s.heavy, finisher: s.heavy, dir: G.sign(s.vx), poise: H.poise });
+            // arrows hit harder the less distance they have flown: +60% within 120px, nothing extra past 300px...
+            const flown = G.dist(s.x, s.y, s.ox, s.oy);
+            const close = 1 + 0.6 * G.clamp((300 - flown) / 180, 0, 1);
+            // ...and lose up to 30% of their force past 240px, so sniping from safety is slow
+            const far = 1 - 0.3 * G.clamp((flown - 240) / 180, 0, 1);
+            const res = G.boss.damage(Math.round(s.dmg * close * far), t, { x: s.x, y: s.y, heavy: s.heavy, finisher: s.heavy, dir: G.sign(s.vx), poise: H.poise });
             if (res) {
-              P.gain(s.heavy ? C.GAIN_HEAVY : C.GAIN_HIT);
+              P.gain(s.heavy ? C.ARROW_GAIN_HEAVY : C.ARROW_GAIN);
               G.fx.stop(s.heavy ? 0.06 : 0.016); G.fx.shake(s.heavy ? 6 : 1.2);
               G.audio.play(s.heavy ? 'hitHeavy' : 'hit');
               G.fx.burst(s.x, s.y, { n: s.heavy ? 14 : 6, color: s.heavy ? GOLD : HOT, speed: [100, 460], life: [0.12, 0.35], kind: 'spark', size: [2, 3.5] });

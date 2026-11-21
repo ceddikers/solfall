@@ -39,13 +39,13 @@
       cloak: ['#3c2a5e', '#120a20'], build: 0.88, scarf: 14, scarfW: 0.7,
       hp: -1, run: 352, air: 2, weapon: 'bow', reach: 1, thick: 1, poise: 0.7,
       combo: [
-        { dmg: 4, cd: 0.26, wind: 0.03 },
-        { dmg: 5, cd: 0.26, wind: 0.03 },
-        { dmg: 10, cd: 0.52, wind: 0.1 },
+        { dmg: 4, cd: 0.28, wind: 0.03 },
+        { dmg: 5, cd: 0.28, wind: 0.03 },
+        { dmg: 10, cd: 0.56, wind: 0.1 },
       ],
       down: 4, special: 'volley', specialName: 'Moon Volley', verb: 'volley',
       blurb: 'Fragile and nimble. Fights from range, hits hardest up close.',
-      lines: ['Moonbow: arrows in any direction, up to 60% stronger at close range', 'Moon Volley: a fan of five arrows and a leap backwards', 'Triple jump; firing downward in the air lifts you; one less health'],
+      lines: ['Moonbow: arrows in any direction, strongest up close and weaker at long range; she slows while firing', 'Moon Volley: a fan of five arrows and a leap backwards', 'Triple jump; firing downward in the air lifts you; one less health'],
     },
   ];
   const heroById = {};

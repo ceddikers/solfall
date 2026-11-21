@@ -2,7 +2,7 @@
 
 A side-on boss fight for the browser: three heroes, one three-phase boss, played as a run of
 ever-harder trials. You pick a hero and a relic before the run and win a boon after each victory.
-Version 0.3a.
+Version 0.3b.
 
 This is the first playable slice of a planned boss-rush roguelite (short runs, a boon after each
 boss, bosses drawn from a pool). There is one boss so far, so a run fights it again and again.
@@ -41,9 +41,9 @@ All three share movement, the dash, Starlight and mending. Weapon and special di
 | | Vesper, the Starblade | Aster, the Starmaul | Lune, the Moonbow |
 |---|---|---|---|
 | Health (Standard) | 5 | 6 | 4 |
-| Weapon | sword: 9, 11, then a 24 finisher | maul: 14, 17, then a 36 finisher that shakes the ground; slow and wide | bow: arrows of 4, 5, then a piercing 10, in any direction; up to 60% stronger within 120px |
+| Weapon | sword: 9, 11, then a 24 finisher | maul: 14, 17, then a 36 finisher that shakes the ground; slow and wide | bow: arrows of 4, 5, then a piercing 10, in any direction; up to 60% stronger within 120px, up to 30% weaker past 240px |
 | Special | Star Lance: a piercing shot at any range | Starfall: a blast around her; from the air she plunges first and passes through attacks | Moon Volley: a fan of five arrows and a leap backwards |
-| Extra | a slash out of a dash is a thrust | fills the stagger bar 35% faster; a little slower on foot | triple jump; firing downward in the air lifts her |
+| Extra | a slash out of a dash is a thrust | fills the stagger bar 35% faster; a little slower on foot | triple jump; firing downward in the air lifts her; moves at 60% speed while firing; arrows give less Starlight than melee hits |
 
 - **Combo:** every third attack in a chain is the finisher. It winds up for a beat and is worth more than the
   first two together; the weapon glows gold when it is next. Hold the button to keep the chain going.
@@ -157,7 +157,7 @@ Open the browser console on the running game.
 
 - **Dodge tests:** `fetch('/tools/dodge-tests.js').then(r => r.text()).then(t => console.log((0, eval)(t)))`
   runs each attack against a simple scripted player and reports health lost. All 20 lose 0 health with each
-  hero as of v0.3a. Set `window.TEST_HERO = 'aster'` (or `'lune'`) first to test another hero.
+  hero as of v0.3b. Set `window.TEST_HERO = 'aster'` (or `'lune'`) first to test another hero.
   Run it after changing any attack.
 - `G.debug.god = true` makes the hero invulnerable. `G.debug.boxes = true` (or `?boxes` in the address)
   draws every hitbox.
@@ -171,7 +171,9 @@ Open the browser console on the running game.
 - **Sound and music have not been heard by anyone.** They are generated in code and run without errors,
   but the mix and the music are untested by ear. Volume sliders are in Settings.
 - **No person has played a run through.** Timings were tuned with scripted players: an invulnerable,
-  always-attacking one beats the first trial on Standard (5,400 boss health) in 75 s as Vesper, 76 s as
-  Aster, and 89 s as Lune firing from the ground, so a real first trial should be about 3 to 4 minutes.
+  always-attacking one beats the first trial on Standard (5,400 boss health) in 70 s as Vesper and 75 s as
+  Aster. Lune takes 129 s firing from the ground, 135 s firing on the move and 97 s at point-blank range
+  (v0.3b; she was 89 s from the ground before a player reported her as too strong). A real first trial
+  should be about 3 to 4 minutes.
   Hero balance, relic and boon strength and the per-trial scaling are first guesses.
 - **Gamepad support is untested** (no pad was available).
