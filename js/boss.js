@@ -71,6 +71,10 @@
     B.hp = Math.max(floorHp, B.hp - dmg);
     G.player.stats.dmg += dmg;
     if (t.kind === 'core') B.core.flash = 1; else t.ref.flash = 1;
+    // struck parts recoil away from the blow
+    const push = (info.dir || G.sign(t.cx - G.player.x) || 1) * (info.lance ? 16 : info.heavy ? 12 : 7);
+    if (t.kind === 'core') B.core.kick = Math.min(1, (B.core.kick || 0) + (info.heavy ? 0.9 : 0.5));
+    else if (t.ref) t.ref.kx = G.clamp((t.ref.kx || 0) + push, -22, 22);
     if (G.settings.numbers) {
       G.fx.text(info.x + G.rand(-12, 12), info.y - 16, String(dmg), {
         color: (t.kind === 'core' || B.staggered) ? '255,232,140' : '255,255,255',
@@ -808,7 +812,8 @@
     B.t += dt;
     const c = B.core, P = G.player;
     c.flash = Math.max(0, c.flash - dt * 6);
-    for (const h of B.hands) h.flash = Math.max(0, h.flash - dt * 6);
+    for (const h of B.hands) { h.flash = Math.max(0, h.flash - dt * 6); h.kx = (h.kx || 0) * Math.exp(-13 * dt); }
+    c.kick = (c.kick || 0) * Math.exp(-11 * dt);
     for (const r of B.rays) r.t += dt;
 
     if (B.script) {
@@ -908,6 +913,7 @@
     ctx.save();
     ctx.translate(c.x + (c.jit ? G.rand(-c.jit, c.jit) : 0), c.y + (c.jit ? G.rand(-c.jit, c.jit) : 0));
     if (B.dead) { drawSun(ctx, c); ctx.restore(); return; }
+    if (c.kick > 0.01) { const ks = 1 - 0.045 * c.kick; ctx.scale(ks, ks); }
     const dim = B.staggered ? 0.4 : 1;
     const ch = c.charge;
 
@@ -1074,7 +1080,7 @@
     const dimK = h.stuck ? 0.4 : 1;
     const j = h.hot > 0 && !h.hurt ? 1.6 : 0;
     ctx.save();
-    ctx.translate(h.x + (j ? G.rand(-j, j) : 0), h.y + (j ? G.rand(-j, j) : 0));
+    ctx.translate(h.x + (h.kx || 0) + (j ? G.rand(-j, j) : 0), h.y + (j ? G.rand(-j, j) : 0));
     ctx.rotate(h.rot);
     ctx.scale(h.side, 1);
 

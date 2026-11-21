@@ -3,7 +3,7 @@
 (function () {
   const STEP = 1 / 120; // fixed simulation step
   const F = G.fx;
-  let canvas, ctx, stage, k = 1, last = 0, acc = 0;
+  let canvas, ctx, stage, k = 1, last = 0;
 
   G.state = 'title';   // title | fight | dead | won
   G.paused = false;
@@ -12,6 +12,7 @@
   G.hitstop = 0; G.slowT = 0; G.slowScale = 1;
   G.deadT = 0; G.wonT = 0; G.endShown = false;
   G.debug = { god: false, boxes: false, forceAttack: '', freeze: false };
+  G.cam = { x: 0, y: 0 }; // small view offset that follows the hero
 
   G.canHurt = () => G.state === 'fight' && !G.player.dead && !G.boss.dying && !G.boss.dead;
   G.playerControl = () => (G.state === 'fight' || G.state === 'won') && !G.paused && !G.ui.current;
@@ -34,7 +35,7 @@
     G.ui.close(); G.ui.resetHud(); G.ui.buildHp(G.player.maxHp); G.ui.bossIntro(); G.ui.hud(true); G.ui.keysHint();
     G.ui.fade(); G.ui.mood('fight');
     G.audio.init(); G.audio.startMusic(); G.audio.setIntensity(1, true); G.audio.duck(1);
-    G.input.endStep(); acc = 0;
+    G.input.endStep();
   };
 
   G.toTitle = function () {
@@ -45,7 +46,7 @@
     G.ui.resetHud(); G.ui.hud(false); G.ui.close(); G.ui.show('title');
     G.ui.fade(); G.ui.mood('menu');
     G.audio.setIntensity(0); G.audio.duck(1);
-    G.input.endStep(); acc = 0;
+    G.input.endStep();
   };
 
   G.pause = function () {
@@ -110,6 +111,11 @@
     G.hazards.update(sdt);
     G.updateShots(sdt);
     F.update(sdt);
+    // the view leans a little towards the hero
+    const P = G.player;
+    const follow = G.state === 'title' || P.hidden ? 0 : 1;
+    G.cam.x = G.damp(G.cam.x, follow * (P.x - G.W / 2) * 0.026, 3.5, dt);
+    G.cam.y = G.damp(G.cam.y, follow * G.clamp((P.y - G.FLOOR) * 0.035, -10, 0), 3.5, dt);
     if (G.state === 'fight' && G.boss.active && !G.boss.dying && !G.boss.dead) G.time += sdt;
     if (G.state === 'dead') {
       G.deadT += dt;
@@ -133,7 +139,7 @@
     const z = 1 + F.zoom;
     ctx.translate(G.W / 2 + F.shakeX, G.H / 2 + F.shakeY);
     ctx.scale(z, z);
-    ctx.translate(-G.W / 2, -G.H / 2);
+    ctx.translate(-G.W / 2 - G.cam.x, -G.H / 2 - G.cam.y);
     G.arena.drawBack(ctx);
     G.boss.drawGround(ctx);
     G.player.drawShadow(ctx);
@@ -156,10 +162,12 @@
     last = now;
     G.input.poll();
     if (!G.paused && !G.debug.freeze) {
-      acc += dt;
-      let n = 0;
-      while (acc >= STEP && n < 24) { step(STEP); acc -= STEP; n++; }
-      if (n >= 24) acc = 0;
+      // Split the frame into equal sub-steps no longer than 1/120 s. The simulation then lands
+      // exactly on each frame's time, so motion stays even on 60, 120 or 144 Hz screens
+      // (a fixed step with leftover time shows as a faint judder).
+      const n = Math.max(1, Math.ceil(dt / STEP - 1e-6));
+      const h = dt / n;
+      for (let i = 0; i < n; i++) step(h);
     }
     render();
     G.ui.update(dt);

@@ -66,10 +66,14 @@
     P.dashCd = Math.max(0, P.dashCd - dt);
     P.atkCd = Math.max(0, P.atkCd - dt);
     P.comboT = Math.max(0, P.comboT - dt);
-    P.jumpBuf = Math.max(0, P.jumpBuf - dt);
-    P.atkBuf = Math.max(0, P.atkBuf - dt);
+    // Buffered presses do not run down during a dash, so anything pressed mid-dash
+    // comes out the moment the dash ends instead of being dropped.
+    if (P.dashT <= 0) {
+      P.jumpBuf = Math.max(0, P.jumpBuf - dt);
+      P.atkBuf = Math.max(0, P.atkBuf - dt);
+      P.flareBuf = Math.max(0, P.flareBuf - dt);
+    }
     P.dashBuf = Math.max(0, P.dashBuf - dt);
-    P.flareBuf = Math.max(0, P.flareBuf - dt);
     P.dropT = Math.max(0, P.dropT - dt);
     if (!P.onGround) P.coyote = Math.max(0, P.coyote - dt);
 
@@ -81,6 +85,8 @@
       if (I.pressed.attack) P.atkBuf = C.BUFFER;
       if (I.pressed.dash) P.dashBuf = C.BUFFER;
       if (I.pressed.flare) P.flareBuf = C.BUFFER;
+      // holding the button keeps the combo going
+      if (I.down.attack && P.atkCd <= 0) P.atkBuf = Math.max(P.atkBuf, 0.03);
     }
 
     // --- mend: hold to spend one segment of Starlight for one health
@@ -124,7 +130,7 @@
       P.vx = P.dashDir * C.DASH_SPEED; P.vy = 0;
       P.ghostT -= dt;
       if (P.ghostT <= 0) { P.ghostT = 0.028; P.ghosts.push({ x: P.x, y: P.y, f: P.facing, life: 0.26 }); }
-      if (P.dashT <= 0) { P.vx = P.dashDir * C.RUN * 0.85; P.dashCd = C.DASH_CD; }
+      if (P.dashT <= 0) { P.vx = P.dashDir * C.RUN * (mx === P.dashDir ? 1 : 0.6); P.dashCd = C.DASH_CD; }
     } else if (P.stun > 0) {
       P.stun -= dt;
       P.vx *= Math.exp(-2.5 * dt);
@@ -156,7 +162,11 @@
     if (P.vy >= 0) P.jumpHeld = false;
 
     // --- gravity and collision
-    if (P.dashT <= 0) P.vy = Math.min(C.MAXFALL, P.vy + C.GRAV * dt);
+    if (P.dashT <= 0) {
+      // a little hang at the top of a held jump, and a slightly quicker fall
+      const hang = !P.onGround && Math.abs(P.vy) < 110 && ctl && I.down.jump ? 0.55 : 1;
+      P.vy = Math.min(C.MAXFALL, P.vy + C.GRAV * hang * (P.vy > 0 ? 1.1 : 1) * dt);
+    }
     const fallSpeed = P.vy;
     P.x += (P.vx + G.wind) * dt;
     if (P.x < G.WALL_L + 13) { P.x = G.WALL_L + 13; if (P.vx < 0) P.vx = 0; }
@@ -199,7 +209,7 @@
       if (mx) P.facing = mx;
       if (I.aim.attack) {
         // a mouse click slashes towards the cursor
-        const ax = I.mx - P.x, ay = I.my - (P.y - 24);
+        const ax = I.mx + G.cam.x - P.x, ay = I.my + G.cam.y - (P.y - 24);
         const steep = Math.abs(ay) > Math.abs(ax) * 1.15;
         kind = steep && ay < 0 ? 'up' : (steep && ay > 0 && !P.onGround ? 'down' : 'side');
         if (Math.abs(ax) > 6) P.facing = ax > 0 ? 1 : -1;
@@ -212,7 +222,7 @@
         kind, idx, heavy, t: 0, dur: heavy ? 0.3 : 0.22, a0: 0.02, a1: heavy ? 0.17 : 0.13,
         hit: new Set(), dmg: heavy ? 17 : (kind === 'side' ? 10 : 11), dir: P.facing,
       };
-      P.atkCd = heavy ? 0.42 : 0.25;
+      P.atkCd = heavy ? 0.36 : 0.23;
       P.slashes.push({ kind, dir: P.facing, heavy, idx, t: 0, dur: heavy ? 0.26 : 0.19 });
       G.audio.play(heavy ? 'slash3' : 'slash');
       if (kind === 'side' && P.onGround && P.stun <= 0) P.vx += P.facing * (heavy ? 240 : 100);
@@ -232,7 +242,7 @@
         let dx = mx, dy = up ? -1 : (down && !P.onGround ? 1 : 0);
         if (I.aim.flare) {
           // a mouse click fires straight at the cursor (never into the floor while standing)
-          dx = I.mx - P.x; dy = I.my - (P.y - 24);
+          dx = I.mx + G.cam.x - P.x; dy = I.my + G.cam.y - (P.y - 24);
           if (P.onGround && dy > 0) dy = 0;
         }
         if (!dx && !dy) dx = P.facing;
@@ -283,8 +293,8 @@
       const res = G.boss.damage(a.dmg, t, { x: c.x, y: c.y, heavy: a.heavy, dir: a.dir });
       if (res) {
         P.gain(a.heavy ? C.GAIN_HEAVY : C.GAIN_HIT);
-        G.fx.stop(a.heavy ? 0.085 : 0.045);
-        G.fx.shake(a.heavy ? 7 : 3);
+        G.fx.stop(a.heavy ? 0.07 : 0.026);
+        G.fx.shake(a.heavy ? 6 : 1.6);
         G.audio.play(a.heavy ? 'hitHeavy' : 'hit');
         G.fx.burst(c.x, c.y, { n: a.heavy ? 16 : 9, color: HOT, speed: [120, 520], life: [0.12, 0.35], kind: 'spark', size: [2, 4] });
         G.fx.burst(c.x, c.y, { n: 4, color: STAR, speed: [20, 120], life: [0.2, 0.4], size: [5, 10] });
@@ -293,7 +303,8 @@
         G.fx.burst(c.x, c.y, { n: 4, color: '200,200,220', speed: [60, 200], life: [0.1, 0.25], kind: 'spark', size: [1.5, 2.5] });
       }
       bounced = true;
-      if (a.kind === 'side' && !P.onGround) P.vx -= a.dir * 90;
+      // a hit landed in the air holds the hero up for a moment, so air combos stay on target
+      if (a.kind !== 'down' && !P.onGround && !a.stall) { a.stall = true; P.vy = Math.min(P.vy, -95); }
     }
     for (const o of G.hazards.slashables()) {
       if (G.circleRect(o.x, o.y, o.r + 5, hb)) { o.slash(); P.gain(C.GAIN_ORB); bounced = true; }
@@ -311,7 +322,7 @@
     P.gain(C.GAIN_PERFECT);
     P.dashCd = 0;
     G.audio.play('perfect');
-    G.fx.slow(0.22, 0.45);
+    G.fx.slow(0.38, 0.3);
     G.fx.ring(P.x, P.y - 22, { r0: 12, r1: 110, life: 0.45, color: STAR, width: 5 });
     G.fx.flash(STAR, 0.1, 0.25);
     G.fx.text(P.x, P.y - 74, 'PERFECT', { color: HOT, size: 17, life: 0.9 });
@@ -325,7 +336,7 @@
     }
     if (P.inv > 0 || G.debug.god) return false;
     P.hp -= dmg; P.stats.hits++;
-    P.inv = C.HURT_INV; P.stun = 0.24; P.dashT = 0; P.atk = null; P.healT = 0; P.hurtFlash = 1;
+    P.inv = C.HURT_INV; P.stun = 0.2; P.dashT = 0; P.atk = null; P.healT = 0; P.hurtFlash = 1;
     const dir = G.sign(P.x - srcX) || -P.facing;
     P.vx = dir * 430; P.vy = (src && src.pop) || -430; P.onGround = false; P.plat = null; P.jumpHeld = false;
     G.fx.stop(0.14); G.fx.shake(13); G.fx.flash('255,50,50', 0.26, 0.35);
@@ -360,7 +371,7 @@
           s.hit.add(t.id);
           const res = G.boss.damage(s.dmg, t, { x: s.x, y: s.y, heavy: true, lance: true });
           if (res) {
-            G.fx.stop(0.09); G.fx.shake(10);
+            G.fx.stop(0.07); G.fx.shake(9);
             G.audio.play('flareHit');
             G.fx.ring(s.x, s.y, { r0: 10, r1: 120, life: 0.35, color: HOT, width: 8 });
             G.fx.burst(s.x, s.y, { n: 26, color: STAR, speed: [150, 700], life: [0.2, 0.55], kind: 'spark', size: [2, 5] });

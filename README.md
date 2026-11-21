@@ -1,6 +1,6 @@
 # Solfall
 
-A side-on boss fight for the browser: one hero, one boss, three phases. Version 0.1b.
+A side-on boss fight for the browser: one hero, one boss, three phases. Version 0.1c.
 
 This is the first playable slice of a planned boss-rush roguelite (short runs, a draft of upgrades
 after each boss, bosses drawn from a pool). It is built to answer one question first: does the
@@ -33,8 +33,9 @@ then open http://localhost:8321. There is no build step and no dependency.
 
 ## The hero
 
-- **Sword:** a three-hit combo on the ground; the third hit is heavier. Slash upward to reach the hands,
-  slash downward in the air to bounce off whatever you hit (this gives the jump and dash back).
+- **Sword:** a three-hit combo on the ground; the third hit is heavier. Hold the button to keep swinging.
+  Slash upward to reach the hands; a hit landed in the air holds you up for a moment, so one jump fits
+  several slashes. Slash downward in the air to bounce off whatever you hit (this gives the jump and dash back).
 - **Dash:** 0.24 s of invulnerability. If an attack would have hit during it, that is a perfect dodge:
   time slows, Starlight fills, and the dash is ready again at once.
 - **Starlight:** three segments, filled by landing hits, perfect dodges and cutting orbs out of the air.
@@ -96,7 +97,7 @@ Most-used tuning numbers: `B.BASE_HP` and `B.poiseMax` in `boss.js`, `G.PLAYER` 
 Open the browser console on the running game.
 
 - **Dodge tests:** `fetch('/tools/dodge-tests.js').then(r => r.text()).then(t => console.log((0, eval)(t)))`
-  runs each attack against a simple scripted player and reports health lost. All 20 lose 0 health as of v0.1b.
+  runs each attack against a simple scripted player and reports health lost. All 20 lose 0 health as of v0.1c.
   Run it after changing any attack.
 - `G.debug.god = true` makes the hero invulnerable. `G.debug.boxes = true` (or `?boxes` in the address)
   draws every hitbox.
