@@ -60,6 +60,8 @@
   B.onRelease = function () { const b = B.body; b.hurt = false; b.pose = 'idle'; b.hidden = false; };
   B.onInterrupt = function () { for (const c of B.clones) smoke(c.x, c.y - 40); B.clones.length = 0; };
   B.onStagger = function () { B.body.pose = 'kneel'; };
+  B.reckonName = 'DEATH MARK';
+  B.onReckon = function (on) { B.body.pose = on ? 'crouch' : 'idle'; };
   B.onRecover = function () { B.body.pose = 'idle'; };
   B.dying0 = function () { B.body.pose = 'kneel'; B.clones.length = 0; };
 

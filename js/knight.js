@@ -63,6 +63,8 @@
   };
   B.onRelease = function () { const b = B.body; b.hurt = false; b.pose = 'idle'; b.spinning = false; b.fast = false; };
   B.onStagger = function () { B.body.pose = 'kneel'; };
+  B.reckonName = 'DIRGE';
+  B.onReckon = function (on) { B.body.pose = on ? 'overRaise' : 'idle'; };
   B.onRecover = function () { B.body.pose = 'idle'; };
   B.dying0 = function () { B.body.pose = 'kneel'; };
   // Blows that land on its back count for more.

@@ -285,6 +285,27 @@
       tone({ type: 'triangle', f0: 1760, f1: 440, dur: 0.5, vol: 0.14 });
       tone({ type: 'sine', f0: 70, f1: 30, dur: 0.7, vol: 0.6 });
     },
+    // ---- moments
+    pulse(o) {
+      const k = o.k || 0;
+      tone({ type: 'sine', f0: 62 + 30 * k, f1: 34, dur: 0.22, vol: 0.34 + 0.2 * k });
+      tone({ type: 'sine', f0: 62 + 30 * k, f1: 34, dur: 0.18, vol: 0.22 + 0.16 * k, delay: 0.16 });
+    },
+    riposte() {
+      noise({ dur: 0.16, vol: 0.4, f0: 1800, f1: 7000, q: 0.8 });
+      tone({ type: 'triangle', f0: 1320, f1: 1980, dur: 0.22, vol: 0.14 });
+      tone({ type: 'sine', f0: 130, f1: 46, dur: 0.26, vol: 0.5 });
+    },
+    clash() {
+      noise({ dur: 0.1, vol: 0.55, type: 'highpass', f0: 3200 });
+      tone({ type: 'triangle', f0: 2300, f1: 2180, dur: 0.6, vol: 0.14 });
+      tone({ type: 'triangle', f0: 3120, f1: 2990, dur: 0.45, vol: 0.09 });
+      tone({ type: 'sine', f0: 150, f1: 40, dur: 0.3, vol: 0.5 });
+    },
+    lastLight() {
+      tone({ type: 'sine', f0: 55, dur: 1.2, vol: 0.5, attack: 0.03 });
+      [440, 660, 880].forEach((f, i) => tone({ f0: f, dur: 0.9, vol: 0.1, delay: 0.1 + i * 0.12 }));
+    },
     // ---- interface
     uiMove() { tone({ f0: 520, dur: 0.05, vol: 0.07 }); },
     uiSelect() { tone({ f0: 660, f1: 990, dur: 0.1, vol: 0.11 }); },

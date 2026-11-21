@@ -54,6 +54,8 @@
   B.onRelease = function () { const b = B.body; b.want = 0; b.spent = false; b.charge = 0; b.hidden = false; b.alpha = 1; B.blizz = 0; };
   B.onInterrupt = function () { B.shards.length = 0; };
   B.onStagger = function () { const b = B.body; b.alpha = 1; b.elem = null; };
+  B.reckonName = 'CONVERGENCE'; B.reckonY = GY;
+  B.onReckon = function (on) { const b = B.body; b.want = on ? 1 : 0; B.spin = on ? 6 : 1; b.alpha = 1; };
   B.onRecover = function () { B.body.homeY = GY; };
   B.dying0 = function () { B.crystals.length = 0; B.body.elem = null; };
 

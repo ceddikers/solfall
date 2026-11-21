@@ -57,6 +57,7 @@
     let n = base() * (GRADE[grade] || 1);
     const rank = G.flow.peak;
     if (rank > 0) { n += 2 * rank; out.lines.push('Flow ' + G.flow.RANKS[rank].name + ' +' + 2 * rank); }
+    if (G.moments.broke) { n += 6 * G.moments.broke; out.lines.push('Wards broken +' + 6 * G.moments.broke); }
     n *= scale();
     if (!M.kills[bossId]) {
       out.first = true; n += 25;

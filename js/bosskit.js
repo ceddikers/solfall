@@ -109,6 +109,12 @@
       if (t.kind === 'extra') return t.ref.onHit(amount, info, t);
       if (B.blocked && B.blocked(t, info)) return false;
       const b = B.body;
+      // a Reckoning's ward takes the blow; the one that breaks it throws the boss down
+      if (B.ward) {
+        b.flash = 1;
+        if (G.moments.wardHit(B, amount, info)) { if (B.onReckon) B.onReckon(false); stagger(); }
+        return true;
+      }
       let mult = B.staggered ? (G.relic('eye') ? 1.82 : 1.4) : 1;
       if (b.exposed) mult *= 1.3;
       if (B.vuln) mult *= B.vuln(t, info);
@@ -284,6 +290,20 @@
       G.onBossDead();
     }
 
+    // Reckoning: it goes to the middle of the arena, wards itself and gathers a blast (moments.js).
+    B.ATTACKS.reckoning = function* () {
+      const b = B.body, P = G.player;
+      b.hidden = false; b.exposed = false;
+      if (B.onReckon) B.onReckon(true);
+      yield* tween(b, { x: 640, y: B.reckonY == null ? FLOOR : B.reckonY }, 0.7, E.inOutCubic);
+      b.face = G.sign(P.x - b.x) || b.face;
+      yield* G.moments.gather(B, () => ({ x: b.x, y: b.y - B.h / 2, r: Math.max(B.w, B.h) * 0.6 + 18 }));
+      // only reached when the ward held
+      if (B.onReckon) B.onReckon(false);
+      if (b.y < FLOOR) yield* tween(b, { y: FLOOR }, 0.3, E.inCubic);
+      yield* wait(0.5);
+    };
+
     B.intro = function () { B.script = introScript(); };
     function* introScript() {
       const b = B.body;
@@ -325,6 +345,7 @@
       let name = G.debug.forceAttack || '';
       if (name === 'none') return; // tests: stand idle
       if (!name && low && B.finale && !B.lastStand) { B.lastStand = true; name = B.finale; }
+      if (!name && G.moments.due(B)) name = 'reckoning';
       if (!name) name = nextAttack();
       if (!B.ATTACKS[name]) name = B.bags[B.phase][0];
       B.attackName = name;

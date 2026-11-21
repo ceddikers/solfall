@@ -7,7 +7,7 @@
   const WL = G.WALL_L, WR = G.WALL_R;
 
   const B = G.boss = {
-    BASE_HP: 5400, id: 'warden', name: 'THE ECLIPSED WARDEN', short: 'The Warden', theme: 'warden',
+    BASE_HP: 5400, id: 'warden', reckonName: 'ECLIPSE', name: 'THE ECLIPSED WARDEN', short: 'The Warden', theme: 'warden',
     blurb: 'A dimmed sun and its two hands',
     tips: [
       'Slash downward in the air to bounce off a hand and stay above the shockwaves.',
@@ -86,6 +86,12 @@
 
   B.damage = function (amount, t, info) {
     if (!B.active || B.dead || B.dying || B.invuln) return false;
+    // a Reckoning's ward takes the blow; the one that breaks it throws the Warden down
+    if (B.ward) {
+      B.core.flash = 1;
+      if (G.moments.wardHit(B, amount, info)) stagger();
+      return true;
+    }
     let mult = t.kind === 'core' ? 1.5 : 1;
     if (B.staggered) mult *= G.relic('eye') ? 1.82 : 1.4;
     if (B.hands.some((h) => h.alive && h.broken > 0)) mult *= 1.25; // exposed while a hand lies broken
@@ -422,6 +428,7 @@
     let name = G.debug.forceAttack || '';
     // the last stand: once, when the Warden is nearly spent
     if (!name && low && !B.lastStand) { B.lastStand = true; name = 'supernova'; }
+    if (!name && G.moments.due(B)) name = 'reckoning';
     if (!name) name = nextAttack();
     if (!ATTACKS[name] || !canUse(name)) name = B.phase === 3 ? 'rain' : 'lance';
     B.attackName = name;
@@ -1185,7 +1192,24 @@
     yield* tween(c, { y: HOME_Y[3] }, 0.6, E.outCubic);
   }
 
+  // Reckoning: the core comes down within reach, wards itself and gathers a blast (moments.js).
+  function* reckoning() {
+    const c = B.core;
+    c.ctrl = true;
+    const moves = [tween(c, { x: 640, y: FLOOR - 196, open: 1 }, 0.8)];
+    for (const h of B.hands) {
+      if (!usable(h)) continue;
+      h.ctrl = true;
+      moves.push(tween(h, { x: 640 + h.side * 480, y: 190, rot: h.side * 0.3, curl: 1 }, 0.8));
+    }
+    yield* par(...moves);
+    yield* G.moments.gather(B, () => ({ x: c.x, y: c.y, r: c.r + 24 }));
+    // only reached when the ward held
+    yield* tween(c, { y: HOME_Y[B.phase] }, 0.6, E.outBack);
+  }
+
   const ATTACKS = B.ATTACKS = {
+    reckoning,
     slam: atkSlam, sweep: atkSweep, clap: atkClap, lance: atkLance, rain: atkRain,
     flick: atkFlick, crossfire: atkCrossfire,
     slam2: atkSlam2, sweep2: atkSweep2, lance3: atkLance3, pulse: atkPulse, comb: atkComb,

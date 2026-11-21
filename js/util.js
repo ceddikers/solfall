@@ -3,7 +3,7 @@
 
 const G = window.G = {};
 
-G.VERSION = '0.7a';
+G.VERSION = '0.8a';
 G.W = 1280;          // logical view size
 G.H = 720;
 G.FLOOR = 612;       // y of the arena floor surface

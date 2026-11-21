@@ -2,7 +2,7 @@
 
 A side-on boss rush for the browser: three heroes, four three-phase bosses, played as a run of
 ever-harder trials. You pick a hero and a relic before the run and win a boon after each victory.
-Version 0.7a.
+Version 0.8a.
 
 This is an early slice of a planned boss-rush roguelite (short runs, a boon after each boss,
 bosses drawn from a pool). A run meets the four bosses in a shuffled order, then meets them again, harder.
@@ -90,6 +90,24 @@ Heroes are defined in `G.HEROES` in `js/run.js` (numbers, colours, text); the we
 
 The last blow of each fills the stagger bar like a Star Lance. When a boss falls, a finishing cut crosses the screen.
 Numbers are in `js/flow.js`.
+
+## Moments (new in v0.8a)
+
+Set pieces and rewards that punctuate a fight. All of them are in `js/moments.js`.
+
+| Moment | When | What happens |
+|---|---|---|
+| **Reckoning** | once in phase I (below five sixths of the boss's health) and once in phase II (below half) | The boss goes to the middle of the arena, wraps itself in a ward and gathers a blast while a red ring closes on it for 6.5 seconds. Hits go to the ward, shown as a gold arc. Break it and the boss is thrown down staggered, Dawnbreak gains a quarter of its bar and the fight pays 6 more Sunshards. Let the ring close and two blast rings go out: dash through each. |
+| **Riposte** | the first weapon hit within 1.5 seconds of a perfect dodge | double damage, with a freeze and a gold cut |
+| **Sunder** | the first finisher on a staggered boss | 2.2 times damage, a longer freeze and a cracked floor. One per stagger. |
+| **Clash** | a finisher, a dash thrust or a heavy arrow lands on the Veil or the Knight in the 0.3 seconds before its weapon swing lands, with you inside the swing | the swing is stopped dead; you are pushed back unharmed with 20 Starlight |
+| **Last Light** | the first time in a fight a hit leaves you on 1 health | time slows, you cannot be hurt for 2.4 seconds, Dawnbreak gains 35% and Starlight half a segment |
+| **One last push** | the boss drops below a tenth of its health | a call-out; the boss bleeds light and the screen pulses until it falls |
+
+The ward's strength is sized to the hero: about 3.3 seconds of steady attacking (158 for Vesper, 165 for
+Aster, 86 for Lune on Standard), more in later trials. A Dawnbreak breaks it outright. Each boss names
+its own Reckoning: Eclipse, Convergence, Death Mark, Dirge. A Reckoning is skipped if the boss leaves
+the phase before it gets the chance, and forced attacks in the tests never trigger one.
 
 ## Omens (new in v0.7a)
 
@@ -323,6 +341,7 @@ To use these in a new attack, call the ready-made mixes in `js/fx.js`: `G.fx.hit
 | `js/meta.js` | what lasts between runs: Sunshards, the Shrine (`G.SHRINE`), trophy relics |
 | `js/flow.js` | the Flow rank and each hero's Dawnbreak |
 | `js/omens.js` | the omens (`G.OMENS`) and what each one does during a fight |
+| `js/moments.js` | Reckoning, Riposte, Sunder, Clash, Last Light and the last push |
 | `js/input.js` | keyboard, mouse and gamepad mapped to actions |
 | `js/audio.js` | every sound and the music, synthesised in code (no audio files) |
 | `js/fx.js` | particles, smoke, shards, cut marks, floor cracks and scorch marks, screen shake and kick, flashes, hit-freeze, slow motion |
@@ -390,6 +409,12 @@ Open the browser console on the running game.
   were run and looked at in captures, and the numbers above were checked in the running game. Whether
   Flow climbs at a satisfying rate, how often Dawnbreak fills in a real fight (the aim was two to four
   times), and whether Sunshard prices are fair are first guesses.
+- **The v0.8a moments have not been played.** Each one was triggered in the running game and looked at
+  in captures: a Reckoning held and broken against all four bosses, a Riposte from a real perfect dodge,
+  a Clash against the Knight's cleave, Last Light and the last push. Whether 6.5 seconds and that much
+  ward is a fair race, whether a Clash is too easy or too hard to land, and whether the moments come too
+  often are guesses. The tests force single attacks, so they never see a Reckoning; the two blast rings
+  on failure use the same ring the Warden's Pulse does, but were not tested with a scripted player.
 - **Omens make fights harder than the tests show.** With no omen the boss tests still lose no health.
   With Stormfront or Emberfall forced on top of every single attack, the same scripted player loses 4
   to 6 health in 134 runs, mostly in the Knight's Charge and Grip and wherever it steps into a stone

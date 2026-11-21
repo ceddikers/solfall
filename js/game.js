@@ -61,7 +61,7 @@
     G.setBoss(G.debug.boss || G.run.foe());
     G.run.rollOmens(); // before the boss works out its health
     G.arena.reset(); G.hazards.clear(); F.reset();
-    G.player.reset(); G.flow.reset(); G.boss.reset(); G.boss.intro();
+    G.player.reset(); G.flow.reset(); G.boss.reset(); G.moments.reset(); G.boss.intro();
     G.state = 'fight'; G.paused = false;
     G.time = 0; G.hitstop = 0; G.slowT = 0; G.deadT = 0; G.wonT = 0; G.endShown = false;
     G.ui.close(); G.ui.resetHud(); G.ui.buildHp(G.player.maxHp); G.ui.buildRun(); G.ui.bossIntro(); G.ui.hud(true); G.ui.keysHint();
@@ -75,7 +75,7 @@
     G.setBoss('warden');
     G.arena.reset(); G.hazards.clear(); F.reset();
     G.player.reset(); G.flow.reset(); G.player.hidden = true;
-    G.boss.attract();
+    G.boss.attract(); G.moments.reset();
     G.state = 'title'; G.paused = false; G.hitstop = 0; G.slowT = 0;
     G.ui.resetHud(); G.ui.hud(false); G.ui.close(); G.ui.show('title');
     G.ui.fade(); G.ui.mood('menu');
@@ -159,6 +159,7 @@
     G.hazards.update(bdt);
     G.omens.update(sdt);
     G.flow.update(sdt);
+    G.moments.update(sdt);
     G.updateShots(sdt);
     F.update(sdt);
     // the view leans a little towards the hero
@@ -192,6 +193,7 @@
     ctx.translate(-G.W / 2 - G.cam.x, -G.H / 2 - G.cam.y);
     G.arena.drawBack(ctx);
     G.flow.drawVeil(ctx);
+    G.moments.drawGloom(ctx);
     F.drawDecals(ctx);
     G.boss.drawGround(ctx);
     G.player.drawShadow(ctx);
@@ -202,6 +204,7 @@
     G.hazards.draw(ctx, 'under');
     G.arena.drawPlatforms(ctx);
     if (G.boss.kit) drawBoss();
+    G.moments.draw(ctx);
     G.drawShots(ctx);
     G.player.draw(ctx);
     G.hazards.draw(ctx, 'over');

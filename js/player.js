@@ -464,7 +464,9 @@
         if (a.hit.has(t.id) || !touch(hb, t)) continue;
         a.hit.add(t.id);
         const c = contact(hb, t);
-        const res = G.boss.damage(a.dmg, t, { x: c.x, y: c.y, heavy: a.heavy || a.thrust, finisher: a.heavy, dir: a.dir, poise: H.poise });
+        // a riposte or a sunder makes this blow worth more (see moments.js)
+        const em = G.moments.strike(a.heavy);
+        const res = G.boss.damage(Math.round(a.dmg * em.mult), t, { x: c.x, y: c.y, heavy: a.heavy || a.thrust, finisher: a.heavy || em.mult > 1, dir: a.dir, poise: H.poise });
         if (res) {
           P.gain(a.heavy ? C.GAIN_HEAVY : C.GAIN_HIT);
           // the freeze, the shake and the kick all scale with the blow; the maul's are heavier
@@ -479,6 +481,7 @@
           }
           G.audio.play(a.heavy ? 'hitHeavy' : 'hit');
           struck(t, c.x, c.y);
+          G.moments.landed(em, c.x, c.y, swingAng(a), a.heavy || a.thrust);
         } else {
           G.audio.play('tink');
           G.fx.tink(c.x, c.y, swingAng(a));
@@ -637,6 +640,7 @@
     P.stats.perfect++;
     P.gain(C.GAIN_PERFECT);
     G.flow.perfect();
+    G.moments.perfect();
     P.dashCd = 0;
     G.audio.play('perfect');
     G.fx.slow(0.38, 0.3);
@@ -691,7 +695,7 @@
       G.run.phoenixUsed = true; P.hp = Math.min(P.maxHp, 3); P.inv = 3;
       revived('REBORN');
     }
-    if (P.hp <= 0) { P.hp = 0; die(); }
+    if (P.hp <= 0) { P.hp = 0; die(); } else G.moments.hurt();
     return true;
   };
 
@@ -735,7 +739,8 @@
             const close = 1 + 0.6 * G.clamp((300 - flown) / 180, 0, 1);
             // ...and lose up to 30% of their force past 240px, so sniping from safety is slow
             const far = 1 - 0.3 * G.clamp((flown - 240) / 180, 0, 1);
-            const res = G.boss.damage(Math.round(s.dmg * close * far), t, { x: s.x, y: s.y, heavy: s.heavy, finisher: s.heavy, dir: G.sign(s.vx), poise: H.poise });
+            const em = G.moments.strike(s.heavy);
+            const res = G.boss.damage(Math.round(s.dmg * close * far * em.mult), t, { x: s.x, y: s.y, heavy: s.heavy, finisher: s.heavy || em.mult > 1, dir: G.sign(s.vx), poise: H.poise });
             if (res) {
               P.gain(s.heavy ? C.ARROW_GAIN_HEAVY : C.ARROW_GAIN);
               G.fx.stop(s.heavy ? 0.06 : 0.016); G.fx.shake(s.heavy ? 6 : 1.2);
@@ -743,6 +748,7 @@
               G.fx.hit(s.x, s.y, Math.atan2(s.vy, s.vx), { heavy: s.heavy, power: s.heavy ? 0.8 : 0.75, col: s.heavy ? GOLD : STAR, hot: HOT });
               if (s.heavy) G.fx.ring(s.x, s.y, { r0: 6, r1: 70, life: 0.25, color: GOLD, width: 5 });
               struck(t, s.x, s.y);
+              G.moments.landed(em, s.x, s.y, Math.atan2(s.vy, s.vx), s.heavy);
             } else G.audio.play('tink');
             if (!s.heavy) s.dead = true; // only the heavy arrow pierces
             continue;
