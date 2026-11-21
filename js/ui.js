@@ -1,7 +1,7 @@
 // Solfall - menus, the in-fight display, and result screens (all plain DOM over the canvas).
 'use strict';
 (function () {
-  const U = G.ui = { current: null, stack: [], focus: 0, seen: {} };
+  const U = G.ui = { current: null, stack: [], focus: 0, seen: {}, lockUntil: 0 };
   const $ = (id) => document.getElementById(id);
   const el = {};
 
@@ -40,6 +40,7 @@
   U.init = function () {
     for (const id of ['hud', 'hp', 'ember', 'mend', 'timer', 'bfill', 'bchip', 'pfill', 'bphase', 'card', 'callout',
       'hint', 'lowhp', 'lbTop', 'lbBot', 'diffNote', 'bestLine', 'ver', 'deadLead', 'deadFill', 'deadStats',
+      'pauseBoons', 'boons', 'trial', 'winOver', 'winPick', 'winCards',
       'deadTip', 'winStats', 'winBest', 'gradeLetter', 'gradeTitle', 'gradeSub', 'stage']) el[id] = $(id);
     el.segs = Array.from(document.querySelectorAll('#ember .seg'));
     el.bbar = document.querySelector('.bbar');
@@ -56,7 +57,7 @@
       it.addEventListener('click', (e) => {
         const items = U.items();
         const i = items.indexOf(it);
-        if (i < 0) return;
+        if (i < 0 || performance.now() < U.lockUntil) return;
         U.setFocus(i);
         if (it.dataset.opt) {
           const def = OPTS[it.dataset.opt];
@@ -74,7 +75,7 @@
   // ------------------------------------------------------------------ menus
   U.items = function () {
     if (!U.current) return [];
-    return Array.from(document.querySelectorAll('#s-' + U.current + ' .item'));
+    return Array.from(document.querySelectorAll('#s-' + U.current + ' .item')).filter((it) => it.style.display !== 'none');
   };
   U.setFocus = function (i) {
     const items = U.items();
@@ -119,7 +120,9 @@
   }
   function act(name) {
     G.audio.play(name === 'back' ? 'uiBack' : 'uiSelect');
-    if (name === 'begin' || name === 'retry' || name === 'restart') G.startFight();
+    if (name === 'begin' || name === 'retry' || name === 'restart') G.startRun();
+    else if (/^boon\d$/.test(name)) G.takeBoon(Number(name.slice(4)));
+    else if (name === 'endrun') G.toTitle();
     else if (name === 'how') U.show('how', true);
     else if (name === 'settings') U.show('settings', true);
     else if (name === 'back') U.back();
@@ -134,6 +137,7 @@
   U.onAction = function (a) {
     const items = U.items();
     if (!items.length) return;
+    if (performance.now() < U.lockUntil) return; // a result screen just opened: ignore mashed buttons
     const n = items.length, it = items[U.focus];
     if (a === 'up') { U.setFocus((U.focus - 1 + n) % n); G.audio.play('uiMove'); }
     else if (a === 'down') { U.setFocus((U.focus + 1) % n); G.audio.play('uiMove'); }
@@ -151,7 +155,7 @@
       else if (U.current === 'pause') { G.audio.play('uiBack'); G.resume(); }
     }
     else if (a === 'retry') {
-      if (U.current === 'dead' || U.current === 'win') act('retry');
+      if (U.current === 'dead') act('retry');
     }
   };
 
@@ -165,7 +169,14 @@
     });
     el.diffNote.textContent = NOTES[G.settings.difficulty] || '';
     const best = G.store.load('best', {})[G.settings.difficulty];
-    el.bestLine.textContent = best ? 'Best on ' + G.diff().name + ': ' + U.fmtTime(best.time) + ' (' + best.grade + ')' : 'No victory on ' + G.diff().name + ' yet';
+    const depth = G.store.load('depth', {})[G.settings.difficulty];
+    el.bestLine.textContent = depth
+      ? G.diff().name + ': deepest trial ' + G.roman(depth) + (best ? ' \u00b7 fastest first trial ' + U.fmtTime(best.time) + ' (' + best.grade + ')' : '')
+      : 'No victory on ' + G.diff().name + ' yet';
+    const held = G.run.held();
+    el.pauseBoons.innerHTML = held.length
+      ? '<h3>Boons this run</h3>' + held.map((h) => '<p><b>' + h.def.name + (h.n > 1 ? ' \u00d7' + h.n : '') + '</b> ' + h.def.desc + '</p>').join('')
+      : '';
   };
 
   // ------------------------------------------------------------------ in-fight display
@@ -187,6 +198,22 @@
       el.hp.appendChild(d);
     }
     H.hp = n; H.max = n;
+  };
+
+  // Trial label, boon list and Starlight segments for the fight that is starting.
+  U.buildRun = function () {
+    const R = G.run;
+    el.trial.textContent = R.trial > 1 ? 'Trial ' + G.roman(R.trial) : '';
+    el.boons.innerHTML = R.held().map((h) => '<span class="t-' + h.def.tag.toLowerCase() + '">' + h.def.name + (h.n > 1 ? ' \u00d7' + h.n : '') + '</span>').join('');
+    const label = el.ember.querySelector('.elabel');
+    el.ember.querySelectorAll('.seg').forEach((s) => s.remove());
+    for (let i = 0; i < G.player.segs; i++) {
+      const s = document.createElement('div');
+      s.className = 'seg'; s.appendChild(document.createElement('i'));
+      el.ember.insertBefore(s, label);
+    }
+    el.segs = Array.from(el.ember.querySelectorAll('.seg'));
+    H.ember = -1; H.full = -1;
   };
 
   U.bossIntro = function () {
@@ -327,7 +354,7 @@
   U.showDead = function () {
     const P = G.player, B = G.boss;
     const pct = Math.max(1, Math.ceil(B.hp / B.maxHp * 100));
-    el.deadLead.textContent = 'The Warden endures with ' + pct + '% of its strength, in phase ' + ROMAN[B.phase] + '.';
+    el.deadLead.textContent = 'You fell in trial ' + G.roman(G.run.trial) + '. The Warden endured with ' + pct + '% of its strength, in phase ' + ROMAN[B.phase] + '.';
     el.deadFill.style.transition = 'none';
     el.deadFill.style.width = '100%';
     void el.deadFill.offsetWidth;
@@ -337,10 +364,11 @@
       [U.fmtTime(G.time), 'Time'],
       [P.stats.dmg, 'Damage dealt'],
       [P.stats.perfect, 'Perfect dodges'],
-      [P.stats.heals, 'Mends'],
+      [G.run.order.length, 'Boons held'],
     ]);
     el.deadTip.textContent = G.pick(TIPS);
     U.hud(false);
+    U.lockUntil = performance.now() + 500;
     U.show('dead');
   };
 
@@ -355,10 +383,23 @@
       [P.stats.perfect, 'Perfect dodges'],
       [P.stats.lances, 'Star Lances'],
     ]);
-    el.winBest.textContent = res.newBest
-      ? 'New best time on ' + G.diff().name + '.'
-      : 'Best on ' + G.diff().name + ': ' + U.fmtTime(res.best.time) + ' (' + res.best.grade + ')';
+    el.winOver.textContent = 'Victory \u00b7 trial ' + G.roman(res.trial);
+    el.winBest.textContent = res.newBest ? 'New fastest first trial on ' + G.diff().name + '.'
+      : res.newDepth ? 'Your deepest trial yet on ' + G.diff().name + '.' : '';
+    el.winPick.textContent = 'Choose a boon to carry into trial ' + G.roman(res.trial + 1);
+    const cards = Array.from(el.winCards.children);
+    cards.forEach((c, i) => {
+      const b = res.offer[i];
+      c.style.display = b ? '' : 'none';
+      if (!b) return;
+      const own = G.boon(b.id);
+      c.className = 'item card t-' + b.tag.toLowerCase();
+      c.querySelector('.ctag').textContent = b.tag;
+      c.querySelector('.cname').textContent = b.name;
+      c.querySelector('.cdesc').textContent = b.desc + (own ? ' You hold ' + own + '.' : '');
+    });
     U.hud(false);
+    U.lockUntil = performance.now() + 700;
     U.show('win');
   };
 })();

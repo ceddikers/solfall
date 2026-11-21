@@ -24,11 +24,12 @@
         <span class="elabel">STARLIGHT</span>
       </div>
       <div id="mend"></div>
+      <div id="boons"></div>
     </div>
     <div id="timer">0:00.0</div>
     <div id="bhud">
       <div class="brow">
-        <span class="bname">THE ECLIPSED WARDEN</span>
+        <span class="bname">THE ECLIPSED WARDEN <i id="trial"></i></span>
         <span id="bphase"><b>I</b><b>II</b><b>III</b></span>
       </div>
       <div class="bbar">
@@ -88,6 +89,7 @@
               <li><b>Slash downward in the air</b> to bounce off the Warden and get your jump and dash back.</li>
               <li><b>The core takes extra damage.</b> Fill the stagger bar to bring it down within reach.</li>
               <li><b>A hand that goes dim and cracked is stuck.</b> That is your opening.</li>
+              <li><b>Each victory grants a boon</b> and leads to a harder trial. Falling ends the run.</li>
             </ul>
           </div>
         </div>
@@ -115,11 +117,12 @@
         <h2>Paused</h2>
         <nav>
           <div class="item" data-act="resume">Resume</div>
-          <div class="item" data-act="restart">Restart fight</div>
+          <div class="item" data-act="restart">Restart run</div>
           <div class="item" data-act="how">How to play</div>
           <div class="item" data-act="settings">Settings</div>
           <div class="item" data-act="quit">Quit to title</div>
         </nav>
+        <div id="pauseBoons" class="boonlist"></div>
       </div>
     </section>
 
@@ -133,7 +136,7 @@
         <div class="stats" id="deadStats"></div>
         <p class="tip" id="deadTip"></p>
         <nav class="row">
-          <div class="item" data-act="retry">Try again <kbd>R</kbd></div>
+          <div class="item" data-act="retry">New run <kbd>R</kbd></div>
           <div class="item" data-act="quit">Title</div>
         </nav>
       </div>
@@ -141,14 +144,19 @@
 
     <section id="s-win" class="screen panelscreen">
       <div class="panel result win">
-        <p class="over">Victory</p>
+        <p class="over" id="winOver">Victory</p>
         <h2>THE SUN RETURNS</h2>
         <div class="grade"><div class="ring"><span id="gradeLetter">A</span></div><div class="gtext"><b id="gradeTitle"></b><span id="gradeSub"></span></div></div>
         <div class="stats" id="winStats"></div>
         <p class="tip" id="winBest"></p>
+        <p class="pick" id="winPick"></p>
+        <nav class="row cards" id="winCards">
+          <div class="item card" data-act="boon0"><span class="ctag"></span><b class="cname"></b><span class="cdesc"></span></div>
+          <div class="item card" data-act="boon1"><span class="ctag"></span><b class="cname"></b><span class="cdesc"></span></div>
+          <div class="item card" data-act="boon2"><span class="ctag"></span><b class="cname"></b><span class="cdesc"></span></div>
+        </nav>
         <nav class="row">
-          <div class="item" data-act="retry">Fight again <kbd>R</kbd></div>
-          <div class="item" data-act="quit">Title</div>
+          <div class="item" data-act="endrun">End the run here</div>
         </nav>
       </div>
     </section>
@@ -157,6 +165,7 @@
 </div>
 
 <script src="js/util.js"></script>
+<script src="js/run.js"></script>
 <script src="js/input.js"></script>
 <script src="js/audio.js"></script>
 <script src="js/fx.js"></script>

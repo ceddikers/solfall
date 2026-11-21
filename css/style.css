@@ -286,3 +286,42 @@ ul.tips b { color: var(--ink); font-weight: 600; }
 #game { transition: filter 1.1s ease-out; }
 #stage.fallen #game { filter: grayscale(0.85) brightness(0.72); }
 #mend kbd { font-size: 11px; }
+
+/* ---------------------------------------------------------------- run: trials and boons */
+#trial { margin-left: 14px; font: 400 12px var(--ui); font-style: normal; letter-spacing: 0.3em; color: var(--bcol2); text-transform: uppercase; }
+#boons { display: flex; flex-wrap: wrap; gap: 5px; max-width: 330px; margin-top: 10px; }
+#boons span {
+  padding: 2px 7px; font-size: 10.5px; letter-spacing: 0.08em; color: var(--ink);
+  background: rgba(8, 6, 14, 0.6); border: 1px solid var(--tagc, rgba(255, 255, 255, 0.3)); border-left-width: 3px;
+}
+.t-movement { --tagc: #7fe3b0; }
+.t-sword { --tagc: #ffba5c; }
+.t-starlight { --tagc: #96e1ff; }
+.t-survival { --tagc: #ff9aa6; }
+.t-risk { --tagc: #ff6038; }
+
+.boonlist { margin-top: 16px; }
+.boonlist h3 { margin: 0 0 8px; text-align: center; }
+.boonlist p { margin: 0 0 6px; font-size: 13px; line-height: 1.4; color: var(--dim); }
+.boonlist b { color: var(--ink); font-weight: 600; margin-right: 6px; }
+
+.panel.result.win { width: 900px; padding-bottom: 22px; }
+.win .grade { margin: 10px 0 14px; }
+.win .tip { margin-top: 12px; min-height: 0; }
+.pick { margin: 16px 0 10px; font-size: 13px; font-weight: 600; letter-spacing: 0.3em; color: var(--gold); text-transform: uppercase; }
+.panel nav.row.cards { gap: 14px; margin-top: 0; align-items: stretch; }
+.item.card {
+  flex: 1; display: flex; flex-direction: column; gap: 6px; padding: 14px 16px 16px; min-height: 132px;
+  text-align: left; text-transform: none; letter-spacing: 0; white-space: normal;
+  background: rgba(255, 255, 255, 0.035); border: 1px solid rgba(255, 255, 255, 0.14); border-top: 3px solid var(--tagc, #fff);
+  transition: transform 0.12s, background 0.12s, box-shadow 0.12s, border-color 0.12s;
+}
+.item.card::before, .item.card::after { display: none; }
+.item.card .ctag { font-size: 10px; letter-spacing: 0.3em; text-transform: uppercase; color: var(--tagc, #fff); }
+.item.card .cname { font: 400 21px var(--display); letter-spacing: 0.06em; color: var(--ink); }
+.item.card .cdesc { font-size: 13.5px; line-height: 1.45; color: var(--dim); }
+.item.card.focus {
+  transform: translateY(-5px); background: rgba(255, 255, 255, 0.09); text-shadow: none;
+  border-color: var(--tagc, #fff); box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5), 0 0 18px -4px var(--tagc, #fff);
+}
+.item.card.focus .cdesc { color: var(--ink); }

@@ -26,19 +26,26 @@
   }
 
   // ------------------------------------------------------------------ state changes
+  // A run is a chain of trials. Each victory grants a boon and leads to a tougher trial;
+  // falling ends the run.
+  G.startRun = function () { G.run.reset(); G.startFight(); };
+  G.nextTrial = function () { G.run.trial++; G.startFight(); };
+  G.takeBoon = function (i) { G.run.take(i); G.nextTrial(); };
+
   G.startFight = function () {
     G.seed((Date.now() ^ (Math.random() * 1e9)) >>> 0);
     G.arena.reset(); G.hazards.clear(); F.reset();
     G.player.reset(); G.boss.reset(); G.boss.intro();
     G.state = 'fight'; G.paused = false;
     G.time = 0; G.hitstop = 0; G.slowT = 0; G.deadT = 0; G.wonT = 0; G.endShown = false;
-    G.ui.close(); G.ui.resetHud(); G.ui.buildHp(G.player.maxHp); G.ui.bossIntro(); G.ui.hud(true); G.ui.keysHint();
+    G.ui.close(); G.ui.resetHud(); G.ui.buildHp(G.player.maxHp); G.ui.buildRun(); G.ui.bossIntro(); G.ui.hud(true); G.ui.keysHint();
     G.ui.fade(); G.ui.mood('fight');
     G.audio.init(); G.audio.startMusic(); G.audio.setIntensity(1, true); G.audio.duck(1);
     G.input.endStep();
   };
 
   G.toTitle = function () {
+    G.run.reset();
     G.arena.reset(); G.hazards.clear(); F.reset();
     G.player.reset(); G.player.hidden = true;
     G.boss.attract();
@@ -78,11 +85,15 @@
     const score = 100 - P.stats.hits * 9 - Math.max(0, t - 150) * 0.12 + Math.min(10, P.stats.perfect * 1.5);
     const grade = score >= 92 ? 'S' : score >= 76 ? 'A' : score >= 58 ? 'B' : 'C';
     const title = { S: 'Flawless light', A: 'Radiant', B: 'Steadfast', C: 'Survivor' }[grade];
+    const d = G.settings.difficulty, trial = G.run.trial;
+    // fastest time counts for the first trial only, where every run starts equal
     const best = G.store.load('best', {});
-    const d = G.settings.difficulty;
-    const newBest = !best[d] || t < best[d].time;
+    const newBest = trial === 1 && (!best[d] || t < best[d].time);
     if (newBest) { best[d] = { time: Math.round(t * 10) / 10, grade }; G.store.save('best', best); }
-    return { grade, title, newBest, best: best[d] };
+    const depth = G.store.load('depth', {});
+    const newDepth = !depth[d] || trial > depth[d];
+    if (newDepth) { depth[d] = trial; G.store.save('depth', depth); }
+    return { grade, title, newBest, best: best[d], trial, newDepth, offer: G.run.rollOffer() };
   }
 
   function onAction(a) {
@@ -90,7 +101,7 @@
     if (G.ui.current) { G.ui.onAction(a); return; }
     if (a === 'pause') G.pause();
     // no need to wait for the defeat screen: R restarts at once
-    if (a === 'retry' && G.state === 'dead') G.startFight();
+    if (a === 'retry' && G.state === 'dead') G.startRun();
   }
 
   // ------------------------------------------------------------------ simulation
@@ -190,6 +201,12 @@
       step(STEP);
     }
     if (opts.random) for (const a of acts) I.down[a] = false;
+  };
+  // Add a boon by id for testing, e.g. G.debug.give('keen'). It takes effect in the next fight.
+  G.debug.give = function (id) {
+    if (!G.boonDef(id)) return 'unknown boon; ids: ' + G.BOONS.map((b) => b.id).join(', ');
+    G.run.boons[id] = G.boon(id) + 1; G.run.order.push(id);
+    return id + ' x' + G.boon(id);
   };
   // Drop the boss to the edge of its next phase (call again to skip another).
   G.debug.nextPhase = function () {

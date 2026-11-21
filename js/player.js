@@ -20,12 +20,20 @@
   P.box = function () { _box.cx = P.x; _box.cy = P.y - 22; return _box; };
 
   P.reset = function () {
+    // boons taken this run change these
+    const hp = Math.max(1, G.diff().hp + G.boon('heart') - G.boon('glass'));
+    const maxAir = 1 + G.boon('wind'), maxDash = 1 + G.boon('twin');
     Object.assign(P, {
       x: 300, y: FLOOR, vx: 0, vy: 0, facing: 1,
-      onGround: true, plat: null, coyote: 0, dropT: 0, jumpHeld: false, airJumps: 1,
+      onGround: true, plat: null, coyote: 0, dropT: 0, jumpHeld: false,
+      maxAir, maxDash, airJumps: maxAir, airDashes: maxDash,
+      segs: C.SEGS + G.boon('fourth'),
+      healTime: C.HEAL_T * (G.boon('swift') ? 0.5 : 1),
+      dashCdMax: C.DASH_CD * (G.boon('twin') ? 0.7 : 1),
+      dashHit: new Set(), dawnUsed: false,
       jumpBuf: 0, atkBuf: 0, dashBuf: 0, flareBuf: 0,
-      dashT: 0, dashCd: 0, dashDir: 1, airDash: true, iframes: 0, pdDone: false, ghostT: 0,
-      inv: 0, stun: 0, hp: G.diff().hp, maxHp: G.diff().hp,
+      dashT: 0, dashCd: 0, dashDir: 1, iframes: 0, pdDone: false, ghostT: 0,
+      inv: 0, stun: 0, hp, maxHp: hp,
       ember: 0, healT: 0, healLock: false,
       atk: null, atkCd: 0, combo: -1, comboT: 0,
       dead: false, deadT: 0, hidden: false,
@@ -39,12 +47,12 @@
   };
 
   function ground() {
-    P.vy = 0; P.onGround = true; P.airJumps = 1; P.airDash = true; P.coyote = C.COYOTE;
+    P.vy = 0; P.onGround = true; P.airJumps = P.maxAir; P.airDashes = P.maxDash; P.coyote = C.COYOTE;
   }
 
   P.gain = function (n) {
     const before = Math.floor(P.ember / C.SEG);
-    P.ember = Math.min(C.SEG * C.SEGS, P.ember + n);
+    P.ember = Math.min(C.SEG * P.segs, P.ember + n * (1 + 0.4 * G.boon('vein')));
     if (Math.floor(P.ember / C.SEG) > before) { G.audio.play('segment'); P.emberFlash = 1; }
   };
 
@@ -101,7 +109,7 @@
         G.fx.spawn({ x: P.x + Math.cos(a) * r, y: P.y - 24 + Math.sin(a) * r, vx: -Math.cos(a) * r * 2.4, vy: -Math.sin(a) * r * 2.4, life: 0.36, size: 3, color: STAR });
       }
       if (P.jumpBuf > 0 || P.dashBuf > 0) { P.healT = 0; P.healLock = true; }
-      else if (P.healT >= C.HEAL_T) {
+      else if (P.healT >= P.healTime) {
         P.hp++; P.ember -= C.SEG; P.healT = 0; P.healLock = true; P.stats.heals++;
         G.audio.play('heal');
         G.fx.ring(P.x, P.y - 24, { r0: 10, r1: 90, life: 0.45, color: STAR, width: 6 });
@@ -114,12 +122,12 @@
     }
 
     // --- dash
-    if (P.dashBuf > 0 && P.dashT <= 0 && P.dashCd <= 0 && P.stun <= 0 && (P.onGround || P.airDash)) {
+    if (P.dashBuf > 0 && P.dashT <= 0 && P.dashCd <= 0 && P.stun <= 0 && (P.onGround || P.airDashes > 0)) {
       P.dashBuf = 0;
       P.dashT = C.DASH_T; P.dashDir = mx || P.facing; P.facing = P.dashDir;
       P.iframes = C.IFRAME; P.pdDone = false;
-      if (!P.onGround) P.airDash = false;
-      P.atk = null; P.healT = 0; P.ghostT = 0;
+      if (!P.onGround) P.airDashes--;
+      P.atk = null; P.healT = 0; P.ghostT = 0; P.dashHit.clear();
       G.audio.play('dash');
       G.fx.burst(P.x, P.y - 22, { n: 8, color: STAR, speed: [80, 300], angle: P.dashDir > 0 ? Math.PI : 0, spread: 0.9, life: [0.15, 0.4], kind: 'spark', size: [2, 3] });
     }
@@ -130,7 +138,8 @@
       P.vx = P.dashDir * C.DASH_SPEED; P.vy = 0;
       P.ghostT -= dt;
       if (P.ghostT <= 0) { P.ghostT = 0.028; P.ghosts.push({ x: P.x, y: P.y, f: P.facing, life: 0.26 }); }
-      if (P.dashT <= 0) { P.vx = P.dashDir * C.RUN * (mx === P.dashDir ? 1 : 0.6); P.dashCd = C.DASH_CD; }
+      if (G.boon('comet')) cometStep();
+      if (P.dashT <= 0) { P.vx = P.dashDir * C.RUN * (mx === P.dashDir ? 1 : 0.6); P.dashCd = P.dashCdMax; }
     } else if (P.stun > 0) {
       P.stun -= dt;
       P.vx *= Math.exp(-2.5 * dt);
@@ -220,10 +229,14 @@
       const heavy = kind === 'side' && idx === 2;
       P.atk = {
         kind, idx, heavy, t: 0, dur: heavy ? 0.3 : 0.22, a0: 0.02, a1: heavy ? 0.17 : 0.13,
-        hit: new Set(), dmg: heavy ? 17 : (kind === 'side' ? 10 : 11), dir: P.facing,
+        hit: new Set(), dir: P.facing,
+        dmg: Math.round((heavy ? 17 : (kind === 'side' ? 10 : 11)) * (1 + 0.25 * G.boon('keen')) * G.dmgMult()),
       };
-      P.atkCd = heavy ? 0.36 : 0.23;
-      P.slashes.push({ kind, dir: P.facing, heavy, idx, t: 0, dur: heavy ? 0.26 : 0.19 });
+      P.atkCd = (heavy ? 0.36 : 0.23) * (1 - 0.18 * G.boon('quick'));
+      P.slashes.push({ kind, dir: P.facing, heavy, idx, t: 0, dur: heavy ? 0.26 : 0.19, reach: 1 + 0.25 * G.boon('reach') });
+      if (heavy && G.boon('crescent')) {
+        G.shots.push({ wave: true, x: P.x + P.facing * 34, y: P.y - 26, vx: P.facing * 980, vy: 0, t: 0, life: 0.42, hit: new Set(), dmg: Math.round(16 * G.dmgMult()) });
+      }
       G.audio.play(heavy ? 'slash3' : 'slash');
       if (kind === 'side' && P.onGround && P.stun <= 0) P.vx += P.facing * (heavy ? 240 : 100);
     }
@@ -248,7 +261,7 @@
         if (!dx && !dy) dx = P.facing;
         if (dx) P.facing = dx > 0 ? 1 : -1;
         const len = Math.hypot(dx, dy); dx /= len; dy /= len;
-        G.shots.push({ x: P.x + dx * 18, y: P.y - 24 + dy * 18, vx: dx * C.LANCE_SPEED, vy: dy * C.LANCE_SPEED, t: 0, hit: new Set(), dmg: C.LANCE_DMG });
+        fireLance(dx, dy);
         P.vx -= dx * 240;
         if (dy > 0) { P.vy = Math.min(P.vy, -420); }
         G.audio.play('flare');
@@ -263,11 +276,38 @@
   };
 
   function atkBox(a) {
-    if (a.kind === 'up') return { cx: P.x + a.dir * 6, cy: P.y - 80, hw: 42, hh: 46 };
-    if (a.kind === 'down') return { cx: P.x, cy: P.y + 14, hw: 36, hh: 42 };
+    const r = 1 + 0.3 * G.boon('reach'); // Long Reach stretches each box away from the hero
+    if (a.kind === 'up') return { cx: P.x + a.dir * 6, cy: P.y - 34 - 46 * r, hw: 42, hh: 46 * r };
+    if (a.kind === 'down') return { cx: P.x, cy: P.y - 28 + 42 * r, hw: 36, hh: 42 * r };
     return a.heavy
-      ? { cx: P.x + a.dir * 54, cy: P.y - 26, hw: 58, hh: 42 }
-      : { cx: P.x + a.dir * 48, cy: P.y - 26, hw: 48, hh: 36 };
+      ? { cx: P.x + a.dir * (58 * r - 4), cy: P.y - 26, hw: 58 * r, hh: 42 }
+      : { cx: P.x + a.dir * 48 * r, cy: P.y - 26, hw: 48 * r, hh: 36 };
+  }
+
+  // Fire one Star Lance (or three with Split Lance) along a unit direction.
+  function fireLance(dx, dy) {
+    const split = G.boon('split');
+    const angles = split ? [-0.2, 0, 0.2] : [0];
+    const dmg = Math.round(C.LANCE_DMG * (split ? 0.6 : 1) * G.dmgMult());
+    for (const a of angles) {
+      const c = Math.cos(a), s = Math.sin(a);
+      const vx = dx * c - dy * s, vy = dx * s + dy * c;
+      G.shots.push({ x: P.x + vx * 18, y: P.y - 24 + vy * 18, vx: vx * C.LANCE_SPEED, vy: vy * C.LANCE_SPEED, t: 0, hit: new Set(), dmg });
+    }
+  }
+
+  // Comet Step: a dash cuts anything it passes through, once per dash.
+  function cometStep() {
+    for (const t of G.boss.targets()) {
+      if (P.dashHit.has(t.id) || !touch(P.box(), t)) continue;
+      P.dashHit.add(t.id);
+      const dmg = Math.round(24 * G.boon('comet') * G.dmgMult());
+      if (G.boss.damage(dmg, t, { x: P.x, y: P.y - 22, heavy: true, dir: P.dashDir })) {
+        P.gain(C.GAIN_HIT);
+        G.audio.play('hit');
+        G.fx.burst(P.x, P.y - 22, { n: 12, color: HOT, speed: [120, 520], life: [0.12, 0.35], kind: 'spark', size: [2, 4] });
+      }
+    }
   }
   P.atkBox = atkBox;
 
@@ -311,7 +351,7 @@
     }
     if (bounced && a.kind === 'down' && !a.pogo) {
       a.pogo = true;
-      P.vy = -680; P.airJumps = 1; P.airDash = true; P.onGround = false; P.plat = null; P.jumpHeld = false;
+      P.vy = -680; P.airJumps = P.maxAir; P.airDashes = P.maxDash; P.onGround = false; P.plat = null; P.jumpHeld = false;
       P.squash = 0.2;
     }
   }
@@ -326,6 +366,13 @@
     G.fx.ring(P.x, P.y - 22, { r0: 12, r1: 110, life: 0.45, color: STAR, width: 5 });
     G.fx.flash(STAR, 0.1, 0.25);
     G.fx.text(P.x, P.y - 74, 'PERFECT', { color: HOT, size: 17, life: 0.9 });
+    // Mirror Step answers a perfect dodge with a free lance at the core
+    const B = G.boss;
+    if (G.boon('mirror') && B.active && !B.dead && !B.dying) {
+      const dx = B.core.x - P.x, dy = B.core.y - (P.y - 24), d = Math.hypot(dx, dy) || 1;
+      fireLance(dx / d, dy / d);
+      G.audio.play('flare');
+    }
   }
 
   P.tryHit = function (dmg, srcX, src) {
@@ -342,6 +389,14 @@
     G.fx.stop(0.14); G.fx.shake(13); G.fx.flash('255,50,50', 0.26, 0.35);
     G.fx.burst(P.x, P.y - 22, { n: 16, color: '255,120,120', speed: [100, 420], life: [0.2, 0.55], kind: 'spark', size: [2, 4] });
     G.audio.play('hurt');
+    if (P.hp <= 0 && G.boon('dawn') && !P.dawnUsed) {
+      // Second Dawn: survive the killing blow once per trial
+      P.dawnUsed = true; P.hp = 1; P.inv = 2.6;
+      G.audio.play('heal');
+      G.fx.flash(HOT, 0.5, 0.6); G.fx.slow(0.3, 0.6);
+      G.fx.ring(P.x, P.y - 22, { r0: 20, r1: 260, life: 0.7, color: HOT, width: 10 });
+      G.fx.text(P.x, P.y - 84, 'SECOND DAWN', { color: HOT, size: 20, life: 1.4 });
+    }
     if (P.hp <= 0) { P.hp = 0; die(); }
     return true;
   };
@@ -369,8 +424,11 @@
           const hb = { cx: s.x, cy: s.y, hw: 16, hh: 16 };
           if (!touch(hb, t)) continue;
           s.hit.add(t.id);
-          const res = G.boss.damage(s.dmg, t, { x: s.x, y: s.y, heavy: true, lance: true });
-          if (res) {
+          const res = G.boss.damage(s.dmg, t, { x: s.x, y: s.y, heavy: true, lance: !s.wave, dir: G.sign(s.vx) });
+          if (res && s.wave) {
+            G.fx.stop(0.03); G.audio.play('hit');
+            G.fx.burst(s.x, s.y, { n: 10, color: STAR, speed: [100, 420], life: [0.15, 0.4], kind: 'spark', size: [2, 4] });
+          } else if (res) {
             G.fx.stop(0.07); G.fx.shake(9);
             G.audio.play('flareHit');
             G.fx.ring(s.x, s.y, { r0: 10, r1: 120, life: 0.35, color: HOT, width: 8 });
@@ -384,7 +442,7 @@
         s.dead = true;
         G.fx.burst(s.x, FLOOR - 4, { n: 14, color: STAR, speed: [100, 460], angle: -Math.PI / 2, spread: 2.4, life: [0.2, 0.5], kind: 'spark', size: [2, 4] });
       }
-      if (s.dead || s.x < -100 || s.x > G.W + 100 || s.y < -200 || s.t > 2) G.shots.splice(i, 1);
+      if (s.dead || s.x < -100 || s.x > G.W + 100 || s.y < -200 || s.t > (s.life || 2)) G.shots.splice(i, 1);
     }
   };
 
@@ -392,6 +450,18 @@
     ctx.globalCompositeOperation = 'lighter';
     ctx.lineCap = 'round';
     for (const s of G.shots) {
+      if (s.wave) {
+        // Crescent: an arc of light that fades as it travels
+        const d = s.vx > 0 ? 1 : -1, k = 1 - s.t / s.life;
+        ctx.save();
+        ctx.translate(s.x, s.y); ctx.scale(d, 1);
+        ctx.strokeStyle = G.rgba(STAR, 0.45 * k); ctx.lineWidth = 16;
+        ctx.beginPath(); ctx.arc(-26, 0, 44, -0.85, 0.85); ctx.stroke();
+        ctx.strokeStyle = G.rgba(HOT, 0.95 * k); ctx.lineWidth = 5;
+        ctx.beginPath(); ctx.arc(-26, 0, 44, -0.85, 0.85); ctx.stroke();
+        ctx.restore();
+        continue;
+      }
       const tx = s.x - s.vx * 0.05, ty = s.y - s.vy * 0.05;
       ctx.strokeStyle = G.rgba(STAR, 0.35); ctx.lineWidth = 16;
       ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(s.x, s.y); ctx.stroke();
@@ -442,6 +512,7 @@
       let cx, cy, R, a0, a1;
       ctx.save();
       ctx.translate(P.x, P.y);
+      const rs = s.reach || 1;
       if (s.kind === 'up') { cx = 0; cy = -50; R = 62; a0 = -Math.PI + 0.3; a1 = -0.3; if (s.dir < 0) ctx.scale(-1, 1); }
       else if (s.kind === 'down') { cx = 0; cy = -14; R = 58; a0 = 0.3; a1 = Math.PI - 0.3; if (s.dir < 0) ctx.scale(-1, 1); }
       else {
@@ -451,6 +522,7 @@
         if (s.idx === 1) { a0 = 1.2; a1 = -1.2; }
         if (s.heavy) { a0 = -1.7; a1 = 1.35; }
       }
+      R *= rs;
       const end = G.lerp(a0, a1, head);
       const start = G.lerp(a0, a1, Math.max(0, head - 0.8 + k * 0.5));
       crescent(ctx, cx, cy, R, start, end, s.heavy ? 36 : 26);
@@ -600,7 +672,7 @@
 
     // mend channel
     if (P.healT > 0) {
-      const k = P.healT / C.HEAL_T;
+      const k = P.healT / P.healTime;
       ctx.globalCompositeOperation = 'lighter';
       ctx.strokeStyle = G.rgba(STAR, 0.3); ctx.lineWidth = 3;
       ctx.beginPath(); ctx.arc(P.x, P.y - 24, 40, 0, G.TAU); ctx.stroke();

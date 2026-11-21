@@ -299,7 +299,7 @@
       tween(R, { y: HOME_Y[1] + 128 }, 2.0, E.outBack)
     );
     G.audio.play('roar'); G.audio.play('card');
-    G.ui.card('', 'THE ECLIPSED WARDEN', 'Keeper of the dimmed sun');
+    G.ui.card('', 'THE ECLIPSED WARDEN', G.run.trial > 1 ? 'Trial ' + G.roman(G.run.trial) + ' \u00b7 it remembers you' : 'Keeper of the dimmed sun');
     G.fx.shake(12);
     G.fx.ring(c.x, c.y, { r0: c.r, r1: 700, life: 0.9, color: G.pal().boss, width: 12, alpha: 0.7 });
     c.charge = 1;
@@ -341,7 +341,7 @@
   }
 
   // ------------------------------------------------------------------ attack helpers
-  const hard = () => G.settings.difficulty === 2;
+  const hard = () => G.fierce();
   const gentle = () => G.settings.difficulty === 0;
 
   // A column warning that scripts move and fill by hand.
