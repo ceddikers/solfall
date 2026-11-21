@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Solfall</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="stage">
+  <canvas id="game"></canvas>
+  <div id="lowhp"></div>
+  <div class="lb" id="lbTop"></div>
+  <div class="lb" id="lbBot"></div>
+
+  <!-- in-fight display -->
+  <div id="hud" class="off">
+    <div id="phud">
+      <div class="plabel">VESPER</div>
+      <div id="hp"></div>
+      <div id="ember">
+        <div class="seg"><i></i></div><div class="seg"><i></i></div><div class="seg"><i></i></div>
+        <span class="elabel">STARLIGHT</span>
+      </div>
+      <div id="mend">Hold <kbd>E</kbd> to mend</div>
+    </div>
+    <div id="timer">0:00.0</div>
+    <div id="bhud">
+      <div class="brow">
+        <span class="bname">THE ECLIPSED WARDEN</span>
+        <span id="bphase"><b>I</b><b>II</b><b>III</b></span>
+      </div>
+      <div class="bbar">
+        <div id="bchip"></div><div id="bfill"></div>
+        <div class="notch" style="left:33.333%"></div><div class="notch" style="left:66.666%"></div>
+      </div>
+      <div class="pbar"><div id="pfill"></div><span>STAGGER</span></div>
+    </div>
+    <div id="card"><div class="num"></div><div class="rule"></div><div class="title"></div><div class="sub"></div></div>
+    <div id="callout"><div class="big"></div><div class="small"></div></div>
+    <div id="hint"></div>
+  </div>
+
+  <!-- menus -->
+  <div id="screens">
+    <section id="s-title" class="screen">
+      <div class="shade"></div>
+      <div class="titleblock">
+        <h1>SOLFALL</h1>
+        <p class="tag">A duel beneath a dimmed sun</p>
+        <nav>
+          <div class="item" data-act="begin">Begin</div>
+          <div class="item opt" data-opt="difficulty"><span class="k">Difficulty</span><span class="v"></span></div>
+          <div class="item" data-act="how">How to play</div>
+          <div class="item" data-act="settings">Settings</div>
+        </nav>
+        <p class="note" id="diffNote"></p>
+      </div>
+      <div class="foot"><span id="bestLine"></span><span>Arrows or W/S to choose · Enter to select</span><span id="ver"></span></div>
+    </section>
+
+    <section id="s-how" class="screen panelscreen">
+      <div class="panel wide">
+        <h2>How to play</h2>
+        <div class="cols">
+          <div>
+            <h3>Controls</h3>
+            <table class="keys">
+              <tr><td>Move</td><td><kbd>A</kbd><kbd>D</kbd> or <kbd>←</kbd><kbd>→</kbd></td></tr>
+              <tr><td>Jump, double jump</td><td><kbd>Space</kbd> or <kbd>Z</kbd></td></tr>
+              <tr><td>Slash</td><td><kbd>J</kbd> or <kbd>X</kbd> or left click</td></tr>
+              <tr><td>Aim a slash up or down</td><td>hold <kbd>W</kbd> / <kbd>S</kbd> or <kbd>↑</kbd> / <kbd>↓</kbd></td></tr>
+              <tr><td>Dash</td><td><kbd>K</kbd> or <kbd>C</kbd> or <kbd>Shift</kbd></td></tr>
+              <tr><td>Star Lance</td><td><kbd>L</kbd> or <kbd>V</kbd> or right click</td></tr>
+              <tr><td>Mend</td><td>hold <kbd>E</kbd> or <kbd>F</kbd></td></tr>
+              <tr><td>Drop through a platform</td><td><kbd>S</kbd> + <kbd>Space</kbd></td></tr>
+              <tr><td>Pause</td><td><kbd>Esc</kbd> or <kbd>P</kbd></td></tr>
+            </table>
+            <p class="small">Gamepad: stick to move, A jump, X slash, B or RB dash, Y lance, LB mend.</p>
+          </div>
+          <div>
+            <h3>Reading the fight</h3>
+            <ul class="tips">
+              <li><span class="sw danger"></span><b>Red-orange is a warning.</b> It marks where an attack will land. When it fills and flashes, the attack fires.</li>
+              <li><span class="sw star"></span><b>Dash through an attack</b> at the last moment for a perfect dodge. Time slows and your Starlight fills.</li>
+              <li><b>Starlight</b> fills as you land hits. Spend a segment on a Star Lance, or hold Mend while standing to restore one health.</li>
+              <li><b>Slash downward in the air</b> to bounce off the Warden and get your jump and dash back.</li>
+              <li><b>The core takes extra damage.</b> Fill the stagger bar to bring it down within reach.</li>
+              <li><b>A hand that goes dim and cracked is stuck.</b> That is your opening.</li>
+            </ul>
+          </div>
+        </div>
+        <nav class="row"><div class="item" data-act="back">Back</div></nav>
+      </div>
+    </section>
+
+    <section id="s-settings" class="screen panelscreen">
+      <div class="panel">
+        <h2>Settings</h2>
+        <nav>
+          <div class="item opt slider" data-opt="music"><span class="k">Music</span><span class="track"><i></i></span><span class="v"></span></div>
+          <div class="item opt slider" data-opt="sfx"><span class="k">Sound effects</span><span class="track"><i></i></span><span class="v"></span></div>
+          <div class="item opt" data-opt="shake"><span class="k">Screen shake</span><span class="v"></span></div>
+          <div class="item opt" data-opt="numbers"><span class="k">Damage numbers</span><span class="v"></span></div>
+          <div class="item opt" data-opt="hints"><span class="k">Mechanic hints</span><span class="v"></span></div>
+          <div class="item" data-act="fullscreen">Toggle fullscreen</div>
+          <div class="item" data-act="back">Back</div>
+        </nav>
+      </div>
+    </section>
+
+    <section id="s-pause" class="screen panelscreen">
+      <div class="panel narrow">
+        <h2>Paused</h2>
+        <nav>
+          <div class="item" data-act="resume">Resume</div>
+          <div class="item" data-act="restart">Restart fight</div>
+          <div class="item" data-act="how">How to play</div>
+          <div class="item" data-act="settings">Settings</div>
+          <div class="item" data-act="quit">Quit to title</div>
+        </nav>
+      </div>
+    </section>
+
+    <section id="s-dead" class="screen panelscreen">
+      <div class="panel result">
+        <p class="over">Defeat</p>
+        <h2>THE LIGHT GOES OUT</h2>
+        <p class="lead" id="deadLead"></p>
+        <div class="prog"><div id="deadFill"></div><div class="notch" style="left:33.333%"></div><div class="notch" style="left:66.666%"></div>
+          <span class="pl" style="left:16.6%">III</span><span class="pl" style="left:50%">II</span><span class="pl" style="left:83.3%">I</span></div>
+        <div class="stats" id="deadStats"></div>
+        <p class="tip" id="deadTip"></p>
+        <nav class="row">
+          <div class="item" data-act="retry">Try again <kbd>R</kbd></div>
+          <div class="item" data-act="quit">Title</div>
+        </nav>
+      </div>
+    </section>
+
+    <section id="s-win" class="screen panelscreen">
+      <div class="panel result win">
+        <p class="over">Victory</p>
+        <h2>THE SUN RETURNS</h2>
+        <div class="grade"><div class="ring"><span id="gradeLetter">A</span></div><div class="gtext"><b id="gradeTitle"></b><span id="gradeSub"></span></div></div>
+        <div class="stats" id="winStats"></div>
+        <p class="tip" id="winBest"></p>
+        <nav class="row">
+          <div class="item" data-act="retry">Fight again <kbd>R</kbd></div>
+          <div class="item" data-act="quit">Title</div>
+        </nav>
+      </div>
+    </section>
+  </div>
+</div>
+
+<script src="js/util.js"></script>
+<script src="js/input.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/fx.js"></script>
+<script src="js/arena.js"></script>
+<script src="js/hazards.js"></script>
+<script src="js/player.js"></script>
+<script src="js/boss.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/game.js"></script>
+</body>
+</html>
