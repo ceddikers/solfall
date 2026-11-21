@@ -205,9 +205,12 @@ kbd {
 .titleblock .note { margin: 4px 0 0; min-height: 18px; font-size: 13px; letter-spacing: 0.06em; color: var(--faint); }
 .foot {
   position: absolute; left: 58px; right: 58px; bottom: 16px;
-  display: flex; justify-content: space-between;
+  /* three fixed columns, so the middle and right text stay put when the left one changes length */
+  display: grid; grid-template-columns: 1fr auto 1fr; align-items: baseline; gap: 24px;
   font-size: 12px; letter-spacing: 0.12em; color: var(--faint);
 }
+.foot span:first-child { text-align: left; }
+.foot span:last-child { text-align: right; }
 
 /* panels */
 .panelscreen.on {

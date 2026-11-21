@@ -1,7 +1,7 @@
 # Solfall
 
 A side-on boss fight for the browser: one hero, one boss, three phases, played as a run of
-ever-harder trials with a boon after each victory. Version 0.2a.
+ever-harder trials with a boon after each victory. Version 0.2b.
 
 This is the first playable slice of a planned boss-rush roguelite (short runs, a boon after each
 boss, bosses drawn from a pool). There is one boss so far, so a run fights it again and again.
