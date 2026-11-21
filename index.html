@@ -17,7 +17,7 @@
   <!-- in-fight display -->
   <div id="hud" class="off">
     <div id="phud">
-      <div class="plabel">VESPER</div>
+      <div class="plabel" id="heroName">VESPER</div>
       <div id="hp"></div>
       <div id="ember">
         <div class="seg"><i></i></div><div class="seg"><i></i></div><div class="seg"><i></i></div>
@@ -61,6 +61,32 @@
       <div class="foot"><span id="bestLine"></span><span>Arrows or W/S to choose · Enter to select</span><span id="ver"></span></div>
     </section>
 
+    <section id="s-hero" class="screen panelscreen">
+      <div class="panel chooser">
+        <h2>Choose your hero</h2>
+        <nav class="row cards" id="heroCards">
+          <div class="item card herocard" data-act="hero0"><canvas width="248" height="264"></canvas><b class="cname"></b><span class="ctag"></span><span class="cdesc"></span><ul class="hlines"></ul><span class="hhp"></span></div>
+          <div class="item card herocard" data-act="hero1"><canvas width="248" height="264"></canvas><b class="cname"></b><span class="ctag"></span><span class="cdesc"></span><ul class="hlines"></ul><span class="hhp"></span></div>
+          <div class="item card herocard" data-act="hero2"><canvas width="248" height="264"></canvas><b class="cname"></b><span class="ctag"></span><span class="cdesc"></span><ul class="hlines"></ul><span class="hhp"></span></div>
+        </nav>
+        <nav class="row"><div class="item" data-act="back">Back</div></nav>
+      </div>
+    </section>
+
+    <section id="s-relic" class="screen panelscreen">
+      <div class="panel chooser narrowpick">
+        <p class="over" id="relicOver"></p>
+        <h2>Choose a relic</h2>
+        <p class="lead">One of these three goes with you for the whole run.</p>
+        <nav class="row cards" id="relicCards">
+          <div class="item card t-relic" data-act="relic0"><span class="ctag">Relic</span><b class="cname"></b><span class="cdesc"></span></div>
+          <div class="item card t-relic" data-act="relic1"><span class="ctag">Relic</span><b class="cname"></b><span class="cdesc"></span></div>
+          <div class="item card t-relic" data-act="relic2"><span class="ctag">Relic</span><b class="cname"></b><span class="cdesc"></span></div>
+        </nav>
+        <nav class="row"><div class="item" data-act="back">Back to heroes</div></nav>
+      </div>
+    </section>
+
     <section id="s-how" class="screen panelscreen">
       <div class="panel wide">
         <h2>How to play</h2>
@@ -70,27 +96,27 @@
             <table class="keys">
               <tr><td>Move</td><td><kbd>A</kbd><kbd>D</kbd> or <kbd>←</kbd><kbd>→</kbd></td></tr>
               <tr><td>Jump, double jump</td><td><kbd>Space</kbd> or <kbd>Z</kbd></td></tr>
-              <tr><td>Slash</td><td><kbd>J</kbd> or <kbd>X</kbd>, or left click (towards the cursor)</td></tr>
-              <tr><td>Aim a slash up or down</td><td>hold <kbd>W</kbd> / <kbd>S</kbd> or <kbd>↑</kbd> / <kbd>↓</kbd></td></tr>
+              <tr><td>Attack</td><td><kbd>J</kbd> or <kbd>X</kbd>, or left click (towards the cursor)</td></tr>
+              <tr><td>Aim an attack up or down</td><td>hold <kbd>W</kbd> / <kbd>S</kbd> or <kbd>↑</kbd> / <kbd>↓</kbd></td></tr>
               <tr><td>Dash</td><td><kbd>K</kbd> or <kbd>C</kbd> or <kbd>Shift</kbd></td></tr>
-              <tr><td>Star Lance</td><td><kbd>L</kbd> or <kbd>V</kbd>, or right click (at the cursor)</td></tr>
+              <tr><td>Special</td><td><kbd>L</kbd> or <kbd>V</kbd>, or right click (at the cursor)</td></tr>
               <tr><td>Mend</td><td>hold <kbd>E</kbd> or <kbd>F</kbd></td></tr>
               <tr><td>Drop through a platform</td><td><kbd>S</kbd> + <kbd>Space</kbd></td></tr>
               <tr><td>Pause</td><td><kbd>Esc</kbd> or <kbd>P</kbd></td></tr>
             </table>
-            <p class="small">Gamepad: stick to move, A jump, X slash, B or RB dash, Y lance, LB mend.</p>
+            <p class="small">Gamepad: stick to move, A jump, X attack, B or RB dash, Y special, LB mend.</p>
           </div>
           <div>
             <h3>Reading the fight</h3>
             <ul class="tips">
               <li><span class="sw danger"></span><b>Red-orange is a warning.</b> It marks where an attack will land. When it fills and flashes, the attack fires.</li>
               <li><span class="sw star"></span><b>Dash through an attack</b> at the last moment for a perfect dodge. Time slows and your Starlight fills.</li>
-              <li><b>Starlight</b> fills as you land hits. Spend a segment on a Star Lance, or hold Mend while standing to restore one health.</li>
-              <li><b>Every third slash is a finisher.</b> It hits harder than the first two together. A dash does not break the chain, and a slash straight out of a dash becomes a thrust.</li>
-              <li><b>Slash downward in the air</b> to bounce off the Warden and get your jump and dash back.</li>
+              <li><b>Starlight</b> fills as you land hits. Spend a segment on your hero's special, or hold Mend while standing to restore one health.</li>
+              <li><b>Every third attack is a finisher.</b> It hits harder than the first two together, and a dash does not break the chain.</li>
+              <li><b>With the sword or maul, strike downward in the air</b> to bounce off the Warden and get your jump and dash back.</li>
               <li><b>The core takes extra damage.</b> Fill the stagger bar to bring it down within reach.</li>
               <li><b>A hand that goes dim and cracked is stuck.</b> That is your opening.</li>
-              <li><b>Each victory grants a boon</b> and leads to a harder trial. Falling ends the run.</li>
+              <li><b>A run starts with a hero and one of three relics.</b> Each victory grants a boon and leads to a harder trial. Falling ends the run.</li>
             </ul>
           </div>
         </div>
@@ -138,6 +164,7 @@
         <p class="tip" id="deadTip"></p>
         <nav class="row">
           <div class="item" data-act="retry">New run <kbd>R</kbd></div>
+          <div class="item" data-act="heroes">Change hero</div>
           <div class="item" data-act="quit">Title</div>
         </nav>
       </div>

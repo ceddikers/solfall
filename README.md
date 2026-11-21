@@ -1,7 +1,8 @@
 # Solfall
 
-A side-on boss fight for the browser: one hero, one boss, three phases, played as a run of
-ever-harder trials with a boon after each victory. Version 0.2c.
+A side-on boss fight for the browser: three heroes, one three-phase boss, played as a run of
+ever-harder trials. You pick a hero and a relic before the run and win a boon after each victory.
+Version 0.3a.
 
 This is the first playable slice of a planned boss-rush roguelite (short runs, a boon after each
 boss, bosses drawn from a pool). There is one boss so far, so a run fights it again and again.
@@ -24,57 +25,79 @@ then open http://localhost:8321. There is no build step and no dependency.
 |---|---|---|
 | Move | A / D or arrow keys | stick or d-pad |
 | Jump, double jump | Space or Z | A |
-| Slash | J or X, or left click (slashes towards the cursor) | X |
-| Aim a slash up or down | hold W / S or up / down | stick |
+| Attack | J or X, or left click (towards the cursor) | X |
+| Aim an attack up or down | hold W / S or up / down | stick |
 | Dash (passes through attacks) | K or C or Shift | B, RB or RT |
-| Star Lance (costs one Starlight segment) | L or V, or right click (fires at the cursor) | Y |
+| Special (costs one Starlight segment) | L or V, or right click (at the cursor) | Y |
 | Mend one health (costs one segment) | hold E or F while standing | LB or LT |
 | Drop through a platform | S + Space | down + A |
 | Pause | Esc or P | Start |
 | Retry (works the moment you fall) | R | |
 
-## The hero
+## The heroes
 
-- **Sword:** a three-hit combo of 9, 11 and 24 damage. The third hit is the finisher: it winds up for a
-  beat, steps into the blow, has a bigger arc and is worth more than the first two together. The blade
-  glows gold when the next slash will be the finisher. Hold the button to keep the chain going.
-  - Side and upward slashes share the count, so the combo works on the ground and in the air.
-  - The chain resets after 0.6 s without a slash. A dash does not use up that time, and the downward
-    bounce does not break the chain.
-  - A slash thrown straight out of a dash is a **thrust**: 40% more damage and longer reach.
-  - A hit landed in the air holds you up for a moment, so one jump fits a full combo.
-  - Slash downward in the air to bounce off whatever you hit (this gives the jump and dash back).
+All three share movement, the dash, Starlight and mending. Weapon and special differ.
+
+| | Vesper, the Starblade | Aster, the Starmaul | Lune, the Moonbow |
+|---|---|---|---|
+| Health (Standard) | 5 | 6 | 4 |
+| Weapon | sword: 9, 11, then a 24 finisher | maul: 14, 17, then a 36 finisher that shakes the ground; slow and wide | bow: arrows of 4, 5, then a piercing 10, in any direction; up to 60% stronger within 120px |
+| Special | Star Lance: a piercing shot at any range | Starfall: a blast around her; from the air she plunges first and passes through attacks | Moon Volley: a fan of five arrows and a leap backwards |
+| Extra | a slash out of a dash is a thrust | fills the stagger bar 35% faster; a little slower on foot | triple jump; firing downward in the air lifts her |
+
+- **Combo:** every third attack in a chain is the finisher. It winds up for a beat and is worth more than the
+  first two together; the weapon glows gold when it is next. Hold the button to keep the chain going.
+  The chain resets after 0.6 s without an attack, but a dash does not use up that time.
+- **With the sword or maul:** a hit landed in the air holds you up, a slash straight out of a dash is a thrust
+  (40% more damage, longer reach), and a downward strike in the air bounces off whatever it hits.
 - **Dash:** 0.24 s of invulnerability. If an attack would have hit during it, that is a perfect dodge:
   time slows, Starlight fills, and the dash is ready again at once.
 - **Starlight:** three segments, filled by landing hits, perfect dodges and cutting orbs out of the air.
-  A segment buys a Star Lance (ranged, pierces, eight directions) or one mended health.
+  A segment buys the hero's special or one mended health.
+
+Heroes are defined in `G.HEROES` in `js/run.js` (numbers, colours, text); the weapon and special code is in `js/player.js`.
 
 ## The run
 
+- A run starts by choosing a **hero**, then **one of three relics** drawn from nine. The relic lasts the whole run.
 - Beating the Warden offers **three boons; you keep one** and go straight into the next trial.
 - Each trial after the first gives the Warden 15% more health, 4% shorter warnings and 6% less rest.
   From trial IV it also uses its Merciless patterns.
 - Health is restored between trials. Falling ends the run; the title screen shows the deepest trial reached.
+
+| Relic | Effect |
+|---|---|
+| Ember Chalice | mending restores 2 health instead of 1 |
+| Comet Shard | finishers deal 50% more damage |
+| Twin Moons | one more Starlight segment; every trial starts with Starlight full |
+| Thorn Crown | all damage +40%, 2 less health |
+| Wardstone | the first hit taken in each of the boss's phases is blocked |
+| Feather Cloak | one more air jump; move 12% faster |
+| Stormcaller | every fifth hit calls lightning for 30 damage |
+| Phoenix Feather | once per run, a killing blow leaves you on 3 health |
+| Sunstone | the stagger bar fills 40% faster; staggers last 1.5 s longer |
 
 | Boon | Kind | Effect | Times |
 |---|---|---|---|
 | Third Wind | Movement | one more jump in the air | 2 |
 | Twin Dash | Movement | a second dash before landing; dashes recover 30% faster | 1 |
 | Comet Step | Movement | dashing through the Warden deals 24 damage | 2 |
-| Long Reach | Sword | sword reach +30% | 2 |
-| Keen Edge | Sword | sword damage +25% | 3 |
-| Quick Hands | Sword | swing 18% faster | 2 |
-| Crescent | Sword | the third combo hit throws a wave of light | 1 |
+| Long Reach | Weapon | weapon reach +30% | 2 |
+| Keen Edge | Weapon | weapon damage +25% | 3 |
+| Quick Hands | Weapon | attack 18% faster | 2 |
+| Crescent | Weapon | each finisher also throws a wave of light | 1 |
 | Bright Vein | Starlight | Starlight fills 40% faster | 2 |
 | Fourth Star | Starlight | one more Starlight segment | 2 |
-| Split Lance | Starlight | the lance fires three at once, each at 60% | 1 |
+| Split Lance | Starlight | Vesper only: the lance fires three at once, each at 60% | 1 |
+| Aftershock | Starlight | Aster only: Starfall strikes a second time at half strength | 1 |
+| Full Quiver | Starlight | Lune only: Moon Volley fires eight arrows | 1 |
 | Swift Mend | Starlight | mending takes half as long | 1 |
-| Mirror Step | Starlight | a perfect dodge fires a free lance at the core | 1 |
+| Mirror Step | Starlight | Vesper and Lune: a perfect dodge fires a free shot at the core | 1 |
 | Steady Heart | Survival | one more health | 3 |
 | Second Dawn | Survival | once per trial, a killing blow leaves you on 1 health | 1 |
 | Glass Star | Risk | all damage +35%, one less health | 1 |
 
-Boons are defined in `G.BOONS` in `js/run.js`; their effects are applied in `js/player.js` (search for `G.boon(`).
+Relics and boons are defined in `G.RELICS` and `G.BOONS` in `js/run.js`; their effects are applied in `js/player.js` and `js/boss.js` (search for `G.relic(` and `G.boon(`).
 
 ## The boss: The Eclipsed Warden
 
@@ -114,13 +137,13 @@ core drops to the floor for a few seconds and takes extra damage. The core alway
 |---|---|
 | `index.html`, `css/style.css` | page, menus and in-fight display |
 | `js/util.js` | constants, maths, seedable randomness, saved settings, difficulty table (`G.DIFFS`) |
-| `js/run.js` | the run: boon list, boon offers, how each trial scales the boss |
+| `js/run.js` | the run: heroes, relics, boons, offers, how each trial scales the boss |
 | `js/input.js` | keyboard, mouse and gamepad mapped to actions |
 | `js/audio.js` | every sound and the music, synthesised in code (no audio files) |
 | `js/fx.js` | particles, screen shake, flashes, hit-freeze, slow motion |
 | `js/arena.js` | backdrops for each phase, platforms |
 | `js/hazards.js` | beams, waves, orbs, zones, rings, meteors and their warnings |
-| `js/player.js` | the hero; tuning numbers are in `G.PLAYER` at the top |
+| `js/player.js` | the hero: shared movement plus each hero's weapon and special; shared numbers are in `G.PLAYER` |
 | `js/boss.js` | the boss; each attack is one generator function, attack pools are in `BAGS` |
 | `js/ui.js` | menus, health bars, result screens |
 | `js/game.js` | main loop, game states, draw order |
@@ -133,7 +156,8 @@ Most-used tuning numbers: `B.BASE_HP` and `B.poiseMax` in `boss.js`, `G.PLAYER` 
 Open the browser console on the running game.
 
 - **Dodge tests:** `fetch('/tools/dodge-tests.js').then(r => r.text()).then(t => console.log((0, eval)(t)))`
-  runs each attack against a simple scripted player and reports health lost. All 20 lose 0 health as of v0.2c.
+  runs each attack against a simple scripted player and reports health lost. All 20 lose 0 health with each
+  hero as of v0.3a. Set `window.TEST_HERO = 'aster'` (or `'lune'`) first to test another hero.
   Run it after changing any attack.
 - `G.debug.god = true` makes the hero invulnerable. `G.debug.boxes = true` (or `?boxes` in the address)
   draws every hitbox.
@@ -147,7 +171,7 @@ Open the browser console on the running game.
 - **Sound and music have not been heard by anyone.** They are generated in code and run without errors,
   but the mix and the music are untested by ear. Volume sliders are in Settings.
 - **No person has played a run through.** Timings were tuned with scripted players: an invulnerable,
-  always-attacking one beat the first trial on Standard in 66 s at v0.2c against 4,800 boss health; the
-  boss was then raised to 5,400 to keep a real first trial at about 3 to 4 minutes. Boon strength and
-  the per-trial scaling are first guesses.
+  always-attacking one beats the first trial on Standard (5,400 boss health) in 75 s as Vesper, 76 s as
+  Aster, and 89 s as Lune firing from the ground, so a real first trial should be about 3 to 4 minutes.
+  Hero balance, relic and boon strength and the per-trial scaling are first guesses.
 - **Gamepad support is untested** (no pad was available).

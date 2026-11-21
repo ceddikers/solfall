@@ -82,7 +82,9 @@
       });
     }
     if (!B.staggered) {
-      B.poise += amount * (t.kind === 'hand' ? 1.5 : (B.phase === 3 ? 1.35 : 0.9)) + (info.lance ? 60 : 0);
+      // heroes differ in how hard they stagger (info.poise); the Sunstone relic speeds it for everyone
+      B.poise += (amount * (t.kind === 'hand' ? 1.5 : (B.phase === 3 ? 1.35 : 0.9)) * (info.poise || 1) + (info.lance ? 60 : 0))
+        * (G.relic('sunstone') ? 1.4 : 1);
     }
     if (B.hp <= 0) die();
     else if (B.phase < 3 && B.hp <= floorHp) beginPhase(B.phase + 1);
@@ -125,7 +127,7 @@
   }
 
   function* staggerScript() {
-    const c = B.core, dur = G.diff().stagger;
+    const c = B.core, dur = G.diff().stagger + (G.relic('sunstone') ? 1.5 : 0);
     c.ctrl = true;
     const drops = [tween(c, { y: FLOOR - 112, open: 0.06 }, 0.42, E.inCubic)];
     for (const h of B.hands) {
@@ -154,6 +156,7 @@
     interrupt();
     B.invuln = true; B.staggered = false; B.poise = 0;
     B.phase = n; B.bag = [];
+    G.player.onPhase(); // the Wardstone relic recharges each phase
     B.script = n === 2 ? toPhase2() : toPhase3();
   }
 

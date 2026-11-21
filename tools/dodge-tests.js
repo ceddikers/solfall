@@ -18,6 +18,8 @@
   window.hitLog = [];
 
   function stage(phase, atk, px) {
+    // set window.TEST_HERO to 'vesper', 'aster' or 'lune' before running to test that hero
+    G.run.reset(); if (window.TEST_HERO) G.run.hero = window.TEST_HERO;
     G.startFight(); G.debug.god = true; G.debug.sim(4.5);
     for (let p = 1; p < phase; p++) {
       G.debug.nextPhase();
@@ -116,7 +118,9 @@
     const r = G.hazards.list.find((h) => h.kind === 'ring' && !h._used);
     if (!r) return;
     const d = G.dist(P.x, P.y - 22, r.x, r.y) - r.r;
-    if (d < 55 && d > 0) { r._used = 1; hold(0, 1); I.pressed.dash = true; }
+    // dash towards the ring's centre, so the dash carries the hero through it
+    if (d < 55 && d > 0) { r._used = 1; hold(P.x > r.x, P.x <= r.x); I.pressed.dash = true; st.t0 = t; }
+    if (st.t0 != null && t - st.t0 > 0.2) hold(0, 0);
   }));
   out.push(run('comb: shift one lane each volley', 2, 'comb', 640, (t, st) => {
     const warn = G.hazards.list.filter((h) => h.kind === 'zone' && h.t < h.tele);

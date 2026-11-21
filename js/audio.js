@@ -85,6 +85,14 @@
       noise({ dur: 0.17, vol: 0.34, f0: 600, f1: 5200, q: 0.8 });
       tone({ type: 'triangle', f0: 520, f1: 250, dur: 0.12, vol: 0.08 });
     },
+    arrow() {
+      tone({ type: 'triangle', f0: 980, f1: 520, dur: 0.07, vol: 0.12 });
+      noise({ dur: 0.06, vol: 0.12, type: 'highpass', f0: 3200 });
+    },
+    arrowHeavy() {
+      tone({ type: 'triangle', f0: 760, f1: 300, dur: 0.14, vol: 0.18 });
+      noise({ dur: 0.14, vol: 0.24, f0: 1400, f1: 5200, q: 0.8 });
+    },
     hit() {
       noise({ dur: 0.07, vol: 0.38, type: 'highpass', f0: 1800, q: 0.5 });
       tone({ type: 'triangle', f0: 210, f1: 90, dur: 0.1, vol: 0.34 });

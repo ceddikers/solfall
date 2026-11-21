@@ -40,7 +40,7 @@
   U.init = function () {
     for (const id of ['hud', 'hp', 'ember', 'mend', 'timer', 'bfill', 'bchip', 'pfill', 'bphase', 'card', 'callout',
       'hint', 'lowhp', 'lbTop', 'lbBot', 'diffNote', 'bestLine', 'ver', 'deadLead', 'deadFill', 'deadStats',
-      'pauseBoons', 'boons', 'trial', 'winOver', 'winPick', 'winCards',
+      'pauseBoons', 'boons', 'trial', 'winOver', 'winPick', 'winCards', 'heroName', 'heroCards', 'relicCards', 'relicOver',
       'deadTip', 'winStats', 'winBest', 'gradeLetter', 'gradeTitle', 'gradeSub', 'stage']) el[id] = $(id);
     el.segs = Array.from(document.querySelectorAll('#ember .seg'));
     el.bbar = document.querySelector('.bbar');
@@ -120,7 +120,11 @@
   }
   function act(name) {
     G.audio.play(name === 'back' ? 'uiBack' : 'uiSelect');
-    if (name === 'begin' || name === 'retry' || name === 'restart') G.startRun();
+    if (name === 'begin') G.chooseHero();
+    else if (name === 'retry' || name === 'restart') G.newRun();
+    else if (name === 'heroes') { G.toTitle(); G.chooseHero(); }
+    else if (/^hero\d$/.test(name)) G.pickHero(Number(name.slice(4)));
+    else if (/^relic\d$/.test(name)) G.pickRelic(Number(name.slice(5)));
     else if (/^boon\d$/.test(name)) G.takeBoon(Number(name.slice(4)));
     else if (name === 'endrun') G.toTitle();
     else if (name === 'how') U.show('how', true);
@@ -159,6 +163,35 @@
     }
   };
 
+  // ---- before a run: choose a hero, then one of three relics
+  U.showHeroes = function () {
+    Array.from(el.heroCards.children).forEach((c, i) => {
+      const h = G.HEROES[i];
+      c.style.setProperty('--tagc', h.css);
+      c.querySelector('.cname').textContent = h.name;
+      c.querySelector('.ctag').textContent = h.title;
+      c.querySelector('.cdesc').textContent = h.blurb;
+      c.querySelector('.hhp').textContent = 'Health ' + ((G.DIFFS[G.settings.difficulty] || G.DIFFS[1]).hp + h.hp) + ' \u00b7 ' + h.specialName;
+      c.querySelector('.hlines').innerHTML = h.lines.map((l) => '<li>' + l + '</li>').join('');
+      G.drawHeroPortrait(c.querySelector('canvas'), h);
+    });
+    U.show('hero', true);
+    U.setFocus(Math.max(0, G.HEROES.findIndex((h) => h.id === G.settings.hero)));
+  };
+  U.showRelics = function (offer) {
+    const h = G.hero();
+    el.relicOver.textContent = h.name + ' \u00b7 ' + h.title;
+    el.relicOver.style.color = h.css;
+    Array.from(el.relicCards.children).forEach((c, i) => {
+      const r = offer[i];
+      c.style.display = r ? '' : 'none';
+      if (!r) return;
+      c.querySelector('.cname').textContent = r.name;
+      c.querySelector('.cdesc').textContent = r.desc;
+    });
+    U.show('relic', true);
+  };
+
   U.refresh = function () {
     document.querySelectorAll('.item.opt').forEach((it) => {
       const opt = it.dataset.opt, def = OPTS[opt], v = G.settings[opt];
@@ -173,9 +206,11 @@
     el.bestLine.textContent = depth
       ? G.diff().name + ': deepest trial ' + G.roman(depth) + (best ? ' \u00b7 fastest first trial ' + U.fmtTime(best.time) + ' (' + best.grade + ')' : '')
       : 'No victory on ' + G.diff().name + ' yet';
-    const held = G.run.held();
-    el.pauseBoons.innerHTML = held.length
-      ? '<h3>Boons this run</h3>' + held.map((h) => '<p><b>' + h.def.name + (h.n > 1 ? ' \u00d7' + h.n : '') + '</b> ' + h.def.desc + '</p>').join('')
+    const held = G.run.held(), relic = G.relicDef(G.run.relic);
+    el.pauseBoons.innerHTML = (held.length || relic)
+      ? '<h3>' + G.hero().name + '\u2019s run</h3>'
+        + (relic ? '<p><b>' + relic.name + '</b> ' + relic.desc + '</p>' : '')
+        + held.map((h) => '<p><b>' + h.def.name + (h.n > 1 ? ' \u00d7' + h.n : '') + '</b> ' + h.def.desc + '</p>').join('')
       : '';
   };
 
@@ -204,7 +239,12 @@
   U.buildRun = function () {
     const R = G.run;
     el.trial.textContent = R.trial > 1 ? 'Trial ' + G.roman(R.trial) : '';
-    el.boons.innerHTML = R.held().map((h) => '<span class="t-' + h.def.tag.toLowerCase() + '">' + h.def.name + (h.n > 1 ? ' \u00d7' + h.n : '') + '</span>').join('');
+    const hero = G.hero(), relic = G.relicDef(R.relic);
+    el.heroName.textContent = hero.name.toUpperCase();
+    // the health pips and Starlight take the hero's own colour
+    el.stage.style.setProperty('--star', hero.css);
+    el.boons.innerHTML = (relic ? '<span class="t-relic">' + relic.name + '</span>' : '')
+      + R.held().map((h) => '<span class="t-' + h.def.tag.toLowerCase() + '">' + h.def.name + (h.n > 1 ? ' \u00d7' + h.n : '') + '</span>').join('');
     const label = el.ember.querySelector('.elabel');
     el.ember.querySelectorAll('.seg').forEach((s) => s.remove());
     for (let i = 0; i < G.player.segs; i++) {
@@ -247,8 +287,8 @@
     U.fights = (U.fights || 0) + 1;
     if (!G.settings.hints || U.fights > 2) return;
     el.hint.innerHTML = G.input.device === 'gamepad'
-      ? 'Stick move &middot; <b>A</b> jump &middot; <b>X</b> slash &middot; <b>B</b> dash &middot; <b>Y</b> lance &middot; hold <b>LB</b> mend'
-      : '<kbd>A</kbd><kbd>D</kbd> move &middot; <kbd>Space</kbd> jump &middot; <kbd>J</kbd> or click slash &middot; <kbd>K</kbd> dash &middot; <kbd>L</kbd> or right click lance &middot; hold <kbd>E</kbd> mend';
+      ? 'Stick move &middot; <b>A</b> jump &middot; <b>X</b> attack &middot; <b>B</b> dash &middot; <b>Y</b> special &middot; hold <b>LB</b> mend'
+      : '<kbd>A</kbd><kbd>D</kbd> move &middot; <kbd>Space</kbd> jump &middot; <kbd>J</kbd> or click attack &middot; <kbd>K</kbd> dash &middot; <kbd>L</kbd> or right click special &middot; hold <kbd>E</kbd> mend';
     el.hint.classList.add('show', 'calm');
     H.hintT = 7;
   };
@@ -311,7 +351,7 @@
       el.mend.classList.toggle('on', ready);
       if (ready) {
         const pad = G.input.device === 'gamepad';
-        el.mend.innerHTML = (pad ? '<kbd>Y</kbd>' : '<kbd>L</kbd> or right click') + ' lance'
+        el.mend.innerHTML = (pad ? '<kbd>Y</kbd>' : '<kbd>L</kbd> or right click') + ' ' + G.hero().verb
           + (P.hp < P.maxHp ? ' &middot; hold ' + (pad ? '<kbd>LB</kbd>' : '<kbd>E</kbd>') + ' to mend' : '');
       }
     }
@@ -381,7 +421,7 @@
       [U.fmtTime(G.time), 'Time'],
       [P.stats.hits, 'Hits taken'],
       [P.stats.perfect, 'Perfect dodges'],
-      [P.stats.lances, 'Star Lances'],
+      [P.stats.lances, 'Specials used'],
     ]);
     el.winOver.textContent = 'Victory \u00b7 trial ' + G.roman(res.trial);
     el.winBest.textContent = res.newBest ? 'New fastest first trial on ' + G.diff().name + '.'

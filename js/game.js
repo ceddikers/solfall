@@ -28,6 +28,28 @@
   // ------------------------------------------------------------------ state changes
   // A run is a chain of trials. Each victory grants a boon and leads to a tougher trial;
   // falling ends the run.
+  // Title -> choose a hero -> choose one of three relics -> first trial.
+  G.chooseHero = function () { G.ui.showHeroes(); };
+  G.pickHero = function (i) {
+    const h = G.HEROES[i];
+    if (!h) return;
+    G.settings.hero = h.id; G.saveSettings();
+    G.run.reset();
+    G.ui.showRelics(G.run.rollRelics());
+  };
+  G.pickRelic = function (i) {
+    const r = G.run.relicOffer[i];
+    if (!r) return;
+    G.run.relic = r.id;
+    G.startFight();
+  };
+  // After a fall: same hero, a fresh choice of relics.
+  G.newRun = function () {
+    G.toTitle();
+    G.ui.showHeroes();
+    G.pickHero(Math.max(0, G.HEROES.findIndex((h) => h.id === G.settings.hero)));
+  };
+  // Straight into a fight with no relic (used by tests and the console).
   G.startRun = function () { G.run.reset(); G.startFight(); };
   G.nextTrial = function () { G.run.trial++; G.startFight(); };
   G.takeBoon = function (i) { G.run.take(i); G.nextTrial(); };
@@ -101,7 +123,7 @@
     if (G.ui.current) { G.ui.onAction(a); return; }
     if (a === 'pause') G.pause();
     // no need to wait for the defeat screen: R restarts at once
-    if (a === 'retry' && G.state === 'dead') G.startRun();
+    if (a === 'retry' && G.state === 'dead') G.newRun();
   }
 
   // ------------------------------------------------------------------ simulation

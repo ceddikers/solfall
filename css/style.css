@@ -328,3 +328,22 @@ ul.tips b { color: var(--ink); font-weight: 600; }
   border-color: var(--tagc, #fff); box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5), 0 0 18px -4px var(--tagc, #fff);
 }
 .item.card.focus .cdesc { color: var(--ink); }
+
+/* ---------------------------------------------------------------- hero and relic choice */
+.t-weapon { --tagc: #ffba5c; }
+.t-relic { --tagc: #ffe08a; }
+.panel.chooser { width: 1080px; text-align: center; padding-bottom: 22px; }
+.panel.chooser.narrowpick { width: 900px; }
+.panel.chooser .lead { margin: -8px 0 18px; }
+.panel.chooser h2 { margin-bottom: 18px; }
+.item.card.herocard { align-items: center; text-align: center; gap: 4px; padding: 10px 18px 14px; }
+.herocard canvas { width: 124px; height: 132px; display: block; }
+.herocard .cname { font-size: 25px; letter-spacing: 0.12em; }
+.herocard .ctag { margin-bottom: 4px; }
+.herocard .cdesc { min-height: 40px; }
+.herocard .hlines { list-style: none; margin: 6px 0 8px; padding: 0; text-align: left; font-size: 12.5px; line-height: 1.42; color: var(--dim); }
+.herocard .hlines li { position: relative; margin-bottom: 5px; padding-left: 14px; }
+.herocard .hlines li::before { content: ""; position: absolute; left: 1px; top: 6px; width: 5px; height: 5px; background: var(--tagc); transform: rotate(45deg); }
+.herocard .hhp { margin-top: auto; font-size: 10.5px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--tagc); }
+.herocard.focus .hlines { color: var(--ink); }
+#relicCards .card { min-height: 150px; }

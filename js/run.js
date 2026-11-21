@@ -1,34 +1,102 @@
-// Solfall - the run: a chain of trials against the Warden. Each victory grants one boon,
-// and each trial after the first makes the Warden tougher and quicker.
+// Solfall - the run: which hero and relic were chosen, the boons won so far, and how each
+// trial scales the Warden. Heroes, relics and boons are all defined here as plain data.
 'use strict';
 (function () {
-  const R = G.run = { trial: 1, boons: {}, order: [], offer: [] };
+  const R = G.run = { trial: 1, hero: 'vesper', relic: null, boons: {}, order: [], offer: [], relicOffer: [], phoenixUsed: false };
 
-  // max is how many times a boon can be taken in one run.
+  // ------------------------------------------------------------------ heroes
+  // combo: three steps of { dmg, cd (time to the next swing), dur, wind (wind-up), act (active time) }.
+  // hp is added to the difficulty's health; reach, thick and poise scale melee reach, arc width and stagger.
+  G.HEROES = [
+    {
+      id: 'vesper', name: 'Vesper', title: 'The Starblade', col: '150,225,255', hot: '235,250,255', css: '#96e1ff',
+      cloak: ['#22365e', '#0a1020'], build: 1, scarf: 10, scarfW: 1,
+      hp: 0, run: 335, air: 1, weapon: 'sword', reach: 1, thick: 1, poise: 1,
+      combo: [
+        { dmg: 9, cd: 0.22, dur: 0.22, wind: 0.02, act: 0.11 },
+        { dmg: 11, cd: 0.24, dur: 0.22, wind: 0.02, act: 0.11 },
+        { dmg: 24, cd: 0.46, dur: 0.36, wind: 0.09, act: 0.15 },
+      ],
+      down: 11, special: 'lance', specialName: 'Star Lance', verb: 'lance',
+      blurb: 'Balanced and quick. The one to learn the fight with.',
+      lines: ['Sword: a fast three-hit combo', 'Star Lance: a piercing shot at any range', 'A slash out of a dash becomes a thrust'],
+    },
+    {
+      id: 'aster', name: 'Aster', title: 'The Starmaul', col: '140,245,185', hot: '232,255,240', css: '#8cf5b9',
+      cloak: ['#1f4a3a', '#08160f'], build: 1.24, scarf: 6, scarfW: 1.7,
+      hp: 1, run: 300, air: 1, weapon: 'maul', reach: 1.28, thick: 1.55, poise: 1.35,
+      combo: [
+        { dmg: 14, cd: 0.34, dur: 0.3, wind: 0.05, act: 0.13 },
+        { dmg: 17, cd: 0.36, dur: 0.3, wind: 0.05, act: 0.13 },
+        { dmg: 36, cd: 0.62, dur: 0.48, wind: 0.15, act: 0.16 },
+      ],
+      down: 15, special: 'starfall', specialName: 'Starfall', verb: 'starfall',
+      blurb: 'Slow, heavy and hard to kill. Every swing counts.',
+      lines: ['Maul: wide, slow swings; the finisher shakes the ground', 'Starfall: slam down for a blast around you, passing through attacks as you fall', 'One more health, and the stagger bar fills 35% faster'],
+    },
+    {
+      id: 'lune', name: 'Lune', title: 'The Moonbow', col: '214,170,255', hot: '246,236,255', css: '#d6aaff',
+      cloak: ['#3c2a5e', '#120a20'], build: 0.88, scarf: 14, scarfW: 0.7,
+      hp: -1, run: 352, air: 2, weapon: 'bow', reach: 1, thick: 1, poise: 0.7,
+      combo: [
+        { dmg: 4, cd: 0.26, wind: 0.03 },
+        { dmg: 5, cd: 0.26, wind: 0.03 },
+        { dmg: 10, cd: 0.52, wind: 0.1 },
+      ],
+      down: 4, special: 'volley', specialName: 'Moon Volley', verb: 'volley',
+      blurb: 'Fragile and nimble. Fights from range, hits hardest up close.',
+      lines: ['Moonbow: arrows in any direction, up to 60% stronger at close range', 'Moon Volley: a fan of five arrows and a leap backwards', 'Triple jump; firing downward in the air lifts you; one less health'],
+    },
+  ];
+  const heroById = {};
+  for (const h of G.HEROES) heroById[h.id] = h;
+  G.hero = () => heroById[R.hero] || G.HEROES[0];
+
+  // ------------------------------------------------------------------ relics (one, chosen before the first trial)
+  G.RELICS = [
+    { id: 'chalice', name: 'Ember Chalice', desc: 'Mending restores 2 health instead of 1.' },
+    { id: 'shard', name: 'Comet Shard', desc: 'Finishers deal 50% more damage.' },
+    { id: 'moons', name: 'Twin Moons', desc: 'One more Starlight segment, and every trial starts with Starlight full.' },
+    { id: 'crown', name: 'Thorn Crown', desc: 'All damage +40%, but 2 less health.' },
+    { id: 'ward', name: 'Wardstone', desc: 'The first hit you take in each of the Warden\'s phases is blocked.' },
+    { id: 'cloak', name: 'Feather Cloak', desc: 'One more jump in the air, and you move 12% faster.' },
+    { id: 'storm', name: 'Stormcaller', desc: 'Every fifth hit calls lightning onto the target for 30 damage.' },
+    { id: 'phoenix', name: 'Phoenix Feather', desc: 'Once per run, a killing blow leaves you on 3 health instead.' },
+    { id: 'sunstone', name: 'Sunstone', desc: 'The stagger bar fills 40% faster, and each stagger lasts 1.5 seconds longer.' },
+  ];
+  const relicById = {};
+  for (const r of G.RELICS) relicById[r.id] = r;
+  G.relicDef = (id) => relicById[id];
+  G.relic = (id) => R.relic === id;
+
+  // ------------------------------------------------------------------ boons (one after each victory)
+  // max is how many times a boon can be taken in one run; heroes limits a boon to some heroes.
   G.BOONS = [
     { id: 'wind', name: 'Third Wind', tag: 'Movement', max: 2, desc: 'One more jump in the air.' },
     { id: 'twin', name: 'Twin Dash', tag: 'Movement', max: 1, desc: 'A second dash before landing, and dashes recover 30% faster.' },
     { id: 'comet', name: 'Comet Step', tag: 'Movement', max: 2, desc: 'Dashing through the Warden cuts it for 24 damage.' },
-    { id: 'reach', name: 'Long Reach', tag: 'Sword', max: 2, desc: 'Sword reach +30%.' },
-    { id: 'keen', name: 'Keen Edge', tag: 'Sword', max: 3, desc: 'Sword damage +25%.' },
-    { id: 'quick', name: 'Quick Hands', tag: 'Sword', max: 2, desc: 'Swing 18% faster.' },
-    { id: 'crescent', name: 'Crescent', tag: 'Sword', max: 1, desc: 'The third hit of a combo throws a wave of light.' },
+    { id: 'reach', name: 'Long Reach', tag: 'Weapon', max: 2, desc: 'Weapon reach +30%.' },
+    { id: 'keen', name: 'Keen Edge', tag: 'Weapon', max: 3, desc: 'Weapon damage +25%.' },
+    { id: 'quick', name: 'Quick Hands', tag: 'Weapon', max: 2, desc: 'Attack 18% faster.' },
+    { id: 'crescent', name: 'Crescent', tag: 'Weapon', max: 1, desc: 'Each finisher also throws a wave of light.' },
     { id: 'vein', name: 'Bright Vein', tag: 'Starlight', max: 2, desc: 'Starlight fills 40% faster.' },
     { id: 'fourth', name: 'Fourth Star', tag: 'Starlight', max: 2, desc: 'One more Starlight segment.' },
-    { id: 'split', name: 'Split Lance', tag: 'Starlight', max: 1, desc: 'The Star Lance fires three at once, each at 60% strength.' },
+    { id: 'split', name: 'Split Lance', tag: 'Starlight', max: 1, heroes: ['vesper'], desc: 'The Star Lance fires three at once, each at 60% strength.' },
+    { id: 'aftershock', name: 'Aftershock', tag: 'Starlight', max: 1, heroes: ['aster'], desc: 'Starfall strikes a second time at half strength.' },
+    { id: 'quiver', name: 'Full Quiver', tag: 'Starlight', max: 1, heroes: ['lune'], desc: 'Moon Volley fires eight arrows instead of five.' },
     { id: 'swift', name: 'Swift Mend', tag: 'Starlight', max: 1, desc: 'Mending takes half as long.' },
-    { id: 'mirror', name: 'Mirror Step', tag: 'Starlight', max: 1, desc: 'A perfect dodge fires a free Star Lance at the core.' },
+    { id: 'mirror', name: 'Mirror Step', tag: 'Starlight', max: 1, heroes: ['vesper', 'lune'], desc: 'A perfect dodge fires a free shot at the core.' },
     { id: 'heart', name: 'Steady Heart', tag: 'Survival', max: 3, desc: 'One more health.' },
     { id: 'dawn', name: 'Second Dawn', tag: 'Survival', max: 1, desc: 'Once per trial, a killing blow leaves you on 1 health.' },
     { id: 'glass', name: 'Glass Star', tag: 'Risk', max: 1, desc: 'All damage +35%, but one less health.' },
   ];
-  const byId = {};
-  for (const b of G.BOONS) byId[b.id] = b;
-  G.boonDef = (id) => byId[id];
+  const boonById = {};
+  for (const b of G.BOONS) boonById[b.id] = b;
+  G.boonDef = (id) => boonById[id];
 
   // How many of a boon the hero holds, and the damage multiplier that applies to everything.
   G.boon = (id) => R.boons[id] || 0;
-  G.dmgMult = () => 1 + 0.35 * G.boon('glass');
+  G.dmgMult = () => (1 + 0.35 * G.boon('glass')) * (G.relic('crown') ? 1.4 : 1);
 
   G.roman = function (n) {
     const t = [[10, 'X'], [9, 'IX'], [5, 'V'], [4, 'IV'], [1, 'I']];
@@ -37,12 +105,25 @@
     return s;
   };
 
-  R.reset = function () { R.trial = 1; R.boons = {}; R.order = []; R.offer = []; };
+  R.reset = function () {
+    R.trial = 1; R.boons = {}; R.order = []; R.offer = []; R.relic = null; R.relicOffer = []; R.phoenixUsed = false;
+    R.hero = heroById[G.settings.hero] ? G.settings.hero : 'vesper';
+  };
 
+  // Health before boons, for deciding whether a health-costing pick may be offered.
+  const baseHp = () => (G.DIFFS[G.settings.difficulty] || G.DIFFS[1]).hp + G.hero().hp + G.boon('heart') - (G.relic('crown') ? 2 : 0);
+
+  // Three relics to choose from before the first trial.
+  R.rollRelics = function () {
+    const pool = G.RELICS.filter((r) => r.id !== 'crown' || baseHp() >= 4);
+    R.relicOffer = G.shuffle(pool.slice()).slice(0, 3);
+    return R.relicOffer;
+  };
   // Three boons to choose from after a victory.
   R.rollOffer = function () {
-    const baseHp = (G.DIFFS[G.settings.difficulty] || G.DIFFS[1]).hp + G.boon('heart');
-    const pool = G.BOONS.filter((b) => G.boon(b.id) < b.max && (b.id !== 'glass' || baseHp >= 3));
+    const pool = G.BOONS.filter((b) => G.boon(b.id) < b.max
+      && (!b.heroes || b.heroes.includes(R.hero))
+      && (b.id !== 'glass' || baseHp() - G.boon('glass') >= 3));
     R.offer = G.shuffle(pool.slice()).slice(0, 3);
     return R.offer;
   };
@@ -57,7 +138,7 @@
     const out = [];
     for (const id of R.order) {
       const e = out.find((x) => x.def.id === id);
-      if (e) e.n++; else out.push({ def: byId[id], n: 1 });
+      if (e) e.n++; else out.push({ def: boonById[id], n: 1 });
     }
     return out;
   };
@@ -75,6 +156,4 @@
   };
   // From the fourth trial the Warden also uses its Merciless patterns (extra hits in several attacks).
   G.fierce = () => G.settings.difficulty === 2 || R.trial >= 4;
-
-  // Console helper: G.debug.give('keen') adds a boon for testing (takes effect next fight).
 })();
