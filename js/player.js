@@ -195,8 +195,15 @@
     // --- sword
     if (P.atkBuf > 0 && P.atkCd <= 0 && P.dashT <= 0 && P.stun <= 0 && P.healT === 0) {
       P.atkBuf = 0;
-      const kind = up ? 'up' : (down && !P.onGround ? 'down' : 'side');
+      let kind = up ? 'up' : (down && !P.onGround ? 'down' : 'side');
       if (mx) P.facing = mx;
+      if (I.aim.attack) {
+        // a mouse click slashes towards the cursor
+        const ax = I.mx - P.x, ay = I.my - (P.y - 24);
+        const steep = Math.abs(ay) > Math.abs(ax) * 1.15;
+        kind = steep && ay < 0 ? 'up' : (steep && ay > 0 && !P.onGround ? 'down' : 'side');
+        if (Math.abs(ax) > 6) P.facing = ax > 0 ? 1 : -1;
+      }
       let idx = 0;
       if (kind === 'side') { idx = (P.comboT > 0 && P.combo >= 0) ? (P.combo + 1) % 3 : 0; P.combo = idx; P.comboT = 0.6; }
       else { P.combo = -1; P.comboT = 0; }
@@ -223,8 +230,13 @@
       if (P.ember >= C.SEG) {
         P.ember -= C.SEG; P.stats.lances++;
         let dx = mx, dy = up ? -1 : (down && !P.onGround ? 1 : 0);
+        if (I.aim.flare) {
+          // a mouse click fires straight at the cursor (never into the floor while standing)
+          dx = I.mx - P.x; dy = I.my - (P.y - 24);
+          if (P.onGround && dy > 0) dy = 0;
+        }
         if (!dx && !dy) dx = P.facing;
-        if (dx) P.facing = dx;
+        if (dx) P.facing = dx > 0 ? 1 : -1;
         const len = Math.hypot(dx, dy); dx /= len; dy /= len;
         G.shots.push({ x: P.x + dx * 18, y: P.y - 24 + dy * 18, vx: dx * C.LANCE_SPEED, vy: dy * C.LANCE_SPEED, t: 0, hit: new Set(), dmg: C.LANCE_DMG });
         P.vx -= dx * 240;
@@ -450,7 +462,8 @@
   function drawBody(ctx) {
     const sp = Math.abs(P.vx);
     const air = !P.onGround;
-    const sq = P.squash;
+    // a slow breath while standing still
+    const sq = P.squash + (!air && sp < 20 ? Math.sin(G.t * 3.2) * 0.018 : 0);
     ctx.save();
     ctx.translate(P.x, P.y);
     ctx.scale(P.facing, 1);
@@ -468,10 +481,24 @@
       ctx.beginPath(); ctx.moveTo(i ? 3 : -3, -15); ctx.lineTo(fx, fy - 1); ctx.stroke();
     }
 
-    // sheathed blade
+    // blade: sheathed on the back, or following the swing
     if (!P.atk) {
       ctx.strokeStyle = G.rgba(STAR, 0.9); ctx.lineWidth = 2.2;
       ctx.beginPath(); ctx.moveTo(-5, -32); ctx.lineTo(-17, -7); ctx.stroke();
+    } else {
+      const a = P.atk, k = G.ease.outCubic(Math.min(1, a.t / (a.dur * 0.55)));
+      let a0 = -1.9, a1 = 1.3;
+      if (a.kind === 'up') { a0 = -2.9; a1 = -0.5; }
+      else if (a.kind === 'down') { a0 = 0.2; a1 = 2.7; }
+      else if (a.idx === 1) { a0 = 1.5; a1 = -1.6; }
+      const ang = G.lerp(a0, a1, k);
+      const sx = 3, sy = -31, len = a.heavy ? 44 : 38;
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.strokeStyle = G.rgba(STAR, 0.5); ctx.lineWidth = 7;
+      ctx.beginPath(); ctx.moveTo(sx + Math.cos(ang) * 8, sy + Math.sin(ang) * 8); ctx.lineTo(sx + Math.cos(ang) * len, sy + Math.sin(ang) * len); ctx.stroke();
+      ctx.strokeStyle = G.rgba(HOT, 1); ctx.lineWidth = 2.6;
+      ctx.beginPath(); ctx.moveTo(sx + Math.cos(ang) * 6, sy + Math.sin(ang) * 6); ctx.lineTo(sx + Math.cos(ang) * len, sy + Math.sin(ang) * len); ctx.stroke();
+      ctx.globalCompositeOperation = 'source-over';
     }
 
     // cloak
@@ -519,6 +546,18 @@
     }
     ctx.globalCompositeOperation = 'source-over';
   }
+
+  // A soft shadow on whatever is below the hero; it shrinks with height, which helps judge landings.
+  P.drawShadow = function (ctx) {
+    if (P.hidden || P.dead) return;
+    let gy = FLOOR;
+    for (const pl of G.arena.platforms) {
+      if (pl.rise > 0.05 && P.x >= pl.x - 9 && P.x <= pl.x + pl.w + 9 && P.y <= pl.y + 4) gy = Math.min(gy, pl.y);
+    }
+    const k = G.clamp(1 - (gy - P.y) / 280, 0.25, 1);
+    ctx.fillStyle = 'rgba(0,0,0,' + (0.42 * k) + ')';
+    ctx.beginPath(); ctx.ellipse(P.x, gy + 3, 17 * k, 4.5 * k, 0, 0, G.TAU); ctx.fill();
+  };
 
   P.draw = function (ctx) {
     if (P.hidden) return;

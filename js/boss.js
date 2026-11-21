@@ -26,6 +26,7 @@
     B.core = {
       x: 640, y: -200, r: 84, ctrl: true, open: 1, charge: 0, flash: 0,
       lx: 0, ly: 0, pulse: 0, spinHint: 0, hurt: false, jit: 0, sun: 0, embedded: false,
+      blink: 0, blinkT: 3,
     };
     B.hands = [mkHand(-1), mkHand(1)];
   };
@@ -293,7 +294,8 @@
       tween(L, { y: HOME_Y[1] + 128 }, 1.9, E.outBack),
       tween(R, { y: HOME_Y[1] + 128 }, 2.0, E.outBack)
     );
-    G.audio.play('roar');
+    G.audio.play('roar'); G.audio.play('card');
+    G.ui.card('', 'THE ECLIPSED WARDEN', 'Keeper of the dimmed sun');
     G.fx.shake(12);
     G.fx.ring(c.x, c.y, { r0: c.r, r1: 700, life: 0.9, color: G.pal().boss, width: 12, alpha: 0.7 });
     c.charge = 1;
@@ -826,7 +828,15 @@
       const tx = G.clamp(c.x + h.side * (B.spread + Math.sin(B.t * 0.8 + h.side) * 16), 90, 1190);
       const ty = c.y + 128 + Math.cos(B.t * 1.1 + h.side * 2) * 18;
       h.x = G.damp(h.x, tx, 4.5, dt); h.y = G.damp(h.y, ty, 4.5, dt);
-      h.rot = G.damp(h.rot, h.side * 0.1, 7, dt); h.curl = G.damp(h.curl, 0.12, 7, dt);
+      h.rot = G.damp(h.rot, h.side * 0.1, 7, dt);
+      h.curl = G.damp(h.curl, 0.13 + 0.07 * Math.sin(B.t * 1.3 + h.side * 1.7), 7, dt);
+    }
+
+    // an occasional blink while it is not busy
+    c.blink = Math.max(0, c.blink - dt);
+    if (!B.staggered && !B.dying && c.charge <= 0 && c.open > 0.9) {
+      c.blinkT -= dt;
+      if (c.blinkT <= 0) { c.blink = 0.17; c.blinkT = G.rand(2.4, 6); }
     }
 
     // the eye follows the player
@@ -954,7 +964,8 @@
     }
 
     // the eye
-    const ew = r * 0.62, eh = r * 0.36 * c.open;
+    const lid = c.blink > 0 ? Math.max(0.06, Math.abs(c.blink / 0.17 * 2 - 1)) : 1;
+    const ew = r * 0.62, eh = r * 0.36 * c.open * lid;
     ctx.save();
     ctx.beginPath();
     ctx.moveTo(-ew, 0); ctx.quadraticCurveTo(0, -eh * 2, ew, 0); ctx.quadraticCurveTo(0, eh * 2, -ew, 0);
@@ -1129,6 +1140,27 @@
     }
     ctx.restore();
   }
+
+  // Light the core throws on the floor, and shadows under the core and hands.
+  B.drawGround = function (ctx) {
+    if (B.dead) return;
+    const P = G.pal(), c = B.core;
+    const near = G.clamp(1 - (FLOOR - c.y) / 520, 0, 1);
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.globalAlpha = (0.22 + 0.5 * near) * (B.staggered ? 0.5 : 1);
+    const w = 300 + 260 * (1 - near);
+    ctx.drawImage(G.fx.glow(P.boss), c.x - w, FLOOR - 16, w * 2, 44);
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = 'source-over';
+    const shadow = (x, y, rx) => {
+      if (y < -60) return;
+      const k = G.clamp(1 - (FLOOR - y) / 560, 0.15, 1);
+      ctx.fillStyle = 'rgba(0,0,0,' + (0.5 * k) + ')';
+      ctx.beginPath(); ctx.ellipse(x, FLOOR + 4, rx * (0.55 + 0.45 * k), 6 * k + 1.5, 0, 0, G.TAU); ctx.fill();
+    };
+    shadow(c.x, c.y + c.r, c.r * 1.05);
+    for (const h of B.hands) if (h.alive) shadow(h.x, h.y + 60, 70);
+  };
 
   B.draw = function (ctx) {
     drawCore(ctx);

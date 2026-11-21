@@ -1,6 +1,6 @@
 # Solfall
 
-A side-on boss fight for the browser: one hero, one boss, three phases. Version 0.1a.
+A side-on boss fight for the browser: one hero, one boss, three phases. Version 0.1b.
 
 This is the first playable slice of a planned boss-rush roguelite (short runs, a draft of upgrades
 after each boss, bosses drawn from a pool). It is built to answer one question first: does the
@@ -22,14 +22,14 @@ then open http://localhost:8321. There is no build step and no dependency.
 |---|---|---|
 | Move | A / D or arrow keys | stick or d-pad |
 | Jump, double jump | Space or Z | A |
-| Slash | J or X or left click | X |
+| Slash | J or X, or left click (slashes towards the cursor) | X |
 | Aim a slash up or down | hold W / S or up / down | stick |
 | Dash (passes through attacks) | K or C or Shift | B, RB or RT |
-| Star Lance (costs one Starlight segment) | L or V or right click | Y |
+| Star Lance (costs one Starlight segment) | L or V, or right click (fires at the cursor) | Y |
 | Mend one health (costs one segment) | hold E or F while standing | LB or LT |
 | Drop through a platform | S + Space | down + A |
 | Pause | Esc or P | Start |
-| Retry on the result screen | R | |
+| Retry (works the moment you fall) | R | |
 
 ## The hero
 
@@ -96,7 +96,7 @@ Most-used tuning numbers: `B.BASE_HP` and `B.poiseMax` in `boss.js`, `G.PLAYER` 
 Open the browser console on the running game.
 
 - **Dodge tests:** `fetch('/tools/dodge-tests.js').then(r => r.text()).then(t => console.log((0, eval)(t)))`
-  runs each attack against a simple scripted player and reports health lost. All 20 lose 0 health as of v0.1a.
+  runs each attack against a simple scripted player and reports health lost. All 20 lose 0 health as of v0.1b.
   Run it after changing any attack.
 - `G.debug.god = true` makes the hero invulnerable. `G.debug.boxes = true` (or `?boxes` in the address)
   draws every hitbox.

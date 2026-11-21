@@ -230,6 +230,17 @@
     } else {
       ctx.drawImage(A.bgs[A.phase], -PAD, -PAD);
     }
+    // low mist drifting across the floor
+    const mist = G.fx.glow(G.pal().rim);
+    ctx.globalCompositeOperation = 'lighter';
+    for (let i = 0; i < 4; i++) {
+      const span = G.W + 900;
+      const x = ((i * 470 + G.t * (9 + i * 4)) % span) - 450;
+      ctx.globalAlpha = 0.07 + 0.03 * Math.sin(G.t * 0.4 + i * 2);
+      ctx.drawImage(mist, x, G.FLOOR - 120 + i * 9, 760, 170);
+    }
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = 'source-over';
   };
 
   A.drawPlatforms = function (ctx) {

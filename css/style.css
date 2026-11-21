@@ -276,3 +276,13 @@ ul.tips b { color: var(--ink); font-weight: 600; }
 
 #hint.calm { border-color: rgba(150, 225, 255, 0.5); color: var(--ink); }
 #hint b { color: var(--star); font-weight: 600; }
+
+/* scene fade, cursor and defeat mood */
+#fade { position: absolute; inset: 0; background: #000; opacity: 0; pointer-events: none; }
+#fade.go { animation: fadeup 0.55s ease-out; }
+@keyframes fadeup { 0% { opacity: 1; } 100% { opacity: 0; } }
+#stage.fighting { cursor: crosshair; }
+#stage.fighting .screen.on { cursor: default; }
+#game { transition: filter 1.1s ease-out; }
+#stage.fallen #game { filter: grayscale(0.85) brightness(0.72); }
+#mend kbd { font-size: 11px; }

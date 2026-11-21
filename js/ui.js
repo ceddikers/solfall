@@ -221,9 +221,16 @@
     if (!G.settings.hints || U.fights > 2) return;
     el.hint.innerHTML = G.input.device === 'gamepad'
       ? 'Stick move &middot; <b>A</b> jump &middot; <b>X</b> slash &middot; <b>B</b> dash &middot; <b>Y</b> lance &middot; hold <b>LB</b> mend'
-      : '<kbd>A</kbd><kbd>D</kbd> move &middot; <kbd>Space</kbd> jump &middot; <kbd>J</kbd> slash &middot; <kbd>K</kbd> dash &middot; <kbd>L</kbd> lance &middot; hold <kbd>E</kbd> mend';
+      : '<kbd>A</kbd><kbd>D</kbd> move &middot; <kbd>Space</kbd> jump &middot; <kbd>J</kbd> or click slash &middot; <kbd>K</kbd> dash &middot; <kbd>L</kbd> or right click lance &middot; hold <kbd>E</kbd> mend';
     el.hint.classList.add('show', 'calm');
     H.hintT = 7;
+  };
+  // Quick fade up from black whenever the scene changes.
+  U.fade = function () { retrigger(document.getElementById('fade'), 'go'); };
+  // 'menu' | 'fight' | 'dead': sets the cursor and drains the colour on defeat.
+  U.mood = function (m) {
+    el.stage.classList.toggle('fighting', m === 'fight');
+    el.stage.classList.toggle('fallen', m === 'dead');
   };
   U.letterbox = function (on) {
     el.lbTop.classList.toggle('on', on); el.lbBot.classList.toggle('on', on);
@@ -269,8 +276,18 @@
       H.full = full;
     }
     if (P.emberFlash < 0) { P.emberFlash = 0; retrigger(el.ember, 'deny'); }
-    const mend = !P.dead && P.hp < P.maxHp && P.ember >= G.PLAYER.SEG;
-    if (mend !== H.mend) { H.mend = mend; el.mend.classList.toggle('on', mend); }
+    // prompt for what a full segment can buy
+    const ready = !P.dead && P.ember >= G.PLAYER.SEG;
+    const mend = !ready ? '' : (P.hp < P.maxHp ? 'both' : 'lance') + G.input.device;
+    if (mend !== H.mend) {
+      H.mend = mend;
+      el.mend.classList.toggle('on', ready);
+      if (ready) {
+        const pad = G.input.device === 'gamepad';
+        el.mend.innerHTML = (pad ? '<kbd>Y</kbd>' : '<kbd>L</kbd> or right click') + ' lance'
+          + (P.hp < P.maxHp ? ' &middot; hold ' + (pad ? '<kbd>LB</kbd>' : '<kbd>E</kbd>') + ' to mend' : '');
+      }
+    }
 
     // boss bar
     if (H.introDelay > 0) H.introDelay -= dt;

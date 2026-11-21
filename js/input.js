@@ -59,6 +59,7 @@
     e.preventDefault();
     if (e.repeat) return;
     I.device = 'keyboard';
+    if (a === 'attack' || a === 'flare') I.aim[a] = false;
     press(a, e.code);
   });
   window.addEventListener('keyup', (e) => {
@@ -67,17 +68,31 @@
   });
   window.addEventListener('blur', releaseAll);
 
-  // Mouse: left click attacks, right click fires the lance. Only on the game canvas.
-  I.bindMouse = function (el) {
-    el.addEventListener('mousedown', (e) => {
-      if (e.button === 0) press('attack', 'Mouse0');
-      if (e.button === 2) press('flare', 'Mouse2');
+  // Mouse: left click slashes, right click fires the lance, both aimed at the cursor.
+  // Listens on the whole window so clicks land wherever the cursor is, and the browser's
+  // right-click menu never opens over the game.
+  I.mx = 640; I.my = 360;                  // cursor position in stage coordinates
+  I.aim = { attack: false, flare: false }; // true when the last press of that action came from the mouse
+  I.mouseBlocked = null;                   // set by the game: returns true while a menu is open
+  I.bindMouse = function (stage) {
+    const track = (e) => {
+      const r = stage.getBoundingClientRect();
+      if (!r.width) return;
+      I.mx = (e.clientX - r.left) / r.width * G.W;
+      I.my = (e.clientY - r.top) / r.height * G.H;
+    };
+    window.addEventListener('mousemove', track);
+    window.addEventListener('mousedown', (e) => {
+      track(e);
+      if (I.mouseBlocked && I.mouseBlocked()) return;
+      if (e.button === 0) { I.aim.attack = true; I.device = 'keyboard'; press('attack', 'Mouse0'); e.preventDefault(); }
+      if (e.button === 2) { I.aim.flare = true; I.device = 'keyboard'; press('flare', 'Mouse2'); e.preventDefault(); }
     });
     window.addEventListener('mouseup', (e) => {
       if (e.button === 0) release('attack', 'Mouse0');
       if (e.button === 2) release('flare', 'Mouse2');
     });
-    el.addEventListener('contextmenu', (e) => e.preventDefault());
+    window.addEventListener('contextmenu', (e) => e.preventDefault());
   };
 
   // Gamepad (standard mapping). Polled once per rendered frame.
@@ -102,7 +117,11 @@
     for (let i = 0; i < pads.length; i++) if (pads[i] && pads[i].connected) { pad = pads[i]; break; }
     for (const a in PAD) {
       const held = pad ? PAD[a](pad) : false;
-      if (held) { I.device = 'gamepad'; press(a, 'pad'); } else release(a, 'pad');
+      if (held) {
+        I.device = 'gamepad';
+        if ((a === 'attack' || a === 'flare') && !sources[a].has('pad')) I.aim[a] = false;
+        press(a, 'pad');
+      } else release(a, 'pad');
     }
   };
 

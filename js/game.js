@@ -32,6 +32,7 @@
     G.state = 'fight'; G.paused = false;
     G.time = 0; G.hitstop = 0; G.slowT = 0; G.deadT = 0; G.wonT = 0; G.endShown = false;
     G.ui.close(); G.ui.resetHud(); G.ui.buildHp(G.player.maxHp); G.ui.bossIntro(); G.ui.hud(true); G.ui.keysHint();
+    G.ui.fade(); G.ui.mood('fight');
     G.audio.init(); G.audio.startMusic(); G.audio.setIntensity(1, true); G.audio.duck(1);
     G.input.endStep(); acc = 0;
   };
@@ -42,6 +43,7 @@
     G.boss.attract();
     G.state = 'title'; G.paused = false; G.hitstop = 0; G.slowT = 0;
     G.ui.resetHud(); G.ui.hud(false); G.ui.close(); G.ui.show('title');
+    G.ui.fade(); G.ui.mood('menu');
     G.audio.setIntensity(0); G.audio.duck(1);
     G.input.endStep(); acc = 0;
   };
@@ -61,7 +63,7 @@
 
   G.onPlayerDeath = function () {
     G.state = 'dead'; G.deadT = 0;
-    G.ui.letterbox(false);
+    G.ui.letterbox(false); G.ui.mood('dead');
     G.audio.duck(0.35);
   };
   G.onBossDying = function () {
@@ -86,6 +88,8 @@
     G.audio.init(); G.audio.startMusic();
     if (G.ui.current) { G.ui.onAction(a); return; }
     if (a === 'pause') G.pause();
+    // no need to wait for the defeat screen: R restarts at once
+    if (a === 'retry' && G.state === 'dead') G.startFight();
   }
 
   // ------------------------------------------------------------------ simulation
@@ -131,6 +135,8 @@
     ctx.scale(z, z);
     ctx.translate(-G.W / 2, -G.H / 2);
     G.arena.drawBack(ctx);
+    G.boss.drawGround(ctx);
+    G.player.drawShadow(ctx);
     G.boss.draw(ctx);
     G.hazards.draw(ctx, 'under');
     G.arena.drawPlatforms(ctx);
@@ -192,7 +198,8 @@
     if (/[?&]boxes/.test(location.search)) G.debug.boxes = true;
     G.arena.init();
     G.ui.init();
-    G.input.bindMouse(canvas);
+    G.input.bindMouse(stage);
+    G.input.mouseBlocked = () => !!G.ui.current || G.paused || (G.state !== 'fight' && G.state !== 'won');
     G.input.onAction = onAction;
     resize();
     window.addEventListener('resize', resize);
