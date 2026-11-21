@@ -45,17 +45,19 @@
     G.startFight();
   };
   // After a fall: same hero, straight back to the gate for a fresh choice of relics.
-  G.newRun = function () { G.toHub(); G.openGate(); };
+  G.newRun = function () { G.toHub('gate'); G.openGate(); };
   // The gate in the camp: choose a relic, then the first trial.
   G.openGate = function () { G.run.reset(); G.ui.showRelics(G.run.rollRelics()); };
 
   // The Vigil: the camp between runs, where the hero walks about (see hub.js).
-  G.toHub = function () {
+  // where: 'fire' (coming from the title) or 'gate' (coming back from a run).
+  G.toHub = function (where) {
     G.run.reset();
     G.setBoss('dummy');
     G.arena.reset(); G.hazards.clear(); F.reset();
     G.player.reset(); G.flow.reset(); G.boss.reset(); G.moments.reset();
-    G.player.x = G.clamp(G.hub.lastX || 600, 500, 660);
+    G.player.x = G.hub.spawn(where); G.player.facing = where === 'gate' ? -1 : 1;
+    G.cam.x = G.hub.camTarget(); G.cam.y = 0; // the view starts on the hero, it does not slide there
     G.player.ember = G.PLAYER.SEG * G.player.segs; // the special can be tried freely here
     G.state = 'hub'; G.paused = false; G.hitstop = 0; G.slowT = 0;
     G.ui.resetHud(); G.ui.hud(false); G.ui.close(); G.ui.buildRun();
@@ -72,6 +74,7 @@
   G.startFight = function () {
     G.seed((Date.now() ^ (Math.random() * 1e9)) >>> 0);
     G.setBoss(G.debug.boss || G.run.foe());
+    G.cam.x = 0; G.cam.y = 0; // the camp scrolls; an arena does not
     G.run.rollOmens(); // before the boss works out its health
     G.arena.reset(); G.hazards.clear(); F.reset();
     G.player.reset(); G.flow.reset(); G.boss.reset(); G.moments.reset(); G.boss.intro();
@@ -85,6 +88,7 @@
 
   G.toTitle = function () {
     G.run.reset();
+    G.cam.x = 0; G.cam.y = 0;
     G.setBoss('warden');
     G.arena.reset(); G.hazards.clear(); F.reset();
     G.player.reset(); G.flow.reset(); G.player.hidden = true;
@@ -179,7 +183,8 @@
     // the view leans a little towards the hero
     const P = G.player;
     const follow = G.state === 'title' || P.hidden ? 0 : 1;
-    G.cam.x = G.damp(G.cam.x, follow * (P.x - G.W / 2) * 0.026, 3.5, dt);
+    if (G.state === 'hub') G.cam.x = G.damp(G.cam.x, G.hub.camTarget(), 5, dt); // the camp is wide: the view follows the hero across it
+    else G.cam.x = G.damp(G.cam.x, follow * (P.x - G.W / 2) * 0.026, 3.5, dt);
     G.cam.y = G.damp(G.cam.y, follow * G.clamp((P.y - G.FLOOR) * 0.035, -10, 0), 3.5, dt);
     if (G.state === 'fight' && G.boss.active && !G.boss.dying && !G.boss.dead) G.time += sdt;
     if (G.state === 'dead') {
@@ -205,7 +210,7 @@
     ctx.translate(G.W / 2 + F.shakeX, G.H / 2 + F.shakeY);
     ctx.scale(z, z);
     ctx.translate(-G.W / 2 - G.cam.x, -G.H / 2 - G.cam.y);
-    G.arena.drawBack(ctx);
+    if (G.state === 'hub') G.hub.drawBack(ctx); else G.arena.drawBack(ctx);
     G.flow.drawVeil(ctx);
     G.moments.drawGloom(ctx);
     F.drawDecals(ctx);
@@ -224,7 +229,10 @@
     G.player.draw(ctx);
     G.hazards.draw(ctx, 'over');
     F.draw(ctx);
-    if (G.state === 'hub') G.hub.drawOver(ctx);
+    if (G.state === 'hub') {
+      G.hub.drawFore(ctx); G.hub.drawOver(ctx);
+      ctx.translate(G.cam.x, 0); // the vignette stays on the view, not on the ground
+    }
     G.arena.drawFront(ctx);
     if (G.debug.boxes) G.boss.drawDebug(ctx);
     ctx.restore();

@@ -340,7 +340,7 @@
     const p = Math.min(2.4, power), dc = F.dustCol();
     const n = Math.round(5 * p);
     for (let i = 0; i < n; i++) {
-      const x = rnd(G.WALL_L + 20, G.WALL_R - 20), life = rnd(0.5, 1), size = rnd(5, 10);
+      const x = rnd(G.cam.x + 56, G.cam.x + G.W - 56), life = rnd(0.5, 1), size = rnd(5, 10); // across whatever is in view
       F.spawn({ kind: 'smoke', color: dc, a: 0.34, x, y: FLOOR - 2, vx: rnd(-14, 14), vy: -rnd(20, 60) * p, life, size, grow: size * 1.5 / life, drag: 2.6, grav: -18 });
       F.spawn({ kind: 'chunk', color: GRIT, x: x + rnd(-40, 40), y: FLOOR - 3, vx: rnd(-30, 30), vy: -rnd(90, 210) * Math.sqrt(p), life: rnd(0.45, 0.7), size: rnd(1.8, 3.2), grav: 1500, rot: 0, vr: rnd(-8, 8) });
     }

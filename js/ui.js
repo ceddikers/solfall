@@ -122,13 +122,13 @@
   }
   function act(name) {
     G.audio.play(name === 'back' ? 'uiBack' : 'uiSelect');
-    if (name === 'begin') G.toHub();
+    if (name === 'begin') G.toHub('fire');
     else if (name === 'retry' || name === 'restart') G.newRun();
-    else if (name === 'heroes' || name === 'camp') G.toHub();
+    else if (name === 'heroes' || name === 'camp') G.toHub('gate');
     else if (/^hero\d$/.test(name)) G.pickHero(Number(name.slice(4)));
     else if (/^relic\d$/.test(name)) G.pickRelic(Number(name.slice(5)));
     else if (/^boon\d$/.test(name)) G.takeBoon(Number(name.slice(4)));
-    else if (name === 'endrun') G.toHub();
+    else if (name === 'endrun') G.toHub('gate');
     else if (name === 'reroll') G.rerollBoons();
     else if (name === 'shrine') U.showShrine();
     else if (/^shrine\d$/.test(name)) buy(Number(name.slice(6)));

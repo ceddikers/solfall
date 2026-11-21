@@ -2,7 +2,7 @@
 
 A side-on boss rush for the browser: three heroes, four three-phase bosses, played as a run of
 ever-harder trials. You pick a hero and a relic before the run and win a boon after each victory.
-Version 0.9a.
+Version 0.9b.
 
 This is an early slice of a planned boss-rush roguelite (short runs, a boon after each boss,
 bosses drawn from a pool). A run meets the four bosses in a shuffled order, then meets them again, harder.
@@ -38,17 +38,24 @@ then open http://localhost:8321. There is no build step and no dependency.
 
 ## The Vigil (new in v0.9a)
 
-The title screen now leads to a camp, the Vigil, where you move your hero about freely. What used to be
+The title screen now leads to a camp, the Vigil, where you move your hero about freely. Since v0.9b it
+is nearly three screens wide (3,600 pixels) and the view follows the hero across it. What used to be
 menu options are places in it, left to right:
 
 | Place | Walk up and press E to |
 |---|---|
-| Two echoes on plinths | become that hero. The one you were takes its place on the plinth. |
-| The Shrine | open the Shrine and spend Sunshards |
-| The sparring post | nothing to press: hit it. It shows the damage of your last flurry, cannot be destroyed, and charges Dawnbreak three times as fast, so every move can be tried here. Starlight starts full. |
+| The Hall of Echoes | become the hero standing in an alcove. Each hero has their own alcove; yours holds only your sigil while you are out of it. |
+| The Shrine | open the Shrine and spend Sunshards. One small shard circles the great one for each trophy won. |
+| The campfire | nothing: it is where you arrive from the title screen |
+| The training yard | nothing to press: hit the sparring post. It shows the damage of your last flurry, cannot be destroyed, and charges Dawnbreak three times as fast, so every move can be tried here. Starlight starts full. |
 | The brazier | step the difficulty: Gentle, Standard, Merciless. The flame grows and changes colour with it. |
-| The banner | choose the first foe: whoever comes, or one of the four bosses. It takes that boss's colour. |
-| The gate | begin a run: choose a relic, then the first trial |
+| The banners | choose the first foe. One banner for each boss hangs on the rail; the lit one comes first, and all four lit means whoever comes. |
+| The gate | begin a run: choose a relic, then the first trial. You come back out of it when a run ends. |
+
+The backdrop is painted once into four layers that slide at different speeds as you walk: the sky (with
+a thin moon and the dimmed sun low over the gate), far hills, a ruined aqueduct, and near columns,
+tents and trees. The places, the fires, the grass (which bends away from you) and the fireflies are
+drawn each frame. A marker at the top right points to the gate until it is in view.
 
 Nothing can hurt you in the camp. Esc opens the menu (settings, how to play, quit to title). After a run,
 **New run** goes straight back to the gate's relic choice, and **Back to camp** returns you to the Vigil.
@@ -430,6 +437,9 @@ Open the browser console on the running game.
   were run and looked at in captures, and the numbers above were checked in the running game. Whether
   Flow climbs at a satisfying rate, how often Dawnbreak fills in a real fight (the aim was two to four
   times), and whether Sunshard prices are fair are first guesses.
+- **The camp's look was judged from captures** taken at each place along it; it costs about 0.6 ms a
+  frame on the machine it was written on. How the scrolling feels, and whether three screens is too far
+  to walk each time, is unknown.
 - **The camp has not been walked by a person.** Every place in it was used by a scripted hero (swapping
   hero, the Shrine, brazier, banner, post, gate) and every way in and out was followed (title, pause,
   defeat, victory). Whether it is pleasant to cross each time, and whether the places are obvious

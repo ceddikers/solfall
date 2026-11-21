@@ -779,7 +779,8 @@
         if (s.arrow) G.fx.dust(s.x, FLOOR, 2, { speed: [20, 80], size: [3, 6], a: 0.3 });
         else if (!s.wave) { G.fx.thud(s.x, FLOOR, 0.8, { noCrack: true }); G.fx.scorch(s.x, 34, STAR); G.fx.shake(4); }
       }
-      if (s.dead || s.x < -100 || s.x > G.W + 100 || s.y < -200 || s.t > (s.life || 2)) G.shots.splice(i, 1);
+      // gone once it leaves the view (the view moves in the camp)
+      if (s.dead || s.x < G.cam.x - 100 || s.x > G.cam.x + G.W + 100 || s.y < -200 || s.t > (s.life || 2)) G.shots.splice(i, 1);
     }
   };
 

@@ -79,7 +79,7 @@
   FL.drawVeil = function (ctx) {
     if (FL.dark < 0.01) return;
     ctx.fillStyle = 'rgba(3,2,10,' + 0.64 * FL.dark + ')';
-    ctx.fillRect(-80, -80, G.W + 160, G.H + 160);
+    ctx.fillRect(G.cam.x - 80, -80, G.W + 160, G.H + 160);
   };
 
   // ------------------------------------------------------------------ Dawnbreak
@@ -184,7 +184,7 @@
       yield* wait(0.05);
       for (const side of [-1, 1]) {
         const px = P.x + side * d * 104;
-        if (px < G.WALL_L + 20 || px > G.WALL_R - 20) continue;
+        if (px < (G.bounds ? G.bounds.l : G.WALL_L) + 20 || px > (G.bounds ? G.bounds.r : G.WALL_R) - 20) continue;
         F.cut(px, FLOOR - 150 + d * 8, -Math.PI / 2, 340 - d * 22, 20 - d * 1.5, H.col, H.hot, 0.34);
         F.light(px, FLOOR - 90, 190, H.col, 0.3, 0.6);
         F.burst(px, FLOOR - 6, { n: 7, color: H.hot, speed: [240, 760], angle: -Math.PI / 2, spread: 0.7, life: [0.2, 0.5], kind: 'spark', size: [2, 4], grav: 900 });
