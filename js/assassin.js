@@ -64,7 +64,8 @@
   B.dying0 = function () { B.body.pose = 'kneel'; B.clones.length = 0; };
 
   function smoke(x, y) {
-    G.fx.burst(x, y, { n: 16, color: '14,12,24', speed: [30, 200], life: [0.3, 0.8], size: [8, 18] });
+    G.fx.dust(x, y, 9, { speed: [20, 170], size: [10, 20], life: [0.4, 0.9], up: 60, a: 0.5, color: '20,17,32', jitter: 16 });
+    G.fx.shards(x, y, 3, G.pal().boss, { speed: [80, 300], size: [2, 4] });
     G.fx.burst(x, y, { n: 8, color: G.pal().boss, speed: [60, 260], life: [0.2, 0.5], size: [2, 5], kind: 'spark' });
   }
   function* vanish() {
@@ -347,6 +348,7 @@
     yield* tween(b, { y: FLOOR }, 0.2, E.inQuad);
     b.pose = 'skid';
     G.fx.shake(5); G.audio.play('land');
+    G.fx.thud(b.x, FLOOR, 0.7, { noCrack: true });
     yield* wait(0.85);
   }
 

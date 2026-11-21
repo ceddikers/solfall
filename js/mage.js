@@ -131,6 +131,8 @@
   function strikeFx(x) {
     G.audio.play('zap'); G.fx.shake(6);
     G.fx.burst(x, FLOOR - 4, { n: 10, color: BOLT.hot, speed: [120, 520], angle: -Math.PI / 2, spread: 2.6, life: [0.15, 0.4], kind: 'spark', size: [2, 3.5], grav: 900 });
+    G.fx.lines(x, FLOOR - 8, 7, BOLT.hot, { r0: 14, speed: [400, 800] });
+    G.fx.flash(BOLT.boss, 0.07, 0.12);
   }
 
   // A lightning strike from the sky: a marked column, then the bolt. Step out of the column.
@@ -432,6 +434,8 @@
           G.audio.play('shatter'); G.fx.shake(7);
           G.fx.burst(this.x, FLOOR - 46, { n: 22, color: ICE.hot, speed: [120, 620], life: [0.3, 0.8], kind: 'spark', size: [2, 5] });
           G.fx.burst(this.x, FLOOR - 46, { n: 10, color: ICE.boss, speed: [80, 400], life: [0.5, 1], size: [5, 10], kind: 'chunk', grav: 1300 });
+          G.fx.shatter(this.x, FLOOR - 46, ICE.boss, 16, { hot: ICE.hot, r: 240, jitter: 16 });
+          G.fx.stop(0.05);
           G.fx.text(this.x, FLOOR - 110, 'BROKEN', { color: ICE.hot, size: 15, life: 0.8 });
         }
         return true;
@@ -515,6 +519,7 @@
     B.spin = 0.3; b.elem = null; b.want = 0; b.spent = true; b.exposed = true;
     yield* tween(b, { y: FLOOR }, 0.45, E.inCubic);
     G.fx.shake(8); G.audio.play('boom');
+    G.fx.thud(b.x, FLOOR, 1.2);
     G.ui.callout('SPENT', 'Strike now');
     yield* wait(3.4);
     b.spent = false; b.exposed = false; b.homeY = GY; B.spin = 1;

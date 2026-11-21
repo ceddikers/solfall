@@ -176,13 +176,16 @@
     ctx.scale(z, z);
     ctx.translate(-G.W / 2 - G.cam.x, -G.H / 2 - G.cam.y);
     G.arena.drawBack(ctx);
+    F.drawDecals(ctx);
     G.boss.drawGround(ctx);
     G.player.drawShadow(ctx);
-    // the Warden looms behind the platforms; the duelling bosses stand among them
-    if (!G.boss.kit) G.boss.draw(ctx);
+    // the Warden looms behind the platforms; the duelling bosses stand among them.
+    // A boss that has just been struck shivers for the length of the hit-freeze.
+    if (!G.boss.kit) drawBoss();
+    F.drawSmoke(ctx);
     G.hazards.draw(ctx, 'under');
     G.arena.drawPlatforms(ctx);
-    if (G.boss.kit) G.boss.draw(ctx);
+    if (G.boss.kit) drawBoss();
     G.drawShots(ctx);
     G.player.draw(ctx);
     G.hazards.draw(ctx, 'over');
@@ -191,6 +194,14 @@
     if (G.debug.boxes) G.boss.drawDebug(ctx);
     ctx.restore();
     F.drawFlash(ctx);
+  }
+
+  function drawBoss() {
+    if (!F.rattleA) { G.boss.draw(ctx); return; }
+    ctx.save();
+    ctx.translate(F.rattleX, F.rattleY);
+    G.boss.draw(ctx);
+    ctx.restore();
   }
 
   function frame(now) {

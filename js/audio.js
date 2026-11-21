@@ -5,6 +5,13 @@
   let noiseBuf = null;
   let duck = 1;
   const last = {};
+  // Sounds that repeat a lot are played a little sharp or flat each time (the range, in semitones),
+  // so a string of hits or footsteps does not sound like one sample on a loop.
+  let vary = 1;
+  const VARY = {
+    hit: 1.3, hitHeavy: 1, slash: 1.6, slash3: 1.2, arrow: 1.2, arrowHeavy: 0.8, tink: 1.5, orbPop: 2,
+    step: 3, stomp: 2, land: 2, landHard: 1.5, jump: 0.7, dash: 1, boom: 1.2, slam: 0.8, blade: 1.2, zap: 1.2,
+  };
 
   // Browsers only allow audio after a user gesture, so this is called from the first key or click.
   A.init = function () {
@@ -46,8 +53,8 @@
     const dur = o.dur;
     const osc = ctx.createOscillator();
     osc.type = o.type || 'sine';
-    osc.frequency.setValueAtTime(o.f0, t);
-    if (o.f1) osc.frequency.exponentialRampToValueAtTime(Math.max(1, o.f1), t + dur);
+    osc.frequency.setValueAtTime(o.f0 * vary, t);
+    if (o.f1) osc.frequency.exponentialRampToValueAtTime(Math.max(1, o.f1 * vary), t + dur);
     if (o.detune) osc.detune.value = o.detune;
     const g = ctx.createGain();
     const a = Math.min(o.attack || 0.004, dur * 0.8);
@@ -66,8 +73,8 @@
     src.buffer = noiseBuf; src.loop = true;
     const f = ctx.createBiquadFilter();
     f.type = o.type || 'bandpass';
-    f.frequency.setValueAtTime(o.f0, t);
-    if (o.f1) f.frequency.exponentialRampToValueAtTime(Math.max(20, o.f1), t + dur);
+    f.frequency.setValueAtTime(o.f0 * vary, t);
+    if (o.f1) f.frequency.exponentialRampToValueAtTime(Math.max(20, o.f1 * vary), t + dur);
     f.Q.value = o.q || 1;
     const g = ctx.createGain();
     const a = Math.min(o.attack || 0.003, dur * 0.8);
@@ -97,11 +104,14 @@
       noise({ dur: 0.07, vol: 0.38, type: 'highpass', f0: 1800, q: 0.5 });
       tone({ type: 'triangle', f0: 210, f1: 90, dur: 0.1, vol: 0.34 });
       tone({ type: 'square', f0: 1400, f1: 700, dur: 0.04, vol: 0.06 });
+      tone({ type: 'sine', f0: 125, f1: 52, dur: 0.1, vol: 0.24 });
     },
     hitHeavy() {
       noise({ dur: 0.15, vol: 0.5, type: 'lowpass', f0: 3200, f1: 400, q: 0.7 });
       tone({ type: 'sine', f0: 160, f1: 48, dur: 0.24, vol: 0.55 });
       tone({ type: 'square', f0: 900, f1: 300, dur: 0.08, vol: 0.09 });
+      tone({ type: 'sine', f0: 84, f1: 32, dur: 0.36, vol: 0.42 });
+      noise({ dur: 0.05, vol: 0.24, type: 'highpass', f0: 2600 });
     },
     tink() { tone({ type: 'triangle', f0: 1900, f1: 1500, dur: 0.07, vol: 0.12 }); },
     jump() { tone({ type: 'sine', f0: 320, f1: 560, dur: 0.09, vol: 0.12 }); },
@@ -110,6 +120,16 @@
       noise({ dur: 0.08, vol: 0.07, f0: 2500, f1: 5000 });
     },
     land() { noise({ dur: 0.08, vol: 0.13, type: 'lowpass', f0: 500, f1: 120 }); },
+    landHard() {
+      noise({ dur: 0.14, vol: 0.26, type: 'lowpass', f0: 700, f1: 100 });
+      tone({ type: 'sine', f0: 96, f1: 40, dur: 0.17, vol: 0.32 });
+    },
+    step() { noise({ dur: 0.05, vol: 0.05, type: 'lowpass', f0: 420, f1: 140 }); },
+    // a heavy boss's footfall
+    stomp() {
+      tone({ type: 'sine', f0: 72, f1: 30, dur: 0.22, vol: 0.34 });
+      noise({ dur: 0.14, vol: 0.2, type: 'lowpass', f0: 380, f1: 90 });
+    },
     dash() {
       noise({ dur: 0.18, vol: 0.3, f0: 500, f1: 3400, q: 1.4 });
       tone({ type: 'sine', f0: 700, f1: 240, dur: 0.14, vol: 0.06 });
@@ -263,7 +283,10 @@
     if (last[name] != null && now - last[name] < 0.035) return;
     last[name] = now;
     const f = S[name];
-    if (f) f(opts || {});
+    if (!f) return;
+    vary = VARY[name] ? Math.pow(2, (Math.random() * 2 - 1) * VARY[name] / 12) : 1;
+    f(opts || {});
+    vary = 1;
   };
 
   // ------------------------------------------------------------------ music

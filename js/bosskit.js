@@ -34,7 +34,8 @@
     G.fx.shake(big ? 20 : 12); G.fx.punch(big ? 0.03 : 0.015);
     G.audio.play('slam');
     G.fx.ring(x, FLOOR - 4, { r0: 20, r1: big ? 240 : 150, life: 0.4, color: col || P.hot, width: 8 });
-    G.fx.burst(x, FLOOR - 6, { n: big ? 26 : 14, color: '190,190,210', speed: [80, 420], angle: -Math.PI / 2, spread: 3, life: [0.3, 0.8], size: [4, 9] });
+    G.fx.thud(x, FLOOR, big ? 1.9 : 1.15, { col: col || P.boss });
+    G.fx.light(x, FLOOR - 30, big ? 300 : 200, col || P.hot, 0.2, 0.5);
     G.fx.burst(x, FLOOR - 6, { n: big ? 12 : 6, color: '22,18,32', speed: [150, 560], angle: -Math.PI / 2, spread: 2.2, life: [0.6, 1.2], size: [5, 11], kind: 'chunk', grav: 1500 });
     G.fx.burst(x, FLOOR - 6, { n: big ? 20 : 10, color: col || P.boss, speed: [150, 600], angle: -Math.PI / 2, spread: 2.6, life: [0.2, 0.6], kind: 'spark', size: [2, 4], grav: 900 });
   };
@@ -120,7 +121,7 @@
       if (G.settings.numbers) {
         G.fx.text(info.x + G.rand(-12, 12), info.y - 16, String(dmg), {
           color: (B.staggered || b.exposed || info.finisher) ? '255,226,140' : '255,255,255',
-          size: info.finisher ? 28 : info.heavy ? 23 : 17, life: info.finisher ? 0.8 : 0.65,
+          size: info.finisher ? 28 : info.heavy ? 23 : 17, life: info.finisher ? 0.8 : 0.65, pop: true,
         });
       }
       if (!B.staggered) {
@@ -165,6 +166,8 @@
       G.fx.stop(0.12); G.fx.shake(14); G.fx.flash(G.COL.starHot, 0.3, 0.3);
       G.fx.ring(b.x, cy, { r0: 40, r1: 280, life: 0.6, color: G.COL.starHot, width: 10 });
       G.fx.burst(b.x, cy, { n: 26, color: G.pal().hot, speed: [200, 700], life: [0.3, 0.8], kind: 'spark', size: [2, 5] });
+      G.fx.shatter(b.x, cy, G.pal().boss, 18, { hot: G.pal().hot, r: 300, jitter: B.w * 0.4 });
+      G.fx.punch(0.022);
       G.ui.callout('STAGGERED', 'Strike now');
       B.script = staggerScript();
     }
@@ -176,7 +179,7 @@
       if (b.y < FLOOR - 1) {
         yield* tween(b, { y: FLOOR }, 0.3, E.inCubic);
         G.fx.shake(8); G.audio.play('boom');
-        G.fx.burst(b.x, FLOOR - 6, { n: 12, color: '190,190,210', speed: [60, 300], angle: -Math.PI / 2, spread: 3, life: [0.3, 0.7], size: [3, 7] });
+        G.fx.thud(b.x, FLOOR, 1.2);
       }
       let e = 0;
       while (e < dur) {
@@ -187,6 +190,8 @@
       B.poiseMax = Math.min(900, B.poiseMax * 1.25);
       G.fx.ring(b.x, b.y - B.h / 2, { r0: 40, r1: 280, life: 0.45, color: G.pal().boss, width: 8 });
       G.audio.play('ring'); G.fx.shake(8);
+      for (const d of [-1, 1]) G.fx.dust(b.x + d * 30, FLOOR, 5, { dir: d, speed: [120, 420], size: [7, 13], up: 40 });
+      if (G.arena.gust) G.arena.gust(b.x, b.y - B.h / 2, 1.4);
       B.pushPlayer(480, 260);
       if (B.onRecover) B.onRecover();
       yield* wait(0.45);
@@ -214,6 +219,9 @@
       G.audio.play('roar'); G.audio.play('card');
       G.ui.card(ROMAN[n], B.cards[n][0], B.cards[n][1]);
       G.fx.flash(G.PAL[n].boss, 0.45, 0.8); G.fx.shake(20);
+      G.fx.shatter(b.x, b.y - B.h / 2, G.PAL[n].boss, 20, { hot: G.PAL[n].hot, r: 420, jitter: B.w * 0.4, r0: 50 });
+      for (const d of [-1, 1]) G.fx.dust(b.x + d * 40, FLOOR, 7, { dir: d, speed: [160, 620], size: [8, 15], life: [0.6, 1.1], up: 50 });
+      if (G.arena.gust) G.arena.gust(b.x, b.y - B.h / 2, 2.2);
       B.pushPlayer();
       const out = B.phaseOut ? B.phaseOut(n) : null;
       let e = 0, ringT = 0, outDone = !out;
@@ -252,7 +260,11 @@
         b.jit = 1.5 + e * 2.5;
         if (next <= 0) {
           next = Math.max(0.07, 0.24 - e * 0.07);
-          G.fx.burst(b.x + G.rand(-B.w / 2, B.w / 2), b.y - G.rand(0, B.h), { n: 10, color: G.pal().hot, speed: [100, 600], life: [0.3, 0.8], size: [4, 10] });
+          const bx = b.x + G.rand(-B.w / 2, B.w / 2), by = b.y - G.rand(0, B.h);
+          G.fx.burst(bx, by, { n: 10, color: G.pal().hot, speed: [100, 600], life: [0.3, 0.8], size: [4, 10] });
+          G.fx.shards(bx, by, 5, G.pal().boss, { speed: [140, 520] });
+          G.fx.light(bx, by, 180, G.pal().hot, 0.18, 0.5);
+          G.fx.dust(bx, by, 2, { speed: [20, 90], size: [8, 14], life: [0.6, 1.1], up: 70, a: 0.36, color: '84,78,100' });
           G.fx.shake(6 + e * 4);
         }
       }
@@ -261,6 +273,10 @@
       G.fx.burst(b.x, cy, { n: 80, color: G.PAL[4].boss, speed: [200, 1100], life: [0.6, 1.8], size: [4, 12], drag: 1.2 });
       G.fx.burst(b.x, cy, { n: 34, color: '18,14,24', speed: [200, 900], life: [1, 2], size: [6, 14], kind: 'chunk', grav: 1300 });
       G.fx.ring(b.x, cy, { r0: 30, r1: 900, life: 1.1, color: G.PAL[4].hot, width: 14 });
+      G.fx.shatter(b.x, cy, G.PAL[4].boss, 40, { hot: G.PAL[4].hot, r: 520, speed: [200, 900], size: [4, 10], jitter: B.w * 0.5, r0: 60 });
+      G.fx.boom(b.x, cy, 150, { col: G.PAL[4].boss, hot: G.PAL[4].hot });
+      G.fx.thud(b.x, FLOOR, 2, { col: G.PAL[4].boss });
+      G.fx.burst(b.x, cy, { n: 40, color: G.PAL[4].boss, speed: [30, 260], life: [1.4, 3], size: [1.6, 3.4], grav: -36, wob: 110, drag: 1.2, jitter: 60 });
       G.arena.setPhase(4, 2.6);
       B.dead = true; b.jit = 0;
       G.audio.play('victory');
@@ -278,6 +294,9 @@
       G.ui.card('', B.name, G.run.trial > 1 ? 'Trial ' + G.roman(G.run.trial) + ' · ' + B.taunt : B.sub);
       G.fx.shake(12);
       G.fx.ring(b.x, b.y - B.h / 2, { r0: 40, r1: 700, life: 0.9, color: G.pal().boss, width: 12, alpha: 0.7 });
+      for (const d of [-1, 1]) G.fx.dust(b.x + d * 30, FLOOR, 6, { dir: d, speed: [140, 520], size: [7, 14], life: [0.6, 1.1], up: 44 });
+      if (G.arena.gust) G.arena.gust(b.x, b.y - B.h / 2, 1.8);
+      G.fx.jolt(1);
       yield* wait(1.0);
       B.active = true; B.invuln = false;
       release();

@@ -62,9 +62,12 @@
         if (Math.random() < 0.6) {
           G.fx.spawn({ x: this.x - this.dir * 10, y: G.FLOOR - G.rand(2, this.hgt * 0.7), vx: -this.dir * G.rand(20, 90), vy: G.rand(-60, -10), life: G.rand(0.15, 0.4), size: G.rand(2, 5), color: pal(this).boss });
         }
+        if (Math.random() < dt * 20) G.fx.dust(this.x - this.dir * 16, G.FLOOR, 1, { dir: -this.dir, speed: [20, 90], size: [4, 8], up: 30, a: 0.3 });
         if (this.x < G.WALL_L + 8 || this.x > G.WALL_R - 8) {
           this.dead = true;
           G.fx.burst(this.x, G.FLOOR - 20, { n: 10, color: pal(this).boss, speed: [60, 260], angle: -Math.PI / 2, spread: 2.4, life: [0.2, 0.5] });
+          G.fx.dust(this.x, G.FLOOR, 4, { dir: -this.dir, speed: [40, 200], size: [6, 11], up: 70 });
+          G.fx.shards(this.x, G.FLOOR - this.hgt * 0.5, 4, pal(this).boss, { angle: this.dir > 0 ? Math.PI : 0, spread: 2, speed: [100, 360], size: [2, 4.5] });
         }
       },
       hits(P) {
@@ -107,6 +110,8 @@
         if (this.onPop) this.onPop(this);
         G.fx.burst(this.x, this.y, { n: 8, color: pal(this).boss, speed: [60, 220], life: [0.2, 0.45], kind: 'spark', size: [2, 3] });
         G.fx.ring(this.x, this.y, { r0: 4, r1: this.r * 2.6, life: 0.2, color: pal(this).boss, width: 3 });
+        G.fx.pop(this.x, this.y, pal(this).boss, this.r);
+        if (this.y + this.r > G.FLOOR - 6) G.fx.dust(this.x, G.FLOOR, 2, { speed: [20, 80], size: [3, 6], a: 0.3 });
       },
       slash() { this.pop(); G.audio.play('orbPop'); },
       hits(P) { return G.circleRect(this.x, this.y, this.r * 0.75, P.box()); },
@@ -153,6 +158,7 @@
           this.fired = true;
           if (this.sfx !== false) G.audio.play(this.sfx || 'beam');
           G.fx.shake(this.shake == null ? 7 : this.shake);
+          if (this.width > 26) G.fx.kick(-Math.cos(this.ang) * 3, -Math.sin(this.ang) * 3);
         }
         if (this.firing) this.ang += this.spin * dt;
         const c = Math.cos(this.ang), s = Math.sin(this.ang);
@@ -166,6 +172,11 @@
         this.srcX = this.ox;
         if (this.firing && this.grounded && this.ex > 0 && this.ex < G.W) {
           G.fx.burst(this.ex, this.ey, { n: 2, color: pal(this).hot, speed: [120, 420], angle: -Math.PI / 2, spread: 2.6, life: [0.15, 0.4], kind: 'spark', size: [2, 3.5], grav: 900 });
+          if (this.sx == null || Math.abs(this.ex - this.sx) > 38) {
+            this.sx = this.ex;
+            G.fx.scorch(this.ex, 12 + this.width * 0.4, pal(this).boss);
+            G.fx.dust(this.ex, G.FLOOR, 1, { speed: [10, 50], size: [6, 11], life: [0.5, 0.9], up: 90, a: 0.34, color: '84,78,100' });
+          }
         }
         if (this.t >= this.tele + this.active + this.fade) this.dead = true;
       },
@@ -219,6 +230,15 @@
         if (this.t >= this.tele && !this.fired) {
           this.fired = true;
           if (this.onFire) this.onFire(this);
+          if (this.style === 'column' && this.y + this.h >= G.FLOOR - 4) {
+            const cx = this.x + this.w / 2, P = pal(this);
+            G.fx.light(cx, G.FLOOR - 50, this.w * 2.6, P.hot, 0.2, 0.55);
+            G.fx.scorch(cx, this.w * 0.55, P.boss);
+            for (const d of [-1, 1]) G.fx.dust(cx + d * this.w * 0.4, G.FLOOR, 2, { dir: d, speed: [40, 170], size: [5, 10], up: 40 });
+            G.fx.burst(cx, G.FLOOR - 6, { n: 5, color: P.boss, speed: [10, 70], life: [0.7, 1.4], size: [1.4, 2.6], grav: -50, wob: 80, jitter: this.w * 0.4 });
+            G.fx.kick(0, 2.2);
+            if (G.arena.gust) G.arena.gust(cx, G.FLOOR - 40, 0.7);
+          }
         }
         if (this.firing && this.style === 'tide' && Math.random() < 0.8) {
           G.fx.spawn({ x: this.x + G.rand(0, this.w), y: G.FLOOR - G.rand(0, 20), vx: G.rand(-20, 20), vy: G.rand(-220, -80), life: G.rand(0.3, 0.7), size: G.rand(3, 7), color: pal(this).boss });
@@ -286,6 +306,7 @@
           G.fx.ring(this.x, this.y, { r0: this.r * 0.3, r1: this.r * 1.25, life: 0.4, color: P.hot, width: 10 });
           G.fx.burst(this.x, this.y, { n: Math.min(60, 14 + this.r * 0.2), color: P.boss, speed: [this.r * 0.6, this.r * 2.4], life: [0.3, 0.8], size: [4, 10], jitter: this.r * 0.3 });
           G.fx.shake(Math.min(22, 6 + this.r * 0.04));
+          G.fx.boom(this.x, this.y, this.r, { col: P.boss, hot: P.hot });
           G.audio.play(this.sfx || 'boom');
           if (this.onBoom) this.onBoom(this);
         }
@@ -371,6 +392,7 @@
             G.fx.burst(this.x, G.FLOOR - 8, { n: 14, color: P.boss, speed: [80, 380], angle: -Math.PI / 2, spread: 2.8, life: [0.25, 0.6], size: [3, 8] });
             G.fx.burst(this.x, G.FLOOR - 4, { n: 5, color: '20,16,30', speed: [100, 380], angle: -Math.PI / 2, spread: 2, life: [0.5, 1], size: [4, 8], kind: 'chunk', grav: 1500 });
             G.fx.shake(5);
+            G.fx.boom(this.x, G.FLOOR - 8, this.blastR * 0.9, { col: P.boss, hot: P.hot });
             G.audio.play('boom');
           }
         }
@@ -447,7 +469,20 @@
       get firing() { return this.t >= this.tele && this.t < this.tele + this.active; },
       update(dt) {
         if (this.follow) this.follow(this, dt);
-        if (this.t >= this.tele && !this.fired) { this.fired = true; if (this.onFire) this.onFire(this); }
+        if (this.t >= this.tele && !this.fired) {
+          this.fired = true;
+          if (this.onFire) this.onFire(this);
+          const P = pal(this), sg = this.a1 > this.a0 ? 1 : -1, big = this.r / 150;
+          for (let i = 0; i < Math.round(6 + 6 * big); i++) {
+            const a = G.lerp(this.a0, this.a1, Math.random()), r = this.r * G.rand(0.7, 1.02), v = G.rand(220, 640) * sg;
+            G.fx.spawn({ kind: 'spark', x: this.x + Math.cos(a) * r, y: this.y + Math.sin(a) * r, vx: -Math.sin(a) * v, vy: Math.cos(a) * v, life: G.rand(0.14, 0.32), size: G.rand(1.6, 3), color: P.hot, drag: 2, grav: 400 });
+          }
+          const mid = (this.a0 + this.a1) / 2;
+          G.fx.kick(-Math.sin(mid) * sg * 3.2 * big, Math.cos(mid) * sg * 3.2 * big);
+          // where the end of the sweep meets the floor
+          const tx = this.x + Math.cos(this.a1) * this.r, ty = this.y + Math.sin(this.a1) * this.r;
+          if (ty >= G.FLOOR - 14 && this.r > 110) G.fx.thud(G.clamp(tx, G.WALL_L + 10, G.WALL_R - 10), G.FLOOR, 0.5 * big, { noCrack: true });
+        }
         if (this.t >= this.tele + this.active + this.fade) this.dead = true;
         this.srcX = this.x;
       },
@@ -521,6 +556,9 @@
         this.srcX = this.x;
         if (this.firing && Math.random() < 0.35) {
           G.fx.spawn({ x: this.x + G.rand(-this.w / 2, this.w / 2), y: G.FLOOR - 2, vx: G.rand(-10, 10), vy: G.rand(-90, -30), life: G.rand(0.3, 0.8), size: G.rand(2, 5), color: pal(this).boss });
+        }
+        if (this.firing && Math.random() < 0.02) {
+          G.fx.dust(this.x + G.rand(-this.w / 2, this.w / 2), G.FLOOR - 4, 1, { speed: [4, 20], size: [6, 10], life: [0.7, 1.2], up: 80, a: 0.24, color: '84,78,100' });
         }
         if (this.t >= this.tele + this.active + this.fade) this.dead = true;
       },

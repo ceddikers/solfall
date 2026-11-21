@@ -203,7 +203,8 @@
       const dt = yield;
       b.x += dir * speed * dt;
       G.fx.shake(3);
-      G.fx.burst(b.x - dir * 30, FLOOR - 4, { n: 1, color: '190,190,210', speed: [40, 220], angle: -Math.PI / 2, spread: 2, life: [0.3, 0.6], size: [4, 8] });
+      if (Math.random() < dt * 60) G.fx.dust(b.x - dir * 34, FLOOR, 1, { dir: -dir, speed: [40, 240], size: [7, 13], life: [0.4, 0.8], up: 60, a: 0.42 });
+      if (Math.random() < dt * 24) G.fx.burst(b.x - dir * 30, FLOOR - 4, { n: 1, color: '24,22,30', speed: [120, 380], angle: -Math.PI / 2 - dir * 0.5, spread: 1.4, life: [0.4, 0.8], size: [2.5, 5], kind: 'chunk', grav: 1500 });
     }
     b.x = tx; b.hurt = false;
     K.impact(tx + dir * 30, true);
@@ -454,6 +455,7 @@
       b.y = G.lerp(FLOOR + 150, FLOOR, E.outCubic(Math.min(1, e / 1.3)));
       G.fx.shake(3);
       if (Math.random() < 0.6) G.fx.burst(b.x + G.rand(-40, 40), FLOOR - 4, { n: 1, color: '24,22,30', speed: [100, 420], angle: -Math.PI / 2, spread: 1.6, life: [0.5, 1], size: [4, 9], kind: 'chunk', grav: 1400 });
+      if (Math.random() < dt * 26) G.fx.dust(b.x + G.rand(-46, 46), FLOOR, 1, { speed: [10, 70], size: [8, 15], life: [0.6, 1.2], up: 80, a: 0.4 });
     }
     b.y = FLOOR;
     yield* wait(0.3);
@@ -485,7 +487,18 @@
 
   B.tick = function (dt) {
     const b = B.body, P = G.player;
-    if (b.pose === 'walk') b.walkT += dt * 5.5;
+    if (b.pose === 'walk') {
+      b.walkT += dt * 5.5;
+      const sn = Math.floor(b.walkT / Math.PI + 0.5);
+      if (sn !== b.stepN) {
+        b.stepN = sn;
+        if (b.y >= FLOOR - 1 && !b.hidden) {
+          G.fx.dust(b.x + b.face * 14, FLOOR, 3, { speed: [20, 110], size: [5, 10], up: 26, a: 0.36 });
+          G.fx.shake(1.6); G.fx.kick(0, 1.4);
+          G.audio.play('stomp');
+        }
+      }
+    }
     const target = b.pose === 'walk' ? walkPose(b.walkT) : (POSES[b.pose] || POSES.idle);
     const k = 1 - Math.exp(-(b.fast ? 46 : 11) * dt);
     for (let i = 0; i < NP; i++) {

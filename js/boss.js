@@ -101,7 +101,7 @@
     if (G.settings.numbers) {
       G.fx.text(info.x + G.rand(-12, 12), info.y - 16, String(dmg), {
         color: (t.kind === 'core' || B.staggered || info.finisher) ? '255,226,140' : '255,255,255',
-        size: info.finisher ? 28 : info.heavy ? 23 : 17, life: info.finisher ? 0.8 : 0.65,
+        size: info.finisher ? 28 : info.heavy ? 23 : 17, life: info.finisher ? 0.8 : 0.65, pop: true,
       });
     }
     if (!B.staggered) {
@@ -133,6 +133,8 @@
     G.fx.ring(h.x, h.y, { r0: 30, r1: 220, life: 0.5, color: G.pal().hot, width: 9 });
     G.fx.burst(h.x, h.y, { n: 16, color: '24,20,34', speed: [150, 620], life: [0.7, 1.4], size: [6, 13], kind: 'chunk', grav: 1400 });
     G.fx.burst(h.x, h.y, { n: 22, color: G.pal().hot, speed: [200, 760], life: [0.3, 0.8], kind: 'spark', size: [2, 5] });
+    G.fx.shatter(h.x, h.y, G.pal().boss, 22, { hot: G.pal().hot, r: 320, jitter: 40, r0: 50 });
+    G.fx.dust(h.x, h.y, 6, { speed: [30, 160], size: [12, 22], life: [0.6, 1.2], up: 60, a: 0.4, color: '84,78,100', jitter: 40 });
     G.ui.callout('HAND BROKEN', 'The Warden is exposed');
     // if it broke in the middle of its own attack, that attack is cut short
     if (busy && !B.staggered) { interrupt(); B.script = flinch(); }
@@ -174,6 +176,8 @@
     G.fx.stop(0.12); G.fx.shake(14); G.fx.flash(G.COL.starHot, 0.3, 0.3);
     G.fx.ring(B.core.x, B.core.y, { r0: 60, r1: 320, life: 0.6, color: G.COL.starHot, width: 10 });
     G.fx.burst(B.core.x, B.core.y, { n: 30, color: G.pal().hot, speed: [200, 700], life: [0.3, 0.8], kind: 'spark', size: [2, 5] });
+    G.fx.shatter(B.core.x, B.core.y, G.pal().boss, 20, { hot: G.pal().hot, r: 340, jitter: 30, r0: 60 });
+    G.fx.punch(0.022);
     G.ui.callout('STAGGERED', 'Strike the core');
     B.script = staggerScript();
   }
@@ -329,6 +333,8 @@
         B.rays.push({ a: G.rand(0, G.TAU), w: G.rand(0.02, 0.07), t: 0 });
         const a = G.rand(0, G.TAU), rr = G.rand(0, c.r);
         G.fx.burst(c.x + Math.cos(a) * rr, c.y + Math.sin(a) * rr, { n: 12, color: G.pal().hot, speed: [100, 600], life: [0.3, 0.8], size: [4, 10] });
+        G.fx.shards(c.x + Math.cos(a) * rr, c.y + Math.sin(a) * rr, 6, G.pal().boss, { speed: [160, 600] });
+        G.fx.light(c.x + Math.cos(a) * rr, c.y + Math.sin(a) * rr, 220, G.pal().hot, 0.18, 0.5);
         G.fx.shake(7 + e * 4);
       }
     }
@@ -336,6 +342,9 @@
     G.fx.flash(G.PAL[4].hot, 1, 2.2); G.fx.shake(30);
     G.fx.burst(c.x, c.y, { n: 90, color: G.PAL[4].boss, speed: [200, 1100], life: [0.6, 1.8], size: [4, 12], drag: 1.2 });
     G.fx.burst(c.x, c.y, { n: 40, color: '18,14,24', speed: [200, 900], life: [1, 2], size: [8, 16], kind: 'chunk', grav: 1300 });
+    G.fx.shatter(c.x, c.y, G.PAL[4].boss, 46, { hot: G.PAL[4].hot, r: 600, speed: [220, 980], size: [4, 11], jitter: 50, r0: 70 });
+    G.fx.burst(c.x, c.y, { n: 46, color: G.PAL[4].boss, speed: [30, 280], life: [1.4, 3.2], size: [1.6, 3.6], grav: 30, wob: 110, drag: 1.2, jitter: 80 });
+    if (G.arena.gust) G.arena.gust(c.x, c.y, 2.4);
     G.arena.setPhase(4, 2.6);
     B.dead = true; B.rays.length = 0; B.hasShards = false; c.jit = 0;
     G.audio.play('victory');
@@ -461,7 +470,8 @@
     G.fx.shake(big ? 22 : 15); G.fx.punch(big ? 0.035 : 0.02);
     G.audio.play('slam');
     G.fx.ring(x, FLOOR - 4, { r0: 20, r1: big ? 260 : 170, life: 0.4, color: P.hot, width: 8 });
-    G.fx.burst(x, FLOOR - 6, { n: big ? 30 : 18, color: '190,190,210', speed: [80, 420], angle: -Math.PI / 2, spread: 3, life: [0.3, 0.8], size: [4, 9] });
+    G.fx.thud(x, FLOOR, big ? 2 : 1.3, { col: P.boss });
+    G.fx.light(x, FLOOR - 30, big ? 320 : 220, P.hot, 0.2, 0.5);
     G.fx.burst(x, FLOOR - 6, { n: big ? 14 : 8, color: '22,18,32', speed: [150, 560], angle: -Math.PI / 2, spread: 2.2, life: [0.6, 1.2], size: [5, 11], kind: 'chunk', grav: 1500 });
     G.fx.burst(x, FLOOR - 6, { n: big ? 24 : 12, color: P.boss, speed: [150, 600], angle: -Math.PI / 2, spread: 2.6, life: [0.2, 0.6], kind: 'spark', size: [2, 4], grav: 900 });
   }
@@ -588,6 +598,9 @@
     G.fx.shake(18); G.fx.punch(0.025); G.fx.flash(pal.hot, 0.2, 0.2);
     G.fx.ring(cx, FLOOR - 125, { r0: 30, r1: 300, life: 0.45, color: pal.hot, width: 10 });
     G.fx.burst(cx, FLOOR - 125, { n: 34, color: pal.boss, speed: [200, 800], life: [0.2, 0.7], kind: 'spark', size: [2, 5] });
+    G.fx.shatter(cx, FLOOR - 125, pal.boss, 12, { hot: pal.hot, r: 360, r0: 40 });
+    for (const d of [-1, 1]) G.fx.dust(cx + d * 60, FLOOR, 6, { dir: d, speed: [160, 560], size: [8, 15], life: [0.5, 1], up: 50 });
+    if (G.arena.gust) G.arena.gust(cx, FLOOR - 125, 2);
     if (B.phase >= 2) {
       for (let i = 0; i < 6; i++) {
         const a = -Math.PI / 2 + (i - 2.5) * 0.36;
@@ -734,7 +747,9 @@
     }
     h.hurt = false; h.hot = 0; h.stuck = true;
     G.fx.shake(16); G.fx.punch(0.02); G.audio.play('slam');
-    G.fx.burst(h.x + dir * 50, h.y, { n: 20, color: '190,190,210', speed: [80, 480], angle: dir > 0 ? Math.PI : 0, spread: 2.4, life: [0.3, 0.8], size: [4, 9] });
+    G.fx.dust(h.x + dir * 50, h.y, 9, { dir: -dir, speed: [80, 420], size: [9, 16], life: [0.5, 1], up: 90, a: 0.42, jitter: 40 });
+    G.fx.burst(h.x + dir * 50, h.y, { n: 10, color: '22,18,32', speed: [150, 520], angle: dir > 0 ? Math.PI : 0, spread: 2.2, life: [0.6, 1.1], size: [5, 10], kind: 'chunk', grav: 1500 });
+    G.fx.kick(dir * 8, 0);
     for (let i = 0; i < 4; i++) {
       H.orb(h.x + dir * 30, h.y - 20, -dir * G.rrand(140, 460), -G.rrand(280, 640), { grav: 1100, r: 11 });
     }
@@ -1050,6 +1065,8 @@
     G.fx.shake(15); G.audio.play('slam');
     G.fx.ring(px, pl.top, { r0: 20, r1: 180, life: 0.4, color: G.pal().hot, width: 8 });
     G.fx.burst(px, pl.top, { n: 16, color: '22,18,32', speed: [150, 560], life: [0.6, 1.2], size: [5, 11], kind: 'chunk', grav: 1500 });
+    G.fx.dust(px, pl.top, 8, { speed: [40, 260], size: [8, 14], life: [0.5, 1], up: 60, jitter: 60 });
+    G.fx.kick(0, 6);
     yield* wait(0.07);
     h.hurt = false; h.hot = 0; h.stuck = true;
     yield* wait(0.6);

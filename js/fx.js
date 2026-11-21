@@ -1,14 +1,22 @@
-// Solfall - particles, rings, floating text, screen shake, flashes, hit-freeze and slow motion.
+// Solfall - particles, rings, floating text, screen shake, flashes, hit-freeze and slow motion,
+// and the heavier layer on top of them: smoke and dust, shards, cut marks, floor cracks and scorch
+// marks, flashes of light, a camera that is knocked about by blows, and ready-made mixes of those
+// for the things that happen most (F.hit, F.thud, F.boom, F.shatter, F.land).
 'use strict';
 (function () {
   const F = G.fx = {
-    parts: [], rings: [], texts: [],
+    parts: [], rings: [], texts: [], decals: [], lights: [], cuts: [],
     shakeAmp: 0, shakeX: 0, shakeY: 0,
+    kx: 0, ky: 0, kvx: 0, kvy: 0,          // camera kick: a sprung offset
+    rattleA: 0, rattleX: 0, rattleY: 0,    // the struck boss shivers during hit-freeze
     flashA: 0, flashC: '255,255,255', flashDecay: 4,
-    zoom: 0,
+    vigA: 0, vigC: '255,40,40', vigDecay: 2,
+    zoom: 0, joltCd: 0,
   };
-  const MAX_PARTS = 1300;
-  const sprites = new Map();
+  const MAX_PARTS = 1700, MAX_DECALS = 22;
+  const FLOOR = G.FLOOR, rnd = G.rand;
+  const sprites = new Map(), puffs = new Map(), vigs = new Map(), dustCols = new Map();
+  const SMOKE = '84,78,100', GRIT = '30,26,40';
 
   // Soft round glow sprite, cached per colour.
   F.glow = function (color) {
@@ -28,11 +36,58 @@
     return c;
   };
 
-  F.reset = function () {
-    F.parts.length = 0; F.rings.length = 0; F.texts.length = 0;
-    F.shakeAmp = 0; F.flashA = 0; F.zoom = 0;
+  // A flatter, cloudier sprite for smoke and dust. It is drawn solid, not as light.
+  function puff(color) {
+    let c = puffs.get(color);
+    if (c) return c;
+    c = document.createElement('canvas');
+    c.width = c.height = 64;
+    const x = c.getContext('2d');
+    const g = x.createRadialGradient(32, 32, 0, 32, 32, 32);
+    g.addColorStop(0, G.rgba(color, 0.9));
+    g.addColorStop(0.45, G.rgba(color, 0.62));
+    g.addColorStop(0.8, G.rgba(color, 0.16));
+    g.addColorStop(1, G.rgba(color, 0));
+    x.fillStyle = g;
+    x.fillRect(0, 0, 64, 64);
+    puffs.set(color, c);
+    return c;
+  }
+
+  function vigSprite(color) {
+    let c = vigs.get(color);
+    if (c) return c;
+    c = document.createElement('canvas');
+    c.width = 320; c.height = 180;
+    const x = c.getContext('2d');
+    const g = x.createRadialGradient(160, 90, 60, 160, 90, 196);
+    g.addColorStop(0, G.rgba(color, 0)); g.addColorStop(0.55, G.rgba(color, 0.1)); g.addColorStop(1, G.rgba(color, 0.9));
+    x.fillStyle = g; x.fillRect(0, 0, 320, 180);
+    vigs.set(color, c);
+    return c;
+  }
+
+  // Dust takes a little of the arena's light, so it belongs to the place it is kicked up in.
+  F.dustCol = function () {
+    const rim = G.pal().rim;
+    let c = dustCols.get(rim);
+    if (!c) {
+      const r = rim.split(',').map(Number);
+      c = [0, 1, 2].map((i) => Math.round(186 * 0.6 + r[i] * 0.4)).join(',');
+      dustCols.set(rim, c);
+    }
+    return c;
   };
 
+  F.reset = function () {
+    F.parts.length = 0; F.rings.length = 0; F.texts.length = 0;
+    F.decals.length = 0; F.lights.length = 0; F.cuts.length = 0;
+    F.shakeAmp = 0; F.flashA = 0; F.zoom = 0; F.vigA = 0;
+    F.kx = F.ky = F.kvx = F.kvy = 0; F.rattleA = 0; F.joltCd = 0;
+  };
+
+  // kind: 'glow' (soft light), 'spark' (a streak along its motion), 'chunk' (tumbling debris),
+  // 'shard' (a tumbling sliver of light), 'smoke' (a solid puff that swells and thins).
   F.spawn = function (p) {
     if (F.parts.length >= MAX_PARTS) return;
     p.max = p.life;
@@ -42,7 +97,7 @@
     F.parts.push(p);
   };
 
-  // o: n, color, speed [a,b], life [a,b], size [a,b], angle, spread, grav, drag, kind
+  // o: n, color, speed [a,b], life [a,b], size [a,b], angle, spread, grav, drag, kind, jitter, len, wob, a, grow
   F.burst = function (x, y, o) {
     const n = o.n || 8;
     const sp = o.speed || [60, 240];
@@ -51,15 +106,16 @@
     const spread = o.spread == null ? G.TAU : o.spread;
     const ang = o.angle || 0;
     for (let i = 0; i < n; i++) {
-      const a = ang + G.rand(-spread / 2, spread / 2);
-      const v = G.rand(sp[0], sp[1]);
+      const a = ang + rnd(-spread / 2, spread / 2);
+      const v = rnd(sp[0], sp[1]);
       F.spawn({
-        x: x + (o.jitter ? G.rand(-o.jitter, o.jitter) : 0),
-        y: y + (o.jitter ? G.rand(-o.jitter, o.jitter) : 0),
+        x: x + (o.jitter ? rnd(-o.jitter, o.jitter) : 0),
+        y: y + (o.jitter ? rnd(-o.jitter, o.jitter) : 0),
         vx: Math.cos(a) * v, vy: Math.sin(a) * v,
-        life: G.rand(lf[0], lf[1]), size: G.rand(sz[0], sz[1]),
+        life: rnd(lf[0], lf[1]), size: rnd(sz[0], sz[1]),
         color: o.color || G.COL.white, grav: o.grav || 0, drag: o.drag || 0,
-        kind: o.kind || 'glow', rot: G.rand(0, 6.28), vr: G.rand(-8, 8),
+        kind: o.kind || 'glow', rot: rnd(0, 6.28), vr: rnd(-8, 8),
+        len: o.len, wob: o.wob, a: o.a, grow: o.grow,
       });
     }
   };
@@ -71,22 +127,227 @@
     });
   };
 
+  // o.pop: the number hops up and falls in a small arc instead of drifting straight up.
   F.text = function (x, y, str, o) {
     o = o || {};
     F.texts.push({
       x, y, str, color: o.color || G.COL.white, size: o.size || 18,
-      life: o.life || 0.8, max: o.life || 0.8, vy: o.vy == null ? -60 : o.vy, bold: o.bold !== false,
+      life: o.life || 0.8, max: o.life || 0.8, vy: o.vy == null ? (o.pop ? -190 : -60) : o.vy, bold: o.bold !== false,
+      vx: o.pop ? rnd(-55, 55) : 0, g: o.pop ? 520 : 0,
     });
   };
 
-  F.shake = function (a) { F.shakeAmp = Math.max(F.shakeAmp, a); };
+  F.shake = function (a) {
+    F.shakeAmp = Math.max(F.shakeAmp, a);
+    if (a >= 14) F.jolt(a / 14); // anything this hard is felt across the whole arena
+  };
   F.flash = function (color, a, dur) {
     F.flashC = color; F.flashA = Math.max(F.flashA, a); F.flashDecay = a / (dur || 0.25);
   };
   F.stop = function (t) { G.hitstop = Math.max(G.hitstop || 0, t); };
   F.slow = function (scale, dur) { G.slowScale = scale; G.slowT = dur; };
   F.punch = function (z) { F.zoom = Math.max(F.zoom, z); };
+  // Knock the view about (dx, dy) pixels; it springs back. Unlike shake, it has a direction.
+  F.kick = function (dx, dy) {
+    F.kvx = G.clamp(F.kvx + dx * 60, -1100, 1100); F.kvy = G.clamp(F.kvy + dy * 60, -1100, 1100);
+  };
+  F.rattle = function (a) { F.rattleA = Math.max(F.rattleA, a); };
+  // Coloured edges of the screen (red when the hero is hurt).
+  F.vig = function (color, a, dur) { F.vigC = color; F.vigA = Math.max(F.vigA, a); F.vigDecay = a / (dur || 0.5); };
 
+  // A burst of light that lights nothing but reads as if it did.
+  F.light = function (x, y, r, color, life, a) {
+    if (F.lights.length > 40) F.lights.shift();
+    F.lights.push({ x, y, r, color, life: life || 0.15, max: life || 0.15, a: a == null ? 0.5 : a });
+  };
+
+  // The bright line a blade leaves where it lands.
+  F.cut = function (x, y, ang, len, w, color, hot) {
+    if (F.cuts.length > 30) F.cuts.shift();
+    F.cuts.push({ x, y, ang, len, w, color, hot: hot || G.COL.white, life: 0.2, max: 0.2 });
+  };
+
+  // ------------------------------------------------------------------ marks left on the floor
+  function decal(d) {
+    if (F.decals.length >= MAX_DECALS) F.decals.shift();
+    d.age = 0;
+    F.decals.push(d);
+  }
+  // Cracks running down the face of the floor slab from where something heavy came down.
+  F.crack = function (x, power, col) {
+    const lines = [], n = 3 + Math.round(2 * power), w = 12 + 16 * power;
+    for (let i = 0; i < n; i++) {
+      let px = x + rnd(-w, w) * 0.7, py = FLOOR + 2, a = Math.PI / 2 + rnd(-1.15, 1.15);
+      const pts = [px, py], segs = 3 + (Math.random() < 0.5 ? 1 : 0);
+      for (let k = 0; k < segs; k++) {
+        a += rnd(-0.6, 0.6);
+        const L = rnd(7, 15) * Math.sqrt(power);
+        px += Math.cos(a) * L; py = Math.min(FLOOR + 74, py + Math.abs(Math.sin(a)) * L + 1);
+        pts.push(px, py);
+      }
+      lines.push(pts);
+    }
+    decal({ kind: 'crack', x, w, lines, col: col || G.pal().boss, life: 8 });
+  };
+  // A burnt patch on the floor, with an edge that glows until it cools.
+  F.scorch = function (x, w, col) {
+    decal({ kind: 'scorch', x, w, col: col || G.pal().boss, life: 6 });
+  };
+
+  // ------------------------------------------------------------------ ready-made mixes
+  // Dust or smoke puffs. o: dir (-1 | 0 | 1), speed [a,b], size [a,b], life [a,b], up, a, color, jitter
+  F.dust = function (x, y, n, o) {
+    o = o || {};
+    const sp = o.speed || [20, 90], sz = o.size || [5, 10], lf = o.life || [0.45, 0.9];
+    const col = o.color || F.dustCol();
+    for (let i = 0; i < n; i++) {
+      const v = rnd(sp[0], sp[1]), life = rnd(lf[0], lf[1]), size = rnd(sz[0], sz[1]);
+      F.spawn({
+        kind: 'smoke', color: col, a: (o.a || 0.4) * 1.5,
+        x: x + rnd(-1, 1) * (o.jitter || 4), y: y - rnd(0, 4),
+        vx: o.dir ? o.dir * v + rnd(-15, 15) : rnd(-1, 1) * v, vy: -rnd(4, o.up == null ? 34 : o.up),
+        life, size: size * 1.3, grow: size * 2.1 / life, drag: 3.2, grav: -26,
+      });
+    }
+  };
+
+  // A footfall.
+  F.step = function (x, y, dir) {
+    F.dust(x, y, 2, { dir, speed: [14, 60], size: [4, 7], life: [0.3, 0.55], up: 24, a: 0.34 });
+  };
+
+  // The hero lands. k: 0 (a hop) to 1 (a long fall).
+  F.land = function (x, y, k) {
+    for (const d of [-1, 1]) F.dust(x + d * 6, y, 2 + Math.round(3 * k), { dir: d, speed: [30, 110 + 170 * k], size: [4, 8 + 5 * k], up: 24 });
+    if (k > 0.55) {
+      F.shake(1.5 + 2.5 * k); F.kick(0, 2 + 3 * k);
+      F.burst(x, y - 2, { n: 3, color: GRIT, speed: [80, 240], angle: -Math.PI / 2, spread: 2.2, life: [0.4, 0.7], size: [2, 3.5], kind: 'chunk', grav: 1500 });
+    }
+  };
+
+  // Something heavy meets the ground at (x, y). power: about 0.5 (a heavy step) to 2 (a boss lands).
+  F.thud = function (x, y, power, o) {
+    o = o || {};
+    const p = power;
+    for (const d of [-1, 1]) {
+      F.dust(x + d * 10 * p, y, Math.round(2 + 3.5 * p), { dir: d, speed: [50, 150 + 190 * p], size: [6 + 2 * p, 10 + 7 * p], life: [0.45, 0.9 + 0.2 * p], up: 30 + 26 * p, a: 0.44, jitter: 10 * p });
+    }
+    F.dust(x, y, Math.round(1 + 2 * p), { speed: [10, 50], size: [8, 12 + 6 * p], life: [0.6, 1.1], up: 70 + 40 * p, a: 0.36, jitter: 14 * p });
+    F.burst(x, y - 3, { n: Math.round(2 + 4 * p), color: GRIT, speed: [130, 300 + 170 * p], angle: -Math.PI / 2, spread: 2.3, life: [0.5, 1], size: [2, 3.5 + 1.5 * p], kind: 'chunk', grav: 1500 });
+    if (p >= 0.9 && y >= FLOOR - 1 && !o.noCrack) F.crack(x, Math.min(2, p), o.col);
+    F.kick(0, 2.4 * p);
+    if (G.arena.gust) G.arena.gust(x, y - 20, p);
+  };
+
+  // What an explosion leaves behind: a flash of light, smoke, drifting embers, a burnt floor.
+  F.boom = function (x, y, r, o) {
+    o = o || {};
+    const col = o.col || G.pal().boss, k = G.clamp(r / 120, 0.3, 2.2);
+    F.light(x, y, r * 2.3, o.hot || col, 0.22 + 0.06 * k, 0.6);
+    const n = G.clamp(Math.round(r / 15), 3, 12);
+    for (let i = 0; i < n; i++) {
+      const a = rnd(0, G.TAU), d = rnd(0, r * 0.55), life = rnd(0.7, 1.4), size = rnd(r * 0.16, r * 0.34);
+      F.spawn({
+        kind: 'smoke', color: SMOKE, a: 0.6, x: x + Math.cos(a) * d, y: y + Math.sin(a) * d * 0.7,
+        vx: Math.cos(a) * rnd(20, 90), vy: Math.sin(a) * rnd(10, 60) - rnd(20, 70),
+        life, size, grow: size * 1.2 / life, drag: 2, grav: -40,
+      });
+    }
+    F.burst(x, y, { n: G.clamp(Math.round(r / 9), 4, 18), color: col, speed: [20, 60 + r], life: [0.8, 1.9], size: [1.4, 3], drag: 1.6, grav: -46, wob: 90, jitter: r * 0.4 });
+    if (y + r * 0.6 >= FLOOR - 4) {
+      F.scorch(x, Math.min(150, r * 0.75), col);
+      for (const d of [-1, 1]) F.dust(x + d * r * 0.4, FLOOR, 2 + Math.round(2 * k), { dir: d, speed: [60, 120 + r], size: [7, 11 + 4 * k], life: [0.5, 1], up: 40, a: 0.4 });
+    }
+    F.kick(0, 1.5 + 1.5 * k);
+    if (G.arena.gust) G.arena.gust(x, y, k);
+  };
+
+  // Streaks flying straight out from a point: the "impact" lines of a heavy blow.
+  F.lines = function (x, y, n, color, o) {
+    o = o || {};
+    const r0 = o.r0 || 26, sp = o.speed || [700, 1300];
+    for (let i = 0; i < n; i++) {
+      const a = (i + rnd(0, 1)) / n * G.TAU, v = rnd(sp[0], sp[1]), r = rnd(r0 * 0.6, r0 * 1.4);
+      F.spawn({ kind: 'spark', x: x + Math.cos(a) * r, y: y + Math.sin(a) * r, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: rnd(0.1, 0.2), size: rnd(1.6, 2.8), color, len: 0.055, drag: 3 });
+    }
+  };
+
+  // Slivers of light knocked out of something.
+  F.shards = function (x, y, n, color, o) {
+    o = o || {};
+    F.burst(x, y, {
+      n, color, kind: 'shard', angle: o.angle == null ? -Math.PI / 2 : o.angle, spread: o.spread == null ? G.TAU : o.spread,
+      speed: o.speed || [140, 520], life: o.life || [0.5, 1.1], size: o.size || [3, 7], grav: 1250, drag: 0.6, jitter: o.jitter || 0,
+    });
+  };
+
+  // The hero's weapon lands. ang: the direction of the blow.
+  // o: heavy, thrust, power, col and hot (the hero's light), foe (the colour knocked out of the target)
+  F.hit = function (x, y, ang, o) {
+    o = o || {};
+    const p = (o.heavy ? 1 : o.thrust ? 0.7 : 0.45) * (o.power || 1);
+    const col = o.col || G.COL.star, hot = o.hot || G.COL.starHot, foe = o.foe || G.pal().boss;
+    const c = Math.cos(ang), s = Math.sin(ang);
+    F.cut(x, y, ang + rnd(-0.35, 0.35), 70 + 100 * p, 4 + 8 * p, col, hot);
+    F.light(x, y, 50 + 100 * p, col, 0.1 + 0.08 * p, 0.2 + 0.45 * p);
+    // sparks carry on the way the blade was going, a few spit back
+    F.burst(x, y, { n: Math.round(5 + 10 * p), color: hot, kind: 'spark', angle: ang, spread: 1.5, speed: [180, 460 + 420 * p], life: [0.12, 0.3 + 0.12 * p], size: [1.8, 3 + 1.4 * p], drag: 2.4, grav: 500 });
+    F.burst(x, y, { n: Math.round(2 + 3 * p), color: col, kind: 'spark', angle: ang + Math.PI, spread: 1.9, speed: [90, 300], life: [0.1, 0.25], size: [1.5, 2.5], grav: 500 });
+    F.burst(x, y, { n: 2 + Math.round(2 * p), color: col, speed: [20, 120], life: [0.2, 0.4], size: [5, 9 + 3 * p] });
+    F.shards(x, y, Math.round(1 + 5 * p), foe, { angle: ang - 0.35 * c, spread: 1.7, speed: [120, 340 + 240 * p], size: [2.5, 4.5 + 3 * p] });
+    if (o.heavy) {
+      F.lines(x, y, 9, hot);
+      F.dust(x, y, 3, { speed: [30, 120], size: [8, 15], life: [0.3, 0.6], up: 50, a: 0.26, color: SMOKE, jitter: 10 });
+    }
+    F.kick(c * (1.2 + 4.6 * p), s * (1.2 + 4.6 * p));
+    F.rattle(1.6 + 4.4 * p);
+  };
+
+  // A glancing or blocked blow: a small white tick.
+  F.tink = function (x, y, ang) {
+    F.cut(x, y, ang + Math.PI / 2, 34, 3, '200,200,220', G.COL.white);
+    F.burst(x, y, { n: 5, color: '200,200,220', speed: [60, 240], life: [0.1, 0.25], kind: 'spark', size: [1.5, 2.5], angle: ang + Math.PI, spread: 2.2 });
+  };
+
+  // Something made of light breaks apart.
+  F.shatter = function (x, y, color, n, o) {
+    o = o || {};
+    F.shards(x, y, n, color, { speed: o.speed || [160, 640], size: o.size || [3, 8], jitter: o.jitter || 10 });
+    F.lines(x, y, Math.min(16, 6 + n / 2), o.hot || color, { r0: o.r0 || 30 });
+    F.light(x, y, o.r || 200, color, 0.25, 0.6);
+  };
+
+  // A small thing of light bursts (an orb cut down, a knife knocked away).
+  F.pop = function (x, y, color, r) {
+    F.shards(x, y, 4, color, { speed: [100, 360], size: [2, 4.5], life: [0.35, 0.7] });
+    F.light(x, y, (r || 13) * 5, color, 0.14, 0.5);
+  };
+
+  // The hero takes a blow from the side dir points away from.
+  F.hurt = function (x, y, dir, color) {
+    F.vig('255,40,40', 0.45, 0.55);
+    F.shards(x, y, 9, color, { speed: [160, 520], size: [2.5, 5.5] });
+    F.lines(x, y, 10, '255,150,150', { r0: 22 });
+    F.light(x, y, 150, '255,90,90', 0.2, 0.6);
+    F.kick(dir * 9, -4);
+  };
+
+  // A blow hard enough to shake the whole arena: dust lifts along the floor, grit drops from the
+  // platforms, and the arena itself reacts (G.arena.bump).
+  F.jolt = function (power) {
+    if (F.joltCd > 0) return;
+    F.joltCd = 0.3;
+    const p = Math.min(2.4, power), dc = F.dustCol();
+    const n = Math.round(5 * p);
+    for (let i = 0; i < n; i++) {
+      const x = rnd(G.WALL_L + 20, G.WALL_R - 20), life = rnd(0.5, 1), size = rnd(5, 10);
+      F.spawn({ kind: 'smoke', color: dc, a: 0.34, x, y: FLOOR - 2, vx: rnd(-14, 14), vy: -rnd(20, 60) * p, life, size, grow: size * 1.5 / life, drag: 2.6, grav: -18 });
+      F.spawn({ kind: 'chunk', color: GRIT, x: x + rnd(-40, 40), y: FLOOR - 3, vx: rnd(-30, 30), vy: -rnd(90, 210) * Math.sqrt(p), life: rnd(0.45, 0.7), size: rnd(1.8, 3.2), grav: 1500, rot: 0, vr: rnd(-8, 8) });
+    }
+    if (G.arena.bump) G.arena.bump(p);
+  };
+
+  // ------------------------------------------------------------------ update
   F.update = function (dt) {
     const parts = F.parts;
     let w = 0;
@@ -96,27 +357,46 @@
       if (p.life <= 0) continue;
       if (p.drag) { const k = Math.exp(-p.drag * dt); p.vx *= k; p.vy *= k; }
       p.vy += p.grav * dt;
+      if (p.wob) p.vx += Math.sin(p.life * 9 + p.rot) * p.wob * dt;
       p.x += p.vx * dt; p.y += p.vy * dt;
-      if (p.kind === 'chunk') {
+      if (p.kind === 'chunk' || p.kind === 'shard') {
         p.rot += p.vr * dt;
-        if (p.y > G.FLOOR - 2 && p.vy > 0) { p.y = G.FLOOR - 2; p.vy *= -0.35; p.vx *= 0.6; p.vr *= 0.5; }
+        if (p.y > FLOOR - 2 && p.vy > 0) {
+          // debris big enough to matter raises a little dust where it first lands
+          if (p.kind === 'chunk' && !p.hit && p.size > 5 && p.vy > 260) {
+            p.hit = true;
+            F.dust(p.x, FLOOR, 1, { speed: [10, 40], size: [3, 6], life: [0.25, 0.45], up: 26, a: 0.28 });
+          }
+          p.y = FLOOR - 2; p.vy *= -0.35; p.vx *= 0.6; p.vr *= 0.5;
+        }
       }
       parts[w++] = p;
     }
     parts.length = w;
 
-    w = 0;
-    for (let i = 0; i < F.rings.length; i++) {
-      const r = F.rings[i];
-      r.life -= dt;
-      if (r.life > 0) F.rings[w++] = r;
+    for (const list of [F.rings, F.lights, F.cuts]) {
+      w = 0;
+      for (let i = 0; i < list.length; i++) {
+        const r = list[i];
+        r.life -= dt;
+        if (r.life > 0) list[w++] = r;
+      }
+      list.length = w;
     }
-    F.rings.length = w;
+
+    w = 0;
+    for (let i = 0; i < F.decals.length; i++) {
+      const d = F.decals[i];
+      d.life -= dt; d.age += dt;
+      if (d.life > 0) F.decals[w++] = d;
+    }
+    F.decals.length = w;
 
     w = 0;
     for (let i = 0; i < F.texts.length; i++) {
       const t = F.texts[i];
-      t.life -= dt; t.y += t.vy * dt; t.vy *= Math.exp(-3 * dt);
+      t.life -= dt; t.y += t.vy * dt; t.x += t.vx * dt;
+      if (t.g) { t.vy += t.g * dt; t.vx *= Math.exp(-2 * dt); } else t.vy *= Math.exp(-3 * dt);
       if (t.life > 0) F.texts[w++] = t;
     }
     F.texts.length = w;
@@ -124,18 +404,81 @@
 
   // Uses real time so shake and flashes keep moving through hit-freeze.
   F.updateScreen = function (dt) {
+    const set = G.settings.shake;
     F.shakeAmp *= Math.exp(-9 * dt);
     if (F.shakeAmp < 0.2) F.shakeAmp = 0;
-    const s = F.shakeAmp * G.settings.shake;
-    F.shakeX = G.rand(-s, s); F.shakeY = G.rand(-s, s);
+    // the kick: a spring pulled back to rest, a little under-damped so it settles with one small rebound
+    F.kvx += (-F.kx * 1440 - F.kvx * 42) * dt; F.kvy += (-F.ky * 1440 - F.kvy * 42) * dt;
+    F.kx += F.kvx * dt; F.ky += F.kvy * dt;
+    const s = F.shakeAmp * set;
+    F.shakeX = rnd(-s, s) + F.kx * set; F.shakeY = rnd(-s, s) + F.ky * set;
+    F.rattleA *= Math.exp(-20 * dt);
+    if (F.rattleA < 0.3) F.rattleA = 0;
+    F.rattleX = rnd(-1, 1) * F.rattleA * set; F.rattleY = rnd(-0.5, 0.5) * F.rattleA * set;
     if (F.flashA > 0) F.flashA = Math.max(0, F.flashA - F.flashDecay * dt);
+    if (F.vigA > 0) F.vigA = Math.max(0, F.vigA - F.vigDecay * dt);
     F.zoom *= Math.exp(-7 * dt);
     if (F.zoom < 0.0005) F.zoom = 0;
+    if (F.joltCd > 0) F.joltCd -= dt;
+  };
+
+  // ------------------------------------------------------------------ drawing
+  // Cracks and scorch marks, drawn straight onto the floor (before anything stands on it).
+  F.drawDecals = function (ctx) {
+    if (!F.decals.length) return;
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    for (const d of F.decals) {
+      const al = Math.min(1, d.life / 1.5), heat = Math.max(0, 1 - d.age / 1.5);
+      if (d.kind === 'crack') {
+        ctx.fillStyle = 'rgba(0,0,0,' + 0.6 * al + ')';
+        ctx.beginPath(); ctx.ellipse(d.x, FLOOR + 2, d.w, 4, 0, 0, G.TAU); ctx.fill();
+        ctx.strokeStyle = 'rgba(0,0,0,' + 0.75 * al + ')'; ctx.lineWidth = 2.6;
+        ctx.beginPath();
+        for (const pts of d.lines) { ctx.moveTo(pts[0], pts[1]); for (let i = 2; i < pts.length; i += 2) ctx.lineTo(pts[i], pts[i + 1]); }
+        ctx.stroke();
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.strokeStyle = G.rgba(d.col, (0.7 * heat * heat + 0.2) * al); ctx.lineWidth = 1 + 0.6 * heat;
+        ctx.stroke();
+        ctx.globalCompositeOperation = 'source-over';
+      } else {
+        ctx.fillStyle = 'rgba(0,0,0,' + 0.5 * al + ')';
+        ctx.beginPath(); ctx.ellipse(d.x, FLOOR + 3, d.w, 5.5, 0, 0, G.TAU); ctx.fill();
+        if (heat > 0) {
+          ctx.globalCompositeOperation = 'lighter';
+          ctx.fillStyle = G.rgba(d.col, 0.5 * heat);
+          ctx.beginPath(); ctx.ellipse(d.x, FLOOR + 2, d.w * 0.8, 3, 0, 0, G.TAU); ctx.fill();
+          ctx.globalCompositeOperation = 'source-over';
+        }
+      }
+    }
+  };
+
+  // Smoke and dust: solid puffs that swell as they thin. They are drawn behind the hero, the
+  // duelling bosses and every warning, so however much is in the air it never hides the fight.
+  F.drawSmoke = function (ctx) {
+    const parts = F.parts;
+    for (let i = 0; i < parts.length; i++) {
+      const p = parts[i];
+      if (p.kind !== 'smoke') continue;
+      const k = p.life / p.max, r = p.size + (p.grow || 0) * (p.max - p.life);
+      ctx.globalAlpha = Math.min(1, (p.a || 0.4) * Math.min(1, (1 - k) * 8) * Math.pow(k, 0.7));
+      ctx.drawImage(puff(p.color), p.x - r, p.y - r, r * 2, r * 2);
+    }
+    ctx.globalAlpha = 1;
   };
 
   F.draw = function (ctx) {
     const parts = F.parts;
-    // solid debris first
+    // light first, so smoke and debris sit in front of it
+    ctx.globalCompositeOperation = 'lighter';
+    for (let i = 0; i < F.lights.length; i++) {
+      const l = F.lights[i], k = l.life / l.max;
+      ctx.globalAlpha = l.a * k * k;
+      ctx.drawImage(F.glow(l.color), l.x - l.r, l.y - l.r, l.r * 2, l.r * 2);
+    }
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = 'source-over';
+    // solid debris
     for (let i = 0; i < parts.length; i++) {
       const p = parts[i];
       if (p.kind !== 'chunk') continue;
@@ -152,20 +495,44 @@
     ctx.lineCap = 'round';
     for (let i = 0; i < parts.length; i++) {
       const p = parts[i];
-      if (p.kind === 'chunk') continue;
+      if (p.kind === 'chunk' || p.kind === 'smoke') continue;
       const k = p.life / p.max;
       if (p.kind === 'spark') {
+        const len = p.len || 0.035;
         ctx.strokeStyle = G.rgba(p.color, k);
         ctx.lineWidth = p.size * (0.4 + 0.6 * k);
         ctx.beginPath();
         ctx.moveTo(p.x, p.y);
-        ctx.lineTo(p.x - p.vx * 0.035, p.y - p.vy * 0.035);
+        ctx.lineTo(p.x - p.vx * len, p.y - p.vy * len);
         ctx.stroke();
+      } else if (p.kind === 'shard') {
+        const c = Math.cos(p.rot) * p.size, s = Math.sin(p.rot) * p.size;
+        ctx.fillStyle = G.rgba(p.color, Math.min(1, k * 2.2));
+        ctx.beginPath();
+        ctx.moveTo(p.x + c, p.y + s);
+        ctx.lineTo(p.x - c * 0.6 - s * 0.42, p.y - s * 0.6 + c * 0.42);
+        ctx.lineTo(p.x - c * 0.6 + s * 0.42, p.y - s * 0.6 - c * 0.42);
+        ctx.closePath(); ctx.fill();
       } else {
         const s = p.size * (0.5 + 0.5 * k) * 2.2;
         ctx.globalAlpha = k;
         ctx.drawImage(F.glow(p.color), p.x - s, p.y - s, s * 2, s * 2);
         ctx.globalAlpha = 1;
+      }
+    }
+    // cut marks: a sliver that snaps out to full length, then thins away
+    for (let i = 0; i < F.cuts.length; i++) {
+      const q = F.cuts[i], k = q.life / q.max;
+      const L = q.len * (0.45 + 0.55 * G.ease.outCubic(Math.min(1, (1 - k) * 4))) / 2, w = q.w * k;
+      const c = Math.cos(q.ang), s = Math.sin(q.ang);
+      for (const [col, ws, al] of [[q.color, 1, 0.75], [q.hot, 0.42, 1]]) {
+        ctx.fillStyle = G.rgba(col, al * Math.min(1, k * 1.6));
+        ctx.beginPath();
+        ctx.moveTo(q.x - c * L, q.y - s * L);
+        ctx.lineTo(q.x - s * w * ws, q.y + c * w * ws);
+        ctx.lineTo(q.x + c * L, q.y + s * L);
+        ctx.lineTo(q.x + s * w * ws, q.y - c * w * ws);
+        ctx.closePath(); ctx.fill();
       }
     }
     for (let i = 0; i < F.rings.length; i++) {
@@ -181,7 +548,7 @@
     for (let i = 0; i < F.texts.length; i++) {
       const t = F.texts[i];
       const k = t.life / t.max;
-      const pop = 1 + 0.35 * Math.max(0, (k - 0.8) / 0.2);
+      const pop = 1 + (t.g ? 0.7 : 0.35) * Math.max(0, (k - 0.8) / 0.2);
       ctx.font = (t.bold ? '700 ' : '500 ') + Math.round(t.size * pop) + 'px Bahnschrift, "Segoe UI", sans-serif';
       ctx.fillStyle = 'rgba(0,0,0,' + 0.55 * Math.min(1, k * 2) + ')';
       ctx.fillText(t.str, t.x + 1.5, t.y + 2);
@@ -191,6 +558,11 @@
   };
 
   F.drawFlash = function (ctx) {
+    if (F.vigA > 0) {
+      ctx.globalAlpha = Math.min(1, F.vigA);
+      ctx.drawImage(vigSprite(F.vigC), 0, 0, G.W, G.H);
+      ctx.globalAlpha = 1;
+    }
     if (F.flashA <= 0) return;
     ctx.fillStyle = G.rgba(F.flashC, Math.min(1, F.flashA));
     ctx.fillRect(-60, -60, G.W + 120, G.H + 120);

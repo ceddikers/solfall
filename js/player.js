@@ -50,7 +50,7 @@
       ember: G.relic('moons') ? C.SEG * segs : 0, healT: 0, healLock: false,
       atk: null, atkCd: 0, combo: -1, comboT: 0, sinceDash: 9,
       dead: false, deadT: 0, hidden: false,
-      squash: 0, runT: 0, hurtFlash: 0, emberFlash: 0,
+      squash: 0, runT: 0, stepN: 0, skidT: 0, hurtFlash: 0, emberFlash: 0,
       scarf: [], ghosts: [], slashes: [], bolts: [],
       stats: { dmg: 0, hits: 0, perfect: 0, heals: 0, lances: 0 },
     });
@@ -142,6 +142,8 @@
         G.audio.play('heal');
         G.fx.ring(P.x, P.y - 24, { r0: 10, r1: 90, life: 0.45, color: STAR, width: 6 });
         G.fx.burst(P.x, P.y - 24, { n: 18, color: HOT, speed: [60, 240], life: [0.3, 0.7], size: [3, 6] });
+        G.fx.burst(P.x, P.y - 8, { n: 12, color: STAR, speed: [10, 60], life: [0.6, 1.2], size: [2, 3.5], grav: -260, wob: 120, jitter: 16 });
+        G.fx.light(P.x, P.y - 24, 170, STAR, 0.35, 0.5);
         G.fx.text(P.x, P.y - 70, 'MENDED', { color: STAR, size: 16 });
       }
     } else {
@@ -158,6 +160,10 @@
       P.atk = null; P.healT = 0; P.ghostT = 0; P.dashHit.clear();
       G.audio.play('dash');
       G.fx.burst(P.x, P.y - 22, { n: 8, color: STAR, speed: [80, 300], angle: P.dashDir > 0 ? Math.PI : 0, spread: 0.9, life: [0.15, 0.4], kind: 'spark', size: [2, 3] });
+      // the push-off: dust thrown back along the ground, or a ring of air
+      G.fx.kick(P.dashDir * 3.5, 0);
+      if (P.onGround) G.fx.dust(P.x - P.dashDir * 6, P.y, 5, { dir: -P.dashDir, speed: [60, 280], size: [6, 12], up: 40 });
+      else G.fx.ring(P.x - P.dashDir * 8, P.y - 22, { r0: 8, r1: 44, life: 0.22, color: STAR, width: 3 });
     }
 
     // --- horizontal movement
@@ -167,9 +173,18 @@
       P.dashT -= dt;
       P.vx = P.dashDir * C.DASH_SPEED; P.vy = 0;
       P.ghostT -= dt;
-      if (P.ghostT <= 0) { P.ghostT = 0.05; P.ghosts.push({ x: P.x, y: P.y, f: P.facing, life: 0.26 }); }
+      if (P.ghostT <= 0) {
+        P.ghostT = 0.05; P.ghosts.push({ x: P.x, y: P.y, f: P.facing, life: 0.26 });
+        for (let i = 0; i < 3; i++) {
+          G.fx.spawn({ kind: 'spark', x: P.x - P.dashDir * G.rand(0, 26), y: P.y - G.rand(4, 46), vx: -P.dashDir * G.rand(260, 620), vy: 0, life: G.rand(0.12, 0.24), size: G.rand(1.2, 2), color: STAR, len: 0.075 });
+        }
+        if (P.onGround) G.fx.dust(P.x - P.dashDir * 10, P.y, 1, { dir: -P.dashDir, speed: [30, 110], size: [4, 8], a: 0.3 });
+      }
       if (G.boon('comet')) cometStep();
-      if (P.dashT <= 0) { P.vx = P.dashDir * P.run * (mx === P.dashDir ? 1 : 0.6); P.dashCd = P.dashCdMax; P.sinceDash = 0; }
+      if (P.dashT <= 0) {
+        P.vx = P.dashDir * P.run * (mx === P.dashDir ? 1 : 0.6); P.dashCd = P.dashCdMax; P.sinceDash = 0;
+        if (P.onGround) G.fx.dust(P.x + P.dashDir * 10, P.y, 3, { dir: P.dashDir, speed: [50, 190], size: [5, 9], up: 26 });
+      }
     } else if (P.stun > 0) {
       P.stun -= dt;
       P.vx *= Math.exp(-2.5 * dt);
@@ -177,6 +192,10 @@
       // firing the bow slows her, so shooting and dodging cannot both be done at full speed
       const target = mx * P.run * (P.atk && P.atk.kind === 'shot' ? C.BOW_SLOW : 1);
       const acc = (P.onGround ? C.ACC_G : C.ACC_A) * dt;
+      if (P.onGround && mx && P.vx * mx < -140) {
+        P.skidT -= dt;
+        if (P.skidT <= 0) { P.skidT = 0.045; G.fx.dust(P.x + G.sign(P.vx) * 9, P.y, 1, { dir: G.sign(P.vx), speed: [40, 130], size: [4, 8], up: 20, a: 0.34 }); }
+      }
       if (P.vx < target) P.vx = Math.min(target, P.vx + acc);
       else if (P.vx > target) P.vx = Math.max(target, P.vx - acc);
       if (mx && !P.atk) P.facing = mx;
@@ -187,15 +206,17 @@
       if (down && P.plat && P.onGround) {
         P.dropT = 0.24; P.onGround = false; P.plat = null; P.coyote = 0; P.jumpBuf = 0; P.y += 3;
       } else if (P.onGround || P.coyote > 0) {
+        if (P.plat) G.arena.bob(P.plat, 26);
         P.vy = -C.JUMP; P.onGround = false; P.plat = null; P.coyote = 0; P.jumpBuf = 0; P.jumpHeld = true;
         P.squash = 0.22; P.healT = 0;
         G.audio.play('jump');
-        G.fx.burst(P.x, P.y, { n: 5, color: '190,190,210', speed: [30, 110], angle: -Math.PI / 2, spread: 2.6, life: [0.2, 0.4], size: [2, 4] });
+        G.fx.dust(P.x, P.y, 5, { speed: [20, 100], size: [4, 8], up: 60 });
       } else if (P.airJumps > 0) {
         P.airJumps--; P.vy = -C.JUMP2; P.jumpBuf = 0; P.jumpHeld = true; P.squash = 0.2;
         G.audio.play('jump2');
         G.fx.ring(P.x, P.y, { r0: 6, r1: 38, life: 0.25, color: STAR, width: 3 });
         G.fx.burst(P.x, P.y, { n: 6, color: STAR, speed: [40, 150], angle: Math.PI / 2, spread: 1.6, life: [0.2, 0.4], size: [2, 4] });
+        G.fx.burst(P.x, P.y, { n: 5, color: STAR, speed: [120, 300], angle: Math.PI / 2, spread: 1.2, life: [0.12, 0.25], kind: 'spark', size: [1.5, 2.5] });
       }
     }
     if (P.jumpHeld && !I.down.jump) { P.jumpHeld = false; if (P.vy < 0) P.vy *= 0.45; }
@@ -245,11 +266,20 @@
       P.plunge = false; P.squash = -0.3; P.iframes = Math.max(P.iframes, 0.12);
       starfallBlast(1.2, 1);
     } else if (landed && fallSpeed > 260) {
-      P.squash = -0.2;
-      G.audio.play('land');
-      G.fx.burst(P.x, P.y, { n: 6, color: '190,190,210', speed: [40, 150], angle: -Math.PI / 2, spread: 3, life: [0.2, 0.4], size: [2, 4] });
+      // the longer the fall, the deeper the crouch, the more dust, and past a point the ground answers
+      const k = G.clamp((fallSpeed - 260) / 1000, 0, 1);
+      P.squash = -0.2 - 0.14 * k;
+      G.audio.play(k > 0.55 ? 'landHard' : 'land');
+      G.fx.land(P.x, P.y, k);
+      if (P.plat) G.arena.bob(P.plat, 30 + 50 * k);
     }
     if (P.onGround && Math.abs(P.vx) > 40) P.runT += dt * Math.abs(P.vx) * 0.055;
+    // footfalls: a puff and a soft step each time a foot comes down
+    const stepN = Math.floor(P.runT / Math.PI);
+    if (stepN !== P.stepN) {
+      P.stepN = stepN;
+      if (P.onGround && P.dashT <= 0 && Math.abs(P.vx) > 150) { G.fx.step(P.x - P.facing * 5, P.y, -G.sign(P.vx)); G.audio.play('step'); }
+    }
 
     // --- weapon
     if (P.atkBuf > 0 && free && P.atkCd <= 0 && P.dashT <= 0 && P.stun <= 0 && P.healT === 0) {
@@ -339,8 +369,19 @@
   }
 
   // The moment the swing comes out: its sound, a step into the blow, and what finishers add.
+  // Which way a swing is travelling when it lands (for sparks and the camera).
+  const swingAng = (a) => (a.kind === 'up' ? -Math.PI / 2 : a.kind === 'down' ? Math.PI / 2 : a.dir > 0 ? 0 : Math.PI);
+
   function swing(a) {
     G.audio.play(a.heavy || H.weapon === 'maul' ? 'slash3' : 'slash');
+    // flecks of light thrown off the blade, and a lean into the blow
+    const ang = swingAng(a), reach = H.reach * (a.heavy ? 1.2 : 1);
+    G.fx.burst(P.x + Math.cos(ang) * 44 * reach, P.y - 30 + Math.sin(ang) * 44 * reach, {
+      n: a.heavy ? 8 : 3, color: a.heavy ? GOLD : STAR, kind: 'spark', angle: ang, spread: 1.4,
+      speed: [180, a.heavy ? 620 : 420], life: [0.1, 0.24], size: [1.4, a.heavy ? 2.8 : 2], jitter: 22 * reach,
+    });
+    G.fx.kick(Math.cos(ang) * (a.heavy ? 2.6 : 0.8) * H.thick, Math.sin(ang) * (a.heavy ? 2.6 : 0.8) * H.thick);
+    if (P.onGround && a.kind === 'side' && (a.heavy || a.thrust)) G.fx.dust(P.x - a.dir * 8, P.y, 3, { dir: -a.dir, speed: [40, 160], size: [5, 9] });
     if (a.kind === 'side' && P.stun <= 0) {
       if (a.thrust) P.vx = a.dir * Math.max(Math.abs(P.vx), 560);
       else if (P.onGround) P.vx += a.dir * (a.heavy ? 330 : 100);
@@ -352,7 +393,8 @@
       a.quake = true;
       G.fx.shake(7); G.audio.play('boom');
       G.fx.ring(P.x + a.dir * 90, FLOOR - 4, { r0: 20, r1: 150, life: 0.35, color: STAR, width: 6 });
-      G.fx.burst(P.x + a.dir * 90, FLOOR - 4, { n: 14, color: '190,190,210', speed: [80, 380], angle: -Math.PI / 2, spread: 2.6, life: [0.3, 0.7], size: [4, 8] });
+      G.fx.thud(P.x + a.dir * 90, FLOOR, 1.15, { col: STAR });
+      G.fx.burst(P.x + a.dir * 90, FLOOR - 4, { n: 8, color: STAR, speed: [150, 520], angle: -Math.PI / 2, spread: 2.2, life: [0.2, 0.5], kind: 'spark', size: [2, 3.5], grav: 900 });
       G.fx.burst(P.x + a.dir * 90, FLOOR - 4, { n: 6, color: '22,18,32', speed: [150, 460], angle: -Math.PI / 2, spread: 2, life: [0.5, 1], size: [5, 9], kind: 'chunk', grav: 1500 });
     }
     if (a.heavy && G.boon('crescent')) {
@@ -417,21 +459,21 @@
         const res = G.boss.damage(a.dmg, t, { x: c.x, y: c.y, heavy: a.heavy || a.thrust, finisher: a.heavy, dir: a.dir, poise: H.poise });
         if (res) {
           P.gain(a.heavy ? C.GAIN_HEAVY : C.GAIN_HIT);
-          G.fx.stop(a.heavy ? 0.095 : a.thrust ? 0.05 : 0.026 * H.thick);
-          G.fx.shake(a.heavy ? 8.5 : a.thrust ? 4 : 1.6 * H.thick);
+          // the freeze, the shake and the kick all scale with the blow; the maul's are heavier
+          G.fx.stop(a.heavy ? 0.11 : a.thrust ? 0.06 : 0.032 * H.thick);
+          G.fx.shake(a.heavy ? 9 : a.thrust ? 4.5 : 1.8 * H.thick);
+          G.fx.hit(c.x, c.y, swingAng(a), { heavy: a.heavy, thrust: a.thrust, power: 0.8 + 0.2 * H.thick, col: a.heavy ? GOLD : STAR, hot: HOT });
           if (a.heavy) {
             // the finisher lands with a gold burst so it reads as the big hit
-            G.fx.punch(0.012);
+            G.fx.punch(0.016);
             G.fx.ring(c.x, c.y, { r0: 8, r1: 92, life: 0.28, color: GOLD, width: 6 });
-            G.fx.burst(c.x, c.y, { n: 12, color: GOLD, speed: [160, 620], life: [0.15, 0.45], kind: 'spark', size: [2.5, 4.5] });
+            G.fx.burst(c.x, c.y, { n: 8, color: GOLD, speed: [160, 620], life: [0.15, 0.45], kind: 'spark', size: [2.5, 4.5] });
           }
           G.audio.play(a.heavy ? 'hitHeavy' : 'hit');
-          G.fx.burst(c.x, c.y, { n: a.heavy ? 16 : 9, color: HOT, speed: [120, 520], life: [0.12, 0.35], kind: 'spark', size: [2, 4] });
-          G.fx.burst(c.x, c.y, { n: 4, color: STAR, speed: [20, 120], life: [0.2, 0.4], size: [5, 10] });
           struck(t, c.x, c.y);
         } else {
           G.audio.play('tink');
-          G.fx.burst(c.x, c.y, { n: 4, color: '200,200,220', speed: [60, 200], life: [0.1, 0.25], kind: 'spark', size: [1.5, 2.5] });
+          G.fx.tink(c.x, c.y, swingAng(a));
         }
         bounced = true;
         // a hit landed in the air holds the hero up for a moment, so air combos stay on target
@@ -457,7 +499,8 @@
       if (G.boss.damage(dmg, t, { x: P.x, y: P.y - 22, heavy: true, dir: P.dashDir })) {
         P.gain(C.GAIN_HIT);
         G.audio.play('hit');
-        G.fx.burst(P.x, P.y - 22, { n: 12, color: HOT, speed: [120, 520], life: [0.12, 0.35], kind: 'spark', size: [2, 4] });
+        G.fx.stop(0.04);
+        G.fx.hit(P.x, P.y - 22, P.dashDir > 0 ? 0 : Math.PI, { thrust: true, col: STAR, hot: HOT });
       }
     }
   }
@@ -491,8 +534,10 @@
     G.audio.play(a.heavy ? 'arrowHeavy' : 'arrow');
     // firing downward in the air lifts her
     if (a.dy > 0.5 && !P.onGround) { P.vy = Math.min(P.vy, -370); P.squash = 0.15; }
+    G.fx.burst(P.x + a.dx * 24, P.y - 38 + a.dy * 24, { n: a.heavy ? 6 : 3, color: a.heavy ? GOLD : STAR, kind: 'spark', angle: Math.atan2(a.dy, a.dx), spread: 0.9, speed: [140, 460], life: [0.08, 0.2], size: [1.3, 2.2] });
     if (a.heavy) {
       P.vx -= a.dx * 120;
+      G.fx.kick(-a.dx * 3, -a.dy * 3);
       G.fx.ring(P.x + a.dx * 22, P.y - 38 + a.dy * 22, { r0: 4, r1: 34, life: 0.2, color: GOLD, width: 4 });
       if (G.boon('crescent')) wave(P.x + a.dx * 30, P.y - 38 + a.dy * 30, a.dx, a.dy);
     }
@@ -513,6 +558,10 @@
 
   function muzzle(dx, dy) {
     G.fx.shake(6);
+    G.fx.kick(-dx * 7, -dy * 7);
+    G.fx.light(P.x + dx * 20, P.y - 36 + dy * 20, 190, STAR, 0.2, 0.6);
+    G.fx.lines(P.x + dx * 20, P.y - 36 + dy * 20, 8, HOT, { r0: 16, speed: [500, 900] });
+    if (P.onGround) G.fx.dust(P.x - dx * 8, P.y, 4, { dir: -G.sign(dx) || -P.facing, speed: [50, 200], size: [5, 10] });
     G.fx.flash(STAR, 0.12, 0.2);
     G.fx.ring(P.x + dx * 20, P.y - 36 + dy * 20, { r0: 6, r1: 60, life: 0.25, color: HOT, width: 5 });
     G.fx.burst(P.x + dx * 20, P.y - 36 + dy * 20, { n: 14, color: STAR, speed: [100, 500], angle: Math.atan2(dy, dx), spread: 1.1, life: [0.15, 0.4], kind: 'spark', size: [2, 4] });
@@ -567,7 +616,10 @@
     G.fx.ring(cx, FLOOR - 4 < P.y ? P.y - 4 : P.y - 4, { r0: 20, r1: R, life: 0.4, color: HOT, width: 10 });
     G.fx.ring(cx, P.y - 4, { r0: 10, r1: R * 0.7, life: 0.3, color: STAR, width: 6 });
     G.fx.burst(cx, P.y - 6, { n: 26, color: STAR, speed: [150, 640], angle: -Math.PI / 2, spread: 3, life: [0.25, 0.7], kind: 'spark', size: [2, 5], grav: 700 });
-    G.fx.burst(cx, P.y - 6, { n: 16, color: '190,190,210', speed: [80, 420], angle: -Math.PI / 2, spread: 3, life: [0.3, 0.8], size: [4, 9] });
+    G.fx.thud(cx, P.y, 1.7 * k * Math.min(1.3, scale), { col: STAR });
+    G.fx.light(cx, P.y - 20, R * 2, STAR, 0.3, 0.7 * k);
+    G.fx.lines(cx, P.y - 20, 14, HOT, { r0: 40 });
+    G.fx.burst(cx, P.y - 6, { n: 12, color: STAR, speed: [20, 140], life: [0.8, 1.6], size: [1.5, 3], grav: -50, wob: 90, drag: 1.5, jitter: R * 0.4 });
     G.fx.burst(cx, P.y - 6, { n: 8, color: '22,18,32', speed: [150, 520], angle: -Math.PI / 2, spread: 2.2, life: [0.6, 1.1], size: [5, 10], kind: 'chunk', grav: 1500 });
     if (k >= 1 && G.boon('aftershock')) { P.afterT = 0.3; P.afterScale = scale; }
   }
@@ -581,6 +633,9 @@
     G.fx.slow(0.38, 0.3);
     G.fx.ring(P.x, P.y - 22, { r0: 12, r1: 110, life: 0.45, color: STAR, width: 5 });
     G.fx.flash(STAR, 0.1, 0.25);
+    G.fx.lines(P.x, P.y - 22, 14, HOT, { r0: 30, speed: [500, 1000] });
+    G.fx.light(P.x, P.y - 22, 220, STAR, 0.3, 0.55);
+    G.fx.punch(0.012);
     G.fx.text(P.x, P.y - 74, 'PERFECT', { color: HOT, size: 17, life: 0.9 });
     // Mirror Step answers a perfect dodge with a free shot at the core
     const B = G.boss;
@@ -604,6 +659,7 @@
       G.audio.play('tink'); G.audio.play('perfect');
       G.fx.shake(6);
       G.fx.ring(P.x, P.y - 22, { r0: 26, r1: 130, life: 0.45, color: HOT, width: 8 });
+      G.fx.shatter(P.x, P.y - 22, HOT, 10, { r: 180 });
       G.fx.text(P.x, P.y - 78, 'WARDED', { color: HOT, size: 18, life: 1 });
       return false;
     }
@@ -613,6 +669,7 @@
     P.vx = dir * 430; P.vy = (src && typeof src.popVy === 'number') ? src.popVy : -430; P.onGround = false; P.plat = null; P.jumpHeld = false;
     G.fx.stop(0.14); G.fx.shake(13); G.fx.flash('255,50,50', 0.26, 0.35);
     G.fx.burst(P.x, P.y - 22, { n: 16, color: '255,120,120', speed: [100, 420], life: [0.2, 0.55], kind: 'spark', size: [2, 4] });
+    G.fx.hurt(P.x, P.y - 22, dir, STAR);
     G.audio.play('hurt');
     if (P.hp <= 0 && G.boon('dawn') && !P.dawnUsed) {
       // Second Dawn: survive the killing blow once per trial
@@ -632,6 +689,8 @@
     G.audio.play('heal');
     G.fx.flash(HOT, 0.5, 0.6); G.fx.slow(0.3, 0.6);
     G.fx.ring(P.x, P.y - 22, { r0: 20, r1: 260, life: 0.7, color: HOT, width: 10 });
+    G.fx.lines(P.x, P.y - 22, 16, HOT, { r0: 36 });
+    G.fx.burst(P.x, P.y - 10, { n: 22, color: STAR, speed: [20, 120], life: [0.8, 1.6], size: [2, 4], grav: -240, wob: 140, jitter: 24 });
     G.fx.text(P.x, P.y - 84, word, { color: HOT, size: 20, life: 1.4 });
   }
 
@@ -642,6 +701,8 @@
     G.fx.burst(P.x, P.y - 22, { n: 46, color: STAR, speed: [40, 520], life: [0.5, 1.5], size: [3, 8], drag: 2 });
     G.fx.burst(P.x, P.y - 22, { n: 24, color: HOT, speed: [100, 700], life: [0.3, 0.8], kind: 'spark', size: [2, 4] });
     G.fx.ring(P.x, P.y - 22, { r0: 10, r1: 220, life: 0.8, color: STAR, width: 8 });
+    G.fx.shatter(P.x, P.y - 22, STAR, 22, { hot: HOT, r: 320 });
+    G.fx.vig('255,40,40', 0.8, 1.6);
     G.onPlayerDeath();
   }
 
@@ -669,7 +730,7 @@
               P.gain(s.heavy ? C.ARROW_GAIN_HEAVY : C.ARROW_GAIN);
               G.fx.stop(s.heavy ? 0.06 : 0.016); G.fx.shake(s.heavy ? 6 : 1.2);
               G.audio.play(s.heavy ? 'hitHeavy' : 'hit');
-              G.fx.burst(s.x, s.y, { n: s.heavy ? 14 : 6, color: s.heavy ? GOLD : HOT, speed: [100, 460], life: [0.12, 0.35], kind: 'spark', size: [2, 3.5] });
+              G.fx.hit(s.x, s.y, Math.atan2(s.vy, s.vx), { heavy: s.heavy, power: s.heavy ? 0.8 : 0.75, col: s.heavy ? GOLD : STAR, hot: HOT });
               if (s.heavy) G.fx.ring(s.x, s.y, { r0: 6, r1: 70, life: 0.25, color: GOLD, width: 5 });
               struck(t, s.x, s.y);
             } else G.audio.play('tink');
@@ -679,12 +740,13 @@
           const res = G.boss.damage(s.dmg, t, { x: s.x, y: s.y, heavy: true, lance: !s.wave, dir: G.sign(s.vx) });
           if (res && s.wave) {
             G.fx.stop(0.03); G.audio.play('hit');
-            G.fx.burst(s.x, s.y, { n: 10, color: STAR, speed: [100, 420], life: [0.15, 0.4], kind: 'spark', size: [2, 4] });
+            G.fx.hit(s.x, s.y, Math.atan2(s.vy, s.vx), { thrust: true, col: STAR, hot: HOT });
           } else if (res) {
             G.fx.stop(0.07); G.fx.shake(9);
             G.audio.play('flareHit');
             G.fx.ring(s.x, s.y, { r0: 10, r1: 120, life: 0.35, color: HOT, width: 8 });
-            G.fx.burst(s.x, s.y, { n: 26, color: STAR, speed: [150, 700], life: [0.2, 0.55], kind: 'spark', size: [2, 5] });
+            G.fx.hit(s.x, s.y, Math.atan2(s.vy, s.vx), { heavy: true, power: 1.25, col: STAR, hot: HOT });
+            G.fx.burst(s.x, s.y, { n: 12, color: STAR, speed: [150, 700], life: [0.2, 0.55], kind: 'spark', size: [2, 5] });
           } else G.audio.play('tink');
         }
         for (const o of G.hazards.slashables()) {
@@ -698,6 +760,8 @@
       if (s.y > FLOOR - 4 && s.vy > 0) {
         s.dead = true;
         G.fx.burst(s.x, FLOOR - 4, { n: s.arrow ? 5 : 14, color: STAR, speed: [100, 460], angle: -Math.PI / 2, spread: 2.4, life: [0.2, 0.5], kind: 'spark', size: [2, 4] });
+        if (s.arrow) G.fx.dust(s.x, FLOOR, 2, { speed: [20, 80], size: [3, 6], a: 0.3 });
+        else if (!s.wave) { G.fx.thud(s.x, FLOOR, 0.8, { noCrack: true }); G.fx.scorch(s.x, 34, STAR); G.fx.shake(4); }
       }
       if (s.dead || s.x < -100 || s.x > G.W + 100 || s.y < -200 || s.t > (s.life || 2)) G.shots.splice(i, 1);
     }
@@ -1302,6 +1366,11 @@
       if (pl.rise > 0.05 && P.x >= pl.x - 9 && P.x <= pl.x + pl.w + 9 && P.y <= pl.y + 4) gy = Math.min(gy, pl.y);
     }
     const k = G.clamp(1 - (gy - P.y) / 280, 0.25, 1);
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.globalAlpha = 0.3 * k;
+    ctx.drawImage(G.fx.glow(STAR), P.x - 78 * k, gy - 5, 156 * k, 15);
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = 'source-over';
     ctx.fillStyle = 'rgba(0,0,0,' + (0.42 * k) + ')';
     ctx.beginPath(); ctx.ellipse(P.x, gy + 3, 19 * k * H.build, 4.8 * k, 0, 0, G.TAU); ctx.fill();
   };

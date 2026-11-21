@@ -2,7 +2,7 @@
 
 A side-on boss rush for the browser: three heroes, four three-phase bosses, played as a run of
 ever-harder trials. You pick a hero and a relic before the run and win a boon after each victory.
-Version 0.5a.
+Version 0.6a.
 
 This is an early slice of a planned boss-rush roguelite (short runs, a boon after each boss,
 bosses drawn from a pool). A run meets the four bosses in a shuffled order, then meets them again, harder.
@@ -212,6 +212,32 @@ Each of these three is one file (`js/mage.js`, `js/assassin.js`, `js/knight.js`)
 `js/bosskit.js`: health, phases, stagger and attack selection live there, and the boss file supplies its
 attacks (one generator function each), movement and drawing.
 
+## Weight and life
+
+Since v0.6a every action leaves something behind, and each arena moves on its own.
+
+- **Blows:** a hit leaves a bright cut mark, throws sparks the way the weapon was travelling, knocks
+  slivers of the boss's own colour out of it, and kicks the view in that direction. The boss shivers for
+  the length of the hit-freeze. Finishers add impact lines and a longer freeze. Damage numbers hop.
+- **Ground:** footsteps, turns, jumps, landings and dashes raise dust; a long fall lands harder. Anything
+  heavy (a boss landing, the maul's finisher, Starfall, a slam) throws dust and stones and cracks the
+  floor; explosions leave smoke, drifting embers and a burnt patch that glows until it cools.
+- **The arena reacts:** a hard enough blow lifts dust along the whole floor, dips the platforms and shakes
+  grit off them, and startles the birds. Platforms give a little when you land on them.
+- **Weather:** embers rise in the Warden's ruin, snow falls on the Magus's spires, it rains on the Veil's
+  city, ash drifts through the Knight's graveyard, and it all thickens with each phase. Explosions push
+  it aside. The graveyard's grass bends away from whoever walks through it. Stars twinkle; bats and
+  crows cross the sky.
+- **Sound:** soft footsteps, a harder landing, the Knight's footfalls, more low end on hits, and a small
+  random change of pitch on sounds that repeat.
+
+Smoke and dust are drawn behind the hero, the bosses and every warning, so they never hide the fight.
+The **Screen shake** setting also scales the view kick and the boss's shiver; Off removes all three.
+
+To use these in a new attack, call the ready-made mixes in `js/fx.js`: `G.fx.hit` (a weapon lands),
+`G.fx.thud` (something heavy meets the ground), `G.fx.boom` (what an explosion leaves), `G.fx.shatter`
+(something of light breaks), `G.fx.dust`, `G.fx.kick` (knock the view a few pixels in a direction).
+
 ## Difficulty
 
 | | Health | Boss health | Warnings | Rest between attacks |
@@ -229,9 +255,9 @@ attacks (one generator function each), movement and drawing.
 | `js/run.js` | the run: heroes, relics, boons, offers, how each trial scales the boss |
 | `js/input.js` | keyboard, mouse and gamepad mapped to actions |
 | `js/audio.js` | every sound and the music, synthesised in code (no audio files) |
-| `js/fx.js` | particles, screen shake, flashes, hit-freeze, slow motion |
+| `js/fx.js` | particles, smoke, shards, cut marks, floor cracks and scorch marks, screen shake and kick, flashes, hit-freeze, slow motion |
 | `js/draw.js` | drawing helpers shared by heroes and bosses: tapered limbs, joints, cloth |
-| `js/arena.js` | palettes and skylines for each boss and phase (`G.THEMES`), platforms |
+| `js/arena.js` | palettes and skylines for each boss and phase (`G.THEMES`), platforms, weather, birds, grass |
 | `js/hazards.js` | beams, waves, orbs, zones, rings, meteors, weapon swings, pools and their warnings |
 | `js/player.js` | the hero: shared movement plus each hero's weapon and special; shared numbers are in `G.PLAYER` |
 | `js/boss.js` | the Warden; each attack is one generator function, attack pools are in `BAGS` |
@@ -249,13 +275,13 @@ Open the browser console on the running game.
 
 - **Dodge tests:** `fetch('/tools/dodge-tests.js').then(r => r.text()).then(t => console.log((0, eval)(t)))`
   runs each of the Warden's attacks against a simple scripted player and reports health lost. There are
-  32 tests and all lose 0 as of v0.5a. Set `window.TEST_HERO = 'aster'` (or `'lune'`) to test another hero
+  32 tests and all lose 0 as of v0.6a. Set `window.TEST_HERO = 'aster'` (or `'lune'`) to test another hero
   and `window.TEST_SEED = 2` for a different, repeatable set of boss choices.
 - **Tests for the other three bosses:** `fetch('/tools/boss-tests.js').then(r => r.text()).then(t => console.log((0, eval)(t)))`
   runs every attack of the Magus, the Veil and the Knight in every phase that uses it (134 runs) against one
   scripted player that follows plain rules: step off marked ground, jump low things, leave a swing's reach,
-  dash when there is no time to walk. As of v0.5a it loses 0 health as Vesper on seed 1. Across three
-  heroes and three seeds it loses between 0 and 6 in 134 runs, in the Veil's Cuts, the Knight's Whirl and,
+  dash when there is no time to walk. As of v0.6a it loses 0 health as Vesper on seed 1. Across three
+  heroes and three seeds it lost between 0 and 6 in 134 runs when last measured (v0.5a), in the Veil's Cuts, the Knight's Whirl and,
   as Lune, things it should cut down but cannot aim at. `window.TEST_BOSSES = ['knight']` limits it to one boss.
   Run the matching test after changing any attack.
 - `G.debug.god = true` makes the hero invulnerable. `G.debug.boxes = true` (or `?boxes` in the address)
@@ -270,6 +296,10 @@ Open the browser console on the running game.
 
 - **Sound and music have not been heard by anyone.** They are generated in code and run without errors,
   but the mix and the music are untested by ear. Volume sliders are in Settings.
+- **The v0.6a effects have only been seen as still frames.** They were checked in captures of each arena,
+  of hits, landings, slams, explosions, a stagger and each boss's death, and cost about 1.2 ms a frame on
+  the machine they were written on. How they feel in motion, whether the hit-freeze is now too long or
+  the weather too busy, and how they run on a slow machine are unknown.
 - **No person has fought the Magus, the Veil or the Knight** (new in v0.5a). Their attacks were checked
   with scripted players and by looking at captured frames, not by playing. Whether they are fun, readable
   at speed and the right length is unknown.
