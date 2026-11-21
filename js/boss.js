@@ -13,6 +13,7 @@
     return {
       id: 'hand' + side, side, x: 640 + side * 320, y: -120, rot: 0, curl: 0.12,
       ctrl: true, hurt: false, hurtDmg: 1, alive: true, flash: 0, stuck: false, hot: 0,
+      hp: 1, maxHp: 1, broken: 0, // a hand that runs out of health lies broken for a while
     };
   }
 
@@ -29,6 +30,11 @@
       blink: 0, blinkT: 3,
     };
     B.hands = [mkHand(-1), mkHand(1)];
+    for (const h of B.hands) h.hp = h.maxHp = Math.round(B.maxHp * 0.07);
+    B.shardA = 0; B.shardSpin = 0.9; B.haloR = 0; B.haloHurt = false;
+    B.campT = 0; B.campPlat = null; B.lastStand = false;
+    B.halo = { kind: 'blade' };
+    G.bounds = null;
   };
 
   // Idle pose for the title screen backdrop.
@@ -38,6 +44,10 @@
     B.spread = 430;
     for (const h of B.hands) { h.ctrl = false; h.x = 640 + h.side * B.spread; h.y = HOME_Y[1] + 128; }
   };
+
+  // A hand can attack and be struck only while it is whole.
+  const usable = (h) => h.alive && h.broken <= 0;
+  const usableHands = () => B.hands.filter(usable);
 
   // ------------------------------------------------------------------ targets and damage
   function handBox(h) {
@@ -55,7 +65,7 @@
     const c = B.core;
     out.push({ id: 'core', kind: 'core', cx: c.x, cy: c.y, r: c.r * 0.96 });
     for (const h of B.hands) {
-      if (!h.alive) continue;
+      if (!usable(h)) continue;
       const b = handBox(h);
       out.push({ id: h.id, kind: 'hand', ref: h, cx: b.cx, cy: b.cy, hw: b.hw, hh: b.hh });
     }
@@ -66,6 +76,7 @@
     if (!B.active || B.dead || B.dying || B.invuln) return false;
     let mult = t.kind === 'core' ? 1.5 : 1;
     if (B.staggered) mult *= 1.4;
+    if (B.hands.some((h) => h.alive && h.broken > 0)) mult *= 1.25; // exposed while a hand lies broken
     const dmg = Math.round(amount * mult);
     const floorHp = B.phase === 1 ? Math.floor(B.maxHp * 2 / 3) : B.phase === 2 ? Math.floor(B.maxHp / 3) : 0;
     B.hp = Math.max(floorHp, B.hp - dmg);
@@ -88,17 +99,46 @@
     }
     if (B.hp <= 0) die();
     else if (B.phase < 3 && B.hp <= floorHp) beginPhase(B.phase + 1);
-    else if (!B.staggered && B.poise >= B.poiseMax) stagger();
+    else {
+      if (t.kind === 'hand' && t.ref && usable(t.ref)) {
+        t.ref.hp -= dmg;
+        if (t.ref.hp <= 0) breakHand(t.ref);
+      }
+      if (!B.staggered && B.poise >= B.poiseMax) stagger();
+    }
     return true;
   };
+
+  // A hand's health ran out: it drops, the Warden loses the attacks that need it, and takes more damage.
+  function breakHand(h) {
+    const busy = h.ctrl;
+    h.broken = hard() ? 9 : 12; h.hp = 0;
+    h.hurt = false; h.hot = 0; h.stuck = false; h.ctrl = false;
+    B.poise = Math.min(B.poiseMax - 1, B.poise + B.poiseMax * 0.3);
+    G.player.gain(40);
+    G.audio.play('shatter');
+    G.fx.stop(0.1); G.fx.shake(13); G.fx.flash(G.pal().hot, 0.25, 0.3);
+    G.fx.ring(h.x, h.y, { r0: 30, r1: 220, life: 0.5, color: G.pal().hot, width: 9 });
+    G.fx.burst(h.x, h.y, { n: 16, color: '24,20,34', speed: [150, 620], life: [0.7, 1.4], size: [6, 13], kind: 'chunk', grav: 1400 });
+    G.fx.burst(h.x, h.y, { n: 22, color: G.pal().hot, speed: [200, 760], life: [0.3, 0.8], kind: 'spark', size: [2, 5] });
+    G.ui.callout('HAND BROKEN', 'The Warden is exposed');
+    // if it broke in the middle of its own attack, that attack is cut short
+    if (busy && !B.staggered) { interrupt(); B.script = flinch(); }
+  }
+  function* flinch() {
+    B.core.open = 0.3;
+    yield* wait(0.9);
+    B.core.open = 1;
+    release();
+  }
 
   // ------------------------------------------------------------------ script control
   function release() {
     const c = B.core;
     c.ctrl = false; c.charge = 0; c.pulse = 0; c.spinHint = 0; c.hurt = false; c.embedded = false; c.jit = 0;
     for (const h of B.hands) { h.ctrl = false; h.hurt = false; h.stuck = false; h.hot = 0; }
-    B.shardsOut = false;
-    G.wind = 0;
+    B.shardsOut = false; B.shardSpin = 0.9; B.haloR = 0; B.haloHurt = false;
+    G.wind = 0; G.bounds = null;
   }
   function interrupt() {
     B.script = null; B.attackName = '';
@@ -131,7 +171,7 @@
     c.ctrl = true;
     const drops = [tween(c, { y: FLOOR - 112, open: 0.06 }, 0.42, E.inCubic)];
     for (const h of B.hands) {
-      if (!h.alive) continue;
+      if (!usable(h)) continue;
       h.ctrl = true;
       drops.push(tween(h, { x: G.clamp(c.x + h.side * 310, 110, 1170), y: FLOOR - 56, rot: h.side * 0.55, curl: 0.35 }, 0.48, E.inCubic));
     }
@@ -156,6 +196,7 @@
     interrupt();
     B.invuln = true; B.staggered = false; B.poise = 0;
     B.phase = n; B.bag = [];
+    for (const h of B.hands) { h.broken = 0; h.hp = h.maxHp; } // a new phase makes the hands whole
     G.player.onPhase(); // the Wardstone relic recharges each phase
     B.script = n === 2 ? toPhase2() : toPhase3();
   }
@@ -313,22 +354,43 @@
 
   // ------------------------------------------------------------------ attack selection
   const BAGS = {
-    1: ['slam', 'sweep', 'clap', 'lance', 'rain', 'slam'],
-    2: ['slam2', 'sweep2', 'clap', 'lance3', 'rain', 'pulse', 'comb', 'rocket', 'tide'],
-    3: ['dive', 'storm', 'wheel', 'singularity', 'rain', 'pulse', 'dive', 'storm'],
+    1: ['slam', 'sweep', 'clap', 'lance', 'rain', 'flick', 'crossfire'],
+    2: ['slam2', 'sweep2', 'clap', 'lance3', 'rain', 'pulse', 'comb', 'rocket', 'tide', 'fan', 'cage', 'duet', 'crossfire', 'flick'],
+    3: ['dive', 'storm', 'wheel', 'singularity', 'rain', 'pulse', 'fan', 'halo', 'dive'],
   };
-  function nextAttack() {
-    if (B.forceNext) { const f = B.forceNext; B.forceNext = ''; B.lastAtk = f; return f; }
-    if (!B.bag.length) {
-      const src = BAGS[B.phase];
-      for (let tries = 0; tries < 8; tries++) {
-        B.bag = G.shuffle(src.slice());
-        let ok = B.bag[B.bag.length - 1] !== B.lastAtk;
-        for (let i = 1; i < B.bag.length && ok; i++) if (B.bag[i] === B.bag[i - 1]) ok = false;
-        if (ok) break;
-      }
+  // How many whole hands an attack needs. Attacks that need more than are left are skipped.
+  const NEEDS = {
+    slam: 1, sweep: 1, clap: 2, slam2: 1, sweep2: 1, comb: 2, rocket: 1,
+    flick: 1, crossfire: 2, cage: 2, swat: 1, duet: 1, duetSlam: 1, duetSweep: 1,
+  };
+  const canUse = (name) => (NEEDS[name] || 0) <= usableHands().length;
+
+  function refillBag() {
+    const src = BAGS[B.phase];
+    for (let tries = 0; tries < 8; tries++) {
+      B.bag = G.shuffle(src.slice());
+      let ok = B.bag[B.bag.length - 1] !== B.lastAtk;
+      for (let i = 1; i < B.bag.length && ok; i++) if (B.bag[i] === B.bag[i - 1]) ok = false;
+      if (ok) break;
     }
-    B.lastAtk = B.bag.pop();
+  }
+  function nextAttack() {
+    if (B.forceNext) {
+      const f = B.forceNext;
+      B.forceNext = '';
+      if (canUse(f)) { B.lastAtk = f; return f; }
+    }
+    // resting on a platform for too long gets it knocked down
+    if (B.phase === 2 && B.campT > 2.4 && B.lastAtk !== 'swat' && canUse('swat') && G.arena.platforms.every((p) => p.rise >= 1)) {
+      B.campT = 0; B.lastAtk = 'swat';
+      return 'swat';
+    }
+    for (let guard = 0; guard < 40; guard++) {
+      if (!B.bag.length) refillBag();
+      const n = B.bag.pop();
+      if (canUse(n)) { B.lastAtk = n; return n; }
+    }
+    B.lastAtk = B.phase === 3 ? 'rain' : 'lance';
     return B.lastAtk;
   }
 
@@ -336,7 +398,11 @@
     const low = B.phase === 3 && B.hp < B.maxHp * 0.12;
     const gap = [0, 0.95, 0.75, 0.6][B.phase] * G.diff().pace * (low ? 0.55 : 1);
     yield* wait(gap);
-    const name = G.debug.forceAttack || nextAttack();
+    let name = G.debug.forceAttack || '';
+    // the last stand: once, when the Warden is nearly spent
+    if (!name && low && !B.lastStand) { B.lastStand = true; name = 'supernova'; }
+    if (!name) name = nextAttack();
+    if (!ATTACKS[name] || !canUse(name)) name = B.phase === 3 ? 'rain' : 'lance';
     B.attackName = name;
     yield* ATTACKS[name]();
     B.attackName = '';
@@ -389,7 +455,7 @@
   }
 
   function nearHand() {
-    const alive = B.hands.filter((h) => h.alive);
+    const alive = usableHands();
     const P = G.player;
     return alive.sort((a, b) => Math.abs(a.x - P.x) - Math.abs(b.x - P.x))[0];
   }
@@ -398,6 +464,7 @@
   // ------------------------------------------------------------------ phase 1 attacks
   function* slam(h, o) {
     const T = G.diff().tele, P = G.player;
+    if (!usable(h)) return;
     h.ctrl = true; h.stuck = false;
     G.audio.play('charge', { dur: 0.95 * T });
     const m = columnMark(h.x, 156);
@@ -471,8 +538,8 @@
     }
     yield* wait(0.35);
   }
-  function* atkSweep() { yield* sweep(G.rpick(B.hands.filter((h) => h.alive)), false); }
-  function* atkSweep2() { yield* sweep(G.rpick(B.hands.filter((h) => h.alive)), true); }
+  function* atkSweep() { yield* sweep(G.rpick(usableHands()), false); }
+  function* atkSweep2() { yield* sweep(G.rpick(usableHands()), true); }
 
   function* atkClap() {
     const [L, R] = B.hands, T = G.diff().tele, P = G.player;
@@ -566,7 +633,7 @@
 
   // ------------------------------------------------------------------ phase 2 attacks
   function* atkSlam2() {
-    const a = nearHand(), b = other(a);
+    const a = nearHand(), b = usable(other(a)) ? other(a) : a;
     const n = hard() ? 3 : 2;
     for (let i = 0; i < n; i++) {
       const h = i % 2 === 0 ? a : b, last = i === n - 1;
@@ -627,7 +694,7 @@
 
   function* atkRocket() {
     const P = G.player, T = G.diff().tele;
-    const h = G.rpick(B.hands.filter((x) => x.alive));
+    const h = G.rpick(usableHands());
     h.ctrl = true;
     const sx = h.side > 0 ? WR - 78 : WL + 78, dir = -h.side;
     const aimY = () => G.clamp(P.y - 36, 150, FLOOR - 66);
@@ -669,7 +736,7 @@
     c.charge = 1;
     G.audio.play('charge', { dur: 1.45 * T });
     H.zone({
-      x: WL, y: FLOOR - 34, w: WR - WL, h: 34, tele: 1.45 * T, active: 2.7, style: 'tide', pop: -780,
+      x: WL, y: FLOOR - 34, w: WR - WL, h: 34, tele: 1.45 * T, active: 2.7, style: 'tide', popVy: -780,
       onFire() { G.audio.play('tide'); G.fx.shake(7); },
     });
     yield* wait(1.45 * T + 0.3);
@@ -803,11 +870,300 @@
     c.open = 1;
   }
 
+  // ------------------------------------------------------------------ more patterns
+  function* delayed(t, gen) { yield* wait(t); yield* gen; }
+
+  // A few aimed meteors in a row.
+  function* meteors(n, gap) {
+    const T = G.diff().tele, P = G.player;
+    for (let i = 0; i < n; i++) {
+      H.meteor({ x: G.clamp(P.x + G.rrand(-20, 20), WL + 50, WR - 50), tele: 0.85 * T });
+      yield* wait(gap);
+    }
+  }
+
+  // A warning drawn by a function, with no damage of its own. Scripts end it with mark.dead = true.
+  function sketch(draw) {
+    return H.add({ kind: 'mark', layer: 'under', update() { }, draw });
+  }
+
+  // Flick: a hand points and fires orbs at where you stand. Step aside, jump them, or cut them down.
+  function* atkFlick() {
+    const T = G.diff().tele, P = G.player;
+    const h = G.rpick(usableHands());
+    if (!h) return;
+    h.ctrl = true;
+    const n = (B.phase === 1 ? 3 : 4) + (hard() ? 1 : 0), aimT = 0.36 * T;
+    yield* tween(h, { x: h.side > 0 ? WR - 170 : WL + 170, y: 250, curl: 0.75, rot: -h.side * 0.9 }, 0.5);
+    for (let i = 0; i < n; i++) {
+      h.hot = 1;
+      G.audio.play('charge', { dur: aimT });
+      const tx = P.x, ty = P.y - 22;
+      const m = sketch(function (ctx) {
+        ctx.strokeStyle = G.rgba(DANGER, 0.25 + 0.55 * Math.min(1, this.t / aimT)); ctx.lineWidth = 2;
+        ctx.setLineDash([9, 8]);
+        ctx.beginPath(); ctx.moveTo(h.x, h.y); ctx.lineTo(tx, ty); ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.beginPath(); ctx.arc(tx, ty, 16, 0, G.TAU); ctx.stroke();
+      });
+      yield* wait(aimT);
+      m.dead = true;
+      const a = Math.atan2(ty - h.y, tx - h.x);
+      H.orb(h.x + Math.cos(a) * 40, h.y + Math.sin(a) * 40, Math.cos(a) * 600, Math.sin(a) * 600, { r: 14 });
+      G.audio.play('orb');
+      h.kx = -Math.cos(a) * 16; h.hot = 0;
+      yield* wait(0.3);
+    }
+    yield* wait(0.45);
+  }
+
+  // Crossfire: one hand fires along the floor, then the other fires at jumping height.
+  // Jump the first beam and be back on the ground for the second.
+  function* atkCrossfire() {
+    const T = G.diff().tele;
+    const lo = G.rng() < 0.5 ? B.hands[0] : B.hands[1], hi = other(lo);
+    lo.ctrl = hi.ctrl = true;
+    const yLow = FLOOR - 26, yHigh = FLOOR - 165, wallX = (h) => (h.side > 0 ? WR - 64 : WL + 64);
+    yield* par(
+      tween(lo, { x: wallX(lo), y: FLOOR - 62, curl: 0.05, rot: -lo.side * Math.PI / 2 }, 0.55),
+      tween(hi, { x: wallX(hi), y: yHigh, curl: 0.05, rot: -hi.side * Math.PI / 2 }, 0.55)
+    );
+    const order = hard() ? [lo, hi, lo] : [lo, hi], tele = 0.9 * T, gap = 0.75;
+    lo.hot = hi.hot = 1;
+    G.audio.play('charge', { dur: tele });
+    order.forEach((h, i) => {
+      H.beam({
+        ox: h.x, oy: h === lo ? yLow : yHigh, ang: h.side > 0 ? Math.PI : 0,
+        tele: tele + i * gap, lock: tele + i * gap, active: 0.26, fade: 0.2, width: 40, clip: false, shake: 6,
+      });
+    });
+    yield* wait(tele + (order.length - 1) * gap + 0.45);
+    lo.hot = hi.hot = 0;
+    yield* wait(0.3);
+  }
+
+  // Fan: the core throws fans of orbs with gaps between them, each fan offset from the last.
+  // Stand in a gap, or cut an orb out of the air.
+  function* atkFan() {
+    const c = B.core, T = G.diff().tele;
+    c.ctrl = true;
+    yield* tween(c, { x: 640, y: 262 }, 0.55);
+    const waves = (B.phase === 3 ? 4 : 3) + (hard() ? 1 : 0), speed = B.phase === 3 ? 380 : 330, aimT = 0.6 * T;
+    for (let w = 0; w < waves; w++) {
+      c.charge = 1;
+      G.audio.play('charge', { dur: aimT });
+      const angs = [];
+      for (let a = 0.52 + (w % 2) * 0.175; a <= 2.63; a += 0.35) angs.push(a);
+      const m = sketch(function (ctx) {
+        const k = Math.min(1, this.t / aimT);
+        ctx.strokeStyle = G.rgba(DANGER, 0.25 + 0.55 * k); ctx.lineWidth = 2.5;
+        for (const a of angs) {
+          const r0 = c.r + 12, r1 = r0 + 90 * k;
+          ctx.beginPath(); ctx.moveTo(c.x + Math.cos(a) * r0, c.y + Math.sin(a) * r0); ctx.lineTo(c.x + Math.cos(a) * r1, c.y + Math.sin(a) * r1); ctx.stroke();
+        }
+      });
+      yield* wait(aimT);
+      m.dead = true;
+      for (const a of angs) H.orb(c.x + Math.cos(a) * c.r, c.y + Math.sin(a) * c.r, Math.cos(a) * speed, Math.sin(a) * speed, { r: 12 });
+      G.audio.play('orb'); G.fx.shake(4); c.kick = 0.7;
+      yield* wait(0.5);
+    }
+    c.charge = 0;
+    yield* wait(0.9);
+  }
+
+  // Cage: both hands plant either side of you and hold you in while embers fall.
+  // The planted hands are open to attack, and breaking one ends the cage.
+  function* atkCage() {
+    const [L, R] = B.hands, T = G.diff().tele, P = G.player;
+    L.ctrl = R.ctrl = true;
+    const half = 230, cx = G.clamp(P.x, WL + 300, WR - 300);
+    yield* par(
+      tween(L, { x: cx - half, y: 240, curl: 1, rot: 0 }, 0.5),
+      tween(R, { x: cx + half, y: 240, curl: 1, rot: 0 }, 0.5)
+    );
+    const mL = columnMark(cx - half, 150), mR = columnMark(cx + half, 150), tt = 0.8 * T;
+    G.audio.play('charge', { dur: tt });
+    L.hot = R.hot = 1;
+    let e = 0;
+    while (e < tt) {
+      e += yield;
+      const k = Math.min(1, e / tt);
+      mL.k = mR.k = k; mL.locked = mR.locked = k > 0.7;
+    }
+    L.hurt = R.hurt = true; L.hurtDmg = R.hurtDmg = 1;
+    yield* par(tween(L, { y: FLOOR - 64 }, 0.09, E.inQuad), tween(R, { y: FLOOR - 64 }, 0.09, E.inQuad));
+    mL.dead = mR.dead = true;
+    impactFx(cx - half, false); impactFx(cx + half, false);
+    yield* wait(0.07);
+    L.hurt = R.hurt = false; L.hot = R.hot = 0; L.stuck = R.stuck = true;
+    const l = cx - half + 76, r = cx + half - 76;
+    if (P.x > l - 16 && P.x < r + 16 && !P.dead) {
+      // caught: the hands are walls until they let go
+      G.bounds = { l, r };
+      G.ui.hint('cage', 'Caged. Break a hand, or dodge until it lets go');
+      const n = hard() ? 5 : 4;
+      for (let i = 0; i < n; i++) {
+        H.meteor({ x: G.clamp(P.x + G.rrand(-24, 24), l + 6, r - 6), tele: 0.8 * T, blastR: 50 });
+        yield* wait(hard() ? 0.9 : 1.1); // each ember has all but landed before the next is aimed
+      }
+      yield* wait(0.5);
+      G.bounds = null;
+    } else {
+      yield* wait(1.3); // it missed: a free opening on two planted hands
+    }
+    L.stuck = R.stuck = false;
+    yield* wait(0.3);
+  }
+
+  // Swat: the answer to resting on a platform. A fist knocks it out of the sky for a while.
+  function* atkSwat() {
+    const T = G.diff().tele;
+    const pl = (B.campPlat && B.campPlat.rise >= 1) ? B.campPlat : G.arena.platforms.find((p) => p.rise >= 1);
+    if (!pl) return;
+    const px = pl.x + pl.w / 2;
+    const h = usableHands().sort((a, b) => Math.abs(a.x - px) - Math.abs(b.x - px))[0];
+    if (!h) return;
+    h.ctrl = true;
+    G.ui.hint('swat', 'It will not let you rest up there');
+    yield* tween(h, { x: px, y: pl.top - 250, curl: 1, rot: 0 }, 0.5);
+    const tt = 0.75 * T;
+    h.hot = 1;
+    G.audio.play('charge', { dur: tt });
+    H.zone({ x: pl.x - 4, y: pl.top - 200, w: pl.w + 8, h: 204, tele: tt, active: 0.1, fade: 0.15, style: 'column' });
+    yield* tween(h, { y: pl.top - 286 }, tt, E.outCubic);
+    h.hurt = true; h.hurtDmg = 1;
+    yield* tween(h, { y: pl.top - 60 }, 0.08, E.inQuad);
+    G.arena.dropPlatform(pl, hard() ? 8 : 5.5);
+    G.fx.shake(15); G.audio.play('slam');
+    G.fx.ring(px, pl.top, { r0: 20, r1: 180, life: 0.4, color: G.pal().hot, width: 8 });
+    G.fx.burst(px, pl.top, { n: 16, color: '22,18,32', speed: [150, 560], life: [0.6, 1.2], size: [5, 11], kind: 'chunk', grav: 1500 });
+    yield* wait(0.07);
+    h.hurt = false; h.hot = 0; h.stuck = true;
+    yield* wait(0.6);
+    h.stuck = false;
+  }
+
+  // Duets: a hand and the core attack together.
+  function* atkDuetSlam() {
+    const h = nearHand();
+    if (!h) { yield* lances(1); return; }
+    yield* par(slam(h, { track: 0.62, stuck: 1.0, wave: 520 }), delayed(0.35, lances(1)));
+  }
+  function* atkDuetSweep() {
+    const h = G.rpick(usableHands());
+    if (!h) { yield* meteors(3, 0.5); return; }
+    yield* par(sweep(h, false), delayed(0.5, meteors(3, 0.55)));
+  }
+  function* atkDuet() { yield* (G.rng() < 0.5 ? atkDuetSlam() : atkDuetSweep()); }
+
+  // Halo (phase 3): the shards become a turning ring of blades around a low, slow core.
+  // Outside the ring is safe, inside it is safe, and inside is where the core can be hit.
+  function* atkHalo() {
+    const c = B.core, T = G.diff().tele, P = G.player;
+    c.ctrl = true;
+    G.ui.hint('halo', 'Slip inside the ring of blades');
+    const R = 210;
+    yield* tween(c, { x: G.clamp(c.x, 300, 980), y: FLOOR - 170 }, 0.6);
+    B.haloR = R; B.shardSpin = 1.6;
+    c.charge = 1;
+    G.audio.play('charge', { dur: T });
+    const m = sketch(function (ctx) {
+      const k = Math.min(1, this.t / T), live = B.haloHurt;
+      ctx.save();
+      ctx.beginPath(); ctx.rect(-80, -400, G.W + 160, FLOOR + 400); ctx.clip();
+      ctx.strokeStyle = G.rgba(DANGER, live ? 0.3 : 0.3 + 0.5 * k); ctx.lineWidth = live ? 2 : 3;
+      ctx.setLineDash([16, 10]); ctx.lineDashOffset = -this.t * 70;
+      ctx.beginPath(); ctx.arc(c.x, c.y, R, 0, G.TAU); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.restore();
+    });
+    yield* wait(T);
+    B.haloHurt = true;
+    G.audio.play('sweep');
+    const dur = hard() ? 6.5 : 5.5;
+    let e = 0, hum = 0;
+    while (e < dur) {
+      const dt = yield;
+      e += dt; hum -= dt;
+      c.x = G.clamp(c.x + G.clamp(P.x - c.x, -110 * dt, 110 * dt), 250, 1030);
+      if (hum <= 0) { hum = 0.7; G.audio.play('streak'); }
+    }
+    m.dead = true;
+    B.haloHurt = false; B.haloR = 0; B.shardSpin = 0.9;
+    c.charge = 0; c.open = 0.2;
+    yield* wait(hard() ? 0.8 : 1.1);
+    c.open = 1;
+    yield* tween(c, { y: HOME_Y[3] }, 0.6, E.outCubic);
+  }
+
+  // Supernova: the last stand, once, when the Warden is nearly spent. Rings, a turning beam, then a collapse.
+  function* atkSupernova() {
+    const c = B.core, T = G.diff().tele, P = G.player;
+    c.ctrl = true;
+    G.ui.callout('LAST LIGHT', 'It burns everything it has left');
+    G.audio.play('roar');
+    G.fx.shake(16); G.fx.flash(G.pal().hot, 0.4, 0.5);
+    yield* tween(c, { x: 640, y: 310 }, 0.7);
+    // two rings
+    for (let i = 0; i < 2; i++) {
+      const tt = (i === 0 ? 0.8 : 0.55) * T;
+      c.charge = 1;
+      G.audio.play('charge', { dur: tt });
+      let e = 0;
+      while (e < tt) { e += yield; c.pulse = Math.min(1, e / tt); }
+      c.pulse = 0;
+      H.ring({ x: c.x, y: c.y, r: c.r, speed: gentle() ? 440 : 530, thick: 26, maxR: 1000 });
+      G.audio.play('ring'); G.fx.shake(8);
+      yield* wait(0.55);
+    }
+    // half a turn of the wheel
+    const dir = G.rng() < 0.5 ? 1 : -1, spin = dir * (gentle() ? 0.9 : 1.05), total = Math.PI / Math.abs(spin);
+    c.spinHint = dir;
+    G.audio.play('charge', { dur: T });
+    for (const a of [0, Math.PI]) {
+      H.beam({
+        ox: c.x, oy: c.y, ang: a, tele: T, lock: T, active: total, fade: 0.25, spin, width: 34, shake: 6,
+        follow(b) { b.ox = c.x; b.oy = c.y; },
+      });
+    }
+    yield* wait(T);
+    c.spinHint = 0;
+    let e = 0, hum = 0;
+    while (e < total) { const dt = yield; e += dt; hum -= dt; if (hum <= 0) { hum = 0.48; G.audio.play('beam'); } }
+    yield* wait(0.35);
+    // the collapse
+    const R = 390, tele = 1.6 * T;
+    H.blast({ x: c.x, y: c.y, r: R, tele, dmg: 2 });
+    G.audio.play('pull');
+    e = 0;
+    while (e < tele) {
+      const dt = yield;
+      e += dt;
+      const dx = c.x - P.x;
+      G.wind = Math.abs(dx) > 14 ? G.sign(dx) * 140 : 0;
+      c.jit = 1 + 3 * e / tele;
+      for (let i = 0; i < 2; i++) {
+        const a = G.rand(0, G.TAU), r = G.rand(R * 0.7, R + 160);
+        G.fx.spawn({ x: c.x + Math.cos(a) * r, y: c.y + Math.sin(a) * r, vx: -Math.cos(a) * r * 1.6, vy: -Math.sin(a) * r * 1.6, life: 0.5, size: 4, color: G.pal().boss, kind: 'spark' });
+      }
+    }
+    G.wind = 0; c.charge = 0; c.jit = 0;
+    G.fx.flash(G.pal().hot, 0.4, 0.4); G.fx.punch(0.04);
+    c.open = 0.12;
+    yield* wait(1.6); // spent: the best opening of the fight
+    c.open = 1;
+    yield* tween(c, { y: HOME_Y[3] }, 0.6, E.outCubic);
+  }
+
   const ATTACKS = B.ATTACKS = {
     slam: atkSlam, sweep: atkSweep, clap: atkClap, lance: atkLance, rain: atkRain,
+    flick: atkFlick, crossfire: atkCrossfire,
     slam2: atkSlam2, sweep2: atkSweep2, lance3: atkLance3, pulse: atkPulse, comb: atkComb,
     rocket: atkRocket, tide: atkTide,
+    fan: atkFan, cage: atkCage, swat: atkSwat, duet: atkDuet, duetSlam: atkDuetSlam, duetSweep: atkDuetSweep,
     dive: atkDive, storm: atkStorm, wheel: atkWheel, singularity: atkSingularity,
+    halo: atkHalo, supernova: atkSupernova,
   };
 
   // ------------------------------------------------------------------ update
@@ -832,7 +1188,20 @@
       c.open = G.damp(c.open, 1, 6, dt);
     }
     for (const h of B.hands) {
-      if (h.ctrl || !h.alive) continue;
+      if (!h.alive) continue;
+      if (h.broken > 0) {
+        // lying broken on the floor until it knits itself back together
+        h.broken -= dt;
+        h.x = G.clamp(h.x, 110, 1170);
+        h.y = G.damp(h.y, FLOOR - 50, 9, dt); h.rot = G.damp(h.rot, h.side * 1.25, 8, dt); h.curl = G.damp(h.curl, 0.6, 8, dt);
+        if (h.broken <= 0) {
+          h.broken = 0; h.hp = h.maxHp;
+          G.audio.play('ring');
+          G.fx.ring(h.x, h.y, { r0: 150, r1: 40, life: 0.45, color: G.pal().boss, width: 7 });
+        }
+        continue;
+      }
+      if (h.ctrl) continue;
       const tx = G.clamp(c.x + h.side * (B.spread + Math.sin(B.t * 0.8 + h.side) * 16), 90, 1190);
       const ty = c.y + 128 + Math.cos(B.t * 1.1 + h.side * 2) * 18;
       h.x = G.damp(h.x, tx, 4.5, dt); h.y = G.damp(h.y, ty, 4.5, dt);
@@ -851,18 +1220,30 @@
     const dx = P.x - c.x, dy = P.y - 22 - c.y, d = Math.hypot(dx, dy) || 1;
     c.lx = G.damp(c.lx, dx / d, 8, dt); c.ly = G.damp(c.ly, dy / d, 8, dt);
 
-    // shards circle the core in phase 3
-    if (B.hasShards) B.shardR = G.damp(B.shardR, B.shardsOut ? 1100 : c.r + 74, B.shardsOut ? 3 : 5, dt);
+    // how long the player has been resting on a platform (see the swat attack)
+    if (P.plat && !P.dead) { B.campT = Math.min(4, B.campT + dt); B.campPlat = P.plat; }
+    else B.campT = Math.max(0, B.campT - dt * 0.5);
+
+    // shards circle the core in phase 3; the halo attack widens the circle into a ring of blades
+    B.shardA += B.shardSpin * dt;
+    if (B.hasShards) B.shardR = G.damp(B.shardR, B.shardsOut ? 1100 : (B.haloR || c.r + 74), B.shardsOut ? 3 : 5, dt);
 
     // contact damage while a part is mid-attack
     if (G.canHurt()) {
       for (const h of B.hands) {
-        if (!h.hurt || !h.alive) continue;
+        if (!h.hurt || !usable(h)) continue;
         const b = handBox(h);
         b.hw *= 0.8; b.hh *= 0.88;
         if (G.rectsOverlap(P.box(), b)) P.tryHit(h.hurtDmg, h.x, h);
       }
       if (c.hurt && G.circleRect(c.x, c.y, c.r * 0.88, P.box())) P.tryHit(2, c.x, c);
+      if (B.haloHurt && B.hasShards) {
+        for (let i = 0; i < 6; i++) {
+          const a = B.shardA + i * G.TAU / 6;
+          const sx = c.x + Math.cos(a) * B.shardR, sy = c.y + Math.sin(a) * B.shardR;
+          if (sy < FLOOR + 10 && G.circleRect(sx, sy, 17, P.box())) P.tryHit(1, sx, B.halo);
+        }
+      }
     }
   };
 
@@ -1056,11 +1437,19 @@
     if (!B.hasShards) return;
     const P = G.pal(), c = B.core;
     for (let i = 0; i < 6; i++) {
-      const a = B.t * 0.9 + i * G.TAU / 6;
+      const a = B.shardA + i * G.TAU / 6;
       const x = c.x + Math.cos(a) * B.shardR, y = c.y + Math.sin(a) * B.shardR;
       if (x < -80 || x > G.W + 80 || y < -80 || y > G.H + 80) continue;
+      if (B.haloR && y > FLOOR + 12) continue; // a blade passing under the floor
       ctx.save();
       ctx.translate(x, y); ctx.rotate(a + Math.PI / 2 + (B.shardsOut ? Math.PI / 2 : 0));
+      if (B.haloR) {
+        // blades: larger, and lit in the warning colour
+        ctx.scale(1.5, 1.5);
+        ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.6;
+        ctx.drawImage(G.fx.glow(DANGER), -26, -26, 52, 52);
+        ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
+      }
       ctx.fillStyle = '#0b0910';
       ctx.beginPath(); ctx.moveTo(0, -26); ctx.lineTo(8, 0); ctx.lineTo(0, 26); ctx.lineTo(-8, 0); ctx.closePath(); ctx.fill();
       ctx.strokeStyle = G.rgba(P.hot, 0.9); ctx.lineWidth = 1.8; ctx.stroke();
@@ -1080,7 +1469,7 @@
     const P = G.pal(), c = h.curl;
     const danger = h.hurt || h.hot > 0;
     const edge = danger ? DANGER : P.boss;
-    const dimK = h.stuck ? 0.4 : 1;
+    const dimK = h.broken > 0 ? 0.2 : h.stuck ? 0.4 : 1;
     const j = h.hot > 0 && !h.hurt ? 1.6 : 0;
     ctx.save();
     ctx.translate(h.x + (h.kx || 0) + (j ? G.rand(-j, j) : 0), h.y + (j ? G.rand(-j, j) : 0));
@@ -1141,8 +1530,16 @@
       G.roundRect(ctx, -57, -48, 114, 114, 28); ctx.fill();
     }
     ctx.globalCompositeOperation = 'source-over';
-    // cracks while it is stuck and safe to hit
-    if (h.stuck) {
+    // how much more the hand can take, as an arc round its sigil (and the time left once it is broken)
+    if (h.broken > 0 || h.hp < h.maxHp) {
+      const k = h.broken > 0 ? 1 - h.broken / 12 : h.hp / h.maxHp;
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.strokeStyle = h.broken > 0 ? G.rgba(G.COL.starHot, 0.5) : G.rgba(P.hot, 0.9); ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc(0, 12, 29, -Math.PI / 2, -Math.PI / 2 + G.TAU * G.clamp(k, 0, 1)); ctx.stroke();
+      ctx.globalCompositeOperation = 'source-over';
+    }
+    // cracks while it is stuck or broken
+    if (h.stuck || h.broken > 0) {
       ctx.strokeStyle = 'rgba(0,0,0,0.7)'; ctx.lineWidth = 2;
       ctx.beginPath(); ctx.moveTo(-30, -40); ctx.lineTo(-18, -8); ctx.lineTo(-32, 20);
       ctx.moveTo(26, -30); ctx.lineTo(16, 6); ctx.lineTo(34, 40); ctx.stroke();

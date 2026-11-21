@@ -212,8 +212,10 @@
     }
     const fallSpeed = P.vy;
     P.x += (P.vx + G.wind) * dt;
-    if (P.x < G.WALL_L + 13) { P.x = G.WALL_L + 13; if (P.vx < 0) P.vx = 0; }
-    if (P.x > G.WALL_R - 13) { P.x = G.WALL_R - 13; if (P.vx > 0) P.vx = 0; }
+    // the arena walls, or the Warden's hands when it has the hero caged
+    const bl = G.bounds ? G.bounds.l : G.WALL_L + 13, br = G.bounds ? G.bounds.r : G.WALL_R - 13;
+    if (P.x < bl) { P.x = bl; if (P.vx < 0) P.vx = 0; }
+    if (P.x > br) { P.x = br; if (P.vx > 0) P.vx = 0; }
     const prevY = P.y;
     P.y += P.vy * dt;
     let landed = false;
@@ -608,7 +610,7 @@
     P.hp -= dmg; P.stats.hits++;
     P.inv = C.HURT_INV; P.stun = 0.2; P.dashT = 0; P.atk = null; P.healT = 0; P.hurtFlash = 1; P.plunge = false;
     const dir = G.sign(P.x - srcX) || -P.facing;
-    P.vx = dir * 430; P.vy = (src && src.pop) || -430; P.onGround = false; P.plat = null; P.jumpHeld = false;
+    P.vx = dir * 430; P.vy = (src && typeof src.popVy === 'number') ? src.popVy : -430; P.onGround = false; P.plat = null; P.jumpHeld = false;
     G.fx.stop(0.14); G.fx.shake(13); G.fx.flash('255,50,50', 0.26, 0.35);
     G.fx.burst(P.x, P.y - 22, { n: 16, color: '255,120,120', speed: [100, 420], life: [0.2, 0.55], kind: 'spark', size: [2, 4] });
     G.audio.play('hurt');

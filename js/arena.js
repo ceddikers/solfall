@@ -185,7 +185,7 @@
 
   A.reset = function () {
     A.phase = 1; A.prevPhase = 1; A.fade = 1;
-    for (const p of A.platforms) { p.rise = 0; p.target = 0; p.y = G.FLOOR + 40; }
+    for (const p of A.platforms) { p.rise = 0; p.target = 0; p.downT = 0; p.y = G.FLOOR + 40; }
   };
 
   A.setPhase = function (p, dur) {
@@ -198,9 +198,14 @@
     for (const p of A.platforms) { p.target = 1; if (instant) p.rise = 1; }
   };
 
+  A.dropPlatform = function (p, secs) { p.target = 0; p.downT = secs; };
+
   A.update = function (dt) {
     if (A.fade < 1) A.fade = Math.min(1, A.fade + dt / A.fadeDur);
     for (const p of A.platforms) {
+      // a platform knocked down by the swat attack sinks, waits, then rises again
+      if (p.rise > p.target) p.rise = Math.max(p.target, p.rise - dt / 0.35);
+      if (p.downT > 0) { p.downT -= dt; if (p.downT <= 0) p.target = 1; }
       if (p.rise < p.target) {
         p.rise = Math.min(p.target, p.rise + dt / 1.6);
         if (Math.random() < 0.5) {

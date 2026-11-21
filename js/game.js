@@ -79,7 +79,7 @@
   };
 
   G.pause = function () {
-    if (G.state !== 'fight' || G.paused || G.player.dead || G.boss.dying) return;
+    if (G.state !== 'fight' || G.paused || G.player.dead || G.boss.dying || G.debug.freeze) return;
     G.paused = true;
     G.ui.show('pause');
     G.audio.duck(0.3);

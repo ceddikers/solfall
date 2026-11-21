@@ -191,6 +191,7 @@
   // ------------------------------------------------------------ rectangular zone
   // o: x, y, w, h (top-left), tele, active, style 'column' | 'tide' | 'crush', pop
   H.zone = function (o) {
+    // popVy: how hard a hit from this zone throws the hero upward (the burning floor uses it to give a chance to reach a platform)
     return H.add(Object.assign({
       kind: 'zone', tele: 0.9, active: 0.5, fade: 0.2, style: 'column', layer: 'under', fired: false,
       get firing() { return this.t >= this.tele && this.t < this.tele + this.active; },

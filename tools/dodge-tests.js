@@ -17,7 +17,7 @@
   }
   window.hitLog = [];
 
-  function stage(phase, atk, px) {
+  function stage(phase, atk, px, prep) {
     // set window.TEST_HERO to 'vesper', 'aster' or 'lune' before running to test that hero
     G.run.reset(); if (window.TEST_HERO) G.run.hero = window.TEST_HERO;
     G.startFight(); G.debug.god = true; G.debug.sim(4.5);
@@ -27,14 +27,17 @@
       while (B.invuln && n < 100) { G.debug.sim(0.1); n++; }
     }
     if (px) P.x = px;
+    if (prep) prep();
+    // the same seed gives the same fight; set window.TEST_SEED to try another
+    G.seed((window.TEST_SEED || 1) * 7919 + phase * 31 + atk.length);
     B.forceNext = ''; G.debug.forceAttack = atk;
     let n = 0;
     while (B.attackName !== atk && n < 200) { G.debug.sim(0.05); n++; }
     G.debug.god = false;
   }
 
-  function run(label, phase, atk, px, policy) {
-    stage(phase, atk, px);
+  function run(label, phase, atk, px, policy, prep) {
+    stage(phase, atk, px, prep);
     window.hitLog = [];
     for (const a in I.down) I.down[a] = false;
     const hp0 = P.hp, st = {};
@@ -163,6 +166,115 @@
     const flat = G.hazards.list.find((b) => b.kind === 'beam' && b.t < b.tele + b.active && Math.abs(Math.sin(b.ang)) < 0.1 && b.t > b.tele - 0.2);
     if (flat && P.onGround) jump();
     if (!flat && P.onGround) I.down.jump = false;
+  }));
+
+  // ---- the attacks added in v0.4a
+  // Walk to the safest nearby spot when a danger point is close, and commit to it until it is reached.
+  function stepClear(st, xs, lo, hi, reach, mid, walls) {
+    if (st.goal != null) {
+      if (Math.abs(P.x - st.goal) < 8) st.goal = null;
+      else { hold(P.x > st.goal, P.x < st.goal); return; }
+    }
+    hold(0, 0);
+    if (!xs.some((dx) => Math.abs(P.x - dx) < reach)) return;
+    let best = P.x, bestD = -1e9;
+    for (let x = lo; x <= hi; x += 10) {
+      // never plan a walk that crosses an ember already on its way down
+      if (walls && walls.some((w) => Math.abs(P.x - w) > 30 && w > Math.min(P.x, x) - 30 && w < Math.max(P.x, x) + 30)) continue;
+      let d = 1e9;
+      for (const dx of xs) d = Math.min(d, Math.abs(x - dx));
+      // a spot that is properly clear always beats one that is not; after that, prefer the shorter walk
+      d = (d >= reach - 8 ? 1000 : 0) + Math.min(d, reach + 30) - Math.abs(x - P.x) * 0.25;
+      if (mid != null) d -= Math.abs(x - mid) * 0.12;         // and do not back into a corner
+      if (d > bestD) { bestD = d; best = x; }
+    }
+    st.goal = best;
+    hold(P.x > best, P.x < best);
+  }
+  function emberXs() { return G.hazards.list.filter((h) => h.kind === 'meteor').map((m) => m.x); }
+  function fallingXs() { return G.hazards.list.filter((h) => h.kind === 'meteor' && h.t >= h.tele).map((m) => m.x); }
+  // Where orbs will be when they reach the hero's height, if that is soon.
+  function incoming(window) {
+    const xs = [];
+    for (const o of G.hazards.list) {
+      if (o.kind !== 'orb' || o.vy <= 20) continue;
+      const ta = (P.y - 22 - o.y) / o.vy;
+      if (ta > -0.05 && ta < window) xs.push(o.x + o.vx * ta);
+    }
+    return xs;
+  }
+
+  out.push(run('flick: jump each orb as it arrives', 1, 'flick', 640, (t, st) => {
+    const o = G.hazards.list.find((h) => h.kind === 'orb' && G.dist(h.x, h.y, P.x, P.y - 22) < 190);
+    if (o && P.onGround) jump();
+    if (!o && P.onGround) I.down.jump = false;
+  }));
+  out.push(run('flick: keep walking', 1, 'flick', 400, (t, st) => {
+    const r = Math.floor(t / 1.5) % 2 === 0;
+    hold(!r, r);
+  }));
+  out.push(run('crossfire: jump the low beam, stay down for the high one', 1, 'crossfire', 640, (t, st) => {
+    const low = G.hazards.list.find((b) => b.kind === 'beam' && b.oy > G.FLOOR - 60 && b.t < b.tele && b.t > b.tele - 0.13);
+    if (low && P.onGround) jump();
+    if (!low && P.onGround) I.down.jump = false;
+  }));
+  out.push(run('fan: step into the gaps', 2, 'fan', 640, (t, st) => {
+    stepClear(st, incoming(0.75), 60, 1220, 52);
+  }));
+  out.push(run('fan: step into the gaps, starting off-centre', 2, 'fan', 380, (t, st) => {
+    stepClear(st, incoming(0.75), 60, 1220, 52);
+  }));
+  out.push(run('cage: dodge the embers inside', 2, 'cage', 640, (t, st) => {
+    const ms = G.hazards.list.filter((h) => h.kind === 'meteor').map((m) => m.x);
+    const lo = G.bounds ? G.bounds.l : 60, hi = G.bounds ? G.bounds.r : 1220;
+    stepClear(st, ms, lo, hi, 78, (lo + hi) / 2, fallingXs());
+  }));
+  out.push(run('swat: walk off the platform when it is marked', 2, 'swat', 300, (t, st) => {
+    const z = G.hazards.list.find((h) => h.kind === 'zone');
+    hold(0, !!z || P.x < 440 && st.go);
+    if (z) st.go = 1;
+  }, () => { const pl = G.arena.platforms[0]; P.x = 300; P.y = pl.y; P.plat = pl; P.onGround = true; P.vy = 0; B.campPlat = pl; }));
+  out.push(run('duet (slam and lance): dash out, keep moving, jump the wave', 2, 'duetSlam', 640, (t, st) => {
+    const m = mark();
+    if (m && m.locked && !st.d) { st.d = 1; I.pressed.dash = true; hold(1, 0); }
+    const b = G.hazards.list.find((h) => h.kind === 'beam');
+    if (st.d && P.dashT <= 0) hold(b && b.t < b.tele + b.active && P.x > 120, 0);
+    jumpWaves();
+  }));
+  out.push(run('duet (sweep and embers): double jump, drift off the markers', 2, 'duetSweep', 640, (t, st) => {
+    const lane = G.hazards.list.find((h) => h.kind === 'lane');
+    doubleJump(st, lane && lane.t / lane.dur > 0.8);
+    stepClear(st, G.hazards.list.filter((h) => h.kind === 'meteor').map((m) => m.x), 60, 1220, 90);
+  }));
+  out.push(run('halo: get under the core and stay there', 3, 'halo', 300, (t, st) => {
+    const c = B.core, dx = c.x - P.x;
+    hold(dx < -24, dx > 24);
+    // if the ring is live and the blades are between the hero and the core, dash through
+    if (B.haloHurt && Math.abs(dx) > 105 && Math.abs(dx) < 185 && P.dashCd <= 0 && P.dashT <= 0) I.pressed.dash = true;
+  }));
+  out.push(run('halo: stay outside and back away', 3, 'halo', 1150, (t, st) => {
+    const c = B.core, dx = P.x - c.x;
+    hold(dx < 0 && Math.abs(dx) < 330, dx >= 0 && Math.abs(dx) < 330);
+    if (B.haloHurt && Math.abs(dx) < 190 && P.dashCd <= 0 && P.dashT <= 0) { hold(dx >= 0, dx < 0); I.pressed.dash = true; }
+  }));
+  out.push(run('last stand: dash the rings and the beam, run from the collapse', 3, 'supernova', 420, (t, st) => {
+    hold(0, 0);
+    const c = B.core;
+    const r = G.hazards.list.find((h) => h.kind === 'ring' && !h._used);
+    if (r) {
+      const d = G.dist(P.x, P.y - 22, r.x, r.y) - r.r;
+      if (d < 55 && d > 0) { r._used = 1; hold(P.x > r.x, P.x <= r.x); I.pressed.dash = true; }
+    }
+    for (const b of G.hazards.list) {
+      if (b.kind !== 'beam' || !b.firing) continue;
+      const d = G.distPointSeg(P.x, P.y - 22, b.ox, b.oy, b.ex, b.ey);
+      if (d < 62 && P.dashCd <= 0 && P.dashT <= 0) { hold(b.spin < 0, b.spin > 0); I.pressed.dash = true; }
+    }
+    if (G.hazards.list.find((h) => h.kind === 'blast')) {
+      const away = P.x >= c.x;
+      hold(!away, away);
+      if (!st.d) { st.d = 1; I.pressed.dash = true; }
+    }
   }));
 
   G.debug.forceAttack = '';

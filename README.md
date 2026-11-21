@@ -2,7 +2,7 @@
 
 A side-on boss fight for the browser: three heroes, one three-phase boss, played as a run of
 ever-harder trials. You pick a hero and a relic before the run and win a boon after each victory.
-Version 0.3c.
+Version 0.4a.
 
 This is the first playable slice of a planned boss-rush roguelite (short runs, a boon after each
 boss, bosses drawn from a pool). There is one boss so far, so a run fights it again and again.
@@ -110,18 +110,35 @@ Every warning is drawn in the same red-orange. It fills up, flashes, then fires.
 | | Clap: both hands close on a marked column (2 damage) | leave the column on the flash, hit both stuck hands |
 | | Sun lance: a beam that tracks, locks, then fires | move once the line locks |
 | | Ember rain: marked meteors | step off the markers |
+| | Flick: a hand points and fires orbs at where you stand | step aside, jump them, or cut them down |
+| | Crossfire: one hand fires along the floor, then the other at jumping height | jump the first beam, be back on the ground for the second |
 | II Totality | Double slam, sweep there and back, triple lance, harder rain | as above, faster |
 | | Corona pulse: expanding rings | dash through each ring |
 | | Comb: alternating columns of light from above | shift one lane each volley |
 | | Rocket punch: a fist fired across at your height | jump over it, hit it while it is stuck in the wall |
 | | Burning floor: the floor ignites while a lance fires | get onto a platform |
+| | Fan: the core throws fans of orbs, each offset from the last | stand in a gap, or cut an orb down |
+| | Cage: both hands plant either side of you and embers fall inside | dodge inside, hit the planted hands; breaking one ends it |
+| | Duet: a hand and the core attack together (slam with a lance, or sweep with embers) | answer both at once |
+| | Swat: a fist knocks down the platform you are resting on | get off when it is marked; it comes back in about 6 s |
+| | Flick and Crossfire return | as above |
 | III Black Sun | Dive: the core drops on you (2 damage), waves and debris | dash out, jump the wave, stay close and punish |
 | | Shard storm: aimed lines, then one flat line | keep moving, jump the last one |
 | | Eclipse wheel: two beams turn through the arena | dash through each as it reaches you |
 | | Collapse: a pull towards the core, then a blast (2 damage) | run clear of the circle |
+| | Halo: the shards become a turning ring of blades around a low, slow core | slip inside the ring, where the core can be hit |
+| | Fan returns, faster | as above |
+| | Last Light: once, below 12% health: two rings, a half-turn of the wheel, then a collapse | each part as above; the core is spent afterwards |
 
 **Stagger:** hits fill the stagger bar under the boss's health (hands fill it fastest). When it fills, the
 core drops to the floor for a few seconds and takes extra damage. The core always takes 1.5x damage.
+
+**Breaking a hand:** each hand has its own health (7% of the boss's), shown as an arc round its sigil.
+Damage to a hand still hurts the boss. When a hand runs out it lies broken for 12 seconds: the attacks
+that need it are skipped, the boss takes 25% more damage from everything, and if it broke in the middle
+of its own attack that attack is cut short. Hands are made whole at each new phase.
+
+**Resting on a platform** for more than a couple of seconds in phase II brings the Swat.
 
 ## Difficulty
 
@@ -156,8 +173,10 @@ Most-used tuning numbers: `B.BASE_HP` and `B.poiseMax` in `boss.js`, `G.PLAYER` 
 Open the browser console on the running game.
 
 - **Dodge tests:** `fetch('/tools/dodge-tests.js').then(r => r.text()).then(t => console.log((0, eval)(t)))`
-  runs each attack against a simple scripted player and reports health lost. All 20 lose 0 health with each
-  hero as of v0.3c. Set `window.TEST_HERO = 'aster'` (or `'lune'`) first to test another hero.
+  runs each attack against a simple scripted player and reports health lost. There are 32 tests. As of
+  v0.4a all pass for every hero on five of six seeds; on seed 3 the scripted Lune walks into a second
+  ember in the rain. Set `window.TEST_HERO = 'aster'` (or `'lune'`) to test another hero and
+  `window.TEST_SEED = 2` for a different, repeatable set of boss choices.
   Run it after changing any attack.
 - `G.debug.god = true` makes the hero invulnerable. `G.debug.boxes = true` (or `?boxes` in the address)
   draws every hitbox.
