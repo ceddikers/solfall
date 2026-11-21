@@ -2,7 +2,7 @@
 
 A side-on boss fight for the browser: three heroes, one three-phase boss, played as a run of
 ever-harder trials. You pick a hero and a relic before the run and win a boon after each victory.
-Version 0.3b.
+Version 0.3c.
 
 This is the first playable slice of a planned boss-rush roguelite (short runs, a boon after each
 boss, bosses drawn from a pool). There is one boss so far, so a run fights it again and again.
@@ -157,7 +157,7 @@ Open the browser console on the running game.
 
 - **Dodge tests:** `fetch('/tools/dodge-tests.js').then(r => r.text()).then(t => console.log((0, eval)(t)))`
   runs each attack against a simple scripted player and reports health lost. All 20 lose 0 health with each
-  hero as of v0.3b. Set `window.TEST_HERO = 'aster'` (or `'lune'`) first to test another hero.
+  hero as of v0.3c. Set `window.TEST_HERO = 'aster'` (or `'lune'`) first to test another hero.
   Run it after changing any attack.
 - `G.debug.god = true` makes the hero invulnerable. `G.debug.boxes = true` (or `?boxes` in the address)
   draws every hitbox.

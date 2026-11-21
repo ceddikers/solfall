@@ -312,6 +312,10 @@
 
   U.update = function (dt) {
     const P = G.player, B = G.boss;
+    // the portraits on the hero screen are alive
+    if (U.current === 'hero') {
+      Array.from(el.heroCards.children).forEach((c, i) => G.drawHeroPortrait(c.querySelector('canvas'), G.HEROES[i]));
+    }
     if (H.hintT > 0) { H.hintT -= dt; if (H.hintT <= 0) el.hint.classList.remove('show'); }
     if (el.hud.classList.contains('off')) return;
 
