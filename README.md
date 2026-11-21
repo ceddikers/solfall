@@ -2,7 +2,7 @@
 
 A side-on boss rush for the browser: three heroes, four three-phase bosses, played as a run of
 ever-harder trials. You pick a hero and a relic before the run and win a boon after each victory.
-Version 0.6a.
+Version 0.7a.
 
 This is an early slice of a planned boss-rush roguelite (short runs, a boon after each boss,
 bosses drawn from a pool). A run meets the four bosses in a shuffled order, then meets them again, harder.
@@ -27,9 +27,10 @@ then open http://localhost:8321. There is no build step and no dependency.
 | Jump, double jump | Space or Z | A |
 | Attack | J or X, or left click (towards the cursor) | X |
 | Aim an attack up or down | hold W / S or up / down | stick |
-| Dash (passes through attacks) | K or C or Shift | B, RB or RT |
+| Dash (passes through attacks) | K or C or Shift | B or RB |
 | Special (costs one Starlight segment) | L or V, or right click (at the cursor) | Y |
 | Mend one health (costs one segment) | hold E or F while standing | LB or LT |
+| Dawnbreak (when its bar is full) | Q or I, or middle click | RT |
 | Drop through a platform | S + Space | down + A |
 | Pause | Esc or P | Start |
 | Retry (works the moment you fall) | R | |
@@ -59,7 +60,7 @@ Heroes are defined in `G.HEROES` in `js/run.js` (numbers, colours, text); the we
 
 ## The run
 
-- A run starts by choosing a **hero**, then **one of three relics** drawn from nine. The relic lasts the whole run.
+- A run starts by choosing a **hero**, then **one of three relics** drawn from nine (up to thirteen once trophies are won). The relic lasts the whole run.
 - Each trial is one boss. The four come in a shuffled order, and when all are beaten the order is
   shuffled again. **First foe** on the title screen fixes who comes first (handy for practising one boss).
 - Beating a boss offers **three boons; you keep one** and go straight into the next trial. The victory
@@ -67,6 +68,72 @@ Heroes are defined in `G.HEROES` in `js/run.js` (numbers, colours, text); the we
 - Each trial after the first gives the boss 15% more health, 4% shorter warnings and 6% less rest.
   From trial V (the second time round) the bosses also use their Merciless patterns.
 - Health is restored between trials. Falling ends the run; the title screen shows the deepest trial reached.
+- From trial II each trial carries an **omen** (two from trial VI), shown at the top right of the fight.
+- Every fight pays **Sunshards**, which buy permanent upgrades at the **Shrine** on the title screen.
+
+## Flow and Dawnbreak (new in v0.7a)
+
+- **Flow** is a rank shown under the timer: C, B, A, S, SS. It climbs with every hit, cut-down orb and
+  perfect dodge, runs down after 2.2 seconds without one, and loses two thirds when you are hit. Each
+  rank adds 3% damage and 2 Sunshards at the end of the fight (counted from the highest rank reached),
+  and from rank A light lifts off the hero.
+- **Dawnbreak** is each hero's ultimate. Its bar (under Starlight) fills from damage dealt and a little
+  from perfect dodges, and carries over between trials. When it is full, one press spends it. While it
+  plays you cannot be hurt, and the boss and everything it has thrown run at a twentieth of their speed.
+  It cannot be started while the boss cannot be hit.
+
+| Hero | Dawnbreak | What it does |
+|---|---|---|
+| Vesper | Thousand Stars | she vanishes; eight cuts of 20 from every side, then a cross-cut of 80 |
+| Aster | Worldbreaker | she rises and comes down for 250, 110 to anything else the boss has out, and everything that can be cut out of the air is destroyed |
+| Lune | Moonfall | one arrow into the sky; twelve fall on the boss for 15 each, then a beam of 70 |
+
+The last blow of each fills the stagger bar like a Star Lance. When a boss falls, a finishing cut crosses the screen.
+Numbers are in `js/flow.js`.
+
+## Omens (new in v0.7a)
+
+| Omen | What changes |
+|---|---|
+| Stormfront | lightning strikes the column you stand in, every 5.6 seconds |
+| Emberfall | a burning stone falls somewhere near you, every 3.4 seconds |
+| Hunted | a slow wisp follows you; cut it down or let it hit you and it returns 7 seconds later |
+| Frenzy | the boss rests a quarter less between attacks |
+| Bulwark | the boss has a fifth more health and its staggers are 0.8 seconds shorter |
+
+An omen is never repeated in the next trial, and each one adds 25% to that trial's Sunshards. Lightning
+and stones are only called down in the rests between the boss's attacks, with their own 1.1 second
+warning, so they land while the next attack is still being shown. Defined in `js/omens.js`.
+
+## Sunshards, the Shrine and trophies (new in v0.7a)
+
+- **Earning:** a victory pays 12 Sunshards, plus 5 for each trial before it, times 1.1 to 1.5 for the
+  grade, plus the Flow bonus; then 0.75 on Gentle or 1.4 on Merciless, plus the omen and Prospector bonuses. The first
+  victory over each boss pays 25 more. A defeat pays a share for the health taken off the boss.
+- **The Shrine** (title screen) sells permanent upgrades:
+
+| Upgrade | Ranks | Cost per rank | Each rank gives |
+|---|---|---|---|
+| Vigor | 2 | 60, 160 | +1 health |
+| Whetstone | 5 | 20, 35, 55, 80, 110 | +4% damage |
+| Kindling | 2 | 25, 60 | each trial starts with 40% of a Starlight segment |
+| Momentum | 3 | 30, 55, 90 | Dawnbreak charges 12% faster |
+| Fourth Relic | 1 | 90 | four relics to choose from |
+| Fourth Boon | 1 | 120 | four boons to choose from |
+| Second Thoughts | 2 | 50, 110 | one redraw of the boons on offer per run |
+| Prospector | 3 | 30, 60, 100 | +10% Sunshards |
+
+- **Trophies:** the first victory over each boss adds its relic to the pool for every later run.
+
+| Boss | Trophy relic | Effect |
+|---|---|---|
+| The Warden | Eclipse Eye | hits on a staggered boss deal 30% more |
+| The Magus | Magus's Prism | your special deals 40% more |
+| The Veil | Silent Shroud | after a perfect dodge, everything you do deals 50% more for 3 seconds |
+| The Knight | Unburied Oath | on your last point of health, everything you do deals 50% more |
+
+All of this is kept in the browser's storage under `solfall.meta`, so it belongs to one browser on one
+machine; clearing site data resets it. Defined in `js/meta.js`.
 
 | Relic | Effect |
 |---|---|
@@ -253,6 +320,9 @@ To use these in a new attack, call the ready-made mixes in `js/fx.js`: `G.fx.hit
 | `index.html`, `css/style.css` | page, menus and in-fight display |
 | `js/util.js` | constants, maths, seedable randomness, saved settings, difficulty table (`G.DIFFS`) |
 | `js/run.js` | the run: heroes, relics, boons, offers, how each trial scales the boss |
+| `js/meta.js` | what lasts between runs: Sunshards, the Shrine (`G.SHRINE`), trophy relics |
+| `js/flow.js` | the Flow rank and each hero's Dawnbreak |
+| `js/omens.js` | the omens (`G.OMENS`) and what each one does during a fight |
 | `js/input.js` | keyboard, mouse and gamepad mapped to actions |
 | `js/audio.js` | every sound and the music, synthesised in code (no audio files) |
 | `js/fx.js` | particles, smoke, shards, cut marks, floor cracks and scorch marks, screen shake and kick, flashes, hit-freeze, slow motion |
@@ -287,6 +357,11 @@ Open the browser console on the running game.
 - `G.debug.god = true` makes the hero invulnerable. `G.debug.boxes = true` (or `?boxes` in the address)
   draws every hitbox.
 - `G.debug.boss = 'knight'` makes every fight that boss (`'warden'`, `'mage'`, `'assassin'`, `'knight'`; `''` to stop).
+- `G.debug.omen = 'storm'` forces omens on every fight, the first trial included (`'storm,hunted'` for two; `''` to stop).
+  With `G.debug.freeze` on, a forced omen starts at once, so the boss tests run with it on top of every attack.
+- Tests and god mode earn no Sunshards. `G.debug.meta = true` lets them, for checking the rewards;
+  remove `solfall.meta` from the browser's storage afterwards.
+- `G.player.ult = 100` fills the Dawnbreak bar.
 - `G.debug.forceAttack = 'wheel'` repeats one attack (names are the keys of `G.boss.ATTACKS`;
   use one that belongs to the current phase). `G.debug.nextPhase()` skips to the next phase.
 - `G.debug.sim(10, { random: true })` runs ten simulated seconds with random inputs, to shake out errors.
@@ -311,4 +386,13 @@ Open the browser console on the running game.
   Boss health, hero balance, relic and boon strength and the per-trial scaling are first guesses.
 - **Fastest first trial** on the title screen compares times against whichever boss came first, so it is
   only a fair record when First foe is set to one boss.
+- **Nothing in v0.7a has been played.** The Dawnbreaks, the Shrine, the reward screens and each omen
+  were run and looked at in captures, and the numbers above were checked in the running game. Whether
+  Flow climbs at a satisfying rate, how often Dawnbreak fills in a real fight (the aim was two to four
+  times), and whether Sunshard prices are fair are first guesses.
+- **Omens make fights harder than the tests show.** With no omen the boss tests still lose no health.
+  With Stormfront or Emberfall forced on top of every single attack, the same scripted player loses 4
+  to 6 health in 134 runs, mostly in the Knight's Charge and Grip and wherever it steps into a stone
+  while dodging something else. In a real fight an omen strikes far less often than that. Hunted lost
+  none. Frenzy lost 2 in 134 (the Magus's burning ground).
 - **Gamepad support is untested** (no pad was available).

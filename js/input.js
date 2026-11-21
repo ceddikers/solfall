@@ -11,6 +11,7 @@
     dash: ['KeyK', 'KeyC', 'ShiftLeft', 'ShiftRight'],
     flare: ['KeyL', 'KeyV'],
     heal: ['KeyE', 'KeyF'],
+    ult: ['KeyQ', 'KeyI'],
     pause: ['Escape', 'KeyP'],
     retry: ['KeyR'],
     confirm: ['Enter', 'NumpadEnter'],
@@ -87,10 +88,12 @@
       if (I.mouseBlocked && I.mouseBlocked()) return;
       if (e.button === 0) { I.aim.attack = true; I.device = 'keyboard'; press('attack', 'Mouse0'); e.preventDefault(); }
       if (e.button === 2) { I.aim.flare = true; I.device = 'keyboard'; press('flare', 'Mouse2'); e.preventDefault(); }
+      if (e.button === 1) { I.device = 'keyboard'; press('ult', 'Mouse1'); e.preventDefault(); } // middle click
     });
     window.addEventListener('mouseup', (e) => {
       if (e.button === 0) release('attack', 'Mouse0');
       if (e.button === 2) release('flare', 'Mouse2');
+      if (e.button === 1) release('ult', 'Mouse1');
     });
     window.addEventListener('contextmenu', (e) => e.preventDefault());
   };
@@ -103,7 +106,8 @@
     down: (g) => g.axes[1] > 0.55 || btn(g, 13),
     jump: (g) => btn(g, 0),
     attack: (g) => btn(g, 2),
-    dash: (g) => btn(g, 1) || btn(g, 5) || btn(g, 7),
+    dash: (g) => btn(g, 1) || btn(g, 5),
+    ult: (g) => btn(g, 7),
     flare: (g) => btn(g, 3),
     heal: (g) => btn(g, 4) || btn(g, 6),
     pause: (g) => btn(g, 9),

@@ -267,6 +267,24 @@
         tone({ type: 'triangle', f0: mtof(m), dur: 1.6, vol: 0.14, delay: 0.1 + i * 0.13 }));
       tone({ type: 'sine', f0: mtof(38), dur: 2.6, vol: 0.3, delay: 0.1 });
     },
+    // ---- Flow, Dawnbreak and the finishing blow
+    rank(o) {
+      const f = 660 * Math.pow(2, ((o.n || 1) - 1) * 2 / 12);
+      tone({ type: 'triangle', f0: f, dur: 0.12, vol: 0.1 });
+      tone({ type: 'triangle', f0: f * 1.5, dur: 0.18, vol: 0.09, delay: 0.07 });
+    },
+    ultReady() { [880, 1320, 1760].forEach((f, i) => tone({ f0: f, dur: 0.4, vol: 0.11, delay: i * 0.07 })); },
+    ult() {
+      tone({ type: 'sawtooth', f0: 110, f1: 880, dur: 0.35, vol: 0.2 });
+      noise({ dur: 0.5, vol: 0.4, f0: 600, f1: 7000, q: 0.7 });
+      tone({ type: 'sine', f0: 80, f1: 40, dur: 0.6, vol: 0.5 });
+      [523, 784, 1047].forEach((f, i) => tone({ type: 'triangle', f0: f, dur: 0.7, vol: 0.1, delay: 0.05 + i * 0.04 }));
+    },
+    finish() {
+      noise({ dur: 0.35, vol: 0.5, f0: 900, f1: 8000, q: 0.6 });
+      tone({ type: 'triangle', f0: 1760, f1: 440, dur: 0.5, vol: 0.14 });
+      tone({ type: 'sine', f0: 70, f1: 30, dur: 0.7, vol: 0.6 });
+    },
     // ---- interface
     uiMove() { tone({ f0: 520, dur: 0.05, vol: 0.07 }); },
     uiSelect() { tone({ f0: 660, f1: 990, dur: 0.1, vol: 0.11 }); },

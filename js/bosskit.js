@@ -109,13 +109,13 @@
       if (t.kind === 'extra') return t.ref.onHit(amount, info, t);
       if (B.blocked && B.blocked(t, info)) return false;
       const b = B.body;
-      let mult = B.staggered ? 1.4 : 1;
+      let mult = B.staggered ? (G.relic('eye') ? 1.82 : 1.4) : 1;
       if (b.exposed) mult *= 1.3;
       if (B.vuln) mult *= B.vuln(t, info);
       const dmg = Math.round(amount * mult);
       const floorHp = B.phase === 1 ? Math.floor(B.maxHp * 2 / 3) : B.phase === 2 ? Math.floor(B.maxHp / 3) : 0;
       B.hp = Math.max(floorHp, B.hp - dmg);
-      G.player.stats.dmg += dmg;
+      G.player.stats.dmg += dmg; G.flow.dealt(dmg);
       b.flash = 1;
       b.kx = G.clamp(b.kx + (info.dir || G.sign(b.x - G.player.x) || 1) * (info.lance ? 14 : info.heavy ? 10 : 5), -18, 18);
       if (G.settings.numbers) {

@@ -162,9 +162,9 @@
   };
 
   // The bright line a blade leaves where it lands.
-  F.cut = function (x, y, ang, len, w, color, hot) {
-    if (F.cuts.length > 30) F.cuts.shift();
-    F.cuts.push({ x, y, ang, len, w, color, hot: hot || G.COL.white, life: 0.2, max: 0.2 });
+  F.cut = function (x, y, ang, len, w, color, hot, life) {
+    if (F.cuts.length > 40) F.cuts.shift();
+    F.cuts.push({ x, y, ang, len, w, color, hot: hot || G.COL.white, life: life || 0.2, max: life || 0.2 });
   };
 
   // ------------------------------------------------------------------ marks left on the floor

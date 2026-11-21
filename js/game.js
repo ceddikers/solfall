@@ -11,7 +11,8 @@
   G.time = 0;          // fight timer
   G.hitstop = 0; G.slowT = 0; G.slowScale = 1;
   G.deadT = 0; G.wonT = 0; G.endShown = false;
-  G.debug = { god: false, boxes: false, forceAttack: '', freeze: false, boss: '' }; // boss: fight this one whatever the run says
+  // boss: fight this one whatever the run says. omen: force these omens ('storm', 'storm,hunted'). meta: earn Sunshards even in tests.
+  G.debug = { god: false, boxes: false, forceAttack: '', freeze: false, boss: '', omen: '', meta: false };
   G.cam = { x: 0, y: 0 }; // small view offset that follows the hero
 
   G.canHurt = () => G.state === 'fight' && !G.player.dead && !G.boss.dying && !G.boss.dead;
@@ -51,14 +52,16 @@
   };
   // Straight into a fight with no relic (used by tests and the console).
   G.startRun = function () { G.run.reset(); G.startFight(); };
-  G.nextTrial = function () { G.run.trial++; G.startFight(); };
+  G.nextTrial = function () { G.run.ult = G.player.ult || 0; G.run.trial++; G.startFight(); }; // the Dawnbreak meter carries over
+  G.rerollBoons = function () { if (G.run.reroll()) { G.audio.play('uiSelect'); G.ui.fillBoons(); } else G.audio.play('empty'); };
   G.takeBoon = function (i) { G.run.take(i); G.nextTrial(); };
 
   G.startFight = function () {
     G.seed((Date.now() ^ (Math.random() * 1e9)) >>> 0);
     G.setBoss(G.debug.boss || G.run.foe());
+    G.run.rollOmens(); // before the boss works out its health
     G.arena.reset(); G.hazards.clear(); F.reset();
-    G.player.reset(); G.boss.reset(); G.boss.intro();
+    G.player.reset(); G.flow.reset(); G.boss.reset(); G.boss.intro();
     G.state = 'fight'; G.paused = false;
     G.time = 0; G.hitstop = 0; G.slowT = 0; G.deadT = 0; G.wonT = 0; G.endShown = false;
     G.ui.close(); G.ui.resetHud(); G.ui.buildHp(G.player.maxHp); G.ui.buildRun(); G.ui.bossIntro(); G.ui.hud(true); G.ui.keysHint();
@@ -71,7 +74,7 @@
     G.run.reset();
     G.setBoss('warden');
     G.arena.reset(); G.hazards.clear(); F.reset();
-    G.player.reset(); G.player.hidden = true;
+    G.player.reset(); G.flow.reset(); G.player.hidden = true;
     G.boss.attract();
     G.state = 'title'; G.paused = false; G.hitstop = 0; G.slowT = 0;
     G.ui.resetHud(); G.ui.hud(false); G.ui.close(); G.ui.show('title');
@@ -95,12 +98,20 @@
 
   G.onPlayerDeath = function () {
     G.state = 'dead'; G.deadT = 0;
+    G.lastShards = G.meta.onDefeat();
     G.ui.letterbox(false); G.ui.mood('dead');
     G.audio.duck(0.35);
   };
   G.onBossDying = function () {
     G.ui.hud(false);
     G.audio.duck(0.2);
+    // the finishing blow: one long cut through the boss, in the hero's light
+    const c = G.boss.core, H = G.hero(), a = G.rand(-0.5, 0.5) + (G.player.x > c.x ? Math.PI : 0);
+    F.cut(c.x, c.y, a, 1500, 11, '255,214,140', H.hot, 0.6);
+    F.cut(c.x, c.y, a, 1500, 30, H.col, H.hot, 0.32);
+    F.lines(c.x, c.y, 22, H.hot, { r0: 50, speed: [800, 1500] });
+    F.punch(0.07); F.kick(Math.cos(a) * 14, Math.sin(a) * 14);
+    G.audio.play('finish');
   };
   G.onBossDead = function () { G.state = 'won'; G.wonT = 0; };
 
@@ -117,7 +128,7 @@
     const depth = G.store.load('depth', {});
     const newDepth = !depth[d] || trial > depth[d];
     if (newDepth) { depth[d] = trial; G.store.save('depth', depth); }
-    return { grade, title, newBest, best: best[d], trial, newDepth, offer: G.run.rollOffer() };
+    return { grade, title, newBest, best: best[d], trial, newDepth, offer: G.run.rollOffer(), meta: G.meta.onVictory(grade, G.boss.id) };
   }
 
   function onAction(a) {
@@ -142,8 +153,12 @@
     G.arena.update(sdt);
     G.player.update(sdt);
     G.input.endStep();
-    G.boss.update(sdt);
-    G.hazards.update(sdt);
+    // while a Dawnbreak plays, the boss and everything it has thrown all but stand still
+    const bdt = G.player.ulting ? sdt * G.flow.SLOW : sdt;
+    G.boss.update(bdt);
+    G.hazards.update(bdt);
+    G.omens.update(sdt);
+    G.flow.update(sdt);
     G.updateShots(sdt);
     F.update(sdt);
     // the view leans a little towards the hero
@@ -176,6 +191,7 @@
     ctx.scale(z, z);
     ctx.translate(-G.W / 2 - G.cam.x, -G.H / 2 - G.cam.y);
     G.arena.drawBack(ctx);
+    G.flow.drawVeil(ctx);
     F.drawDecals(ctx);
     G.boss.drawGround(ctx);
     G.player.drawShadow(ctx);
@@ -225,7 +241,7 @@
   // G.debug.sim(10, { random: true }) runs ten simulated seconds with random inputs.
   G.debug.sim = function (sec, opts) {
     opts = opts || {};
-    const I = G.input, acts = ['left', 'right', 'up', 'down', 'jump', 'attack', 'dash', 'flare', 'heal'];
+    const I = G.input, acts = ['left', 'right', 'up', 'down', 'jump', 'attack', 'dash', 'flare', 'heal', 'ult'];
     const n = Math.round(sec / STEP);
     for (let i = 0; i < n; i++) {
       if (opts.random && i % 10 === 0) {

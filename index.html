@@ -23,10 +23,13 @@
         <div class="seg"><i></i></div><div class="seg"><i></i></div><div class="seg"><i></i></div>
         <span class="elabel">STARLIGHT</span>
       </div>
+      <div id="ult"><div class="ubar"><i id="ultFill"></i></div><span class="elabel">DAWNBREAK</span><span id="ultKey"></span></div>
       <div id="mend"></div>
       <div id="boons"></div>
     </div>
     <div id="timer">0:00.0</div>
+    <div id="flow"><b id="flowRank"></b><div class="fbar"><i id="flowFill"></i></div><span class="flabel">FLOW</span></div>
+    <div id="omen"></div>
     <div id="bhud">
       <div class="brow">
         <span class="bname"><span id="bname">THE ECLIPSED WARDEN </span><i id="trial"></i></span>
@@ -54,6 +57,7 @@
           <div class="item" data-act="begin">Begin</div>
           <div class="item opt" data-opt="difficulty"><span class="k">Difficulty</span><span class="v"></span></div>
           <div class="item opt" data-opt="firstFoe"><span class="k">First foe</span><span class="v"></span></div>
+          <div class="item" data-act="shrine">Shrine <span id="shardCount"></span></div>
           <div class="item" data-act="how">How to play</div>
           <div class="item" data-act="settings">Settings</div>
         </nav>
@@ -83,8 +87,29 @@
           <div class="item card t-relic" data-act="relic0"><span class="ctag">Relic</span><b class="cname"></b><span class="cdesc"></span></div>
           <div class="item card t-relic" data-act="relic1"><span class="ctag">Relic</span><b class="cname"></b><span class="cdesc"></span></div>
           <div class="item card t-relic" data-act="relic2"><span class="ctag">Relic</span><b class="cname"></b><span class="cdesc"></span></div>
+          <div class="item card t-relic" data-act="relic3"><span class="ctag">Relic</span><b class="cname"></b><span class="cdesc"></span></div>
         </nav>
         <nav class="row"><div class="item" data-act="back">Back to heroes</div></nav>
+      </div>
+    </section>
+
+    <section id="s-shrine" class="screen panelscreen">
+      <div class="panel shrine">
+        <p class="over" id="shrineOver">Sunshards</p>
+        <h2>The Shrine</h2>
+        <p class="lead" id="shrineLead"></p>
+        <nav id="shrineList">
+          <div class="item up" data-act="shrine0"><b class="uname"></b><span class="upips"></span><span class="udesc"></span><span class="ucost"></span></div>
+          <div class="item up" data-act="shrine1"><b class="uname"></b><span class="upips"></span><span class="udesc"></span><span class="ucost"></span></div>
+          <div class="item up" data-act="shrine2"><b class="uname"></b><span class="upips"></span><span class="udesc"></span><span class="ucost"></span></div>
+          <div class="item up" data-act="shrine3"><b class="uname"></b><span class="upips"></span><span class="udesc"></span><span class="ucost"></span></div>
+          <div class="item up" data-act="shrine4"><b class="uname"></b><span class="upips"></span><span class="udesc"></span><span class="ucost"></span></div>
+          <div class="item up" data-act="shrine5"><b class="uname"></b><span class="upips"></span><span class="udesc"></span><span class="ucost"></span></div>
+          <div class="item up" data-act="shrine6"><b class="uname"></b><span class="upips"></span><span class="udesc"></span><span class="ucost"></span></div>
+          <div class="item up" data-act="shrine7"><b class="uname"></b><span class="upips"></span><span class="udesc"></span><span class="ucost"></span></div>
+        </nav>
+        <p class="tip" id="shrineTrophies"></p>
+        <nav class="row"><div class="item" data-act="back">Back</div></nav>
       </div>
     </section>
 
@@ -102,10 +127,11 @@
               <tr><td>Dash</td><td><kbd>K</kbd> or <kbd>C</kbd> or <kbd>Shift</kbd></td></tr>
               <tr><td>Special</td><td><kbd>L</kbd> or <kbd>V</kbd>, or right click (at the cursor)</td></tr>
               <tr><td>Mend</td><td>hold <kbd>E</kbd> or <kbd>F</kbd></td></tr>
+              <tr><td>Dawnbreak</td><td><kbd>Q</kbd> or <kbd>I</kbd>, or middle click, when its bar is full</td></tr>
               <tr><td>Drop through a platform</td><td><kbd>S</kbd> + <kbd>Space</kbd></td></tr>
               <tr><td>Pause</td><td><kbd>Esc</kbd> or <kbd>P</kbd></td></tr>
             </table>
-            <p class="small">Gamepad: stick to move, A jump, X attack, B or RB dash, Y special, LB mend.</p>
+            <p class="small">Gamepad: stick to move, A jump, X attack, B or RB dash, Y special, LB mend, RT Dawnbreak.</p>
           </div>
           <div>
             <h3>Reading the fight</h3>
@@ -117,7 +143,9 @@
               <li><b>With the sword or maul, strike downward in the air</b> to bounce off a boss and get your jump and dash back.</li>
               <li><b>Fill the stagger bar</b> under a boss's health and it is helpless for a few seconds, taking extra damage.</li>
               <li><b>Every boss is open after its big attacks:</b> a stuck fist, a blade in the floor, a caster mid-spell. That is when to strike.</li>
-              <li><b>A run starts with a hero and one of three relics.</b> Each trial is one of four bosses; each victory grants a boon and leads to a harder trial. Falling ends the run.</li>
+              <li><b>Dawnbreak</b> fills as you deal damage. When the bar is full, one press unleashes your hero's greatest blow, and nothing can touch you while it plays.</li>
+              <li><b>Flow</b> climbs from C to SS while you keep hitting and dodging, and falls when you are hit. Each rank adds 3% damage.</li>
+              <li><b>A run starts with a hero and a relic.</b> Each victory grants a boon and a harder trial; later trials carry an omen that changes the rules. Sunshards from every fight buy lasting upgrades at the Shrine.</li>
             </ul>
           </div>
         </div>
@@ -183,8 +211,10 @@
           <div class="item card" data-act="boon0"><span class="ctag"></span><b class="cname"></b><span class="cdesc"></span></div>
           <div class="item card" data-act="boon1"><span class="ctag"></span><b class="cname"></b><span class="cdesc"></span></div>
           <div class="item card" data-act="boon2"><span class="ctag"></span><b class="cname"></b><span class="cdesc"></span></div>
+          <div class="item card" data-act="boon3"><span class="ctag"></span><b class="cname"></b><span class="cdesc"></span></div>
         </nav>
         <nav class="row">
+          <div class="item" data-act="reroll" id="rerollItem">Redraw boons</div>
           <div class="item" data-act="endrun">End the run here</div>
         </nav>
       </div>
@@ -195,6 +225,7 @@
 
 <script src="js/util.js"></script>
 <script src="js/run.js"></script>
+<script src="js/meta.js"></script>
 <script src="js/input.js"></script>
 <script src="js/audio.js"></script>
 <script src="js/fx.js"></script>
@@ -202,11 +233,13 @@
 <script src="js/arena.js"></script>
 <script src="js/hazards.js"></script>
 <script src="js/player.js"></script>
+<script src="js/flow.js"></script>
 <script src="js/boss.js"></script>
 <script src="js/bosskit.js"></script>
 <script src="js/mage.js"></script>
 <script src="js/assassin.js"></script>
 <script src="js/knight.js"></script>
+<script src="js/omens.js"></script>
 <script src="js/ui.js"></script>
 <script src="js/game.js"></script>
 </body>

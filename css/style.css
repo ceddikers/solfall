@@ -190,7 +190,7 @@ kbd {
   position: absolute; inset: 0;
   background: linear-gradient(180deg, rgba(4, 3, 10, 0.3) 0%, rgba(4, 3, 10, 0.12) 34%, rgba(4, 3, 10, 0.8) 66%, rgba(4, 3, 10, 0.96) 100%);
 }
-.titleblock { position: absolute; left: 0; right: 0; top: 322px; text-align: center; }
+.titleblock { position: absolute; left: 0; right: 0; top: 298px; text-align: center; }
 .titleblock h1 {
   margin: 0; font: 400 88px/1.08 var(--display); letter-spacing: 0.4em; padding-left: 0.4em;
   background: linear-gradient(180deg, #fff 18%, #ffd9a0 58%, #ff9a4a 100%);
@@ -347,3 +347,55 @@ ul.tips b { color: var(--ink); font-weight: 600; }
 .herocard .hhp { margin-top: auto; font-size: 10.5px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--tagc); }
 .herocard.focus .hlines { color: var(--ink); }
 #relicCards .card { min-height: 150px; }
+
+/* ---------------------------------------------------------------- Dawnbreak, Flow, omens */
+#ult { display: flex; align-items: center; gap: 5px; margin-top: 8px; }
+.ubar { width: 166px; height: 7px; transform: skewX(-20deg); overflow: hidden; background: rgba(0, 0, 0, 0.5); border: 1px solid rgba(255, 214, 140, 0.4); }
+.ubar i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #c8782a, var(--gold)); }
+#ultKey { margin-left: 4px; font-size: 11px; letter-spacing: 0.08em; color: var(--gold); opacity: 0; transition: opacity 0.2s; }
+#ult.ready .ubar { border-color: #fff; animation: ultready 0.9s ease-in-out infinite; }
+#ult.ready .ubar i { background: linear-gradient(90deg, var(--gold), #fff); }
+#ult.ready .elabel { color: var(--gold); }
+#ult.ready #ultKey { opacity: 1; }
+@keyframes ultready { 0%, 100% { box-shadow: 0 0 6px rgba(255, 214, 140, 0.6); } 50% { box-shadow: 0 0 18px rgba(255, 214, 140, 1); } }
+
+#flow { position: absolute; right: 58px; top: 58px; display: flex; align-items: center; gap: 9px; opacity: 0; transition: opacity 0.4s; }
+#flow.on { opacity: 1; }
+#flowRank {
+  min-width: 44px; text-align: right; font: 400 40px/1 var(--display); color: var(--fcol, #fff);
+  text-shadow: 0 0 16px var(--fcol, #fff), 0 2px 6px #000; transform-origin: 100% 50%;
+}
+#flowRank.pop { animation: flowpop 0.4s ease-out; }
+@keyframes flowpop { 0% { transform: scale(2); filter: brightness(2); } 100% { transform: scale(1); } }
+.fbar { width: 96px; height: 5px; background: rgba(0, 0, 0, 0.55); border: 1px solid rgba(255, 255, 255, 0.26); }
+.fbar i { display: block; height: 100%; width: 0; background: var(--fcol, #fff); box-shadow: 0 0 8px var(--fcol, #fff); }
+.flabel { font-size: 10px; letter-spacing: 0.3em; color: var(--dim); }
+#flow.r1 { --fcol: #9fb4c8; } #flow.r2 { --fcol: #96e1ff; } #flow.r3 { --fcol: #8cf5b9; } #flow.r4 { --fcol: #ffd68c; } #flow.r5 { --fcol: #ff9a4a; }
+
+#omen { position: absolute; right: 58px; top: 112px; max-width: 300px; text-align: right; font-size: 12px; line-height: 1.5; color: var(--dim); text-shadow: 0 1px 4px #000; }
+#omen b { display: block; font-weight: 600; font-size: 11px; letter-spacing: 0.3em; text-transform: uppercase; color: var(--danger); }
+
+/* ---------------------------------------------------------------- the Shrine */
+#shardCount { margin-left: 10px; color: var(--gold); letter-spacing: 0.1em; }
+.panel.shrine { width: 860px; padding-bottom: 22px; }
+.panel.shrine .over { color: var(--gold); text-align: center; }
+.panel.shrine h2 { margin-bottom: 8px; }
+.panel.shrine .lead { text-align: center; margin-bottom: 14px; }
+.panel.shrine .tip { text-align: center; margin-top: 12px; }
+.panel nav .item.up {
+  display: grid; grid-template-columns: 190px 92px 1fr 84px; align-items: center; gap: 12px;
+  padding: 7px 30px; text-align: left; text-transform: none; letter-spacing: 0.02em; font-size: 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+.item.up .uname { font: 400 18px var(--display); letter-spacing: 0.08em; color: var(--ink); }
+.item.up .upips { display: flex; gap: 5px; }
+.item.up .upips i { width: 9px; height: 9px; transform: rotate(45deg); border: 1px solid rgba(255, 214, 140, 0.6); }
+.item.up .upips i.on { background: var(--gold); box-shadow: 0 0 7px var(--gold); }
+.item.up .udesc { color: var(--dim); white-space: normal; line-height: 1.35; }
+.item.up .ucost { text-align: right; color: var(--gold); font-variant-numeric: tabular-nums; letter-spacing: 0.06em; }
+.item.up.poor .ucost { color: var(--faint); }
+.item.up.max .ucost { color: var(--star); }
+.item.up.bought { animation: bought 0.4s ease-out; }
+@keyframes bought { 0% { background: rgba(255, 214, 140, 0.3); } 100% { background: transparent; } }
+.stats .n.gold { color: var(--gold); }
+#winCards .card { min-width: 0; }

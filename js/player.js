@@ -30,7 +30,7 @@
   P.reset = function () {
     H = G.hero(); STAR = H.col; HOT = H.hot;
     // the hero, the relic and the boons taken this run set these
-    const hp = Math.max(1, G.diff().hp + H.hp + G.boon('heart') - G.boon('glass') - (G.relic('crown') ? 2 : 0));
+    const hp = Math.max(1, G.diff().hp + H.hp + G.boon('heart') + G.up('vigor') - G.boon('glass') - (G.relic('crown') ? 2 : 0));
     const maxAir = H.air + G.boon('wind') + (G.relic('cloak') ? 1 : 0), maxDash = 1 + G.boon('twin');
     const segs = C.SEGS + G.boon('fourth') + (G.relic('moons') ? 1 : 0);
     Object.assign(P, {
@@ -47,10 +47,11 @@
       jumpBuf: 0, atkBuf: 0, dashBuf: 0, flareBuf: 0,
       dashT: 0, dashCd: 0, dashDir: 1, iframes: 0, pdDone: false, ghostT: 0,
       inv: 0, stun: 0, hp, maxHp: hp,
-      ember: G.relic('moons') ? C.SEG * segs : 0, healT: 0, healLock: false,
+      ember: G.relic('moons') ? C.SEG * segs : 40 * G.up('spark'), healT: 0, healLock: false,
       atk: null, atkCd: 0, combo: -1, comboT: 0, sinceDash: 9,
       dead: false, deadT: 0, hidden: false,
       squash: 0, runT: 0, stepN: 0, skidT: 0, hurtFlash: 0, emberFlash: 0,
+      ult: 0, ulting: false, vanish: false, shroudT: 0,
       scarf: [], ghosts: [], slashes: [], bolts: [],
       stats: { dmg: 0, hits: 0, perfect: 0, heals: 0, lances: 0 },
     });
@@ -67,6 +68,7 @@
     const before = Math.floor(P.ember / C.SEG);
     P.ember = Math.min(C.SEG * P.segs, P.ember + n * (1 + 0.4 * G.boon('vein')));
     if (Math.floor(P.ember / C.SEG) > before) { G.audio.play('segment'); P.emberFlash = 1; }
+    G.flow.add(n * 0.5); // whatever earns Starlight also builds Flow
   };
 
   // The Warden entered a new phase: the Wardstone recharges.
@@ -89,6 +91,8 @@
 
     if (P.dead) { P.deadT += dt; return; }
     if (P.hidden) return;
+    // a Dawnbreak takes the hero over until it is done
+    if (P.ulting) { G.flow.ultStep(dt); return; }
 
     P.inv = Math.max(0, P.inv - dt);
     P.iframes = Math.max(0, P.iframes - dt);
@@ -295,6 +299,9 @@
       if (a.t >= a.dur) P.atk = null;
     }
 
+    // --- Dawnbreak: the ultimate, when its meter is full
+    if (ctl && I.pressed.ult && free && P.stun <= 0 && G.flow.tryUlt()) return;
+
     // --- special: costs one segment of Starlight
     if (P.flareBuf > 0 && free && P.dashT <= 0 && P.stun <= 0 && P.healT === 0) {
       P.flareBuf = 0;
@@ -333,6 +340,7 @@
   }
   const weaponMult = (heavy) => (1 + 0.25 * G.boon('keen')) * G.dmgMult() * (heavy && G.relic('shard') ? 1.5 : 1);
   const haste = () => 1 - 0.18 * G.boon('quick');
+  const spec = () => (G.relic('prism') ? 1.4 : 1); // the Magus's Prism strengthens every special
 
   // ---------------------------------------------------------------- melee (sword, maul)
   function startSwing(mx, up, down) {
@@ -548,7 +556,7 @@
   function fireLance(dx, dy) {
     const split = G.boon('split');
     const angles = split ? [-0.2, 0, 0.2] : [0];
-    const dmg = Math.round(C.LANCE_DMG * (split ? 0.6 : 1) * G.dmgMult());
+    const dmg = Math.round(C.LANCE_DMG * (split ? 0.6 : 1) * G.dmgMult() * spec());
     for (const a of angles) {
       const c = Math.cos(a), s = Math.sin(a);
       const vx = dx * c - dy * s, vy = dx * s + dy * c;
@@ -579,7 +587,7 @@
   // Lune: a fan of arrows, and a leap away from where she aimed.
   function castVolley(dx, dy) {
     const n = G.boon('quiver') ? 8 : 5, spread = G.boon('quiver') ? 0.95 : 0.72;
-    const dmg = Math.round(C.VOLLEY_DMG * G.dmgMult());
+    const dmg = Math.round(C.VOLLEY_DMG * G.dmgMult() * spec());
     for (let i = 0; i < n; i++) {
       const a = (i / (n - 1) - 0.5) * spread, c = Math.cos(a), s = Math.sin(a);
       arrow(dx * c - dy * s, dx * s + dy * c, dmg, false, 0.46);
@@ -603,7 +611,7 @@
   // The blast around Aster's feet. scale grows the radius and damage; k is the damage share (Aftershock uses 0.5).
   function starfallBlast(scale, k) {
     const R = C.STARFALL_R * scale, cx = P.x, cy = P.y - 20;
-    const dmg = Math.round(C.STARFALL_DMG * scale * k * G.dmgMult());
+    const dmg = Math.round(C.STARFALL_DMG * scale * k * G.dmgMult() * spec());
     for (const t of G.boss.targets()) {
       const inside = t.r ? G.dist(cx, cy, t.cx, t.cy) < R + t.r : G.circleRect(cx, cy, R, t);
       if (!inside) continue;
@@ -628,6 +636,7 @@
   function perfect() {
     P.stats.perfect++;
     P.gain(C.GAIN_PERFECT);
+    G.flow.perfect();
     P.dashCd = 0;
     G.audio.play('perfect');
     G.fx.slow(0.38, 0.3);
@@ -647,7 +656,7 @@
   }
 
   P.tryHit = function (dmg, srcX, src) {
-    if (P.dead || P.hidden || !G.canHurt()) return false;
+    if (P.dead || P.hidden || P.ulting || !G.canHurt()) return false;
     if (P.iframes > 0) {
       if (!P.pdDone) { P.pdDone = true; perfect(); }
       return false;
@@ -670,6 +679,7 @@
     G.fx.stop(0.14); G.fx.shake(13); G.fx.flash('255,50,50', 0.26, 0.35);
     G.fx.burst(P.x, P.y - 22, { n: 16, color: '255,120,120', speed: [100, 420], life: [0.2, 0.55], kind: 'spark', size: [2, 4] });
     G.fx.hurt(P.x, P.y - 22, dir, STAR);
+    G.flow.hurt();
     G.audio.play('hurt');
     if (P.hp <= 0 && G.boon('dawn') && !P.dawnUsed) {
       // Second Dawn: survive the killing blow once per trial
@@ -1360,7 +1370,7 @@
 
   // A soft shadow on whatever is below the hero; it shrinks with height, which helps judge landings.
   P.drawShadow = function (ctx) {
-    if (P.hidden || P.dead) return;
+    if (P.hidden || P.dead || P.vanish) return;
     let gy = FLOOR;
     for (const pl of G.arena.platforms) {
       if (pl.rise > 0.05 && P.x >= pl.x - 9 && P.x <= pl.x + pl.w + 9 && P.y <= pl.y + 4) gy = Math.min(gy, pl.y);
@@ -1414,10 +1424,9 @@
 
     const blink = P.inv > 0 && P.iframes <= 0 && Math.floor(G.t * 28) % 2 === 0;
     if (blink) ctx.globalAlpha = 0.35;
-    drawTail(ctx, H, P.scarf);
     P.primed = P.combo === 1 && P.comboT > 0 && !P.atk;
     P.dash = P.dashT > 0;
-    drawBody(ctx, H, P);
+    if (!P.vanish) { drawTail(ctx, H, P.scarf); drawBody(ctx, H, P); }
     ctx.globalAlpha = 1;
     drawSlashes(ctx);
 

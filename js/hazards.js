@@ -36,7 +36,8 @@
       h.t += dt;
       h.update(dt);
       if (!h.dead && canHurt && h.hits && h.hits(P)) {
-        P.tryHit(h.dmg, h.srcX != null ? h.srcX : (h.x != null ? h.x : P.x), h);
+        const hurt = P.tryHit(h.dmg, h.srcX != null ? h.srcX : (h.x != null ? h.x : P.x), h);
+        if (hurt && h.once && h.pop) h.pop();
       }
     }
     let w = 0;
@@ -94,7 +95,7 @@
     o = o || {};
     return H.add({
       kind: 'orb', x, y, vx, vy, r: o.r || 13, grav: o.grav || 0, life: o.life || 7,
-      slashable: o.slashable !== false, dmg: o.dmg || 1, srcX: x, tint: o.tint, steer: o.steer, onPop: o.onPop,
+      slashable: o.slashable !== false, dmg: o.dmg || 1, srcX: x, tint: o.tint, steer: o.steer, onPop: o.onPop, once: o.once,
       update(dt) {
         if (this.steer) this.steer(this, dt);
         this.vy += this.grav * dt;

@@ -87,12 +87,12 @@
   B.damage = function (amount, t, info) {
     if (!B.active || B.dead || B.dying || B.invuln) return false;
     let mult = t.kind === 'core' ? 1.5 : 1;
-    if (B.staggered) mult *= 1.4;
+    if (B.staggered) mult *= G.relic('eye') ? 1.82 : 1.4;
     if (B.hands.some((h) => h.alive && h.broken > 0)) mult *= 1.25; // exposed while a hand lies broken
     const dmg = Math.round(amount * mult);
     const floorHp = B.phase === 1 ? Math.floor(B.maxHp * 2 / 3) : B.phase === 2 ? Math.floor(B.maxHp / 3) : 0;
     B.hp = Math.max(floorHp, B.hp - dmg);
-    G.player.stats.dmg += dmg;
+    G.player.stats.dmg += dmg; G.flow.dealt(dmg);
     if (t.kind === 'core') B.core.flash = 1; else t.ref.flash = 1;
     // struck parts recoil away from the blow
     const push = (info.dir || G.sign(t.cx - G.player.x) || 1) * (info.lance ? 16 : info.heavy ? 12 : 7);

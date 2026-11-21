@@ -2,7 +2,8 @@
 // trial scales the Warden. Heroes, relics and boons are all defined here as plain data.
 'use strict';
 (function () {
-  const R = G.run = { trial: 1, hero: 'vesper', relic: null, boons: {}, order: [], offer: [], relicOffer: [], phoenixUsed: false, foes: [] };
+  const R = G.run = { trial: 1, hero: 'vesper', relic: null, boons: {}, order: [], offer: [], relicOffer: [], phoenixUsed: false, foes: [],
+    omens: [], lastOmens: [], ult: 0, rerolls: 0 };
 
   // ------------------------------------------------------------------ heroes
   // combo: three steps of { dmg, cd (time to the next swing), dur, wind (wind-up), act (active time) }.
@@ -66,7 +67,7 @@
   ];
   const relicById = {};
   for (const r of G.RELICS) relicById[r.id] = r;
-  G.relicDef = (id) => relicById[id];
+  G.relicDef = (id) => relicById[id] || G.RELICS.find((r) => r.id === id); // trophies are added later, in meta.js
   G.relic = (id) => R.relic === id;
 
   // ------------------------------------------------------------------ boons (one after each victory)
@@ -96,7 +97,10 @@
 
   // How many of a boon the hero holds, and the damage multiplier that applies to everything.
   G.boon = (id) => R.boons[id] || 0;
-  G.dmgMult = () => (1 + 0.35 * G.boon('glass')) * (G.relic('crown') ? 1.4 : 1);
+  // Boons and relics, the Shrine's Whetstone, the Flow rank, and the two trophies that depend on the moment.
+  G.dmgMult = () => (1 + 0.35 * G.boon('glass')) * (G.relic('crown') ? 1.4 : 1)
+    * (1 + 0.04 * G.up('edge')) * (1 + 0.03 * G.flow.rank)
+    * (G.relic('shroud') && G.player.shroudT > 0 ? 1.5 : 1) * (G.relic('oath') && G.player.hp === 1 ? 1.5 : 1);
 
   G.roman = function (n) {
     const t = [[10, 'X'], [9, 'IX'], [5, 'V'], [4, 'IV'], [1, 'I']];
@@ -107,6 +111,7 @@
 
   R.reset = function () {
     R.trial = 1; R.boons = {}; R.order = []; R.offer = []; R.relic = null; R.relicOffer = []; R.phoenixUsed = false;
+    R.omens = []; R.lastOmens = []; R.ult = 0; R.rerolls = G.up('reroll');
     R.hero = heroById[G.settings.hero] ? G.settings.hero : 'vesper';
     R.foes = [];
   };
@@ -127,21 +132,32 @@
   };
 
   // Health before boons, for deciding whether a health-costing pick may be offered.
-  const baseHp = () => (G.DIFFS[G.settings.difficulty] || G.DIFFS[1]).hp + G.hero().hp + G.boon('heart') - (G.relic('crown') ? 2 : 0);
+  const baseHp = () => (G.DIFFS[G.settings.difficulty] || G.DIFFS[1]).hp + G.hero().hp + G.boon('heart') + G.up('vigor') - (G.relic('crown') ? 2 : 0);
 
   // Three relics to choose from before the first trial.
   R.rollRelics = function () {
-    const pool = G.RELICS.filter((r) => r.id !== 'crown' || baseHp() >= 4);
-    R.relicOffer = G.shuffle(pool.slice()).slice(0, 3);
+    const pool = G.RELICS.filter((r) => G.meta.unlocked(r) && (r.id !== 'crown' || baseHp() >= 4));
+    R.relicOffer = G.shuffle(pool.slice()).slice(0, 3 + G.up('relics'));
     return R.relicOffer;
   };
   // Three boons to choose from after a victory.
-  R.rollOffer = function () {
-    const pool = G.BOONS.filter((b) => G.boon(b.id) < b.max
+  R.rollOffer = function (avoid) {
+    let pool = G.BOONS.filter((b) => G.boon(b.id) < b.max
       && (!b.heroes || b.heroes.includes(R.hero))
       && (b.id !== 'glass' || baseHp() - G.boon('glass') >= 3));
-    R.offer = G.shuffle(pool.slice()).slice(0, 3);
+    const n = 3 + G.up('choice');
+    // a redraw shows different boons where there are enough left to do so
+    const fresh = avoid ? pool.filter((b) => !avoid.includes(b)) : pool;
+    if (fresh.length >= n) pool = fresh;
+    R.offer = G.shuffle(pool.slice()).slice(0, n);
     return R.offer;
+  };
+  // Second Thoughts (the Shrine): draw the offer again.
+  R.reroll = function () {
+    if (R.rerolls <= 0) return false;
+    R.rerolls--;
+    R.rollOffer(R.offer);
+    return true;
   };
   R.take = function (i) {
     const b = R.offer[i];
@@ -163,11 +179,13 @@
   const base = () => G.DIFFS[G.settings.difficulty] || G.DIFFS[1];
   G.diff = function () {
     const b = base(), n = R.trial - 1;
-    if (n <= 0) return b;
+    if (n <= 0 && !R.omens.length) return b;
+    const bulwark = R.omens.includes('bulwark'), frenzy = R.omens.includes('frenzy');
     return Object.assign({}, b, {
-      bossHp: b.bossHp * (1 + 0.15 * n),
+      bossHp: b.bossHp * (1 + 0.15 * n) * (bulwark ? 1.2 : 1),
       tele: Math.max(0.7, b.tele * (1 - 0.04 * n)),
-      pace: Math.max(0.55, b.pace * (1 - 0.06 * n)),
+      pace: Math.max(0.5, Math.max(0.55, b.pace * (1 - 0.06 * n)) * (frenzy ? 0.75 : 1)),
+      stagger: b.stagger - (bulwark ? 0.8 : 0),
     });
   };
   // From the fifth trial (the second lap of the bosses) they also use their Merciless patterns.

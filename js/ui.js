@@ -39,7 +39,8 @@
     for (const id of ['hud', 'hp', 'ember', 'mend', 'timer', 'bfill', 'bchip', 'pfill', 'bphase', 'card', 'callout',
       'hint', 'lowhp', 'lbTop', 'lbBot', 'diffNote', 'bestLine', 'ver', 'deadLead', 'deadFill', 'deadStats',
       'pauseBoons', 'boons', 'trial', 'winOver', 'winPick', 'winCards', 'heroName', 'heroCards', 'relicCards', 'relicOver',
-      'deadTip', 'winStats', 'winBest', 'gradeLetter', 'gradeTitle', 'gradeSub', 'stage']) el[id] = $(id);
+      'deadTip', 'winStats', 'winBest', 'gradeLetter', 'gradeTitle', 'gradeSub', 'stage',
+      'ult', 'ultFill', 'ultKey', 'flow', 'flowRank', 'flowFill', 'omen', 'shardCount', 'shrineLead', 'shrineList', 'shrineTrophies', 'rerollItem']) el[id] = $(id);
     el.segs = Array.from(document.querySelectorAll('#ember .seg'));
     el.bbar = document.querySelector('.bbar');
     el.bname = document.getElementById('bname');
@@ -126,6 +127,9 @@
     else if (/^relic\d$/.test(name)) G.pickRelic(Number(name.slice(5)));
     else if (/^boon\d$/.test(name)) G.takeBoon(Number(name.slice(4)));
     else if (name === 'endrun') G.toTitle();
+    else if (name === 'reroll') G.rerollBoons();
+    else if (name === 'shrine') U.showShrine();
+    else if (/^shrine\d$/.test(name)) buy(Number(name.slice(6)));
     else if (name === 'how') U.show('how', true);
     else if (name === 'settings') U.show('settings', true);
     else if (name === 'back') U.back();
@@ -191,7 +195,34 @@
     U.show('relic', true);
   };
 
+  // ---- the Shrine: permanent upgrades bought with Sunshards
+  U.fillShrine = function () {
+    const M = G.meta;
+    el.shrineLead.innerHTML = 'You hold <b style="color:var(--gold)">' + M.shards + '</b> Sunshards. Every fight earns some, win or lose; what you buy here lasts.';
+    Array.from(el.shrineList.children).forEach((row, i) => {
+      const u = G.SHRINE[i], n = G.up(u.id), max = u.costs.length, cost = M.cost(u);
+      row.querySelector('.uname').textContent = u.name;
+      row.querySelector('.upips').innerHTML = u.costs.map((c, k) => '<i' + (k < n ? ' class="on"' : '') + '></i>').join('');
+      row.querySelector('.udesc').textContent = n >= max ? u.text(n) : (n ? u.text(n) + '  \u2192  ' : '') + u.text(n + 1);
+      row.querySelector('.ucost').textContent = cost == null ? 'Complete' : cost + ' \u25c6';
+      row.classList.toggle('max', cost == null);
+      row.classList.toggle('poor', cost != null && M.shards < cost);
+    });
+    const got = G.TROPHIES.filter((t) => M.kills[t.boss]);
+    el.shrineTrophies.textContent = 'Trophy relics ' + got.length + ' of ' + G.TROPHIES.length
+      + (got.length ? ': ' + got.map((t) => t.name).join(', ') + '.' : '. The first victory over each boss adds its relic to those you can be offered.');
+  };
+  U.showShrine = function () { U.fillShrine(); U.show('shrine', true); };
+  function buy(i) {
+    if (G.meta.buy(i)) {
+      G.audio.play('segment');
+      U.fillShrine(); U.refresh();
+      retrigger(el.shrineList.children[i], 'bought');
+    } else G.audio.play('empty');
+  }
+
   U.refresh = function () {
+    el.shardCount.textContent = '\u25c6 ' + G.meta.shards;
     document.querySelectorAll('.item.opt').forEach((it) => {
       const opt = it.dataset.opt, def = OPTS[opt], v = G.settings[opt];
       if (def.slider) {
@@ -238,6 +269,9 @@
   U.buildRun = function () {
     const R = G.run;
     el.trial.textContent = R.trial > 1 ? 'Trial ' + G.roman(R.trial) : '';
+    el.omen.innerHTML = R.omens.map((id) => '<b>Omen \u00b7 ' + G.omenDef(id).name + '</b>' + G.omenDef(id).desc).join('');
+    el.ultKey.innerHTML = G.input.device === 'gamepad' ? '<kbd>RT</kbd>' : '<kbd>Q</kbd>';
+    H.ult = -1; H.ready = null; H.frank = -1; H.ffill = -1;
     const hero = G.hero(), relic = G.relicDef(R.relic);
     el.heroName.textContent = hero.name.toUpperCase();
     // the health pips and Starlight take the hero's own colour
@@ -287,8 +321,8 @@
     U.fights = (U.fights || 0) + 1;
     if (!G.settings.hints || U.fights > 2) return;
     el.hint.innerHTML = G.input.device === 'gamepad'
-      ? 'Stick move &middot; <b>A</b> jump &middot; <b>X</b> attack &middot; <b>B</b> dash &middot; <b>Y</b> special &middot; hold <b>LB</b> mend'
-      : '<kbd>A</kbd><kbd>D</kbd> move &middot; <kbd>Space</kbd> jump &middot; <kbd>J</kbd> or click attack &middot; <kbd>K</kbd> dash &middot; <kbd>L</kbd> or right click special &middot; hold <kbd>E</kbd> mend';
+      ? 'Stick move &middot; <b>A</b> jump &middot; <b>X</b> attack &middot; <b>B</b> dash &middot; <b>Y</b> special &middot; hold <b>LB</b> mend &middot; <b>RT</b> Dawnbreak'
+      : '<kbd>A</kbd><kbd>D</kbd> move &middot; <kbd>Space</kbd> jump &middot; <kbd>J</kbd> or click attack &middot; <kbd>K</kbd> dash &middot; <kbd>L</kbd> or right click special &middot; hold <kbd>E</kbd> mend &middot; <kbd>Q</kbd> Dawnbreak';
     el.hint.classList.add('show', 'calm');
     H.hintT = 7;
   };
@@ -360,6 +394,21 @@
       }
     }
 
+    // Dawnbreak and Flow
+    const ult = Math.round(P.ult || 0);
+    if (ult !== H.ult) { H.ult = ult; el.ultFill.style.width = ult + '%'; }
+    const rdy = ult >= 100 && !P.dead;
+    if (rdy !== H.ready) { H.ready = rdy; el.ult.classList.toggle('ready', rdy); }
+    const FL = G.flow;
+    if (FL.rank !== H.frank) {
+      if (FL.rank > H.frank && H.frank >= 0) retrigger(el.flowRank, 'pop');
+      H.frank = FL.rank;
+      el.flowRank.textContent = FL.RANKS[FL.rank].name;
+      el.flow.className = (FL.rank ? 'on ' : '') + 'r' + FL.rank;
+    }
+    const ff = Math.round(FL.frac() * 100);
+    if (ff !== H.ffill) { H.ffill = ff; el.flowFill.style.width = ff + '%'; }
+
     // boss bar
     if (H.introDelay > 0) H.introDelay -= dt;
     else if (H.introK < 1) H.introK = Math.min(1, H.introK + dt / 1.3);
@@ -408,8 +457,9 @@
       [U.fmtTime(G.time), 'Time'],
       [P.stats.dmg, 'Damage dealt'],
       [P.stats.perfect, 'Perfect dodges'],
-      [G.run.order.length, 'Boons held'],
+      ['+' + (G.lastShards || 0), 'Sunshards'],
     ]);
+    el.deadStats.lastElementChild.firstElementChild.classList.add('gold');
     el.deadTip.textContent = G.pick(TIPS.concat(B.tips || [], B.tips || []));
     U.hud(false);
     U.lockUntil = performance.now() + 500;
@@ -425,16 +475,26 @@
       [U.fmtTime(G.time), 'Time'],
       [P.stats.hits, 'Hits taken'],
       [P.stats.perfect, 'Perfect dodges'],
-      [P.stats.lances, 'Specials used'],
+      ['+' + res.meta.shards, 'Sunshards'],
     ]);
+    el.winStats.lastElementChild.firstElementChild.classList.add('gold');
     el.winOver.textContent = 'Victory \u00b7 trial ' + G.roman(res.trial);
-    el.winBest.textContent = res.newBest ? 'New fastest first trial on ' + G.diff().name + '.'
+    el.winBest.textContent = res.meta.relic ? 'Trophy won: ' + res.meta.relic.name + ' joins the relics you can be offered.'
+      : res.meta.lines.length ? res.meta.lines.join(' \u00b7 ')
+      : res.newBest ? 'New fastest first trial on ' + G.diff().name + '.'
       : res.newDepth ? 'Your deepest trial yet on ' + G.diff().name + '.' : '';
     const next = G.bosses[G.run.foe(res.trial + 1)];
     el.winPick.textContent = 'Choose a boon to carry into trial ' + G.roman(res.trial + 1) + ', against ' + next.short;
-    const cards = Array.from(el.winCards.children);
-    cards.forEach((c, i) => {
-      const b = res.offer[i];
+    U.hud(false);
+    U.lockUntil = performance.now() + 700;
+    U.fillBoons();
+    U.show('win');
+  };
+  // The boons on offer (three, or four with the Shrine's Fourth Boon), and the redraw button.
+  U.fillBoons = function () {
+    const offer = G.run.offer;
+    Array.from(el.winCards.children).forEach((c, i) => {
+      const b = offer[i];
       c.style.display = b ? '' : 'none';
       if (!b) return;
       const own = G.boon(b.id);
@@ -443,8 +503,8 @@
       c.querySelector('.cname').textContent = b.name;
       c.querySelector('.cdesc').textContent = b.desc + (own ? ' You hold ' + own + '.' : '');
     });
-    U.hud(false);
-    U.lockUntil = performance.now() + 700;
-    U.show('win');
+    el.rerollItem.style.display = G.run.rerolls > 0 ? '' : 'none';
+    el.rerollItem.textContent = 'Redraw boons (' + G.run.rerolls + ' left)';
+    if (U.current === 'win') U.setFocus(0);
   };
 })();
