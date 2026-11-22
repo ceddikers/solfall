@@ -36,27 +36,31 @@
 
   // ------------------------------------------------------------------ poses
   // lean, hip height, two feet (x, y), sword hand (x, y), blade angle, off hand (x, y; 999 = on the hilt)
+  // It carries the greatsword on its shoulder, one-handed, and walks with it there. So a cut starts
+  // high and falls with the sword's own weight (raise -> cleave); the cut after it is the blade
+  // coming back up off the ground (low -> rise). It never has to lift the sword to begin.
   const POSES = {
-    idle: [0.06, -58, 17, 0, -17, 0, 22, -54, 1.2, 999, 0],
+    idle: [0.04, -58, 17, 0, -17, 0, 22, -84, -2.24, -15, -54],
     raise: [-0.12, -58, 20, 0, -18, 0, -8, -108, -2.45, 999, 0],
-    cleave: [0.32, -52, 26, 0, -20, 0, 38, -58, 0.62, 999, 0],
-    low: [0.3, -52, 24, 0, -20, 0, 34, -44, 0.95, 999, 0],
+    cleave: [0.32, -52, 26, 0, -20, 0, 38, -58, 0.42, 999, 0],
+    low: [0.3, -52, 24, 0, -20, 0, 34, -44, 0.32, 999, 0],
     rise: [-0.1, -58, 20, 0, -18, 0, 2, -112, -2.2, 999, 0],
     overRaise: [-0.08, -60, 16, 0, -18, 0, 6, -118, -1.72, 999, 0],
-    slam: [0.5, -46, 28, 0, -22, 0, 34, -40, 1.32, 999, 0],
+    slam: [0.5, -46, 28, 0, -22, 0, 36, -78, 1.3, 999, 0],
     chargeUp: [0.42, -44, 22, 0, -26, 0, -16, -52, 2.85, 6, -78],
     charge: [0.62, -48, 26, -4, -30, -2, -22, -58, 2.95, 26, -82],
-    crash: [-0.25, -40, 24, 0, -18, 0, 22, -20, 1.45, -22, -30],
-    grip: [0.1, -58, 18, 0, -18, 0, 10, -50, 1.3, 48, -86],
-    plant: [0.14, -56, 16, 0, -18, 0, 24, -92, 1.5708, 999, 0],
+    crash: [-0.25, -40, 24, 0, -18, 0, 22, -8, 0.04, -22, -30],
+    grip: [0.1, -58, 18, 0, -18, 0, -6, -50, 2.8, 48, -86],
+    plant: [0.14, -56, 16, 0, -18, 0, 24, -104, 1.5708, 999, 0],
     whirl: [0.1, -54, 20, 0, -20, 0, 30, -70, 0.02, 999, 0],
     air: [0.0, -58, 12, -16, -14, -8, 4, -120, -1.75, 999, 0],
-    kneel: [0.5, -34, 24, 0, -30, 0, 26, -64, 1.5708, -6, -30],
+    kneel: [0.5, -34, 24, 0, -30, 0, 26, -98, 1.5708, -6, -30],
   };
   const NP = 11;
   function walkPose(t) {
     const s = Math.sin(t), c = Math.cos(t), p = POSES.idle.slice();
     p[2] = 17 + s * 15; p[3] = -Math.max(0, c) * 7; p[4] = -17 - s * 15; p[5] = -Math.max(0, -c) * 7; p[1] = -58 + Math.abs(s) * 2;
+    p[7] = -84 + Math.abs(s) * 2.5; p[8] = -2.24 + Math.abs(s) * 0.05; p[9] = -15 - s * 9; p[10] = -54 + Math.abs(s) * 2;
     return p;
   }
 
@@ -104,7 +108,7 @@
       hits(Pl) { return G.rectsOverlap(Pl.box(), { cx: this.x, cy: this.y, hw: 36, hh: 24 }); },
       draw(ctx) {
         ctx.globalCompositeOperation = 'lighter'; D.glow(ctx, DANGER, this.x, this.y, 70, 0.5); ctx.globalCompositeOperation = 'source-over';
-        sword(ctx, this.x - Math.cos(this.spin) * 45, this.y - Math.sin(this.spin) * 45, this.spin, tint.boss, tint.hot);
+        sword(ctx, this.x - Math.cos(this.spin) * 60, this.y - Math.sin(this.spin) * 60, this.spin, tint.boss, tint.hot);
       },
     });
     G.audio.play('streak');
@@ -129,7 +133,7 @@
     const b = B.body, f = b.face;
     const m = (ang) => (f > 0 ? ang : Math.PI - ang);
     return H.arc({
-      x: b.x + f * 10, y: b.y - 86, r: o.r || 185, a0: m(o.a0), a1: m(o.a1), tele: o.tele, active: 0.13, dmg: o.dmg || 1, heavy: (o.dmg || 1) > 1, owner: b,
+      x: b.x + f * 10, y: b.y - 86, r: o.r || 195, a0: m(o.a0), a1: m(o.a1), tele: o.tele, active: 0.13, dmg: o.dmg || 1, heavy: (o.dmg || 1) > 1, owner: b,
       follow(h) { if (!h.fired) { h.x = b.x + b.face * 10; h.y = b.y - 86; } },
       onFire() { G.audio.play('cleave'); b.fast = true; b.pose = o.pose; G.fx.shake(7); if (o.wind) echo(b.x, b.face, o, o.wind); },
     });
@@ -141,7 +145,7 @@
     const g = { x, y: FLOOR, face, p: POSES[wind].slice(), kx: 0, a: 0, fired: false };
     const m = (ang) => (face > 0 ? ang : Math.PI - ang);
     const ao = {
-      x: x + face * 10, y: FLOOR - 86, r: (o.r || 185) * 0.95, a0: m(o.a0), a1: m(o.a1), tele, active: 0.12, owner: g, tint,
+      x: x + face * 10, y: FLOOR - 86, r: (o.r || 195) * 0.95, a0: m(o.a0), a1: m(o.a1), tele, active: 0.12, owner: g, tint,
       onFire() { g.fired = true; g.to = POSES[o.pose]; G.audio.play('blade'); G.fx.shake(4); },
     };
     if (harmless) { ao.hits = () => false; ao.heavy = true; } // for show, in the scene where the Host first rises
@@ -497,7 +501,7 @@
     G.ui.hint('rend', 'Jump the low wave. Stay on the ground for the high one');
     facePlayer();
     const n = 3 + (B.phase === 3 ? 1 : 0) + (K.hard() ? 1 : 0);
-    let low = G.rng() < 0.5;
+    let low = false; // off the shoulder the blade can only come down first; the low wave is the cut back up
     for (let i = 0; i < n; i++) {
       const tele = (i ? 0.6 : 0.7) * T, dir = b.face;
       b.fast = false; b.pose = low ? 'low' : 'raise';
@@ -595,7 +599,7 @@
         ctx.globalCompositeOperation = 'lighter';
         if (this.state !== 'stuck') D.glow(ctx, DANGER, this.x, this.y, 70, 0.5);
         ctx.globalCompositeOperation = 'source-over';
-        sword(ctx, this.x - Math.cos(ang) * (this.state === 'stuck' ? 96 : 45), this.y - Math.sin(ang) * 45, ang, tint.boss, tint.hot);
+        sword(ctx, this.x - Math.cos(ang) * (this.state === 'stuck' ? SWORD - 30 : 60), this.y - Math.sin(ang) * 60, ang, tint.boss, tint.hot);
       },
     });
     // unarmed: nothing to swing, and every blow counts for more
@@ -798,11 +802,20 @@
     }
     for (const w of B.swords) w.t = Math.min(1, w.t + dt / 0.12);
     const target = b.pose === 'walk' ? walkPose(b.walkT) : (POSES[b.pose] || POSES.idle);
-    const k = 1 - Math.exp(-(b.fast ? 46 : 11) * dt);
+    // Every part of the pose is a weight on a spring: it starts slowly, gathers speed, runs a little
+    // past where it is going and settles. And it has weight: whatever is on its way down (the hips,
+    // the sword hand, the point of the blade) is hurried by it, whatever is on its way up is held back.
+    // So a cut that falls lands hard and bites, and hauling the sword back up takes visible effort.
+    if (!b.pv) b.pv = new Array(NP).fill(0);
+    const w0 = b.fast ? 42 : 13, z = b.fast ? 0.6 : 0.82;
     for (let i = 0; i < NP; i++) {
-      if (i === 9 && (target[9] === 999 || b.p[9] === 999)) { b.p[9] = target[9]; b.p[10] = target[10]; continue; }
+      if (i === 9 && (target[9] === 999 || b.p[9] === 999)) { b.p[9] = target[9]; b.p[10] = target[10]; b.pv[9] = b.pv[10] = 0; continue; }
       if (i === 10 && target[9] === 999) continue;
-      b.p[i] += (target[i] - b.p[i]) * k;
+      let w = w0;
+      const falling = i === 8 ? Math.sin(target[8]) > Math.sin(b.p[8]) + 0.02 : (i === 1 || i === 7) ? target[i] > b.p[i] + 0.5 : null;
+      if (falling !== null) w *= falling ? 1.3 : 0.86;
+      b.pv[i] += ((target[i] - b.p[i]) * w * w - 2 * z * w * b.pv[i]) * dt;
+      b.p[i] += b.pv[i] * dt;
     }
     D.chainStep(B.cape, b.x - b.face * 12, b.y + b.p[1] - 42, dt, { seg: 13, grav: 90, drift: 12, face: b.face, wave: 5, rate: 4, floor: FLOOR - 2 });
     if (b.blaze && Math.random() < dt * 70) {
@@ -816,26 +829,30 @@
   };
 
   // ------------------------------------------------------------------ drawing
+  // The greatsword: as long as the Knight is tall (SWORD from the guard to the point), with a grip
+  // for two hands. Drawn from the sword hand along ang.
+  const SWORD = 152;
   function sword(ctx, x, y, ang, col, hot) {
+    const L = SWORD;
     ctx.save();
     ctx.translate(x, y); ctx.rotate(ang);
-    D.glow(ctx, col, 62, 0, 70, 0.3);
-    ctx.strokeStyle = '#06080c'; ctx.lineWidth = 6; D.line(ctx, -28, 0, 2, 0);
-    ctx.strokeStyle = '#2a3440'; ctx.lineWidth = 2.5; D.line(ctx, -26, 0, 0, 0);
-    ctx.fillStyle = G.rgba(col, 0.9); D.poly(ctx, [-34, 0, -29, -4.5, -24, 0, -29, 4.5]); ctx.fill();
+    D.glow(ctx, col, L / 2, 0, L * 0.56, 0.3);
+    ctx.strokeStyle = '#06080c'; ctx.lineWidth = 6; D.line(ctx, -34, 0, 2, 0);
+    ctx.strokeStyle = '#2a3440'; ctx.lineWidth = 2.5; D.line(ctx, -32, 0, 0, 0);
+    ctx.fillStyle = G.rgba(col, 0.9); D.poly(ctx, [-41, 0, -35.5, -5, -30, 0, -35.5, 5]); ctx.fill();
     // crossguard with hooked ends
     ctx.fillStyle = '#1c2630';
     D.poly(ctx, [0, -15, 5, -19, 9, -15, 7, -4, 7, 4, 9, 15, 5, 19, 0, 15]); ctx.fill();
     ctx.strokeStyle = G.rgba(col, 0.8); ctx.lineWidth = 1.2; ctx.stroke();
     // a broad blade, dark with a lit edge and runes down the fuller
     ctx.fillStyle = '#131a22';
-    D.poly(ctx, [7, -9, 100, -8, 124, 0, 100, 8, 7, 9]); ctx.fill();
+    D.poly(ctx, [7, -9.5, L - 26, -8, L, 0, L - 26, 8, 7, 9.5]); ctx.fill();
     ctx.fillStyle = G.rgba(col, 0.55);
-    D.poly(ctx, [7, -9, 100, -8, 124, 0, 104, -3.4, 9, -4.6]); ctx.fill();
+    D.poly(ctx, [7, -9.5, L - 26, -8, L, 0, L - 22, -3.4, 9, -4.8]); ctx.fill();
     ctx.strokeStyle = G.rgba(hot, 0.9); ctx.lineWidth = 1.3;
-    ctx.beginPath(); ctx.moveTo(7, -9); ctx.lineTo(100, -8); ctx.lineTo(124, 0); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(7, -9.5); ctx.lineTo(L - 26, -8); ctx.lineTo(L, 0); ctx.stroke();
     ctx.fillStyle = G.rgba(hot, 0.95);
-    for (let i = 0; i < 5; i++) { const rx = 22 + i * 17; D.poly(ctx, [rx, 0, rx + 4, -2.6, rx + 8, 0, rx + 4, 2.6]); ctx.fill(); }
+    for (let rx = 22; rx < L - 44; rx += 17) { D.poly(ctx, [rx, 0, rx + 4, -2.6, rx + 8, 0, rx + 4, 2.6]); ctx.fill(); }
     ctx.restore();
   }
 
@@ -850,14 +867,14 @@
     if (B.lost) {
       const q = B.lost, kk = q.k, x = G.lerp(q.x0, q.x1, kk), y = FLOOR - 96 - 4 * 190 * kk * (1 - kk) + 96 * 0;
       const ang = kk < 1 ? kk * 11 * (q.x1 > q.x0 ? 1 : -1) + 1.2 : Math.PI / 2;
-      if (kk < 1) sword(ctx, x - Math.cos(ang) * 45, y - Math.sin(ang) * 45, ang, pal.boss, pal.hot);
-      else sword(ctx, q.x1, FLOOR - 108, Math.PI / 2 + Math.sin(G.t * 40) * 0.02, pal.boss, pal.hot);
+      if (kk < 1) sword(ctx, x - Math.cos(ang) * 60, y - Math.sin(ang) * 60, ang, pal.boss, pal.hot);
+      else sword(ctx, q.x1, FLOOR - SWORD + 36, Math.PI / 2 + Math.sin(G.t * 40) * 0.02, pal.boss, pal.hot);
     }
     // the Blood Oath's ring: greatswords driven into the ground, hilts up
     for (const w of B.swords) {
       const drop = (1 - G.ease.inQuad(w.t)) * 700;
       ctx.save();
-      ctx.translate(w.x, FLOOR - 150 * w.s + 44 - drop); ctx.rotate(w.lean); ctx.scale(w.s, w.s);
+      ctx.translate(w.x, FLOOR - (SWORD - 34) * w.s - drop); ctx.rotate(w.lean); ctx.scale(w.s, w.s);
       sword(ctx, 0, 0, Math.PI / 2, pal.boss, pal.hot);
       ctx.restore();
     }
@@ -988,7 +1005,7 @@
 
     if (!b.unarmed) {
       // a burning blade: the warning colour, and a glow that grows through the wind-up
-      if (b.blaze) { ctx.save(); ctx.translate(hx, hy); ctx.rotate(ang); D.glow(ctx, DANGER, 64, 0, 96, 0.75); ctx.restore(); }
+      if (b.blaze) { ctx.save(); ctx.translate(hx, hy); ctx.rotate(ang); D.glow(ctx, DANGER, SWORD / 2, 0, SWORD * 0.76, 0.75); ctx.restore(); }
       sword(ctx, hx, hy, ang, b.blaze ? DANGER : col, b.blaze ? '255,236,220' : hot); // thrown: see atkHurl
     }
     arm(true);

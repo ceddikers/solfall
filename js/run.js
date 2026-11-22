@@ -17,15 +17,16 @@
       cloak: ['#22365e', '#0a1020'], build: 1, scarf: 10, scarfW: 1,
       hp: 0, run: 335, air: 1, weapon: 'sword', reach: 1, thick: 1, poise: 1,
       combo: [
-        { dmg: 9, cd: 0.22, dur: 0.22, wind: 0.02, act: 0.11 },
-        { dmg: 11, cd: 0.24, dur: 0.22, wind: 0.02, act: 0.11 },
-        { dmg: 24, cd: 0.46, dur: 0.36, wind: 0.09, act: 0.15 },
+        // (v1.4b: a little slower, with a wind-up long enough to see the blade go up; a little more per cut to match)
+        { dmg: 10, cd: 0.27, dur: 0.26, wind: 0.06, act: 0.11 },
+        { dmg: 12, cd: 0.29, dur: 0.26, wind: 0.05, act: 0.11 },
+        { dmg: 26, cd: 0.5, dur: 0.38, wind: 0.1, act: 0.15 },
       ],
       down: 11, special: 'lance', specialName: 'Star Lance', verb: 'lance',
       blurb: 'Balanced and quick. The one to learn the fight with.',
       lines: ['Sword: a fast three-hit combo', 'Star Lance: a piercing shot at any range', 'A slash out of a dash becomes a thrust'],
       how: {
-        attack: 'Sword. Two quick cuts (9, 11), then a finisher (24). Hold the button to keep cutting.',
+        attack: 'Sword. A cut down (10), a cut back up (12), then a finisher (26). Hold the button to keep cutting.',
         aim: 'Hold up to cut overhead. In the air, hold down to strike below and bounce off what you hit, getting your jump and dash back.',
         dash: 'A cut thrown straight out of a dash becomes a thrust: 40% more damage and a longer reach.',
         special: 'Star Lance: she draws back and throws a piercing lance of 42 that crosses the arena. Aim with the mouse, or hold a direction. Dash during the throw and it flies at once; get hit first and the Starlight comes back.',

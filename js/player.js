@@ -1154,16 +1154,24 @@
     ctx.globalCompositeOperation = 'source-over';
   }
 
-  // Angle of a melee weapon through its swing.
+  // Angle of a melee weapon through its swing: w0 (where the wind-up starts) to a0 (where the cut
+  // starts) to a1 (where it ends). A chain goes down, then up, then down: the first cut is lifted
+  // overhead and falls; the second rides that weight back up from where the first ended; the
+  // finisher is drawn further back from the top of the second and comes down hardest.
+  // The wind-up is there to be seen: the blade is carried to the top before anything falls.
   function swingAngle(a) {
-    const k = G.ease.outCubic(G.clamp((a.t - a.a0 + 0.02) / (a.dur * 0.5), 0, 1));
-    let a0 = -1.9, a1 = 1.3;
-    if (a.thrust) { a0 = -0.05; a1 = -0.05; }
-    else if (a.kind === 'up') { a0 = a.heavy ? 0.5 : -2.9; a1 = a.heavy ? -2.9 : -0.5; }
-    else if (a.kind === 'down') { a0 = 0.2; a1 = 2.7; }
-    else if (a.heavy) { a0 = -2.7; a1 = 1.5; }
-    else if (a.idx === 1) { a0 = 1.5; a1 = -1.6; }
-    return G.lerp(a0, a1, k) + (a.heavy && a.t < a.a0 ? G.rand(-0.06, 0.06) : 0);
+    let w0 = -3.4, a0 = -1.9, a1 = 1.3;
+    if (a.thrust) { w0 = a0 = a1 = -0.05; }
+    else if (a.kind === 'up') { if (a.heavy) { w0 = 0.9; a0 = 0.5; a1 = -2.9; } else { w0 = -3.5; a0 = -2.9; a1 = -0.5; } }
+    else if (a.kind === 'down') { w0 = -0.4; a0 = 0.2; a1 = 2.7; }
+    else if (a.heavy) { w0 = -1.7; a0 = -2.7; a1 = 1.5; }
+    else if (a.idx === 1) { w0 = 1.95; a0 = 1.5; a1 = -1.6; }
+    if (a.t < a.a0) return G.lerp(w0, a0, G.ease.outCubic(G.clamp(a.t / a.a0, 0, 1))) + (a.heavy ? G.rand(-0.06, 0.06) : 0);
+    // the cut itself, inside the active window. A blade that is falling gathers speed and then is
+    // caught; one that is rising leaves fast and slows as it climbs. Gravity decides which.
+    const u = G.clamp((a.t - a.a0) / Math.max(0.01, a.a1 - a.a0), 0, 1);
+    const falling = Math.sin(a1) > Math.sin(a0);
+    return G.lerp(a0, a1, falling ? u * u * (3 - 2 * u) : 1 - (1 - u) * (1 - u));
   }
 
   // Where the feet go: [front foot, back foot].

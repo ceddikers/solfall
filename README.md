@@ -2,7 +2,7 @@
 
 A side-on boss rush for the browser: three heroes, four three-phase bosses, played as a run of
 ever-harder trials. You pick a hero and a relic before the run and win a boon after each victory.
-Version 1.4a.
+Version 1.4b.
 
 This is an early slice of a planned boss-rush roguelite (short runs, a boon after each boss,
 bosses drawn from a pool). A run meets the four bosses in a shuffled order, then meets them again, harder.
@@ -113,6 +113,36 @@ hero (`tools/feel-check.js`).
 - Settings, Reset progress erases Sunshards, upgrades, trophies and records (it has to be chosen twice).
 
 Not done: touch controls, a colour-blind alternative to red-orange warnings, gamepad rebinding.
+
+## Swings with weight (new in v1.4b)
+
+A sword or maul swing now shows where it comes from. The chain was always down, up, down, but the
+first cut reached the front in a single frame, so the eye saw the blade come up from its low carry and
+read it as a rising cut. Now each swing has a wind-up you can see (`swingAngle` in `player.js`): the
+blade is lifted overhead, falls, and hangs at the bottom of its arc; the second cut rides that weight
+back up from where the first ended; the finisher is drawn further back from the top and comes down.
+
+Vesper's attacks are a little slower to match: wind-up 0.06 s and 0.05 s (was 0.02), a swing every
+0.27 s and 0.29 s (was 0.22 and 0.24), the finisher every 0.5 s (was 0.46). A full chain takes 1.06 s
+(was 0.92). The cuts do 10, 12 and 26 (were 9, 11, 24), which leaves her about 5% below her old damage
+over time. Aster's maul uses the same wind-up shape with her timings unchanged.
+
+**The Knight carries its greatsword on its shoulder**, one-handed, standing and walking. It used to
+drag the point along the ground, so every wind-up was the blade being hauled up from the floor. Now a
+cut starts high and falls with the sword's weight, and the cut after it is the blade coming back up
+off the ground. Its Rend always opens with the falling cut (the high crescent) and then the rising one
+(the low wave); the order used to be random.
+
+**Its greatsword is longer** (152 from guard to point, was 124, about as long as the Knight is tall),
+its reach follows the blade (195, was 185), and its poses were redrawn so the point comes to rest on
+the ground instead of under it.
+
+**Weight.** The Knight's body is no longer blended from pose to pose; every part of the pose is a
+weight on a spring (`B.tick` in `knight.js`). It starts slowly, gathers speed, runs a little past where
+it is going and settles; whatever is on its way down is hurried and whatever is on its way up is held
+back. A falling cut lands hard and bites; hauling the sword back onto the shoulder takes effort. The
+heroes' cuts follow the same rule inside their active window: a falling blade speeds up and is caught,
+a rising one leaves fast and slows as it climbs.
 
 ## Shounen (new in v1.4a)
 
@@ -317,7 +347,7 @@ All three share movement, the dash, Starlight and mending. Weapon and special di
 | | Vesper, the Starblade | Aster, the Starmaul | Lune, the Moonbow |
 |---|---|---|---|
 | Health (Standard) | 5 | 6 | 4 |
-| Weapon | sword: 9, 11, then a 24 finisher | maul: a wide sweep in front (20), then a smash that shakes the ground (40). Hold the smash to charge it, up to 60; fully charged it also throws a wave along the floor (14) | bow: arrows of 4, 5, then a piercing 10, in any direction; up to 60% stronger within 120px, up to 30% weaker past 240px |
+| Weapon | sword: 10 down, 12 back up, then a 26 finisher | maul: a wide sweep in front (20), then a smash that shakes the ground (40). Hold the smash to charge it, up to 60; fully charged it also throws a wave along the floor (14) | bow: arrows of 4, 5, then a piercing 10, in any direction; up to 60% stronger within 120px, up to 30% weaker past 240px |
 | Special | Star Lance: a piercing shot at any range | Starfall: a blast around her; from the air she plunges first and passes through attacks | Moon Volley: a fan of five arrows and a leap backwards |
 | Extra | a slash out of a dash is a thrust | fills the stagger bar 35% faster; a little slower on foot | triple jump; firing downward in the air lifts her; moves at 60% speed while firing; arrows give less Starlight than melee hits |
 
