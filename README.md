@@ -1,8 +1,8 @@
 # Solfall
 
-A side-on boss rush for the browser: three heroes, four three-phase bosses, played as a run of
+A side-on boss rush for the browser: four heroes, four three-phase bosses, played as a run of
 ever-harder trials. You pick a hero and a relic before the run and win a boon after each victory.
-Version 1.5a.
+Version 1.6a.
 
 This is an early slice of a planned boss-rush roguelite (short runs, a boon after each boss,
 bosses drawn from a pool). A run meets the four bosses in a shuffled order, then meets them again, harder.
@@ -113,6 +113,43 @@ hero (`tools/feel-check.js`).
 - Settings, Reset progress erases Sunshards, upgrades, trophies and records (it has to be chosen twice).
 
 Not done: touch controls, a colour-blind alternative to red-orange warnings, gamepad rebinding.
+
+## Eos, the Sheathed Dawn (new in v1.6a)
+
+A fourth hero, built around one idea: **the blade stays in its sheath, and patience is what you spend.**
+
+| Button | What it does |
+|---|---|
+| Attack, pressed | **A flick.** The blade is out, across and home again: 11. It comes out the moment you press. |
+| Attack, held | **The stance.** She sets her feet and Focus gathers while she stands on the ground: one band on the sheath lights at 0.45 s, a second at 0.95 s, the third (gold) at 1.5 s. She walks at 45% speed while she holds it. |
+| Attack, let go | **The draw.** She is carried 170, 230 or 300 pixels along the line you aim down (the mouse, or a held direction; straight up works) and cuts everything she passes through for 18, 46 or 100. The cut does not land yet: a thin line hangs in the air, she feeds the blade home, and the damage arrives on the click, 0.2 to 0.46 s later. |
+| Special | **Dawn Arc.** A cut thrown across the whole arena as a crescent of light: 40, through everything in its path. Her only reach. |
+| Dawnbreak | **Horizon.** Every light in the arena runs to the mouth of the sheath; she is then on the far side of the boss with a hair of light lying across the arena. When the blade is home the cut arrives for 250 (110 to anything else the boss has out), and the picture itself is cut in two along the line for half a second. |
+
+What makes her worth learning:
+
+- **A dash or a jump keeps the Focus you have. Being hit loses all of it.** Focus only gathers on the
+  ground, so the fight becomes finding the half-seconds in a pattern where you can stand.
+- **The draw passes through attacks,** for a little less time than a dash does. Drawn through a blow it
+  is a perfect dodge, and the cut that follows is its Riposte: a three-mark draw through a swing lands
+  for 200. That is the play the whole hero is built to reward.
+- **Patience is paid for.** Held without a break, flicks alone are about 30 damage a second, one-mark
+  draws 37, two-mark 41, three-mark 53. Vesper holding her button is about 46.
+- A three-mark draw that lands on a staggered boss is a Sunder, like any finisher; one that lands while
+  the boss's own swing is coming round stops the swing (a Clash).
+- No text, no meter on the HUD: her Focus is the three bands on the sheath, three rising notes, and a
+  sliver of blade showing at the mouth.
+
+Her way back to rest is the move itself: every flick ends with the blade finding the sheath, and the
+long sheathing after a draw is the wait before the cut lands.
+
+Also in this build: the Hall of Echoes has a fourth alcove (the hall is the same width; its bays are
+narrower), the hero screen has a fourth card, a new boon (**Second Light**, Eos only: the Dawn Arc is
+followed by a second at 60%), and `tools/feel-check.js` can play her.
+
+Measured with the scripted hero (never hit, never dodging, so no Ripostes): Eos clears the Warden in
+74 s, the Magus in 74, the Veil in 85 and the Knight in 55; Vesper takes 75, 72, 87 and 75. Not yet
+played by a person.
 
 ## A finished picture, and a way back to rest (new in v1.5a)
 
@@ -386,7 +423,7 @@ For testing: `G.debug.variant = 'plain'` turns every tell's second form off; a l
 
 ## The heroes
 
-All three share movement, the dash, Starlight and mending. Weapon and special differ.
+All four share movement, the dash, Starlight and mending. Weapon and special differ. Eos works differently enough to have her own section above; the table covers the other three.
 
 | | Vesper, the Starblade | Aster, the Starmaul | Lune, the Moonbow |
 |---|---|---|---|
@@ -437,6 +474,7 @@ Heroes are defined in `G.HEROES` in `js/run.js` (numbers, colours, text); the we
 | Vesper | Thousand Stars | she vanishes; eight cuts of 20 from every side, then a cross-cut of 80 |
 | Aster | Worldbreaker | she rises and comes down for 250, 110 to anything else the boss has out, and everything that can be cut out of the air is destroyed |
 | Lune | Moonfall | a moon rises behind her; one great arrow (26), fourteen moonbeams (11 each), then a cut of 70 |
+| Eos | Horizon | one cut from one side of the arena to the other, 250, landing when the blade is home; 110 to anything else the boss has out |
 
 The last blow of each fills the stagger bar like a Star Lance. When a boss falls, a finishing cut crosses the screen.
 Numbers are in `js/flow.js`.
@@ -529,6 +567,7 @@ machine; clearing site data resets it. Defined in `js/meta.js`.
 | Split Lance | Starlight | Vesper only: the lance fires three at once, each at 60% | 1 |
 | Aftershock | Starlight | Aster only: Starfall strikes a second time at half strength | 1 |
 | Full Quiver | Starlight | Lune only: Moon Volley fires eight arrows | 1 |
+| Second Light | Starlight | Eos only: the Dawn Arc is followed by a second at 60% strength | 1 |
 | Swift Mend | Starlight | mending takes half as long | 1 |
 | Mirror Step | Starlight | Vesper and Lune: a perfect dodge fires a free shot at the core | 1 |
 | Steady Heart | Survival | one more health | 3 |

@@ -1,6 +1,6 @@
 // Solfall - the hero. Movement, dash and mending are shared; the weapon and the special come from
 // the chosen hero (see G.HEROES in run.js): Vesper's sword and lance, Aster's maul and Starfall,
-// Lune's bow and volley.
+// Lune's bow and volley, Eos's sheathed blade and Dawn Arc.
 'use strict';
 (function () {
   const FLOOR = G.FLOOR;
@@ -19,6 +19,15 @@
     STARFALL_DMG: 46, STARFALL_R: 165,
     CHARGE_T: 1.05, // how long Aster's smash takes to charge fully
     CHARGE_DMG: 0.5, // how much a full charge adds to the smash (0.5 = half again)
+    // Eos keeps her blade in its sheath. Holding the attack gathers Focus; letting go is the draw.
+    FOCUS: [0.45, 0.95, 1.5],     // seconds of stance for the first, second and third mark
+    DRAW_DMG: [18, 46, 100],      // what the draw is worth at one, two and three marks: patience is paid for, the third mark most of all
+    DRAW_STEP: [170, 230, 300],   // how far it carries her
+    DRAW_T: 0.1,                  // how long that takes
+    DRAW_WAIT: [0.2, 0.32, 0.46], // how long after it the cut lands: the blade going home
+    DRAW_GAIN: [12, 24, 44],      // Starlight for each thing a draw cut
+    STANCE_SLOW: 0.45,            // her speed while she holds the stance
+    ARC_DMG: 40, ARC_SPEED: 1500, // the Dawn Arc
   };
   const GOLD = '255,214,140'; // the finisher's colour
   // The active hero and its two light colours; set in P.reset.
@@ -60,6 +69,8 @@
       flT: 0, flCd: 0, flBrazen: false, lifts: 0,
       cast: null, // a special's body motion: Vesper's throw, Lune's release, Aster's slam (see castPose)
       recov: null, // how the weapon comes back to rest after the last attack (see recoverPose)
+      // Eos: the stance she is holding, the Focus gathered in it, the draw carrying her, and the cuts made but not yet landed
+      hold: null, focus: 0, drawT: 0, drawV: null, owed: [], arc2: null,
       rig: {}, // pose memory for drawing (see drawBody)
       scarf: [], ghosts: [], slashes: [], bolts: [],
       stats: { dmg: 0, hits: 0, perfect: 0, heals: 0, lances: 0 },
@@ -116,6 +127,12 @@
 
     if (P.dead) { P.deadT += dt; return; }
     if (P.hidden) return;
+    // Eos: a cut that has been made lands when its blade is home, whatever she is doing by then
+    for (let i = P.owed.length - 1; i >= 0; i--) {
+      const o = P.owed[i];
+      o.t -= dt;
+      if (o.t <= 0) { P.owed.splice(i, 1); landCut(o); }
+    }
     // a Dawnbreak takes the hero over until it is done
     if (P.ulting) { G.flow.ultStep(dt); return; }
 
@@ -137,18 +154,20 @@
     if (!P.onGround) P.coyote = Math.max(0, P.coyote - dt);
     // Aftershock: the second Starfall blast
     if (P.afterT > 0) { P.afterT -= dt; if (P.afterT <= 0) starfallBlast(P.afterScale, 0.5); }
+    // Second Light: the Dawn Arc's second crescent
+    if (P.arc2) { P.arc2.t -= dt; if (P.arc2.t <= 0) { const q = P.arc2; P.arc2 = null; arcShot(q.dx, q.dy, 0.6); G.audio.play('draw'); } }
     // a special in motion: the lance leaves the hand when the arm comes through
     if (P.cast) {
       const c = P.cast;
       c.t += dt;
-      if (!c.thrown && c.t >= c.wind) { c.thrown = true; if (c.kind === 'lance') throwLance(c); }
-      if (c.t >= c.dur) P.cast = null;
+      if (!c.thrown && c.t >= c.wind) { c.thrown = true; if (c.kind === 'lance') throwLance(c); else if (c.kind === 'arc') throwArc(c); }
+      if (c.t >= c.dur) { P.cast = null; if (c.kind === 'arc') G.audio.play('sheath', { soft: true }); }
     }
     // Starfall's plunge passes through attacks until it lands
     if (P.plunge) P.iframes = Math.max(P.iframes, 0.1);
 
     const ctl = G.playerControl();
-    const free = !P.plunge && !(P.cast && !P.cast.thrown); // nothing else can be started mid-plunge or mid-throw
+    const free = !P.plunge && !(P.cast && !P.cast.thrown) && P.drawT <= 0; // nothing else can be started mid-plunge, mid-throw or mid-draw
     let mx = ctl ? I.axisX() : 0;
     const up = ctl && I.down.up, down = ctl && I.down.down;
     if (ctl) {
@@ -157,7 +176,8 @@
       if (I.pressed.dash) P.dashBuf = C.BUFFER;
       if (I.pressed.flare) P.flareBuf = C.BUFFER;
       // holding the button keeps the combo going
-      if (I.down.attack && P.atkCd <= 0) P.atkBuf = Math.max(P.atkBuf, 0.03);
+      // (not for Eos: for her a held button is the stance)
+      if (I.down.attack && P.atkCd <= 0 && !H.draw) P.atkBuf = Math.max(P.atkBuf, 0.03);
     }
 
     // --- flourish: a salute that leaves you open for its whole length. Finish one and Flow and
@@ -172,7 +192,7 @@
       }
       if (!P.onGround || P.stun > 0) P.flT = 0;
       else if (P.flT >= C.FLOURISH_T) flourished();
-    } else if (ctl && I.pressed.taunt && free && P.onGround && P.dashT <= 0 && !P.atk && P.stun <= 0 && P.healT === 0) {
+    } else if (ctl && I.pressed.taunt && free && P.onGround && P.dashT <= 0 && !P.atk && !P.hold && P.stun <= 0 && P.healT === 0) {
       if (P.flCd > 0) { G.audio.play('empty'); }
       else {
         P.flT = 0.0001; P.flBrazen = false; mx = 0;
@@ -183,7 +203,7 @@
 
     // --- mend: hold to spend one segment of Starlight for health
     if (!I.down.heal) P.healLock = false;
-    const wantHeal = ctl && I.down.heal && !P.healLock && P.flT === 0;
+    const wantHeal = ctl && I.down.heal && !P.healLock && P.flT === 0 && !P.hold;
     if (wantHeal && free && P.onGround && P.dashT <= 0 && !P.atk && P.stun <= 0 && P.hp < P.maxHp && P.ember >= C.SEG) {
       if (P.healT === 0) G.audio.play('healStart');
       P.healT += dt;
@@ -209,12 +229,13 @@
     }
 
     // --- dash
-    if (P.dashBuf > 0 && !P.plunge && P.dashT <= 0 && P.dashCd <= 0 && P.stun <= 0 && (P.onGround || P.airDashes > 0)) {
+    if (P.dashBuf > 0 && !P.plunge && P.drawT <= 0 && P.dashT <= 0 && P.dashCd <= 0 && P.stun <= 0 && (P.onGround || P.airDashes > 0)) {
       P.dashBuf = 0;
       P.dashT = C.DASH_T; P.dashDir = mx || P.facing; P.facing = P.dashDir;
       P.iframes = C.IFRAME; P.pdDone = false;
       if (!P.onGround) P.airDashes--;
       if (P.cast && !P.cast.thrown && P.cast.kind === 'lance') throwLance(P.cast);
+      if (P.cast && !P.cast.thrown && P.cast.kind === 'arc') throwArc(P.cast);
       P.cast = null;
       P.atk = null; P.healT = 0; P.ghostT = 0; P.dashHit.clear();
       G.audio.play('dash');
@@ -228,6 +249,25 @@
     // --- horizontal movement
     if (P.plunge) {
       P.vx = 0;
+    } else if (P.drawT > 0) {
+      // Eos's draw: she is carried along the line she aimed down, through whatever stands on it
+      P.drawT -= dt;
+      P.vx = P.drawV.x; P.vy = P.drawV.y;
+      P.ghostT -= dt;
+      if (P.ghostT <= 0) {
+        const a = P.atk;
+        P.ghostT = 0.02;
+        P.ghosts.push({ x: P.x, y: P.y, f: P.facing, life: 0.24, atk: a && a.kind === 'draw' ? { kind: 'draw', t: a.t, a0: 0, a1: a.a1, dx: a.dx, dy: a.dy, lvl: a.lvl, heavy: a.heavy } : null });
+        for (let i = 0; i < 3; i++) {
+          G.fx.spawn({ kind: 'spark', x: P.x + G.rand(-8, 8), y: P.y - G.rand(8, 46), vx: -P.drawV.x * G.rand(0.1, 0.24), vy: -P.drawV.y * G.rand(0.1, 0.24), life: G.rand(0.12, 0.26), size: G.rand(1.2, 2.2), color: a && a.heavy ? GOLD : STAR, len: 0.075 });
+        }
+      }
+      if (P.drawT <= 0) {
+        // she stops as fast as she started; in the air she hangs for a moment
+        const dir = G.sign(P.drawV.x);
+        P.vx = P.drawV.x * 0.05; P.vy = P.onGround ? 0 : Math.min(-90, P.drawV.y * 0.05);
+        if (P.onGround && dir) G.fx.dust(P.x + dir * 12, P.y, 4, { dir, speed: [60, 260], size: [5, 10], up: 30 });
+      }
     } else if (P.dashT > 0) {
       P.dashT -= dt;
       P.vx = P.dashDir * C.DASH_SPEED; P.vy = 0;
@@ -249,7 +289,8 @@
       P.vx *= Math.exp(-2.5 * dt);
     } else {
       // firing the bow slows her, so shooting and dodging cannot both be done at full speed
-      const target = mx * P.run * (P.atk && P.atk.kind === 'shot' ? C.BOW_SLOW : P.atk && P.atk.hold > 0 && !P.atk.swung ? 0.3 : 1);
+      // (and holding the stance slows Eos to a walk)
+      const target = mx * P.run * (P.atk && P.atk.kind === 'shot' ? C.BOW_SLOW : P.atk && P.atk.hold > 0 && !P.atk.swung ? 0.3 : P.hold && P.focus > 0.12 ? C.STANCE_SLOW : 1);
       // (on a frozen floor, G.slick, everyone does: far less grip to start, stop or turn with; platforms stay dry)
       const grip = P.onGround && !P.plat ? 1 - 0.8 * G.slick : 1;
       const acc = (P.onGround ? C.ACC_G : C.ACC_A) * (H.accel || 1) * grip * dt; // the heavy hero takes longer to start and stop
@@ -288,7 +329,7 @@
     if (P.plunge) {
       P.vy = 1750;
       if (Math.random() < 0.8) G.fx.spawn({ x: P.x + G.rand(-8, 8), y: P.y - 30, vx: G.rand(-30, 30), vy: -200, life: 0.3, size: 7, color: STAR });
-    } else if (P.dashT <= 0) {
+    } else if (P.dashT <= 0 && P.drawT <= 0) {
       // a little hang at the top of a held jump, and a slightly quicker fall
       const hang = !P.onGround && Math.abs(P.vy) < 110 && ctl && I.down.jump ? 0.55 : 1;
       P.vy = Math.min(C.MAXFALL, P.vy + C.GRAV * hang * (P.vy > 0 ? 1.1 : 1) * dt);
@@ -350,7 +391,8 @@
 
     // --- weapon
     const charging = P.atk && P.atk.canCharge && !P.atk.swung;
-    if (P.atkBuf > 0 && free && P.atkCd <= 0 && P.dashT <= 0 && P.stun <= 0 && P.healT === 0 && !charging) {
+    if (H.draw) stance(dt, ctl, mx, up, down, free);
+    else if (P.atkBuf > 0 && free && P.atkCd <= 0 && P.dashT <= 0 && P.stun <= 0 && P.healT === 0 && !charging) {
       P.atkBuf = 0; P.cast = null;
       if (H.weapon === 'bow') startShot(mx, up, down);
       else startSwing(mx, up, down);
@@ -363,8 +405,9 @@
         charge(a, dt);
       } else a.t += dt;
       if (!a.swung && a.t >= a.a0) { a.swung = true; if (a.kind === 'shot') loose(a); else swing(a); }
-      if (a.kind !== 'shot' && a.t >= a.a0 && a.t <= a.a1) checkHits(a);
-      if (a.t >= a.dur) { P.atk = null; P.recov = recoverOf(a); }
+      if (a.kind === 'draw') sweepCut(a);
+      else if (a.kind !== 'shot' && a.t >= a.a0 && a.t <= a.a1) checkHits(a);
+      if (a.t >= a.dur) { P.atk = null; P.recov = recoverOf(a); if (a.kind === 'draw') drawn(a); }
     }
     // the way back to rest: only ever a picture, it never holds a button back
     if (P.recov) {
@@ -388,6 +431,7 @@
         const d = aim(mx, up, down, I.aim.flare);
         if (H.special === 'lance') castLance(d.x, d.y);
         else if (H.special === 'starfall') castStarfall();
+        else if (H.special === 'arc') castArc(d.x, d.y);
         else castVolley(d.x, d.y);
       } else {
         G.audio.play('empty'); P.emberFlash = -1;
@@ -505,7 +549,7 @@
     if (P.onGround && a.kind === 'side' && (a.heavy || a.thrust)) G.fx.dust(P.x - a.dir * 8, P.y, 3, { dir: -a.dir, speed: [40, 160], size: [5, 9] });
     if (a.kind === 'side' && P.stun <= 0) {
       if (a.thrust) P.vx = a.dir * Math.max(Math.abs(P.vx), 560);
-      else if (P.onGround) P.vx += a.dir * (a.heavy ? 330 : 100);
+      else if (P.onGround && !a.flick) P.vx += a.dir * (a.heavy ? 330 : 100);
       else if (a.heavy) P.vx += a.dir * 150;
     }
     if (a.heavy && a.kind === 'up' && !P.onGround) P.vy = Math.min(P.vy, -240);
@@ -807,6 +851,200 @@
     if (k >= 1 && G.boon('aftershock')) { P.afterT = 0.3; P.afterScale = scale; }
   }
 
+
+  // ---------------------------------------------------------------- the sheathed blade (Eos)
+  // Her blade lives in its sheath. A press is a flick: out, across and home. Keep the button down
+  // and she sets her feet behind it: Focus gathers while she is on the ground (a dash or a jump
+  // keeps what she has, a hit loses it), one mark on the sheath at a time, up to three. Letting go
+  // is the draw: she is carried along the line she aimed down, through whatever stands on it and
+  // through anything coming at her, and the cut itself lands a moment later, when the blade is home.
+  function focusMark(f) { f = f == null ? P.focus : f; return f >= C.FOCUS[2] ? 3 : f >= C.FOCUS[1] ? 2 : f >= C.FOCUS[0] ? 1 : 0; }
+  P.focusMark = focusMark;
+  const mouthX = () => P.x + P.facing * 9, mouthY = () => P.y - 31; // where the mouth of the sheath is, for light
+
+  function stance(dt, ctl, mx, up, down, free) {
+    const I = G.input;
+    if (!ctl || P.stun > 0) { P.hold = null; P.focus = 0; return; }
+    const can = free && P.healT === 0 && P.flT === 0;
+    if (!P.hold) {
+      if (P.atkBuf > 0 && can && P.atkCd <= 0 && P.dashT <= 0) {
+        // a press: the flick comes out at once, and the stance begins behind it
+        P.atkBuf = 0; P.cast = null;
+        flick(mx, up, down);
+        P.hold = { t: 0 }; P.focus = 0;
+      } else if (I.down.attack && can && P.atkCd <= 0 && P.atkBuf <= 0 && !P.atk) {
+        P.hold = { t: 0 }; P.focus = 0; // still held from before (through a hit, say): straight back into the stance
+      }
+      if (!P.hold) return;
+    }
+    const h = P.hold;
+    h.t += dt;
+    if (I.down.attack && !h.go) {
+      if (P.onGround && P.dashT <= 0 && can) gather(dt);
+      return;
+    }
+    // let go (mid-throw it waits for the throw)
+    h.go = true;
+    if (!can) return;
+    const lvl = focusMark();
+    P.hold = null; P.focus = 0;
+    if (lvl > 0) drawCut(lvl, mx, up, down);
+  }
+
+  function gather(dt) {
+    const was = focusMark();
+    P.focus = Math.min(C.FOCUS[2], P.focus + dt / haste());
+    if (P.focus < 0.12) return; // a tap is not a stance
+    const m = focusMark(), hx = mouthX(), hy = mouthY();
+    // light runs to the mouth of the sheath
+    if (Math.random() < dt * (14 + 16 * m)) {
+      const ang = G.rand(0, G.TAU), r = G.rand(40, 84);
+      G.fx.spawn({ x: hx + Math.cos(ang) * r, y: hy + Math.sin(ang) * r, vx: -Math.cos(ang) * r * 3.2, vy: -Math.sin(ang) * r * 3.2, life: 0.3, size: G.rand(1.6, 3.2), color: m >= 3 ? GOLD : m ? HOT : STAR });
+    }
+    if (m >= 3 && Math.random() < dt * 12) G.fx.dust(P.x + G.rand(-26, 26), P.y, 1, { speed: [10, 40], size: [3, 7], up: 50, a: 0.26 });
+    if (m > was) {
+      G.audio.play('focus', { n: m });
+      G.fx.glint(hx, hy, 18 + 9 * m, m >= 3 ? GOLD : HOT, 0.26);
+      G.fx.ring(hx, hy, { r0: 30 + 16 * m, r1: 6, life: 0.22, color: m >= 3 ? GOLD : STAR, width: 2 + m });
+      if (m >= 3) {
+        G.fx.shake(2.5); G.fx.light(hx, hy, 190, GOLD, 0.3, 0.6); G.fx.vig(STAR, 0.16, 0.6);
+        G.fx.dust(P.x, P.y, 6, { speed: [60, 200], size: [5, 9], up: 24 });
+      }
+    }
+  }
+
+  // The flick: one quick cut from the sheath, rising, and straight back in.
+  function flick(mx, up, down) {
+    const I = G.input;
+    let kind = up ? 'up' : (down && !P.onGround ? 'down' : 'side');
+    if (mx) P.facing = mx;
+    if (I.aim.attack) {
+      const ax = I.mx + G.cam.x - P.x, ay = I.my + G.cam.y - (P.y - 32);
+      const steep = Math.abs(ay) > Math.abs(ax) * 1.15;
+      kind = steep && ay < 0 ? 'up' : (steep && ay > 0 && !P.onGround ? 'down' : 'side');
+      if (Math.abs(ax) > 6) P.facing = ax > 0 ? 1 : -1;
+    }
+    const st = H.combo[0];
+    P.combo = -1; P.comboT = 0;
+    P.atk = {
+      kind, idx: 1, heavy: false, thrust: false, flick: true, t: 0, dur: st.dur, a0: st.wind, a1: st.wind + st.act,
+      hit: new Set(), dir: P.facing, swung: false, quake: false, sweep: false, canCharge: false, hold: 0, charge: 0,
+      dmg: Math.round((kind === 'down' ? H.down : st.dmg) * weaponMult(false)),
+    };
+    P.atkCd = st.cd * haste();
+    slashArc(P.atk, -st.wind);
+  }
+
+  // The draw.
+  function drawCut(lvl, mx, up, down) {
+    const d = aim(mx, up, down, G.input.aim.attack), k = lvl - 1, heavy = lvl >= 3;
+    // from the ground, a line that is nearly level is level
+    if (P.onGround && Math.abs(d.y) < 0.26) { d.x = G.sign(d.x) || P.facing; d.y = 0; }
+    const dist = C.DRAW_STEP[k] * (1 + 0.3 * G.boon('reach')), spd = dist / C.DRAW_T;
+    if (P.dashT > 0) { P.dashT = 0; P.dashCd = P.dashCdMax; P.sinceDash = 0; } // straight out of a dash
+    const owe = {
+      t: C.DRAW_T + C.DRAW_WAIT[k], lvl, heavy, cuts: [], dir: G.sign(d.x) || P.facing, ang: Math.atan2(d.y, d.x),
+      dmg: Math.round(C.DRAW_DMG[k] * weaponMult(heavy)),
+    };
+    P.owed.push(owe);
+    P.atk = {
+      kind: 'draw', lvl, heavy, thrust: false, t: 0, dur: C.DRAW_T, a0: 0, a1: C.DRAW_T, hit: new Set(),
+      dir: P.facing, dx: d.x, dy: d.y, swung: true, hold: 0, charge: 0, x0: P.x, y0: P.y, owe,
+    };
+    P.drawT = C.DRAW_T; P.drawV = { x: d.x * spd, y: d.y * spd }; P.ghostT = 0;
+    if (d.y < -0.05) { P.plat = null; P.onGround = false; P.coyote = 0; }
+    // it passes through attacks, as a dash does: drawn through one, it is a perfect dodge
+    P.iframes = Math.max(P.iframes, C.DRAW_T + 0.06 + 0.02 * lvl); P.pdDone = false;
+    P.atkCd = C.DRAW_T + C.DRAW_WAIT[k] + 0.03;
+    P.cast = null; P.recov = null; P.healT = 0; P.squash = -0.07; P.dashHit.clear();
+    G.audio.play('draw');
+    G.fx.kick(d.x * (3 + 2 * lvl), d.y * (3 + 2 * lvl));
+    const hx = mouthX(), hy = mouthY();
+    G.fx.glint(hx, hy, 22 + 12 * lvl, heavy ? GOLD : HOT, 0.2);
+    G.fx.lines(hx, hy, 4 + 3 * lvl, HOT, { r0: 14, speed: [500, 1000] });
+    if (P.onGround) G.fx.dust(P.x - d.x * 8, P.y, 3 + lvl, { dir: -G.sign(d.x) || -P.facing, speed: [80, 320], size: [5, 11], up: 30 });
+    else G.fx.ring(P.x, P.y - 24, { r0: 8, r1: 40 + 10 * lvl, life: 0.22, color: STAR, width: 3 });
+    if (heavy) { G.fx.light(hx, hy, 240, GOLD, 0.2, 0.6); G.fx.flash(HOT, 0.07, 0.14); }
+  }
+
+  // Everything her blade crosses while the draw carries her. Nothing is hurt yet: each is owed a cut.
+  function sweepCut(a) {
+    const r = (1 + 0.3 * G.boon('reach')) * H.reach;
+    const hb = { cx: P.x + a.dx * 24 * r, cy: P.y - 28 + a.dy * 24 * r, hw: 40 * r, hh: 38 };
+    for (const t of G.boss.targets()) {
+      if (a.hit.has(t.id) || !touch(hb, t)) continue;
+      a.hit.add(t.id);
+      const c = contact(hb, t);
+      a.owe.cuts.push({ id: t.id, ox: c.x - t.cx, oy: c.y - t.cy });
+      // steel passing: a ring of it and a star of light, and the world catches for an instant
+      G.audio.play('glint');
+      G.fx.stop(0.02 + 0.012 * a.lvl);
+      G.fx.glint(c.x, c.y, 26 + 10 * a.lvl, HOT, 0.24);
+    }
+    for (const o of G.hazards.slashables()) {
+      if (G.circleRect(o.x, o.y, o.r + 5, hb)) { o.slash(); P.gain(C.GAIN_ORB); }
+    }
+  }
+
+  // The draw is over: the line of the cut hangs in the air until the blade is home.
+  function drawn(a) {
+    const o = a.owe, len = G.dist(a.x0, a.y0, P.x, P.y), cx = (a.x0 + P.x) / 2, cy = (a.y0 + P.y) / 2 - 30;
+    G.fx.cut(cx, cy, o.ang, len + 110, 6 + 3 * a.lvl, STAR, HOT, 0.13);
+    G.fx.cut(cx, cy, o.ang, len + 170, 1.4 + 0.5 * a.lvl, a.heavy ? GOLD : HOT, HOT, o.t + 0.1);
+    if (a.heavy && G.boon('crescent')) wave(P.x + a.dx * 20, P.y - 30 + a.dy * 20, a.dx, a.dy);
+  }
+
+  // The blade is home, and what it cut finds out.
+  function landCut(o) {
+    G.audio.play('sheath');
+    for (const c of o.cuts) {
+      const t = G.boss.targets().find((q) => q.id === c.id);
+      if (!t) continue;
+      const x = t.cx + c.ox, y = t.cy + c.oy, lvl = o.lvl;
+      const em = G.moments.strike(o.heavy);
+      const res = G.boss.damage(Math.round(o.dmg * em.mult), t, { x, y, heavy: true, finisher: o.heavy || em.mult > 1, dir: o.dir, poise: H.poise });
+      if (!res) { G.audio.play('tink'); G.fx.tink(x, y, o.ang); continue; }
+      P.gain(C.DRAW_GAIN[lvl - 1]);
+      G.fx.stop([0.05, 0.08, 0.14][lvl - 1]); G.fx.shake([4, 8, 16][lvl - 1]);
+      G.fx.cut(x, y, o.ang, [240, 440, 900][lvl - 1], [9, 16, 28][lvl - 1], STAR, HOT, [0.22, 0.3, 0.42][lvl - 1]);
+      G.fx.hit(x, y, o.ang, { heavy: lvl >= 2, thrust: lvl < 2, power: 0.8 + 0.2 * lvl, col: o.heavy ? GOLD : STAR, hot: HOT });
+      // light that drifts down from the cut like petals
+      G.fx.burst(x, y, { n: 4 + 5 * lvl, color: STAR, speed: [30, 210], life: [0.7, 1.5], size: [1.6, 3.2], grav: 90, wob: 110, drag: 1.4, jitter: 18 });
+      if (lvl >= 2) G.fx.ring(x, y, { r0: 8, r1: 60 + 30 * lvl, life: 0.3, color: o.heavy ? GOLD : STAR, width: 3 + 2 * lvl });
+      if (o.heavy) {
+        G.fx.cut(x, y, o.ang, 900, 13, GOLD, HOT, 0.52);
+        G.fx.punch(0.04); G.fx.flash(HOT, 0.1, 0.25); G.fx.impact(x, y, 0.07);
+        G.fx.lines(x, y, 14, HOT, { r0: 24 });
+        G.fx.light(x, y, 220, HOT, 0.25, 0.45);
+        G.fx.burst(x, y, { n: 12, color: GOLD, speed: [200, 760], life: [0.15, 0.5], kind: 'spark', size: [2.5, 4.5] });
+        G.audio.play('slam');
+      }
+      G.audio.play(lvl >= 2 ? 'hitHeavy' : 'hit');
+      struck(t, x, y);
+      G.moments.landed(em, x, y, o.ang, o.heavy);
+    }
+  }
+
+  // Eos's special: a cut thrown across the arena as a crescent of light.
+  function castArc(dx, dy) {
+    P.atk = null; P.recov = null;
+    P.cast = { kind: 'arc', t: 0, wind: 0.07, dur: 0.46, dx, dy, thrown: false };
+    G.fx.glint(mouthX(), mouthY(), 30, HOT, 0.18);
+  }
+  function arcShot(dx, dy, k) {
+    G.shots.push({
+      wave: true, arc: true, big: 1.5, x: P.x + dx * 30, y: P.y - 34 + dy * 30, vx: dx * C.ARC_SPEED, vy: dy * C.ARC_SPEED,
+      t: 0, life: 0.9, hit: new Set(), dmg: Math.round(C.ARC_DMG * k * G.dmgMult() * spec()),
+    });
+  }
+  function throwArc(c) {
+    arcShot(c.dx, c.dy, 1);
+    if (G.boon('second')) P.arc2 = { t: 0.16, dx: c.dx, dy: c.dy };
+    P.vx -= c.dx * 160;
+    G.audio.play('draw'); G.audio.play('flare');
+    muzzle(c.dx, c.dy);
+  }
+
   // An attack connected while the player was dashing (or plunging) through it.
   function perfect() {
     P.stats.perfect++;
@@ -855,6 +1093,7 @@
     const braced = !!(P.atk && P.atk.canCharge && !P.atk.swung && P.atk.hold > 0.12) && P.hp > 0;
     const dir = G.sign(P.x - srcX) || -P.facing;
     P.inv = C.HURT_INV; P.dashT = 0; P.healT = 0; P.hurtFlash = 1; P.plunge = false;
+    P.drawT = 0; if (!braced) { P.hold = null; P.focus = 0; } // and whatever Focus Eos had gathered is gone
     if (P.flT > 0) { P.flT = 0; P.flCd = 2; } // caught showing off
     G.feats.bump('hurt');
     if (braced) {
@@ -913,7 +1152,7 @@
       // step in two halves so a fast shot cannot skip through a thin target
       for (let k = 0; k < 2 && !s.dead; k++) {
         s.x += s.vx * dt * 0.5; s.y += s.vy * dt * 0.5;
-        const half = s.arrow ? 11 : 16;
+        const half = (s.arrow ? 11 : 16) * (s.big || 1);
         for (const t of G.boss.targets()) {
           if (s.dead || s.hit.has(t.id)) continue;
           if (!touch({ cx: s.x, cy: s.y, hw: half, hh: half }, t)) continue;
@@ -938,8 +1177,8 @@
             if (!s.heavy) s.dead = true; // only the heavy arrow pierces
             continue;
           }
-          const res = G.boss.damage(s.dmg, t, { x: s.x, y: s.y, heavy: true, lance: !s.wave, dir: G.sign(s.vx) });
-          if (res && s.wave) {
+          const res = G.boss.damage(s.dmg, t, { x: s.x, y: s.y, heavy: true, lance: !s.wave || !!s.arc, dir: G.sign(s.vx) || P.facing });
+          if (res && s.wave && !s.arc) {
             G.fx.stop(0.03); G.audio.play('hit');
             G.fx.hit(s.x, s.y, Math.atan2(s.vy, s.vx), { thrust: true, col: STAR, hot: HOT });
           } else if (res) {
@@ -951,7 +1190,7 @@
           } else G.audio.play('tink');
         }
         for (const o of G.hazards.slashables()) {
-          if (!s.dead && G.dist(o.x, o.y, s.x, s.y) < o.r + (s.arrow ? 12 : 18)) {
+          if (!s.dead && G.dist(o.x, o.y, s.x, s.y) < o.r + (s.arrow ? 12 : 18) * (s.big || 1)) {
             o.slash();
             if (s.arrow) { P.gain(C.GAIN_ORB); if (!s.heavy) s.dead = true; }
           }
@@ -975,9 +1214,10 @@
     for (const s of G.shots) {
       if (s.wave) {
         // Crescent: an arc of light that fades as it travels
-        const k = 1 - s.t / s.life;
+        const k = s.arc ? Math.min(1, (s.life - s.t) / 0.12) : 1 - s.t / s.life;
         ctx.save();
         ctx.translate(s.x, s.y); ctx.rotate(Math.atan2(s.vy, s.vx));
+        if (s.big) ctx.scale(s.big, s.big);
         ctx.strokeStyle = G.rgba(STAR, 0.45 * k); ctx.lineWidth = 16;
         ctx.beginPath(); ctx.arc(-26, 0, 44, -0.85, 0.85); ctx.stroke();
         ctx.strokeStyle = G.rgba(HOT, 0.95 * k); ctx.lineWidth = 5;
@@ -1031,6 +1271,10 @@
       dark: '#110a1f', mid: '#281b46', plate: '#483474', hi: '#7256aa', leg: [4.5, 3.4, 2.5], arm: [3.4, 2.9, 2.4], stance: 4,
       anchor: [-4.2, -50], tail: { n: 13, seg: 5.2, w0: 4.8, w1: 0.8, glow: true },
     },
+    eos: {
+      dark: '#1c0811', mid: '#3e1526', plate: '#6c2a44', hi: '#a8496c', leg: [6.4, 5.6, 3.2], arm: [4, 3.4, 2.7], stance: 5.5, lunge: true,
+      anchor: [-6, -49.5], tail: { n: 10, seg: 6, w0: 3.2, w1: 0.8, glow: true },
+    },
   };
   G.heroStyle = (id) => STYLE[id];
 
@@ -1082,8 +1326,8 @@
       DR.ribbon(ctx, pts, tl.w0 * 2.1, tl.w1 * 2.4); ctx.fillStyle = G.rgba(h.col, 0.2); ctx.fill();
       DR.ribbon(ctx, pts, tl.w0, tl.w1); ctx.fillStyle = G.rgba(h.col, 0.85); ctx.fill();
       DR.ribbon(ctx, pts, tl.w0 * 0.38, tl.w1 * 0.4); ctx.fillStyle = G.rgba(h.hot, 0.9); ctx.fill();
-      if (h.id === 'vesper') {
-        // the scarf's second, shorter tail
+      if (h.id === 'vesper' || h.id === 'eos') {
+        // the scarf's second, shorter tail (and the second of Eos's hat ribbons)
         DR.ribbon(ctx, pts.slice(0, 7).map((q, k) => ({ x: q.x, y: q.y + 2 + k * 1.4 })), tl.w0 * 0.7, 0.8);
         ctx.fillStyle = G.rgba(h.col, 0.5); ctx.fill();
       }
@@ -1171,6 +1415,11 @@
   // it out of the ground first); Lune lets the bow drop after a shot and spins it once after the
   // heavy arrow. It is drawing only: any button cuts it short.
   function recoverOf(a) {
+    if (H.draw) {
+      // Eos: every cut ends with the blade going home. After a draw it is slow, and the click is when the cut lands.
+      if (a.kind === 'draw') { const w = C.DRAW_WAIT[a.lvl - 1]; return { kind: 'noto', t: 0, dur: w + 0.14, at: w / (w + 0.14), ang: Math.atan2(a.dy, Math.abs(a.dx)), lvl: a.lvl }; }
+      return { kind: 'home', t: 0, dur: 0.2, at: 0.92, from: swingAngle(Object.assign({}, a, { t: a.a1 })), up: a.kind === 'up' };
+    }
     if (a.kind === 'shot') return { kind: a.heavy ? 'spin' : 'drop', t: 0, dur: a.heavy ? 0.4 : 0.22, at: 0.05, dx: a.dx, dy: a.dy };
     if (a.thrust) return { kind: 'thrust', t: 0, dur: 0.24, at: 2 };
     if (a.kind !== 'side') return null;
@@ -1195,6 +1444,8 @@
       // it lands on her shoulder
       if (P.onGround) { P.squash = Math.min(P.squash, -0.07); G.audio.play('stepHeavy'); }
     } else if (r.kind === 'spin') G.audio.play('whoosh');
+    else if (r.kind === 'home') G.audio.play('sheath', { soft: true });
+    else if (r.kind === 'noto') G.fx.glint(mouthX(), mouthY(), 14, HOT, 0.16);
   }
   // rest: where the weapon would be held if nothing had just happened
   function recoverPose(h, r, SH, rest) {
@@ -1243,6 +1494,9 @@
     else if (a.kind === 'down') { w0 = -0.4; a0 = 0.2; a1 = 2.7; }
     else if (a.heavy) { w0 = -1.7; a0 = -2.7; a1 = 1.5; }
     else if (a.idx === 1) { w0 = 1.95; a0 = 1.5; a1 = -1.6; }
+    // Eos's flick starts in the sheath behind her and rises
+    if (a.flick && a.kind === 'side') { w0 = 2.6; a0 = 1.6; a1 = -1.0; }
+    else if (a.flick && a.kind === 'up') { w0 = 2.6; a0 = 0.8; a1 = -2.2; }
     if (a.t < a.a0) return G.lerp(w0, a0, G.ease.outCubic(G.clamp(a.t / a.a0, 0, 1))) + (a.heavy ? G.rand(-0.06, 0.06) : 0);
     // the cut itself, inside the active window. A blade that is falling gathers speed and then is
     // caught; one that is rising leaves fast and slows as it climbs. Gravity decides which.
@@ -1254,11 +1508,14 @@
   // Where the feet go: [front foot, back foot].
   function footTargets(s, st) {
     if (s.dash) return [[-12, -7], [-5, -2]];
+    // Eos thrown along her cut, or holding where it left her: a long, low lunge
+    if (st.lunge && s.onGround && ((s.atk && s.atk.kind === 'draw') || (s.recov && s.recov.kind === 'noto' && s.recov.t < s.recov.dur * s.recov.at && Math.abs(s.vx) <= 40))) return [[11.5, 0], [-11, 0]];
     if (!s.onGround) return s.vy < 0 ? [[5.5, -9], [-7.5, -3]] : [[4.5, -3], [-6.5, -7]];
     if (Math.abs(s.vx) > 40) {
       const p = s.runT;
       return [[Math.sin(p) * 10.5, -Math.max(0, Math.cos(p)) * 7], [Math.sin(p + Math.PI) * 10.5, -Math.max(0, Math.cos(p + Math.PI)) * 7]];
     }
+    if (st.lunge && s.hold && s.focus > 0.12) return [[9.5, 0], [-8.5, 0]]; // set in her stance
     return [[st.stance, 0], [-st.stance, 0]];
   }
 
@@ -1267,6 +1524,7 @@
     const a = s.atk, air = !s.onGround, run = !air && Math.abs(s.vx) > 40;
     const sw = Math.sin(s.runT + Math.PI);
     const SH = -35; // shoulder height
+    if (h.weapon === 'blade') return bladePose(h, s, breath);
     if (s.flT > 0) {
       // flourish: the weapon goes round once and is held high
       const k = G.clamp(s.flT / 0.3, 0, 1), spin = (1 - k) * (1 - k) * G.TAU, ang = -1.42 - spin;
@@ -1320,6 +1578,115 @@
     }
     if (s.dash) return { fx: -2, fy: -28, bx: -6, by: -27, ang: 0.1, pull: 0, len: 0 };
     return { fx: 12.5 + (run ? sw * 2 : 0), fy: -27.5 + breath * 0.3, bx: -3.5 + (run ? -sw * 3 : 0), by: -25.5, ang: 0.16, pull: 0, len: 0 };
+  }
+
+
+  // ---- Eos: the sheath at her hip and the blade in it. Her pose carries more than the others':
+  // the sheath (its mouth sx, sy and the way it points, sang), the sword's own place (hx, hy: where
+  // grip meets guard), its angle, and how much blade shows (vis). Her hand sits on the grip, a
+  // little behind the guard.
+  const KAT = 36;                        // blade length
+  const MOUTH = [4, -21], SANG = 2.72;   // the sheath at rest: its mouth at her belt, pointing back and a little down
+  const smooth = (x) => { x = G.clamp(x, 0, 1); return x * x * (3 - 2 * x); };
+  // the sword home in its sheath (o.out: how far the guard has been thumbed clear of the mouth)
+  function sheathed(sx, sy, sang, o) {
+    const c = -Math.cos(sang), s = -Math.sin(sang), out = (o && o.out) || 0;
+    const hx = sx + c * (1.6 + out), hy = sy + s * (1.6 + out);
+    return Object.assign({ sx, sy, sang, hx, hy, ang: sang, vis: out, len: KAT, tip: false, fx: hx + c * 4, fy: hy + s * 4, bx: sx - c * 2.5 - 1.5, by: sy - s * 2.5 + 0.5 }, o);
+  }
+  // the blade in her hand; sc is the sheath to go with it: [sx, sy, sang]
+  function freeBlade(fx, fy, ang, sc, o) {
+    return Object.assign({
+      fx, fy, hx: fx + Math.cos(ang) * 4, hy: fy + Math.sin(ang) * 4, ang, vis: KAT, len: KAT, tip: true, free: true,
+      sx: sc[0], sy: sc[1], sang: sc[2], bx: sc[0] + Math.cos(sc[2]) * 2.5 - 1.5, by: sc[1] + Math.sin(sc[2]) * 2.5 + 0.5,
+    }, o);
+  }
+  // The blade on its way into the sheath, q from 0 to 1. First it swings round (sense +1: it falls
+  // forward and under; -1: back over the top) until it points down the sheath, which is drawn back
+  // and tipped up to meet it; then it slides home. Blade that is already inside is not drawn.
+  function homing(q, from, sense, sc, SH, rad) {
+    const sx = sc[0], sy = sc[1], sang = sc[2];
+    const mx = sx - 6, my = sy + 1.5, tilt = 2.5;         // the sheath, drawn back to meet the point
+    const c = -Math.cos(tilt), sn = -Math.sin(tilt);
+    const s1x = mx + c * 26, s1y = my + sn * 26;          // where her hand is when the point finds the mouth
+    if (q < 0.55) {
+      const k = smooth(q / 0.55);
+      let d = (tilt - from) % G.TAU;
+      if (sense > 0 && d < 0) d += G.TAU;
+      if (sense < 0 && d > 0) d -= G.TAU;
+      const ang = from + d * (sense > 0 ? k * k * (1.6 - 0.6 * k) : k); // falling, it gathers speed and is caught
+      const fx = G.lerp(2 + Math.cos(from) * rad, s1x, k), fy = G.lerp(SH + 2 + Math.sin(from) * rad, s1y, k) + Math.sin(k * Math.PI) * 2.5 * sense;
+      return freeBlade(fx, fy, ang, [G.lerp(sx - 5, mx, k), G.lerp(sy + 1, my, k), G.lerp(3.05, tilt, k)], { vis: G.lerp(KAT, 20.2, k * k * k) });
+    }
+    const k = smooth((q - 0.55) / 0.45), R = sheathed(sx, sy, sang, {});
+    const m2x = G.lerp(mx, sx, k), m2y = G.lerp(my, sy, k), fx = G.lerp(s1x, R.fx, k), fy = G.lerp(s1y, R.fy, k);
+    const ang = Math.atan2(m2y - fy, m2x - fx);
+    return freeBlade(fx, fy, ang, [m2x, m2y, G.lerp(tilt, sang, k)], { vis: Math.max(0, Math.hypot(m2x - fx, m2y - fy) - 5.8), tip: false });
+  }
+  // Her ways back to rest: a flick's blade falls back the way it came and finds the mouth; after a
+  // draw she holds the line of the cut, lets the blade fall, and feeds it home. The click is at r.at.
+  function bladeRecover(r, sc, SH) {
+    const u = G.clamp(r.t / r.dur, 0, 1);
+    if (r.kind === 'home') return homing(u, r.from, r.up ? -1 : 1, sc, SH, 11.5);
+    const hold = r.at * 0.42, th = r.ang;
+    if (u < hold) {
+      const k = smooth(u / hold), ang = th - 0.3 + 0.12 * k;
+      return freeBlade(2 + Math.cos(ang) * 13, SH + 2 + Math.sin(ang) * 13, ang, [sc[0] - 5, sc[1] + 1, 3.05], { vis: KAT + 4 * (1 - k) });
+    }
+    if (u < r.at) return homing((u - hold) / (r.at - hold), th - 0.18, 1, sc, SH, 13);
+    // home: her hand leaves the grip and comes to rest on the pommel
+    const k = smooth((u - r.at) / (1 - r.at)), W = sheathed(sc[0], sc[1], sc[2], {}), c = -Math.cos(sc[2]), sn = -Math.sin(sc[2]);
+    W.fx = G.lerp(W.fx, W.hx + c * 8.7, k); W.fy = G.lerp(W.fy, W.hy + sn * 8.7 - 1, k);
+    return W;
+  }
+  // The Dawn Arc: a hand to the grip, the blade out and across in one motion, and home again.
+  function arcPose(c, sc, SH) {
+    const th = Math.atan2(c.dy, Math.abs(c.dx));
+    if (!c.thrown) return sheathed(sc[0] + 2, sc[1] + 0.5, 3.04, { out: 2 });
+    const t = c.t - c.wind;
+    if (t < 0.16) {
+      const u = G.ease.outCubic(G.clamp(t / 0.07, 0, 1)), ang = G.lerp(th + 2.2, th - 0.75, u);
+      return freeBlade(2 + Math.cos(ang) * 13, SH + 2 + Math.sin(ang) * 13, ang, [sc[0] - 5, sc[1] + 1, 3.05], { vis: KAT + 4 * (1 - u) });
+    }
+    return homing(G.clamp((t - 0.16) / Math.max(0.01, c.dur - c.wind - 0.16), 0, 1), th - 0.75, 1, sc, SH, 13);
+  }
+  function bladePose(h, s, breath) {
+    const a = s.atk, air = !s.onGround, run = !air && Math.abs(s.vx) > 40, sw = Math.sin(s.runT + Math.PI), SH = -35;
+    // the sheath hangs at her hip: it swings as she runs, tips as she rises and falls, streams back in a dash
+    const sx = MOUTH[0], sy = MOUTH[1] + (run ? Math.abs(sw) * 0.5 : breath * 0.25);
+    const sang = s.dash ? 3.02 : air ? (s.vy < 0 ? 2.6 : 2.95) : run ? SANG + sw * 0.07 : SANG;
+    const sc = [sx, sy, sang];
+    if (s.flT > 0) {
+      // flourish: the blade is drawn, goes round once and is held up
+      const k = G.clamp(s.flT / 0.3, 0, 1), spin = (1 - k) * (1 - k) * G.TAU, ang = -1.42 - spin;
+      return freeBlade(3 + Math.cos(ang) * 6, SH - 6 + Math.sin(ang) * 6, ang, sc);
+    }
+    if (s.cast && !a && s.cast.kind === 'arc') return arcPose(s.cast, sc, SH);
+    if (s.stun > 0 && !a) return sheathed(sx - 1, sy, 2.35, { fx: 9, fy: SH - 6, bx: -10, by: SH + 1 });
+    if (s.healT > 0 && !a) { const q = Math.sin(G.t * 9) * 0.4; return sheathed(sx, sy, sang, { fx: 5, fy: -27 + q, bx: 2.5, by: -28.5 + q }); }
+    if (s.recov && !a && !s.dash) return bladeRecover(s.recov, sc, SH);
+    if (a && a.kind === 'draw') {
+      // the draw itself: the blade leaves the sheath behind her and is carried round to lie along the cut
+      const th = Math.atan2(a.dy, Math.abs(a.dx)), u = G.ease.outCubic(G.clamp(a.t / Math.max(0.01, a.a1), 0, 1));
+      const ang = G.lerp(th + 2.3, th - 0.3, u);
+      return freeBlade(2 + Math.cos(ang) * 13, SH + 2 + Math.sin(ang) * 13, ang, [sx - 5, sy + 1, 3.05], { vis: G.lerp(KAT * 0.4, KAT + 4, u) });
+    }
+    if (a) {
+      const ang = swingAngle(a), k = G.clamp(a.t / Math.max(0.01, a.a0), 0, 1);
+      return freeBlade(1.5 + Math.cos(ang) * 11.5, SH + 1 + Math.sin(ang) * 11.5, ang, [sx - 3, sy + 0.5, 2.95], { vis: KAT * (0.45 + 0.55 * k) });
+    }
+    if (s.hold && s.focus > 0.12) {
+      // the stance: sheath drawn forward and levelled, hand closed on the grip, the guard thumbed clear
+      // of the mouth so a sliver of the blade shows. With all three marks lit it trembles.
+      const m = focusMark(s.focus), q = m >= 3 ? Math.sin(G.t * 34) * 0.22 : 0;
+      return sheathed(sx + 2.5, sy + 0.5 + q, 3.04, { out: m ? 1.2 + 0.7 * m : 0 });
+    }
+    const W = sheathed(sx, sy, sang, {});
+    if (s.dash) return W;
+    if (air) { W.fx = W.hx + 3; W.fy = W.hy - 3.5; }          // a hand on the grip in the air
+    else if (run) { W.fx = 2 + sw * 4; W.fy = -22.5; }        // her sword arm swings free as she runs; the other steadies the sheath
+    else { const c = -Math.cos(sang), sn = -Math.sin(sang); W.fx = W.hx + c * 8.7; W.fy = W.hy + sn * 8.7 - 1 + breath * 0.3; } // at rest, a wrist laid on the pommel
+    return W;
   }
 
   // The body motion of a special (P.cast). Vesper: the free arm cocks back behind the head with the
@@ -1448,6 +1815,57 @@
       ctx.fillStyle = ctx.strokeStyle; poly(ctx, [nx + 25, -2.6, nx + 32, 0, nx + 25, 2.6]); ctx.fill();
     }
     ctx.globalCompositeOperation = 'source-over';
+    ctx.restore();
+  }
+
+
+  // Eos's sheath: lacquer with the blade's own slight curve, and three bands that Focus lights one at a time.
+  function drawScabbard(ctx, W, h, st, marks) {
+    ctx.save();
+    ctx.translate(W.sx, W.sy); ctx.rotate(W.sang);
+    const L = KAT + 3, lit = marks >= 3 ? GOLD : h.hot;
+    ctx.fillStyle = '#16070d';
+    ctx.beginPath();
+    ctx.moveTo(-0.6, -2.1); ctx.quadraticCurveTo(L * 0.6, -2.3, L, -3.1);
+    ctx.lineTo(L + 1.2, -1.2); ctx.quadraticCurveTo(L * 0.6, 1.7, -0.6, 2.1);
+    ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = G.rgba(h.col, 0.55); ctx.lineWidth = 0.7; ctx.stroke();
+    ctx.fillStyle = st.hi; ctx.fillRect(-0.8, -2.5, 2.6, 5);                                   // the collar at its mouth
+    ctx.fillStyle = G.rgba(h.col, 0.95); poly(ctx, [L - 2.4, -3.3, L + 1.7, -2.4, L + 0.3, -0.7, L - 2.8, -0.5]); ctx.fill(); // end cap
+    for (let i = 0; i < 3; i++) {
+      const bx = 9.5 + i * 7.5, by = -2.3 - 0.2 * i, on = marks > i;
+      ctx.fillStyle = on ? G.rgba(lit, 1) : G.rgba(h.col, 0.16);
+      ctx.fillRect(bx, by, 1.8, 4.2);
+      if (on) glowAt(ctx, marks >= 3 ? GOLD : h.col, bx + 0.9, 0, 8, 0.95);
+    }
+    ctx.restore();
+  }
+
+  // Her sword: a wrapped grip, a small round guard seen edge on, and a long single edge with a little
+  // curve to it. Only as much blade as W.vis says is drawn (the rest is in the sheath).
+  function drawKatana(ctx, W, h, gold) {
+    ctx.save();
+    ctx.translate(W.hx, W.hy); ctx.rotate(W.ang);
+    const c = gold ? GOLD : h.col, len = W.vis;
+    ctx.fillStyle = '#0d0508'; ctx.fillRect(-9.6, -1.3, 9.8, 2.6);
+    ctx.strokeStyle = G.rgba(h.col, 0.75); ctx.lineWidth = 0.6;
+    for (const gx of [-8, -5.8, -3.6, -1.4]) line(ctx, gx, -1.3, gx + 1.3, 1.3);
+    ctx.fillStyle = G.rgba(c, 1); ctx.fillRect(-10.8, -1.6, 1.5, 3.2);
+    if (len > 0.4) {
+      const e = 1.8 + len, b = len * 0.045;
+      glowAt(ctx, c, 2 + len * 0.55, 0, Math.max(5, len * 0.66), 0.55);
+      ctx.fillStyle = G.rgba(gold ? GOLD : h.hot, 1);
+      ctx.beginPath();
+      ctx.moveTo(1.8, -1.5);
+      if (W.tip && len > 8) {
+        ctx.quadraticCurveTo(1.8 + len * 0.6, -1.5 - b * 0.2, e, -1.2 - b);   // the back, lifting towards the point
+        ctx.lineTo(e - 3, 1.2 - b * 0.8);                                      // the slanted point
+        ctx.quadraticCurveTo(1.8 + len * 0.55, 1.5 - b * 0.1, 1.8, 1.5);       // the edge
+      } else { ctx.lineTo(e, -1.5); ctx.lineTo(e, 1.5); ctx.lineTo(1.8, 1.5); }
+      ctx.closePath(); ctx.fill();
+      if (len > 8) { ctx.strokeStyle = G.rgba(c, 0.9); ctx.lineWidth = 0.7; ctx.beginPath(); ctx.moveTo(3.2, -0.3); ctx.quadraticCurveTo(1.8 + len * 0.6, -0.4 - b * 0.15, e - 4, -0.3 - b * 0.7); ctx.stroke(); }
+    }
+    ctx.fillStyle = G.rgba(c, 1); ctx.fillRect(0.2, -3.4, 1.6, 6.8); // guard
     ctx.restore();
   }
 
@@ -1603,6 +2021,59 @@
     ctx.restore();
   }
 
+
+  function backEos(ctx, h, st, sway, hip) {
+    // a long coat, split up the back
+    ctx.fillStyle = st.dark; ctx.strokeStyle = G.rgba(h.col, 0.45); ctx.lineWidth = 0.8;
+    poly(ctx, [-4.6, SHY + 2, 2.6, SHY + 1, 2, hip + 2, -1.6 - sway, hip + 15, -5 - sway * 1.1, hip + 10.5, -8.4 - sway * 1.3, hip + 17, -9.8 - sway, hip + 4, -7.4, SHY + 8]);
+    ctx.fill(); ctx.stroke();
+  }
+  function bodyEos(ctx, h, st, sway, hip) {
+    const col = h.col;
+    // wide trousers gathered at the waist: a pleated panel over each thigh
+    ctx.fillStyle = st.mid;
+    poly(ctx, [-4.6, hip - 1, 4.8, hip - 1, 6 - sway * 0.3, hip + 9.5, 1.4 - sway * 0.3, hip + 8.2, -1.4 - sway * 0.5, hip + 10.2, -6 - sway * 0.6, hip + 8.6]); ctx.fill();
+    ctx.strokeStyle = 'rgba(0,0,0,0.5)'; ctx.lineWidth = 0.7;
+    line(ctx, 1.2, hip + 1, 1.4 - sway * 0.3, hip + 8.2); line(ctx, -1.8, hip + 1, -1.4 - sway * 0.5, hip + 10.2);
+    // a wrapped coat, crossed left over right
+    ctx.fillStyle = st.mid;
+    poly(ctx, [-3.6, hip + 1, 4, hip + 1, 6, SHY + 1, 3.6, SHY - 2.6, -4.4, SHY - 2, -5.2, SHY + 2]); ctx.fill();
+    ctx.fillStyle = st.plate;
+    poly(ctx, [6, SHY + 1, 3.6, SHY - 2.6, 0.4, SHY - 2.4, -2.4, hip - 1.5, 4, hip - 1.5]); ctx.fill();
+    ctx.strokeStyle = G.rgba(h.hot, 0.9); ctx.lineWidth = 1; line(ctx, 0.6, SHY - 2.2, -2.2, hip - 2);   // the collar's bright edge
+    ctx.strokeStyle = G.rgba(col, 0.8); ctx.lineWidth = 0.8; line(ctx, 3.4, SHY - 2.4, -0.2, SHY + 6.5);
+    // a broad sash, knotted, one end hanging
+    ctx.fillStyle = st.hi; poly(ctx, [-4, hip - 2.8, 4.6, hip - 3, 4.6, hip + 1, -4, hip + 1.2]); ctx.fill();
+    ctx.strokeStyle = G.rgba(col, 0.7); ctx.lineWidth = 0.7; line(ctx, -4, hip - 0.9, 4.6, hip - 1.1);
+    ctx.fillStyle = G.rgba(col, 0.95); poly(ctx, [-1.6, hip - 2.2, 0.6, hip - 1.4, -0.4 - sway * 0.5, hip + 7, -2 - sway * 0.5, hip + 6]); ctx.fill();
+    // a small sun on the breast
+    glowAt(ctx, col, 3.3, SHY + 3.4, 5.5, 0.8);
+    ctx.fillStyle = G.rgba(h.hot, 1); ctx.beginPath(); ctx.arc(3.3, SHY + 3.4, 1.35, 0, G.TAU); ctx.fill();
+  }
+  function headEos(ctx, h, st) {
+    ctx.save();
+    ctx.translate(1, -46.6);
+    // hair, tied back under the hat
+    ctx.fillStyle = st.dark;
+    poly(ctx, [-5.6, 3.8, -7, -1, -4.8, -4.8, 3.6, -5, 5.6, -1.8, 2.4, -3.2, -1.6, -2.6, -3.4, 1.2]); ctx.fill();
+    // a face in shadow, wrapped to the eyes
+    ctx.fillStyle = '#060208';
+    poly(ctx, [-0.8, -3.6, 4, -4, 6.2, -1.2, 5.8, 3.2, 3.2, 5.4, -0.2, 3.6, -3, 0.6]); ctx.fill();
+    ctx.fillStyle = st.plate; poly(ctx, [0.4, 1, 6.1, 0.2, 5.8, 3.2, 3.2, 5.4, 0, 3.4]); ctx.fill();
+    eyes(ctx, h, 1.1, -1.3, 0.9);
+    // a wide travelling hat, tipped forward so its brim shades her eyes
+    ctx.translate(0, -3.2); ctx.rotate(0.07);
+    ctx.fillStyle = st.plate;
+    poly(ctx, [-13.5, -1.4, -1.6, -9.6, 1.4, -9.8, 15, -1.9, 14.2, -0.4, -12.6, 0.2]); ctx.fill();
+    ctx.strokeStyle = G.rgba(h.col, 0.8); ctx.lineWidth = 0.9; ctx.stroke();
+    ctx.fillStyle = st.hi; poly(ctx, [1.4, -9.8, 15, -1.9, 14.2, -0.4, 4.4, -4.6]); ctx.fill();     // the lit side
+    ctx.strokeStyle = 'rgba(0,0,0,0.38)'; ctx.lineWidth = 0.6;
+    line(ctx, -0.8, -9.2, -7.6, -0.4); line(ctx, 0, -9.4, 0.6, -0.2); line(ctx, 0.9, -9.3, 8.4, -0.5);
+    ctx.fillStyle = '#060208'; poly(ctx, [-12.6, 0.2, 14.2, -0.4, 12.4, 0.9, -11, 1.3]); ctx.fill();  // the underside of the brim
+    ctx.fillStyle = G.rgba(h.hot, 1); poly(ctx, [-1.6, -9.6, -0.1, -11.8, 1.4, -9.8]); ctx.fill();    // the knot at its crown
+    ctx.restore();
+  }
+
   // One hero, drawn from a state:
   // { x, y, facing, vx, vy, onGround, squash, runT, atk, primed, hurtFlash, dash }.
   // Used for the live hero, dash afterimages and the portraits on the hero-select screen.
@@ -1611,7 +2082,7 @@
     const a = s.atk, air = !s.onGround, sp = Math.abs(s.vx);
     const run = !air && sp > 40, idle = !air && !run && !a;
     const breath = idle ? Math.sin(G.t * 3) : 0;
-    const gold = s.primed || !!(a && a.heavy);
+    const gold = s.primed || !!(a && a.heavy) || !!(s.recov && s.recov.lvl >= 3);
     // Pose memory. Only the live hero has one (afterimages, echoes and portraits are drawn exactly as
     // posed). With it the limbs, the lean and the weapon at rest ease from one pose to the next over
     // a few frames, so nothing snaps; a swing, a shot and the flourish are always shown exactly.
@@ -1630,16 +2101,35 @@
     ctx.scale(s.facing * SC * (1 - 0.34 * turn), SC);
     const c = s.cast, lean0 = s.dash ? 0.42 : G.clamp(s.vx * s.facing / h.run, -1.6, 1.6) * 0.13;
     let leanT = lean0;
-    if (c && !a) leanT = c.kind === 'lance' ? (c.thrown ? 0.3 : -0.16) : c.kind === 'slam' ? 0.34 : -0.12; // rock back to wind up, fall into the throw
+    if (c && !a) leanT = c.kind === 'lance' ? (c.thrown ? 0.3 : -0.16) : c.kind === 'slam' ? 0.34 : c.kind === 'arc' ? 0.24 : -0.12; // rock back to wind up, fall into the throw
     else if (s.stun > 0) leanT = -0.32;
     else if (s.healT > 0) leanT = 0.1;
-    ctx.rotate(ease('lean', leanT, c ? 45 : 30));
+    else if (h.draw && a && a.kind === 'draw') leanT = 0.5; // thrown forward along the cut
+    else if (h.draw && s.recov && s.recov.kind === 'noto' && !s.dash) leanT = s.recov.t < s.recov.dur * s.recov.at ? 0.32 : 0.08;
+    else if (h.draw && s.hold && s.focus > 0.12 && s.onGround && !s.dash) leanT = 0.2;
+    const drawing = !!(a && a.kind === 'draw');
+    const leanNow = ease('lean', leanT, c || drawing ? 45 : 30);
+    ctx.rotate(leanNow);
+    // Eos sinks into her stance, lower with each mark, and lowest of all in the lunge after a draw
+    let crouchT = 0;
+    if (h.draw && !air) {
+      if (drawing) crouchT = 6;
+      else if (s.recov && s.recov.kind === 'noto' && !s.dash) crouchT = s.recov.t < s.recov.dur * s.recov.at ? 5 : 1;
+      else if (c && c.kind === 'arc') crouchT = 3;
+      else if (s.hold && s.focus > 0.12 && !s.dash) crouchT = 3 + 0.8 * focusMark(s.focus);
+    }
+    const crouch = h.draw ? ease('crouch', crouchT, drawing ? 60 : 22) : 0;
     ctx.scale(1 - s.squash * 0.55, 1 + s.squash);
     ctx.lineCap = 'round'; ctx.lineJoin = 'round';
 
     const bob = run ? Math.abs(Math.sin(s.runT)) * 1.3 : 0;
-    const hip = -24 + bob;
+    const hip = -24 + bob + crouch;
     const ft = footTargets(s, st), L = st.leg, A = st.arm, fr = run ? 44 : 26;
+    if (st.lunge && !air && !s.dash && (drawing || !run)) {
+      // her wide stances are planted: the lean must not lift one foot and bury the other
+      const cl = Math.cos(leanNow), sl = Math.sin(leanNow);
+      for (const f of ft) { const X = f[0], Y = f[1]; f[0] = X * cl + Y * sl; f[1] = -X * sl + Y * cl; }
+    }
     const feet = R ? [[ease('f0x', ft[0][0], fr), ease('f0y', ft[0][1], fr)], [ease('f1x', ft[1][0], fr), ease('f1y', ft[1][1], fr)]] : ft;
     const leg = (i) => {
       const hx = i ? -1.6 : 1.6, k = ik(hx, hip, feet[i][0], feet[i][1], 12.7, 12.7, -1);
@@ -1650,7 +2140,7 @@
       const gx = G.lerp(k.jx, k.ex, 0.82), gy = G.lerp(k.jy, k.ey, 0.82);
       ctx.fillStyle = i ? st.mid : st.plate;
       poly(ctx, [k.jx - L[1] * 0.25, k.jy + 0.5, k.jx + L[1] * 0.72, k.jy - 0.4, gx + L[2] * 0.85, gy, gx - L[2] * 0.2, gy + 0.6]); ctx.fill();
-      if (id !== 'lune') { poly(ctx, [k.jx - 0.6, k.jy - L[1] * 0.6, k.jx + L[1] * 0.95, k.jy - 0.6, k.jx + 0.6, k.jy + L[1] * 0.5]); ctx.fill(); }
+      if (id !== 'lune' && id !== 'eos') { poly(ctx, [k.jx - 0.6, k.jy - L[1] * 0.6, k.jx + L[1] * 0.95, k.jy - 0.6, k.jx + 0.6, k.jy + L[1] * 0.5]); ctx.fill(); }
       poly(ctx, [k.ex - L[2] * 0.9, k.ey - 3.2, k.ex + L[2] * 0.55, k.ey - 3.4, k.ex + L[2] * 0.55 + 4.4, k.ey, k.ex - L[2] * 0.9, k.ey]); ctx.fill();
       if (!i) { ctx.strokeStyle = G.rgba(col, 0.55); ctx.lineWidth = 0.8; line(ctx, k.jx + L[1] * 0.72, k.jy - 0.4, gx + L[2] * 0.85, gy); }
     };
@@ -1658,26 +2148,37 @@
     const sway = G.clamp(s.vx * s.facing * 0.02, -6, 6) + (air ? G.clamp(s.vy * 0.004, -3, 4) : 0) + breath * 0.3;
     // what hangs behind the legs
     ctx.save();
-    ctx.translate(0, bob - breath * 0.5);
+    ctx.translate(0, bob + crouch - breath * 0.5);
     if (id === 'vesper') backVesper(ctx, h, st, sway, -24);
     else if (id === 'lune') backLune(ctx, h, st, sway, -24);
+    else if (id === 'eos') backEos(ctx, h, st, sway, -24);
     ctx.restore();
     leg(1);
 
     // everything above the hips rides the run bob and the idle breath
-    ctx.translate(0, bob - breath * 0.5);
+    ctx.translate(0, bob + crouch - breath * 0.5);
     let W = weaponPose(h, s, breath);
     if (R) {
-      if (a || s.flT > 0 || s.cast || s.recov || R.wang == null) { R.wfx = W.fx; R.wfy = W.fy; R.wbx = W.bx; R.wby = W.by; R.wang = W.ang; }
-      else {
+      if (a || s.flT > 0 || s.cast || s.recov || R.wang == null) {
+        R.wfx = W.fx; R.wfy = W.fy; R.wbx = W.bx; R.wby = W.by; R.wang = W.ang;
+        if (W.sx != null) { R.wsx = W.sx; R.wsy = W.sy; R.wsa = W.sang; }
+      } else {
         // back to rest after a swing, or from one carry to another: quick, but not in one frame
         const kk = 1 - Math.exp(-22 * rdt);
         R.wfx += (W.fx - R.wfx) * kk; R.wfy += (W.fy - R.wfy) * kk; R.wbx += (W.bx - R.wbx) * kk; R.wby += (W.by - R.wby) * kk;
         R.wang += G.angDiff(R.wang, W.ang) * kk;
         W = Object.assign({}, W, { fx: R.wfx, fy: R.wfy, bx: R.wbx, by: R.wby, ang: R.wang });
+        if (W.sx != null) {
+          // Eos: the sheath eases too, and the sword in it goes where the sheath goes
+          if (R.wsx == null) { R.wsx = W.sx; R.wsy = W.sy; R.wsa = W.sang; }
+          R.wsx += (W.sx - R.wsx) * kk; R.wsy += (W.sy - R.wsy) * kk; R.wsa += G.angDiff(R.wsa, W.sang) * kk;
+          W.sx = R.wsx; W.sy = R.wsy; W.sang = W.ang = R.wsa;
+          W.hx = W.sx - Math.cos(R.wsa) * (1.6 + W.vis); W.hy = W.sy - Math.sin(R.wsa) * (1.6 + W.vis);
+        }
       }
     }
     W.fy -= LIFT; W.by -= LIFT;
+    if (W.sy != null) { W.sy -= LIFT; W.hy -= LIFT; }
     const arm = (front) => {
       const sx = front ? (id === 'aster' ? 6.4 : 3) : (id === 'aster' ? -6 : -2.6), held = front !== !!W.swap, tx = held ? W.fx : W.bx, ty = held ? W.fy : W.by;
       const k = ik(sx, SHY, tx, ty, 8.4, 8.8, 1);
@@ -1688,12 +2189,20 @@
       ctx.fillStyle = front ? st.plate : st.mid;
       DR.limb(ctx, G.lerp(k.jx, k.ex, 0.3), G.lerp(k.jy, k.ey, 0.3), G.lerp(k.jx, k.ex, 0.88), G.lerp(k.jy, k.ey, 0.88), A[1] + 1, A[2] + 0.8); ctx.fill();
       if (front) { ctx.strokeStyle = G.rgba(col, 0.6); ctx.lineWidth = 0.7; ctx.stroke(); }
+      if (id === 'eos') {
+        // a wide sleeve hangs from her forearm
+        const mx2 = G.lerp(k.jx, k.ex, 0.5), my2 = G.lerp(k.jy, k.ey, 0.5);
+        ctx.fillStyle = front ? st.mid : st.dark;
+        poly(ctx, [sx - 1.6, SHY + 0.6, k.jx + 0.6, k.jy - A[1] * 0.7, G.lerp(k.jx, k.ex, 0.78), G.lerp(k.jy, k.ey, 0.78) - 1.2, mx2 - 1 - sway * 0.3, my2 + 6.8, k.jx - 2.4 - sway * 0.2, k.jy + 3.6]); ctx.fill();
+        if (front) { ctx.strokeStyle = G.rgba(col, 0.5); ctx.lineWidth = 0.7; ctx.stroke(); }
+      }
       ctx.fillStyle = front ? st.hi : st.plate;
       ctx.beginPath(); ctx.arc(k.ex, k.ey, A[2] * 0.62, 0, G.TAU); ctx.fill();
     };
     const weapon = () => {
       if (h.weapon === 'sword') drawSword(ctx, W, h, gold);
       else if (h.weapon === 'maul') drawMaul(ctx, W, h, st, gold);
+      else if (h.weapon === 'blade') { drawScabbard(ctx, W, h, st, s.hold ? focusMark(s.focus || 0) : 0); drawKatana(ctx, W, h, gold); }
       else drawBow(ctx, W, h, a, gold);
     };
 
@@ -1702,6 +2211,7 @@
     if (id === 'aster') pauldron(ctx, h, st, -9.4, SHY - 1, 0.9, st.mid);
     if (id === 'vesper') bodyVesper(ctx, h, st, sway, -24);
     else if (id === 'aster') bodyAster(ctx, h, st, sway, -24);
+    else if (id === 'eos') bodyEos(ctx, h, st, sway, -24);
     else bodyLune(ctx, h, st);
     ctx.translate(0, breath * 0.5);
     leg(0);
@@ -1710,6 +2220,7 @@
     ctx.translate(0, -breath * 0.35);
     if (id === 'vesper') headVesper(ctx, h, st);
     else if (id === 'aster') headAster(ctx, h, st);
+    else if (id === 'eos') headEos(ctx, h, st);
     else headLune(ctx, h, st);
     ctx.restore();
     if (!W.behind) weapon();
@@ -1775,7 +2286,7 @@
       const k = gh.life / 0.26;
       glowAt(ctx, STAR, gh.x, gh.y - 34, 38, 0.3 * k);
       ctx.globalAlpha = 0.34 * k;
-      drawBody(ctx, H, { x: gh.x, y: gh.y, facing: gh.f, vx: gh.f * C.DASH_SPEED, vy: 0, onGround: false, squash: 0, runT: 0, atk: null, primed: false, hurtFlash: 0, dash: true });
+      drawBody(ctx, H, { x: gh.x, y: gh.y, facing: gh.f, vx: gh.f * C.DASH_SPEED, vy: 0, onGround: false, squash: 0, runT: 0, atk: gh.atk || null, primed: false, hurtFlash: 0, dash: !gh.atk });
       ctx.globalAlpha = 1;
     }
     // Stormcaller's lightning
@@ -1807,7 +2318,7 @@
 
     const blink = P.inv > 0 && P.iframes <= 0 && Math.floor(G.t * 28) % 2 === 0;
     if (blink) ctx.globalAlpha = 0.35;
-    P.primed = P.combo === (H.chain || 3) - 2 && P.comboT > 0 && !P.atk;
+    P.primed = H.draw ? !!P.hold && focusMark() >= 3 : P.combo === (H.chain || 3) - 2 && P.comboT > 0 && !P.atk;
     P.dash = P.dashT > 0;
     if (!P.vanish) { drawTail(ctx, H, P.scarf); drawBody(ctx, H, P); }
     ctx.globalAlpha = 1;

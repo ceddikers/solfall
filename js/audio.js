@@ -122,6 +122,22 @@
       tone({ type: 'triangle', f0: 2900, f1: 2100, dur: 0.3, vol: 0.12 });
       noise({ dur: 0.16, vol: 0.4, f0: 5000, f1: 1800, q: 0.9 });
     },
+    // Eos: steel leaving the sheath, the click of it going home, and the three marks of her Focus
+    draw() {
+      noise({ dur: 0.15, vol: 0.3, f0: 2600, f1: 8000, q: 1.3 });
+      tone({ type: 'triangle', f0: 2300, f1: 3500, dur: 0.24, vol: 0.06 });
+    },
+    sheath(o) {
+      const v = o && o.soft ? 0.45 : 1;
+      noise({ dur: 0.035, vol: 0.3 * v, type: 'highpass', f0: 3000 });
+      tone({ type: 'square', f0: 1700, f1: 900, dur: 0.035, vol: 0.07 * v });
+      tone({ type: 'triangle', f0: 640, f1: 610, dur: 0.14, vol: 0.07 * v });
+    },
+    focus(o) {
+      const n = (o && o.n) || 1, f = 880 * Math.pow(2, (n - 1) * 4 / 12);
+      tone({ f0: f, f1: f * 1.01, dur: 0.16, vol: 0.085 });
+      if (n >= 3) { tone({ f0: f * 1.5, dur: 0.5, vol: 0.06, delay: 0.05 }); tone({ type: 'triangle', f0: f * 2, dur: 0.6, vol: 0.035, delay: 0.1 }); }
+    },
     jump() { tone({ type: 'sine', f0: 320, f1: 560, dur: 0.09, vol: 0.12 }); },
     jump2() {
       tone({ type: 'sine', f0: 480, f1: 880, dur: 0.1, vol: 0.12 });

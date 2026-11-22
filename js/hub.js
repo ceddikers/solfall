@@ -15,7 +15,10 @@
   const NOTES = ['7 health. Warnings last longer, attacks come slower', '5 health. The fight as intended', '4 health. Shorter warnings, less rest, extra attacks'];
   const FLAME = ['150,215,255', '255,170,90', '255,70,60'];
   // where things stand
-  const ECHO_X = [420, 590, 760], SHRINE_X = 1130, FIRE_X = 1560, POST_X = 1950, BRAZIER_X = 2390, BANNER_X = 2770, RELIQ_X = 3266, GATE_X = 3720;
+  // The Hall of Echoes has one bay for each hero, between piers that stand BAY apart
+  const NH = G.HEROES.length, BAY = 510 / NH, ARCH = BAY / 2 - 23;
+  const ECHO_X = G.HEROES.map((h, i) => Math.round(335 + BAY * (i + 0.5)));
+  const SHRINE_X = 1130, FIRE_X = 1560, POST_X = 1950, BRAZIER_X = 2390, BANNER_X = 2770, RELIQ_X = 3266, GATE_X = 3720;
   const BANNERS = [2665, 2735, 2805, 2875], RING_X = 2975;
 
   const HUB = G.hub = { near: null, t: 0, lastX: FIRE_X - 70, msg: '', msgT: 0, W: HW, layers: null, flies: [], blades: [] };
@@ -262,9 +265,7 @@
   // ------------------------------------------------------------------ the places
   // x: where it stands. reach: how close the hero must be. top: how high its name floats.
   const STATIONS = [
-    { id: 'echo', hero: 0, x: ECHO_X[0], reach: 56, top: 262 },
-    { id: 'echo', hero: 1, x: ECHO_X[1], reach: 56, top: 262 },
-    { id: 'echo', hero: 2, x: ECHO_X[2], reach: 56, top: 262 },
+    ...G.HEROES.map((h, i) => ({ id: 'echo', hero: i, x: ECHO_X[i], reach: Math.min(56, BAY / 2 - 8), top: 262 })),
     { id: 'shrine', x: SHRINE_X, reach: 78, top: 300 },
     { id: 'tally', x: TALLY_X, reach: 62, top: 204 },
     { id: 'post', x: POST_X, reach: 0, top: 140 },
@@ -722,18 +723,18 @@
 
   const still = { x: 0, y: 0, facing: 1, vx: 0, vy: 0, onGround: true, squash: 0, runT: 0, atk: null, primed: false, hurtFlash: 0, dash: false };
 
-  // The Hall of Echoes: three alcoves, one for each hero. Yours stands empty while you are out of it.
+  // The Hall of Echoes: an alcove for each hero. Yours stands empty while you are out of it.
   function drawHall(ctx, t) {
     if (!seen(590, 520)) return;
     const near = HUB.near && HUB.near.id === 'echo' ? HUB.near.hero : -1;
     // back wall, and a step up to the hall
     ctx.fillStyle = DARK; ctx.fillRect(322, FLOOR - 226, 536, 226);
     block(ctx, 590, 600, 9, 0, STONE2);
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < NH; i++) {
       const cx = ECHO_X[i], h = G.HEROES[i], mine = h.id === G.run.hero, on = near === i;
       // light in the alcove, in that hero's colour
       glow(ctx, h.col, cx, FLOOR - 92, on ? 128 : 100, mine ? 0.22 : on ? 0.62 : 0.36 + 0.06 * Math.sin(t * 1.7 + i * 2));
-      block(ctx, cx, 64, 12, 9, STONE);
+      block(ctx, cx, Math.min(64, ARCH * 2 - 14), 12, 9, STONE);
       if (mine) {
         // your own place: only your sigil, waiting
         const bob = Math.sin(t * 2) * 3;
@@ -748,20 +749,20 @@
         ctx.globalAlpha = 1;
       }
     }
-    // the arcade in front of them: four piers, three arches, a beam, and what is left of the roof
-    for (let i = 0; i < 3; i++) {
-      const cx = ECHO_X[i];
+    // the arcade in front of them: piers, an arch over each bay, a beam, and what is left of the roof
+    for (let i = 0; i < NH; i++) {
+      const cx = ECHO_X[i], ay = FLOOR - 212 + ARCH; // every arch reaches the same height, however wide the bays
       ctx.fillStyle = STONE;
-      ctx.beginPath(); ctx.moveTo(cx - 62, FLOOR - 226); ctx.lineTo(cx + 62, FLOOR - 226); ctx.lineTo(cx + 62, FLOOR - 150); ctx.arc(cx, FLOOR - 150, 62, 0, Math.PI, true); ctx.closePath(); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(cx - ARCH, FLOOR - 226); ctx.lineTo(cx + ARCH, FLOOR - 226); ctx.lineTo(cx + ARCH, ay); ctx.arc(cx, ay, ARCH, 0, Math.PI, true); ctx.closePath(); ctx.fill();
       ctx.strokeStyle = G.rgba(RIM, 0.5); ctx.lineWidth = 1.5;
-      ctx.beginPath(); ctx.arc(cx, FLOOR - 150, 62, Math.PI, 0); ctx.stroke();
+      ctx.beginPath(); ctx.arc(cx, ay, ARCH, Math.PI, 0); ctx.stroke();
       // a pennant in the hero's colour over each arch
       const h = G.HEROES[i], sw = Math.sin(t * 1.5 + i) * 3;
       poly(ctx, [cx - 11, FLOOR - 252, cx + 11, FLOOR - 252, cx + 11 + sw, FLOOR - 214, cx + sw, FLOOR - 224, cx - 11 + sw, FLOOR - 214], STONE2, G.rgba(h.col, 0.9));
       ctx.globalCompositeOperation = 'lighter'; diamond(ctx, cx + sw * 0.5, FLOOR - 236, 4, 7, G.rgba(h.col, 0.95)); ctx.globalCompositeOperation = 'source-over';
     }
-    for (let i = 0; i < 4; i++) {
-      const px = 335 + i * 170;
+    for (let i = 0; i <= NH; i++) {
+      const px = 335 + i * BAY;
       poly(ctx, [px - 23, FLOOR - 9, px - 23, FLOOR - 226, px + 23, FLOOR - 226, px + 23, FLOOR - 9], STONE);
       poly(ctx, [px - 30, FLOOR - 9, px - 30, FLOOR - 24, px + 30, FLOOR - 24, px + 30, FLOOR - 9], STONE2);
       ctx.strokeStyle = 'rgba(0,0,0,0.4)'; ctx.lineWidth = 2;

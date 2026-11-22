@@ -73,6 +73,27 @@
         ult: 'Moonfall: a moon rises behind you. One great arrow for 26, fourteen moonbeams for 11 each, then the cut that ends it, for 70.',
       },
     },
+    {
+      id: 'eos', name: 'Eos', title: 'The Sheathed Dawn', col: '255,146,172', hot: '255,238,242', css: '#ff92ac',
+      cloak: ['#5e2238', '#200a12'], build: 0.98, scarf: 10, scarfW: 0.8,
+      hp: 0, run: 322, air: 1, weapon: 'blade', draw: true, reach: 1.08, thick: 1.1, poise: 1.1,
+      // only the flick uses these; the draws are in G.PLAYER (FOCUS, DRAW_DMG and the rest)
+      combo: [
+        { dmg: 11, cd: 0.36, dur: 0.22, wind: 0.04, act: 0.1 },
+        { dmg: 11, cd: 0.36, dur: 0.22, wind: 0.04, act: 0.1 },
+        { dmg: 11, cd: 0.36, dur: 0.22, wind: 0.04, act: 0.1 },
+      ],
+      down: 11, special: 'arc', specialName: 'Dawn Arc', verb: 'arc',
+      blurb: 'Patient and exact. One cut, when it counts.',
+      lines: ['Sheathed blade: hold the attack to gather Focus, let go to draw through the foe', 'The draw passes through attacks; its cut lands when the blade is home', 'Dawn Arc: a crescent of light thrown across the arena'],
+      how: {
+        attack: 'Her blade stays in its sheath. A press is a flick: out, across and home (11). Keep the button held and she sets her feet: Focus gathers while she stands on the ground, one mark on the sheath at a time, up to three (0.45, 0.95 and 1.5 seconds). Let go to draw: she crosses the ground in a blink and cuts whatever she passes through, for 18, 46 or 100. The cut lands a moment later, when the blade clicks home.',
+        aim: 'The draw goes where you aim it: at the mouse, or the way you hold, straight up included. A press with down held in the air strikes below and bounces off what it hits.',
+        dash: 'A dash or a jump keeps the Focus you have; being hit loses it, and she walks slowly while she holds it. The draw passes through attacks as a dash does, so a draw through a blow is a perfect dodge, and the cut that follows is its Riposte.',
+        special: 'Dawn Arc: a cut thrown across the arena as a crescent of light, 40, through everything in its path.',
+        ult: 'Horizon: one cut from one side of the arena to the other, for 250. It lands when the blade is home.',
+      },
+    },
   ];
   const heroById = {};
   for (const h of G.HEROES) heroById[h.id] = h;
@@ -109,6 +130,7 @@
     { id: 'fourth', name: 'Fourth Star', tag: 'Starlight', max: 2, desc: 'One more Starlight segment.' },
     { id: 'split', name: 'Split Lance', tag: 'Starlight', max: 1, heroes: ['vesper'], desc: 'The Star Lance fires three at once, each at 60% strength.' },
     { id: 'aftershock', name: 'Aftershock', tag: 'Starlight', max: 1, heroes: ['aster'], desc: 'Starfall strikes a second time at half strength.' },
+    { id: 'second', name: 'Second Light', tag: 'Starlight', max: 1, heroes: ['eos'], desc: 'The Dawn Arc is followed by a second at 60% strength.' },
     { id: 'quiver', name: 'Full Quiver', tag: 'Starlight', max: 1, heroes: ['lune'], desc: 'Moon Volley fires eight arrows instead of five.' },
     { id: 'swift', name: 'Swift Mend', tag: 'Starlight', max: 1, desc: 'Mending takes half as long.' },
     { id: 'mirror', name: 'Mirror Step', tag: 'Starlight', max: 1, heroes: ['vesper', 'lune'], desc: 'A perfect dodge fires a free shot at the boss.' },

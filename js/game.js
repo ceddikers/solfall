@@ -288,6 +288,7 @@
     if (G.debug.boxes) G.boss.drawDebug(ctx);
     ctx.restore();
     G.post.finish(ctx, canvas, 1 / 60);
+    G.flow.drawSplit(ctx, canvas, k); // Horizon cuts the finished picture in two
     ctx.setTransform(k, 0, 0, k, 0, 0);
     G.flow.drawCutin(ctx);
     F.drawFlash(ctx);

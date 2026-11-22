@@ -9,7 +9,7 @@
 // window.FEEL_HEROES / FEEL_BOSSES narrow the run; window.FEEL_JSON = true returns the raw numbers.
 (function () {
   'use strict';
-  const HEROES = window.FEEL_HEROES || ['vesper', 'aster', 'lune'];
+  const HEROES = window.FEEL_HEROES || ['vesper', 'aster', 'lune', 'eos'];
   const BOSSES = window.FEEL_BOSSES || G.BOSS_IDS;
   const I = G.input, STEP = 1 / 120, SEG = G.PLAYER.SEG;
   const keep = { freeze: G.debug.freeze, god: G.debug.god, boss: G.debug.boss, force: G.debug.forceAttack, omen: G.debug.omen, hero: G.settings.hero };
@@ -41,13 +41,18 @@
           const dx = t.cx - P.x, up = (P.y - 26) - t.cy;
           I.down.left = dx < -reach; I.down.right = dx > reach;
           I.mx = t.cx - G.cam.x; I.my = t.cy - G.cam.y; I.aim.attack = true; I.aim.flare = true;
-          if (melee && up > 80 && Math.abs(dx) < reach + 80) {
+          if (melee && !P.hero.draw && up > 80 && Math.abs(dx) < reach + 80) {
             // get up to it: jump, and jump again near the top
             if (P.onGround && n % 8 === 0) I.pressed.jump = true;
             else if (!P.onGround && P.vy > -120 && P.airJumps > 0 && up > 60) I.pressed.jump = true;
             I.down.jump = true;
           }
-          if (n % 10 === 0 && Math.abs(dx) < reach + 70) I.pressed.attack = true;
+          if (P.hero.draw) {
+            // Eos: hold the stance until all three marks are lit, then let go at whatever is nearest
+            const near = Math.hypot(dx, up) < 270; // (she does not jump for it: her draw goes up to it)
+            if (!I.down.attack && near && P.atkCd <= 0) { I.down.attack = true; I.pressed.attack = true; }
+            else if (I.down.attack && (P.focus >= G.PLAYER.FOCUS[2] || !near)) I.down.attack = false;
+          } else if (n % 10 === 0 && Math.abs(dx) < reach + 70) I.pressed.attack = true;
           if (P.ult >= 100) I.pressed.ult = true;
           else if (P.ember >= SEG * 2 && n % 90 === 0) I.pressed.flare = true;
         }
@@ -68,7 +73,7 @@
       rows.push(s);
     }
   }
-  for (const a of ['left', 'right', 'jump']) I.down[a] = false;
+  for (const a of ['left', 'right', 'jump', 'attack']) I.down[a] = false;
   I.aim.attack = I.aim.flare = false;
   Object.assign(G.debug, { freeze: keep.freeze, god: keep.god, boss: keep.boss, forceAttack: keep.force, omen: keep.omen });
   G.settings.hero = keep.hero;

@@ -12,12 +12,12 @@
 
   const FL = G.flow = { v: 0, rank: 0, peak: 0, idle: 0, pop: 0, dark: 0, script: null, ready: false };
   FL.RANKS = [{ at: 0, name: '' }, { at: 18, name: 'C' }, { at: 42, name: 'B' }, { at: 72, name: 'A' }, { at: 108, name: 'S' }, { at: 150, name: 'SS' }];
-  FL.NAMES = { vesper: 'THOUSAND STARS', aster: 'WORLDBREAKER', lune: 'MOONFALL' };
+  FL.NAMES = { vesper: 'THOUSAND STARS', aster: 'WORLDBREAKER', lune: 'MOONFALL', eos: 'HORIZON' };
   FL.SLOW = 0.05; // how fast the boss and its attacks run while a Dawnbreak plays
 
   // Heroes land hits at different rates, so each hit is worth more for the slower ones: steady
   // attacking earns every hero about the same Flow per second.
-  const HIT_K = { vesper: 1, aster: 1.4, lune: 1.25 };
+  const HIT_K = { vesper: 1, aster: 1.4, lune: 1.25, eos: 1.15 };
   FL.hit = function (n) { FL.add(n * 0.3 * (HIT_K[P.hero.id] || 1)); };
 
   function rankOf(v) { let r = 0; for (let i = 1; i < FL.RANKS.length; i++) if (v >= FL.RANKS[i].at) r = i; return r; }
@@ -28,7 +28,7 @@
   };
 
   FL.reset = function () {
-    FL.v = 0; FL.rank = 0; FL.peak = 0; FL.idle = 0; FL.pop = 0; FL.dark = 0; FL.script = null; FL.moon = null; FL.cutin = null;
+    FL.v = 0; FL.rank = 0; FL.peak = 0; FL.idle = 0; FL.pop = 0; FL.dark = 0; FL.script = null; FL.moon = null; FL.cutin = null; FL.split = null;
     P.ult = G.run.ult || 0; P.ulting = false; P.vanish = false; P.shroudT = 0;
     FL.ready = P.ult >= 100;
   };
@@ -195,6 +195,7 @@
     aim = { x: t.cx, y: t.cy };
     P.ult = 0; FL.ready = false;
     P.ulting = true; P.atk = null; P.cast = null; P.dashT = 0; P.plunge = false; P.healT = 0; P.flT = 0; P.vx = 0; P.vy = 0; P.stun = 0;
+    P.hold = null; P.focus = 0; P.drawT = 0; P.recov = null;
     P.facing = G.sign(t.cx - P.x) || P.facing;
     G.audio.play('ult');
     FL.cutin = { t0: performance.now(), hero: H, name: FL.NAMES[H.id] };
@@ -202,7 +203,7 @@
     F.ring(P.x, P.y - 24, { r0: 20, r1: 320, life: 0.5, color: H.hot, width: 10 });
     F.lines(P.x, P.y - 24, 18, H.hot, { r0: 30 });
     F.light(P.x, P.y - 24, 360, H.col, 0.4, 0.8);
-    FL.script = (H.id === 'aster' ? worldbreaker : H.id === 'lune' ? moonfall : thousandStars)(H);
+    FL.script = (H.id === 'aster' ? worldbreaker : H.id === 'lune' ? moonfall : H.id === 'eos' ? horizon : thousandStars)(H);
     return true;
   };
 
@@ -210,7 +211,7 @@
   FL.ultStep = function (dt) {
     if (FL.script && !FL.script.next(dt).done) return;
     FL.script = null; FL.moon = null;
-    P.ulting = false; P.vanish = false; P.cast = null;
+    P.ulting = false; P.vanish = false; P.cast = null; P.atk = null; P.recov = null;
     P.vx = 0; P.vy = 0; P.plat = null; P.onGround = P.y >= FLOOR - 0.5;
     P.iframes = Math.max(P.iframes, 0.5); P.pdDone = true; // a moment to read the fight again
     FL.add(18);
@@ -285,6 +286,132 @@
     }
     yield* wait(0.32);
   }
+
+
+  // Eos: Horizon. She sets herself and every light in the arena runs to the mouth of her sheath.
+  // Then she is on the far side of the boss with the blade out and a hair of light lying across
+  // the whole arena behind her. Nothing happens until the blade is home. Then the picture itself
+  // comes apart along the line, and first light comes up out of the cut.
+  function* horizon(H) {
+    const C = G.PLAYER, dir = G.sign(aim.x - P.x) || P.facing;
+    const mouth = () => ({ x: P.x + P.facing * 9, y: P.y - 31 });
+    P.facing = dir; P.hold = { t: 0 }; P.focus = 0;
+    G.audio.play('charge', { dur: 0.55 });
+    let e = 0, mark = 0;
+    while (e < 0.6) {
+      e += yield;
+      const k = Math.min(1, e / 0.55), m = mouth();
+      P.focus = k * C.FOCUS[2];
+      const now = P.focusMark();
+      if (now > mark) {
+        mark = now;
+        G.audio.play('focus', { n: now });
+        F.glint(m.x, m.y, 20 + 10 * now, now >= 3 ? GOLD : H.hot, 0.26);
+        F.ring(m.x, m.y, { r0: 40 + 30 * now, r1: 6, life: 0.24, color: now >= 3 ? GOLD : H.col, width: 2 + now });
+      }
+      for (let i = 0; i < 3; i++) {
+        const a = rnd(0, G.TAU), r = rnd(120, 420);
+        F.spawn({ x: m.x + Math.cos(a) * r, y: m.y + Math.sin(a) * r * 0.6, vx: -Math.cos(a) * r / 0.24, vy: -Math.sin(a) * r * 0.6 / 0.24, life: 0.24, size: rnd(2, 4), color: i ? H.col : H.hot });
+      }
+      F.light(m.x, m.y, 60 + 160 * k, H.col, 0.06, 0.5);
+    }
+    yield* wait(0.1);
+    // the draw: along the line from her to it, and on past
+    const x0 = P.x, y0 = P.y, sy = P.y - 30;
+    let dx = aim.x - x0, dy = aim.y - sy;
+    const d = Math.hypot(dx, dy) || 1;
+    dx /= d; dy /= d;
+    if (Math.abs(dy) < 0.2) { dx = dir; dy = 0; }
+    const bl = (G.bounds ? G.bounds.l : G.WALL_L + 13) + 14, br = (G.bounds ? G.bounds.r : G.WALL_R - 13) - 14;
+    let ex = x0 + dx * (d + 230), ey = sy + dy * (d + 230);
+    if (ex < bl || ex > br) { const nx = G.clamp(ex, bl, br), q = (nx - x0) / ((ex - x0) || 1); ex = nx; ey = sy + (ey - sy) * q; }
+    ey = G.clamp(ey, 90, FLOOR - 30);
+    const ang = Math.atan2(dy, dx);
+    P.hold = null; P.focus = 0;
+    P.atk = { kind: 'draw', lvl: 3, heavy: true, t: 0, a0: 0, a1: 0.08, dur: 9, dx, dy, dir, hit: new Set(), swung: true, hold: 0 };
+    P.onGround = false;
+    G.audio.play('draw'); F.kick(dx * 12, dy * 12); F.flash(H.hot, 0.2, 0.18);
+    F.dust(x0, y0, 7, { dir: -dir, speed: [80, 340], size: [6, 12], up: 30 });
+    e = 0;
+    while (e < 0.08) {
+      e += yield;
+      const k = Math.min(1, e / 0.08);
+      P.x = G.lerp(x0, ex, k); P.y = G.lerp(y0, ey + 30, k); P.atk.t = Math.min(0.08, e);
+      P.ghosts.push({ x: P.x, y: P.y, f: dir, life: 0.34, atk: { kind: 'draw', t: P.atk.t, a0: 0, a1: 0.08, dx, dy, lvl: 3, heavy: true } });
+    }
+    // the hair of light she leaves behind, right across the arena
+    F.cut((x0 + ex) / 2, (sy + ey) / 2, ang, 2800, 2.2, GOLD, H.hot, 1.3);
+    F.cut((x0 + ex) / 2, (sy + ey) / 2, ang, G.dist(x0, sy, ex, ey) + 160, 16, H.col, H.hot, 0.16);
+    F.stop(0.07);
+    // she holds where the cut left her, and the blade goes home, slowly
+    P.atk = null; P.onGround = P.y >= FLOOR - 0.5;
+    const r = P.recov = { kind: 'noto', t: 0, dur: 0.96, at: 0.85, ang: Math.atan2(dy, Math.abs(dx)), lvl: 3 };
+    while (r.t < r.dur * r.at) r.t += yield;
+    G.audio.play('sheath');
+    const m = mouth();
+    F.glint(m.x, m.y, 28, H.hot, 0.22);
+    yield* wait(0.07);
+    // and the cut arrives
+    const t = main();
+    for (const o of G.boss.targets()) {
+      if (o === t || (t && o.id === t.id)) continue;
+      G.boss.damage(Math.round(110 * G.dmgMult()), o, { x: o.cx, y: o.cy, heavy: true, dir });
+    }
+    const c = strike(250, { finisher: true, lance: true, poise: H.poise, dir });
+    for (const h of G.hazards.slashables()) h.slash();
+    FL.split = { t0: performance.now(), x: c.x - G.cam.x, y: c.y - G.cam.y, ang, dur: 0.62 };
+    F.cut(c.x, c.y, ang, 2800, 34, H.col, H.hot, 0.5);
+    F.cut(c.x, c.y, ang, 2800, 11, GOLD, H.hot, 0.7);
+    F.hit(c.x, c.y, ang, { heavy: true, power: 1.2, col: GOLD, hot: H.hot });
+    F.shatter(c.x, c.y, H.col, 24, { hot: H.hot, r: 480, r0: 50 });
+    F.light(c.x, c.y, 300, H.hot, 0.35, 0.5);
+    F.impact(c.x, c.y, 0.09); F.flash(H.hot, 0.3, 0.4); F.shake(24); F.stop(0.18); F.punch(0.06);
+    G.audio.play('hitHeavy'); G.audio.play('slam'); G.audio.play('shatter');
+    // first light: it comes up out of the cut, all along it
+    for (let i = 0; i < 11; i++) {
+      const q = (i + 0.5) / 11 - 0.5, px = c.x + Math.cos(ang) * q * 1500, py = c.y + Math.sin(ang) * q * 1500;
+      if (px < G.cam.x - 40 || px > G.cam.x + G.W + 40 || py > FLOOR) continue;
+      F.light(px, py, 230, H.col, 0.5, 0.5);
+      F.burst(px, py, { n: 5, color: i % 2 ? H.col : H.hot, speed: [30, 220], angle: -Math.PI / 2, spread: 1.4, life: [0.7, 1.5], size: [1.6, 3.4], grav: -60, wob: 110, drag: 1.3, jitter: 40 });
+    }
+    while (r.t < r.dur) r.t += yield;
+    yield* wait(0.3);
+    P.recov = null;
+  }
+
+  // Horizon cuts the picture in two: for half a second the halves either side of the line slide
+  // along it, and then settle back. Done to the finished frame, in the canvas's own pixels.
+  let splitCv = null;
+  FL.drawSplit = function (ctx, canvas, k) {
+    const s = FL.split;
+    if (!s) return;
+    const t = (performance.now() - s.t0) / 1000;
+    if (t >= s.dur) { FL.split = null; return; }
+    const u = t / s.dur, W = canvas.width, Hh = canvas.height;
+    // apart in an instant, held, then eased back together
+    const off = 20 * k * (u < 0.07 ? u / 0.07 : u < 0.45 ? 1 : Math.pow(1 - (u - 0.45) / 0.55, 2));
+    if (!splitCv || splitCv.width !== W || splitCv.height !== Hh) { splitCv = document.createElement('canvas'); splitCv.width = W; splitCv.height = Hh; }
+    const sc = splitCv.getContext('2d');
+    sc.globalCompositeOperation = 'copy'; sc.drawImage(canvas, 0, 0);
+    const px = s.x * k, py = s.y * k, cs = Math.cos(s.ang), sn = Math.sin(s.ang), L = W + Hh;
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
+    for (const side of [-1, 1]) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(px - cs * L, py - sn * L); ctx.lineTo(px + cs * L, py + sn * L);
+      ctx.lineTo(px + cs * L - sn * L * side, py + sn * L + cs * L * side); ctx.lineTo(px - cs * L - sn * L * side, py - sn * L + cs * L * side);
+      ctx.closePath(); ctx.clip();
+      ctx.drawImage(splitCv, cs * off * side, sn * off * side);
+      ctx.restore();
+    }
+    // the seam
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.strokeStyle = 'rgba(255,244,236,' + (0.9 * (1 - u)) + ')'; ctx.lineWidth = Math.max(1, 2.5 * k * (1 - u));
+    ctx.beginPath(); ctx.moveTo(px - cs * L, py - sn * L); ctx.lineTo(px + cs * L, py + sn * L); ctx.stroke();
+    ctx.restore();
+  };
 
   // Lune: Moonfall. She springs up and a full moon rises behind her. She draws, and the moon's light
   // runs down into the arrow until only a blade of it is left; the arrow goes through the boss, the

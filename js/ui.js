@@ -322,7 +322,7 @@
     const h = G.hero(), I = G.input, k = (a) => I.keys(a).map((n) => '<kbd>' + n + '</kbd>').join(' ');
     const jumps = 1 + h.air + G.boon('wind') + (G.relic('cloak') ? 1 : 0);
     const rows = [
-      ['Move', k('left') + ' ' + k('right'), 'Run. ' + (h.heavy ? 'She is heavy: slower to start, slower to stop.' : h.id === 'lune' ? 'The fastest of the three.' : 'Quick on her feet.')],
+      ['Move', k('left') + ' ' + k('right'), 'Run. ' + (h.heavy ? 'She is heavy: slower to start, slower to stop.' : h.id === 'lune' ? 'The fastest of them.' : h.draw ? 'She slows to a walk while she holds her stance.' : 'Quick on her feet.')],
       ['Jump', k('jump'), 'Jump; press again in the air (' + jumps + ' jumps in all). Hold for height. Down and jump drops through a platform.'],
       ['Attack', k('attack') + ' or left click', h.how.attack],
       ['Aim', k('up') + ' ' + k('down'), h.how.aim],

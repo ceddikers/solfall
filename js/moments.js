@@ -12,7 +12,7 @@
   const { wait } = G.seq;
   const GOLD = '255,214,140', DANGER = G.COL.danger;
   // roughly what each hero deals in a second of steady attacking, to size the ward
-  const DPS = { vesper: 48, aster: 50, lune: 26 };
+  const DPS = { vesper: 48, aster: 50, lune: 26, eos: 50 };
 
   const M = G.moments = { sunder: false, wasStag: false, push: false, pushT: 0, gloom: 0, broke: 0, beat: 0 };
 
