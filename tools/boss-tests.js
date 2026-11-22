@@ -97,6 +97,10 @@
       } else if (h.kind === 'firewall') {
         const dx = P.x - h.x;
         if (h.started && dx * h.dir > 0 && Math.abs(dx) < 120) { jump = true; high = true; }
+      } else if (h.kind === 'flycut') {
+        // a cut thrown straight at the hero: jump it as it arrives
+        const dx = P.x - h.x;
+        if (dx * h.vx > 0 && Math.abs(dx) < 210 && Math.abs(h.y - (P.y - 22)) < 90) jump = true;
       } else if (h.kind === 'crescent') {
         if ((P.x - h.x) * h.dir > -40 && Math.abs(P.x - h.x) < 230) stayDown = true;
       } else if (h.kind === 'beam') {

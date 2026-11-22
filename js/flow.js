@@ -28,7 +28,7 @@
   };
 
   FL.reset = function () {
-    FL.v = 0; FL.rank = 0; FL.peak = 0; FL.idle = 0; FL.pop = 0; FL.dark = 0; FL.script = null;
+    FL.v = 0; FL.rank = 0; FL.peak = 0; FL.idle = 0; FL.pop = 0; FL.dark = 0; FL.script = null; FL.moon = null; FL.cutin = null;
     P.ult = G.run.ult || 0; P.ulting = false; P.vanish = false; P.shroudT = 0;
     FL.ready = P.ult >= 100;
   };
@@ -88,6 +88,87 @@
     if (FL.dark < 0.01) return;
     ctx.fillStyle = 'rgba(3,2,10,' + 0.64 * FL.dark + ')';
     ctx.fillRect(G.cam.x - 80, -80, G.W + 160, G.H + 160);
+    const m = FL.moon;
+    if (!m || m.a <= 0.01) return;
+    // Moonfall's moon: it rises full behind her, and wanes to a blade as its light goes into the bow
+    const r = m.r, y = m.y + (1 - G.ease.outCubic(m.k)) * 150;
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.globalAlpha = 0.55 * m.a;
+    ctx.drawImage(F.glow(m.col), m.x - r * 2.3, y - r * 2.3, r * 4.6, r * 4.6);
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.globalAlpha = m.a;
+    ctx.save();
+    ctx.beginPath(); ctx.arc(m.x, y, r, 0, G.TAU); ctx.clip();
+    ctx.fillStyle = 'rgb(246,238,255)'; ctx.fillRect(m.x - r, y - r, r * 2, r * 2);
+    ctx.fillStyle = G.rgba(m.col, 0.3);
+    for (const [cx, cy, cr] of [[-0.35, -0.3, 0.2], [0.3, 0.1, 0.27], [-0.1, 0.45, 0.15], [0.5, -0.45, 0.11], [-0.6, 0.2, 0.1]]) {
+      ctx.beginPath(); ctx.arc(m.x + cx * r, y + cy * r, cr * r, 0, G.TAU); ctx.fill();
+    }
+    if (m.wane > 0.001) {
+      ctx.fillStyle = 'rgb(7,5,18)';
+      ctx.beginPath(); ctx.arc(m.x + m.side * r * (2.05 - 1.72 * m.wane), y - r * 0.1 * m.wane, r * 1.02, 0, G.TAU); ctx.fill();
+    }
+    ctx.restore();
+    if (m.crack > 0) {
+      // the last cut goes through the moon as well
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.strokeStyle = G.rgba(GOLD, m.crack); ctx.lineWidth = 3 + 5 * m.crack;
+      ctx.beginPath(); ctx.moveTo(m.x - r * 1.3, y + r * 0.55); ctx.lineTo(m.x + r * 1.3, y - r * 0.55); ctx.stroke();
+      ctx.globalCompositeOperation = 'source-over';
+    }
+    ctx.globalAlpha = 1;
+  };
+
+  // The cut-in: for half a second a slanted band crosses the screen with the hero's eyes in it and
+  // the name of what they are about to do. Drawn in screen space, over everything.
+  FL.drawCutin = function (ctx) {
+    const c = FL.cutin;
+    if (!c) return;
+    const now = performance.now(), t = (now - c.t0) / 1000, dur = 0.62;
+    if (t >= dur) { FL.cutin = null; return; }
+    const inK = G.ease.outCubic(Math.min(1, t / 0.12)), outK = Math.max(0, (t - (dur - 0.14)) / 0.14);
+    const hgt = 150 * inK * (1 - outK), cy = 318, sl = 60, H = c.hero;
+    if (hgt < 1) return;
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(-20, cy - hgt / 2 + sl * 0.5); ctx.lineTo(G.W + 20, cy - hgt / 2 - sl * 0.5);
+    ctx.lineTo(G.W + 20, cy + hgt / 2 - sl * 0.5); ctx.lineTo(-20, cy + hgt / 2 + sl * 0.5); ctx.closePath();
+    ctx.fillStyle = 'rgba(4,3,12,0.9)'; ctx.fill();
+    ctx.strokeStyle = G.rgba(H.col, 0.9); ctx.lineWidth = 3; ctx.stroke();
+    ctx.clip();
+    // streaks rushing the other way
+    ctx.globalCompositeOperation = 'lighter';
+    for (let i = 0; i < 22; i++) {
+      const sy = cy - 90 + ((i * 53) % 180), sp = 1500 + ((i * 97) % 900), len = 120 + ((i * 41) % 260);
+      const sx = G.W + 300 - ((t * sp + i * 173) % (G.W + 600));
+      ctx.strokeStyle = G.rgba(i % 3 ? H.col : H.hot, 0.16 + 0.2 * ((i * 29) % 5) / 5); ctx.lineWidth = 1 + (i % 3);
+      ctx.beginPath(); ctx.moveTo(sx, sy - (sx - 640) * sl / G.W); ctx.lineTo(sx + len, sy - (sx + len - 640) * sl / G.W); ctx.stroke();
+    }
+    // the eyes: two narrowed slits of the hero's light, sliding a little as the band opens
+    const ex = 330 + 40 * (1 - inK) + t * 30, ey = cy + 6;
+    ctx.translate(ex, ey); ctx.rotate(-sl / G.W);
+    for (const side of [-1, 1]) {
+      const ox = side * 74;
+      ctx.globalAlpha = 0.8; ctx.drawImage(F.glow(H.col), ox - 90, -70, 180, 140); ctx.globalAlpha = 1;
+      ctx.fillStyle = G.rgba(H.hot, 1);
+      ctx.beginPath();
+      ctx.moveTo(ox - 46, 4 + side * 5); ctx.quadraticCurveTo(ox - 6, -22 - side * 3, ox + 46, -6 - side * 5);
+      ctx.quadraticCurveTo(ox + 4, 12, ox - 46, 4 + side * 5); ctx.closePath(); ctx.fill();
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.fillStyle = 'rgba(4,3,12,0.92)';
+      ctx.beginPath(); ctx.ellipse(ox + 5, -5, 5, 12, 0.1, 0, G.TAU); ctx.fill();
+      ctx.globalCompositeOperation = 'lighter';
+    }
+    ctx.setTransform(ctx.getTransform().a, 0, 0, ctx.getTransform().d, 0, 0);
+    ctx.globalCompositeOperation = 'source-over';
+    // the name, struck in from the right
+    const tx = 800 + 500 * (1 - G.ease.outCubic(Math.min(1, t / 0.16)));
+    ctx.translate(tx, cy - (tx - 640) * sl / G.W); ctx.rotate(-sl / G.W);
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.font = 'italic 700 58px Bahnschrift, "Segoe UI", sans-serif';
+    ctx.fillStyle = G.rgba(H.col, 0.5); ctx.fillText(c.name, 5, 5);
+    ctx.fillStyle = G.rgba(H.hot, 1); ctx.fillText(c.name, 0, 0);
+    ctx.restore();
   };
 
   // ------------------------------------------------------------------ Dawnbreak
@@ -116,8 +197,8 @@
     P.ulting = true; P.atk = null; P.cast = null; P.dashT = 0; P.plunge = false; P.healT = 0; P.flT = 0; P.vx = 0; P.vy = 0; P.stun = 0;
     P.facing = G.sign(t.cx - P.x) || P.facing;
     G.audio.play('ult');
-    G.ui.callout(FL.NAMES[H.id], 'Dawnbreak');
-    F.stop(0.22); F.flash(H.hot, 0.32, 0.3); F.punch(0.045); F.shake(8);
+    FL.cutin = { t0: performance.now(), hero: H, name: FL.NAMES[H.id] };
+    F.stop(0.3); F.flash(H.hot, 0.32, 0.3); F.punch(0.045); F.shake(8);
     F.ring(P.x, P.y - 24, { r0: 20, r1: 320, life: 0.5, color: H.hot, width: 10 });
     F.lines(P.x, P.y - 24, 18, H.hot, { r0: 30 });
     F.light(P.x, P.y - 24, 360, H.col, 0.4, 0.8);
@@ -128,8 +209,8 @@
   // Called in place of the hero's own update while a Dawnbreak plays.
   FL.ultStep = function (dt) {
     if (FL.script && !FL.script.next(dt).done) return;
-    FL.script = null;
-    P.ulting = false; P.vanish = false;
+    FL.script = null; FL.moon = null;
+    P.ulting = false; P.vanish = false; P.cast = null;
     P.vx = 0; P.vy = 0; P.plat = null; P.onGround = P.y >= FLOOR - 0.5;
     P.iframes = Math.max(P.iframes, 0.5); P.pdDone = true; // a moment to read the fight again
     FL.add(18);
@@ -156,7 +237,7 @@
     for (const a of [-0.62, Math.PI + 0.62]) F.cut(c.x, c.y, a, 960, 26, GOLD, H.hot, 0.42);
     F.hit(c.x, c.y, 0, { heavy: true, power: 1.3, col: GOLD, hot: H.hot });
     F.shatter(c.x, c.y, H.col, 18, { hot: H.hot, r: 420, r0: 50 });
-    F.flash(H.hot, 0.45, 0.35); F.shake(17); F.stop(0.14); F.punch(0.05);
+    F.flash(H.hot, 0.45, 0.35); F.shake(17); F.stop(0.14); F.punch(0.05); F.impact(c.x, c.y, 0.08);
     G.audio.play('hitHeavy'); G.audio.play('slam');
     P.vanish = false; P.x = x0; P.y = y0;
     yield* wait(0.34);
@@ -182,7 +263,7 @@
     const c = strike(250, { finisher: true, lance: true, poise: H.poise, dir: G.sign(aim.x - P.x) });
     for (const h of G.hazards.slashables()) h.slash();
     G.audio.play('slam'); G.audio.play('boom'); G.audio.play('hitHeavy');
-    F.stop(0.16); F.shake(27); F.punch(0.06); F.flash(H.hot, 0.5, 0.4);
+    F.stop(0.16); F.shake(27); F.punch(0.06); F.flash(H.hot, 0.5, 0.4); F.impact(P.x, FLOOR - 30, 0.09);
     F.thud(P.x, FLOOR, 2, { col: H.col });
     F.ring(P.x, FLOOR - 4, { r0: 30, r1: 520, life: 0.6, color: H.hot, width: 14 });
     F.ring(P.x, FLOOR - 4, { r0: 20, r1: 300, life: 0.45, color: GOLD, width: 8 });
@@ -205,32 +286,95 @@
     yield* wait(0.32);
   }
 
-  // Lune: one arrow into the sky, and the sky sends back a dozen.
+  // Lune: Moonfall. She springs up and a full moon rises behind her. She draws, and the moon's light
+  // runs down into the arrow until only a blade of it is left; the arrow goes through the boss, the
+  // moon answers with a rain of its own, and she lands with her back turned. Then the cut arrives.
   function* moonfall(H) {
-    P.squash = 0.2;
-    yield* tween(P, { y: P.y - 64 }, 0.2, G.ease.outCubic);
-    F.cut(P.x, P.y - 330, -Math.PI / 2, 620, 9, H.col, H.hot, 0.3);
-    F.burst(P.x, P.y - 44, { n: 10, color: H.hot, speed: [200, 700], angle: -Math.PI / 2, spread: 0.6, life: [0.15, 0.4], kind: 'spark', size: [2, 3] });
-    G.audio.play('arrowHeavy'); F.shake(5);
-    yield* wait(0.2);
-    for (let i = 0; i < 12; i++) {
-      const c = strike(15, { dir: i % 2 ? -1 : 1 });
-      const ang = Math.PI / 2 + rnd(-0.24, 0.24), hx = c.x + rnd(-30, 30), hy = c.y + rnd(-24, 24);
-      F.cut(hx - Math.cos(ang) * 270, hy - Math.sin(ang) * 270, ang, 560, 6, H.col, H.hot, 0.22);
-      F.hit(hx, hy, ang, { power: 0.9, col: H.col, hot: H.hot });
-      F.shake(2.6); G.audio.play('arrow');
-      yield* wait(0.07);
+    const x0 = P.x, dir = G.sign(aim.x - P.x) || P.facing;
+    const m = FL.moon = { x: G.clamp(P.x - dir * 30, 230, 1050), y: 236, r: 172, k: 0, a: 0, wane: 0, crack: 0, side: dir, col: H.col };
+    const topY = Math.min(P.y - 90, 318);
+    const aimAt = () => { const dx = aim.x - P.x, dy = aim.y - (P.y - 36), d = Math.hypot(dx, dy) || 1; return { dx: dx / d, dy: dy / d, d }; };
+    // up, turning over, with the moon coming up behind
+    P.squash = 0.3; P.facing = dir;
+    G.audio.play('jump2');
+    F.dust(P.x, P.y, 6, { speed: [40, 200], size: [5, 10], up: 60 });
+    const y0 = P.y;
+    let e = 0;
+    while (e < 0.34) {
+      e += yield;
+      const k = Math.min(1, e / 0.34);
+      P.y = G.lerp(y0, topY, G.ease.outCubic(k)); m.k = k; m.a = Math.min(1, k * 1.6);
+      if (Math.random() < 0.5) P.ghosts.push({ x: P.x, y: P.y, f: P.facing, life: 0.22 });
     }
-    yield* wait(0.16);
-    const c = strike(70, { finisher: true, lance: true, poise: H.poise });
-    F.cut(c.x, c.y - 320, Math.PI / 2, 1000, 64, H.col, H.hot, 0.45);
-    F.cut(c.x, c.y - 320, Math.PI / 2, 1000, 24, GOLD, H.hot, 0.5);
-    F.hit(c.x, c.y, Math.PI / 2, { heavy: true, power: 1.4, col: GOLD, hot: H.hot });
-    F.shatter(c.x, c.y, H.col, 18, { hot: H.hot, r: 440, r0: 50 });
-    F.light(c.x, c.y, 420, H.hot, 0.4, 0.8);
-    if (c.y > FLOOR - 160) F.thud(c.x, FLOOR, 1.4, { col: H.col });
-    F.flash(H.hot, 0.45, 0.35); F.shake(17); F.stop(0.14); F.punch(0.05);
-    G.audio.play('hitHeavy'); G.audio.play('slam');
-    yield* wait(0.3);
+    // the draw: light falls out of the moon into the bow
+    let d = aimAt();
+    P.cast = { kind: 'draw', t: 0, wind: 0, dur: 9, thrown: true, dx: d.dx, dy: d.dy, pull: 0 };
+    G.audio.play('charge', { dur: 0.5 });
+    e = 0;
+    while (e < 0.5) {
+      e += yield;
+      const k = Math.min(1, e / 0.5);
+      P.cast.pull = G.ease.outCubic(k); m.wane = G.ease.inOutCubic(k);
+      const hx = P.x + d.dx * 20, hy = P.y - 36 + d.dy * 20;
+      for (let i = 0; i < 2; i++) {
+        const a = rnd(0, G.TAU), sx = m.x + Math.cos(a) * rnd(0, m.r), sy = m.y + Math.sin(a) * rnd(0, m.r);
+        F.spawn({ x: sx, y: sy, vx: (hx - sx) / 0.2, vy: (hy - sy) / 0.2, life: 0.2, size: rnd(2, 4), color: i ? H.hot : H.col });
+      }
+      F.light(hx, hy, 60 + 140 * k, H.col, 0.06, 0.5);
+    }
+    F.glint(P.x + d.dx * 26, P.y - 36 + d.dy * 26, 64, H.hot, 0.3);
+    G.audio.play('segment');
+    yield* wait(0.1);
+    // loose
+    d = aimAt();
+    let c = strike(26, { dir, heavy: true });
+    const ang = Math.atan2(d.dy, d.dx), sx = P.x + d.dx * 24, sy = P.y - 36 + d.dy * 24;
+    F.cut((sx + c.x) / 2 + d.dx * 200, (sy + c.y) / 2 + d.dy * 200, ang, d.d + 520, 30, H.col, H.hot, 0.34);
+    F.cut((sx + c.x) / 2 + d.dx * 200, (sy + c.y) / 2 + d.dy * 200, ang, d.d + 520, 9, GOLD, H.hot, 0.44);
+    F.hit(c.x, c.y, ang, { heavy: true, power: 1.2, col: H.col, hot: H.hot });
+    F.lines(sx, sy, 14, H.hot, { r0: 16, speed: [600, 1200] });
+    F.ring(sx, sy, { r0: 6, r1: 120, life: 0.3, color: H.hot, width: 7 });
+    F.impact(c.x, c.y, 0.07); F.stop(0.1); F.shake(12); F.kick(-d.dx * 9, -d.dy * 9);
+    G.audio.play('arrowHeavy'); G.audio.play('flare');
+    P.cast.pull = 0; P.cast.twang = 1;
+    yield* tween(P, { x: G.clamp(P.x - dir * 34, G.WALL_L + 20, G.WALL_R - 20), y: P.y - 16 }, 0.12, G.ease.outCubic);
+    // the moon's answer: what is left of it comes down as beams
+    for (let i = 0; i < 14; i++) {
+      c = strike(11, { dir: i % 2 ? -1 : 1 });
+      const a = rnd(0.5, 2.6) * (m.side > 0 ? 1 : -1) + Math.PI / 2 + (m.side > 0 ? 0.4 : -0.4);
+      const bx = m.x - m.side * m.r * 0.72 + Math.cos(a) * m.r * 0.25, by = m.y + Math.sin(a) * m.r * 0.9;
+      const hx = c.x + rnd(-26, 26), hy = c.y + rnd(-26, 26), ba = Math.atan2(hy - by, hx - bx), bl = Math.hypot(hx - bx, hy - by);
+      F.cut((bx + hx) / 2, (by + hy) / 2, ba, bl + 60, 7, H.col, H.hot, 0.2);
+      F.hit(hx, hy, ba, { power: 0.9, col: H.col, hot: H.hot });
+      F.glint(bx, by, 22, H.hot, 0.16);
+      if (hy > FLOOR - 120 && i % 3 === 0) F.dust(hx, FLOOR, 2, { speed: [30, 140], size: [5, 9], up: 50 });
+      F.shake(3); G.audio.play('arrow');
+      P.cast.twang = Math.max(0, P.cast.twang - 0.1);
+      yield* wait(0.05);
+    }
+    // down, with her back to it
+    P.cast = null; P.squash = 0.25;
+    yield* tween(P, { y: FLOOR }, 0.12, G.ease.inQuad);
+    P.squash = -0.3; P.facing = -dir;
+    F.land(P.x, FLOOR, 1); G.audio.play('land');
+    const cx = aim.x, cy = aim.y;
+    F.cut(cx, cy, -0.42 * dir, 520, 2.5, GOLD, H.hot, 0.5); // the line of the cut, before the cut
+    G.audio.play('glint');
+    yield* wait(0.42);
+    // the cut arrives
+    c = strike(70, { finisher: true, lance: true, poise: H.poise, dir });
+    m.crack = 1;
+    F.cut(c.x, c.y, -0.42 * dir, 1300, 46, H.col, H.hot, 0.5);
+    F.cut(c.x, c.y, -0.42 * dir, 1300, 16, GOLD, H.hot, 0.6);
+    F.hit(c.x, c.y, -0.42 * dir, { heavy: true, power: 1.4, col: GOLD, hot: H.hot });
+    F.shatter(c.x, c.y, H.col, 22, { hot: H.hot, r: 460, r0: 50 });
+    F.shatter(m.x, m.y, '246,238,255', 26, { hot: H.hot, r: 420, r0: 80, jitter: m.r * 0.6 });
+    F.light(c.x, c.y, 440, H.hot, 0.4, 0.8);
+    F.impact(c.x, c.y, 0.09); F.flash(H.hot, 0.4, 0.35); F.shake(19); F.stop(0.16); F.punch(0.055);
+    G.audio.play('hitHeavy'); G.audio.play('slam'); G.audio.play('shatter');
+    e = 0;
+    while (e < 0.36) { e += yield; m.a = Math.max(0, 1 - e / 0.3); m.crack = m.a; }
+    P.x = G.clamp(P.x, G.WALL_L + 20, G.WALL_R - 20);
+    void x0;
   }
 })();

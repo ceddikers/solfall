@@ -4,7 +4,9 @@
 (function () {
   const { wait, tween } = G.seq;
   const E = G.ease, FLOOR = G.FLOOR, H = G.hazards, K = G.kit, D = G.draw, DANGER = G.COL.danger;
-  const WL = G.WALL_L, WR = G.WALL_R;
+  // The walls the Knight fights between. In its third phase a ring of fallen blades stands in for them.
+  let WL = G.WALL_L, WR = G.WALL_R;
+  const RING_L = 290, RING_R = 990;
 
   const B = {
     id: 'knight', name: 'THE UNBURIED KNIGHT', short: 'The Knight', theme: 'knight',
@@ -12,7 +14,7 @@
     blurb: 'A death knight whose back is its weakness',
     tips: [
       'The Knight cannot cut behind itself. Dash through it as it swings and strike its back for extra damage.',
-      'After an overhead blow, a charge into the wall or a whirl it is helpless for a moment.',
+      'After an overhead blow, a charge into the wall or a whirl it is helpless for a moment. A finisher timed into one of its cuts turns the cut aside.',
       'Jump the low wave; stay on the ground for the high one.',
       'Its charge is too tall for one jump. Dash through it, or jump twice.',
       'Rotting ground fades after a few seconds. Fight on what is left.',
@@ -20,12 +22,13 @@
       'A blade that burns red as it rises takes two health and throws a wave along the floor. Get behind it, or get out and jump.',
     ],
     hudCols: [null, ['#6ab4ff', '#d4ecff'], ['#8ce04a', '#e0ffc8'], ['#ff4c46', '#ffd0c8']],
-    BASE_HP: 4300, poise0: 460, w: 62, h: 122, platformsFrom: 2,
+    BASE_HP: 4300, poise0: 460, w: 62, h: 122,
+    answer: 'sever',
     gaps: [0, 1.0, 0.8, 0.6],
     bags: {
-      1: ['cleave', 'overhead', 'charge', 'grip', 'graves', 'hurl'],
-      2: ['cleave2', 'overhead', 'charge', 'grip', 'graves', 'wraiths', 'desecrate', 'whirl', 'rend', 'hurl'],
-      3: ['reap', 'overhead', 'charge', 'grip', 'wraiths', 'desecrate', 'whirl', 'rend', 'leap', 'hurl'],
+      1: ['cleave', 'overhead', 'charge', 'grip', 'graves', 'hurl', 'sever'],
+      2: ['cleave2', 'overhead', 'charge', 'grip', 'graves', 'wraiths', 'desecrate', 'whirl', 'rend', 'hurl', 'sever'],
+      3: ['reap', 'overhead', 'charge', 'grip', 'wraiths', 'desecrate', 'whirl', 'rend', 'leap', 'hurl', 'sever'],
     },
     cards: { 2: ['THE HOST', 'The dead answer the call'], 3: ['BLOOD OATH', 'It will not fall alone'] },
     first: { 1: 'cleave', 2: 'wraiths', 3: 'leap' },
@@ -61,11 +64,55 @@
   B.setup = function () {
     const b = B.body;
     b.x = 900; b.y = FLOOR + 150; b.pose = 'kneel'; b.p = POSES.kneel.slice(); b.walkT = 0; b.hurt = false; b.spin = 0; b.spinning = false; b.fast = false;
+    b.bare = false; b.still = false;
     B.cape = D.chain(9, b.x, b.y - 100);
+    WL = G.WALL_L; WR = G.WALL_R; B.ring = false; B.swords = []; B.lost = null;
   };
+  B.bounds = () => (B.ring ? { l: WL + 13, r: WR - 13 } : null);
   B.onHit = function () { if (B.body.unarmed) G.feats.bump('unarmed'); }; // for the feat
   B.onRelease = function () { const b = B.body; b.hurt = false; b.pose = 'idle'; b.spinning = false; b.fast = false; b.unarmed = false; b.blaze = 0; };
   B.onStagger = function () { B.body.pose = 'kneel'; };
+  B.onInterrupt = function () { B.lost = null; };
+  B.staggerWord = 'DISARMED';
+  B.staggerIn = function* () {
+    const b = B.body;
+    b.y = FLOOR; b.unarmed = true;
+    const away = -(G.sign(G.player.x - b.x) || b.face);
+    const lost = B.lost = { x0: b.x, x1: G.clamp(b.x + away * 210, WL + 40, WR - 40), k: 0 };
+    G.audio.play('clash');
+    yield* tween(lost, { k: 1 }, 0.5, E.linear || ((t) => t));
+    G.audio.play('tink'); G.audio.play('boom'); G.fx.shake(7);
+    G.fx.thud(lost.x1, FLOOR, 0.9, { col: G.pal().boss });
+    G.fx.burst(lost.x1, FLOOR - 6, { n: 10, color: G.pal().hot, speed: [120, 480], angle: -Math.PI / 2, spread: 1.8, life: [0.15, 0.4], kind: 'spark', size: [2, 4], grav: 900 });
+  };
+  B.staggerOut = function* () {
+    const b = B.body, lost = B.lost;
+    if (!lost) return;
+    b.unarmed = true; b.pose = 'grip'; b.face = lost.x1 > b.x ? 1 : -1;
+    G.fx.glint(lost.x1, FLOOR - 120, 34, DANGER, 0.3); G.audio.play('glint'); G.audio.play('pull');
+    yield* wait(0.38 * K.T());
+    // the sword tears free and flies home
+    B.lost = null;
+    const tint = tintNow(), dir = G.sign(b.x - lost.x1) || 1;
+    const blade = H.add({
+      kind: 'blade', x: lost.x1, y: FLOOR - 50, spin: 0, tint,
+      update(dt) {
+        this.x += dir * 1150 * dt; this.spin += dir * 30 * dt; this.srcX = this.x - dir * 30;
+        if (Math.random() < dt * 50) G.fx.spawn({ x: this.x + G.rand(-20, 20), y: this.y + G.rand(-16, 16), vx: G.rand(-30, 30), vy: G.rand(-30, 30), life: G.rand(0.15, 0.35), size: G.rand(2, 5), color: tint.boss });
+        if ((b.x - this.x) * dir <= 44) this.dead = true;
+      },
+      hits(Pl) { return G.rectsOverlap(Pl.box(), { cx: this.x, cy: this.y, hw: 36, hh: 24 }); },
+      draw(ctx) {
+        ctx.globalCompositeOperation = 'lighter'; D.glow(ctx, DANGER, this.x, this.y, 70, 0.5); ctx.globalCompositeOperation = 'source-over';
+        sword(ctx, this.x - Math.cos(this.spin) * 45, this.y - Math.sin(this.spin) * 45, this.spin, tint.boss, tint.hot);
+      },
+    });
+    G.audio.play('streak');
+    while (!blade.dead) yield;
+    b.unarmed = false; b.fast = true; b.pose = 'raise';
+    G.audio.play('blade'); G.fx.shake(5);
+    G.fx.ring(b.x, b.y - 80, { r0: 60, r1: 12, life: 0.25, color: tint.hot, width: 4 });
+  };
   B.reckonName = 'DIRGE';
   B.onReckon = function (on) { B.body.pose = on ? 'overRaise' : 'idle'; };
   B.onRecover = function () { B.body.pose = 'idle'; };
@@ -84,9 +131,34 @@
     return H.arc({
       x: b.x + f * 10, y: b.y - 86, r: o.r || 185, a0: m(o.a0), a1: m(o.a1), tele: o.tele, active: 0.13, dmg: o.dmg || 1, heavy: (o.dmg || 1) > 1, owner: b,
       follow(h) { if (!h.fired) { h.x = b.x + b.face * 10; h.y = b.y - 86; } },
-      onFire() { G.audio.play('cleave'); b.fast = true; b.pose = o.pose; G.fx.shake(7); },
+      onFire() { G.audio.play('cleave'); b.fast = true; b.pose = o.pose; G.fx.shake(7); if (o.wind) echo(b.x, b.face, o, o.wind); },
     });
   }
+  // The Host (from the second phase): the ghost of the Knight is left standing where it cut, and
+  // half a second later it makes the same cut again. Behind the Knight is still behind the ghost.
+  function echo(x, face, o, wind, harmless) {
+    const T = K.T(), tele = 0.5 * T, tint = tintNow();
+    const g = { x, y: FLOOR, face, p: POSES[wind].slice(), kx: 0, a: 0, fired: false };
+    const m = (ang) => (face > 0 ? ang : Math.PI - ang);
+    const ao = {
+      x: x + face * 10, y: FLOOR - 86, r: (o.r || 185) * 0.95, a0: m(o.a0), a1: m(o.a1), tele, active: 0.12, owner: g, tint,
+      onFire() { g.fired = true; g.to = POSES[o.pose]; G.audio.play('blade'); G.fx.shake(4); },
+    };
+    if (harmless) { ao.hits = () => false; ao.heavy = true; } // for show, in the scene where the Host first rises
+    const arc = H.arc(ao);
+    return H.add({
+      kind: 'ghost', layer: 'under', g,
+      update(dt) {
+        if (arc.dead && !g.fired) { this.dead = true; G.fx.burst(g.x, FLOOR - 70, { n: 14, color: tint.boss, speed: [60, 320], life: [0.25, 0.6], size: [3, 7] }); return; } // met and turned aside
+        g.a = this.t < tele ? Math.min(1, this.t / 0.18) : Math.max(0, 1 - (this.t - tele - 0.12) / 0.3);
+        if (g.to) { const q = 1 - Math.exp(-46 * dt); for (let i = 0; i < NP; i++) if (g.to[i] !== 999 && g.p[i] !== 999) g.p[i] += (g.to[i] - g.p[i]) * q; }
+        if (Math.random() < dt * 30) G.fx.spawn({ x: g.x + G.rand(-24, 24), y: FLOOR - G.rand(10, 130), vx: G.rand(-14, 14), vy: -G.rand(30, 90), life: G.rand(0.3, 0.6), size: G.rand(2, 4), color: tint.boss });
+        if (this.t > tele + 0.45) this.dead = true;
+      },
+      draw(ctx) { drawKnight(ctx, g, 0.62 * g.a); },
+    });
+  }
+
   // blaze: the blade burns red through the wind-up. That swing takes two health and throws a wave along the floor.
   function* cut(down, tele, r, blaze) {
     const b = B.body;
@@ -94,6 +166,7 @@
     if (blaze) { G.audio.play('charge', { dur: tele }); G.audio.play('whoosh'); }
     const o = down ? { a0: -2.5, a1: 0.78, tele, pose: 'cleave', r } : { a0: 0.78, a1: -2.5, tele, pose: 'rise', r };
     if (blaze) o.dmg = 2;
+    if (B.phase >= 2) o.wind = down ? 'raise' : 'low';
     swing(o);
     yield* wait(tele);
     if (blaze) { H.shockwave(b.x + b.face * 84, b.face, 560, 46, { boss: DANGER, hot: '255,236,220' }); G.fx.shake(11); G.audio.play('boom'); }
@@ -187,7 +260,7 @@
     facePlayer();
     b.fast = false; b.pose = 'overRaise';
     const reach = 138;
-    const m = { x: b.x + b.face * reach, k: 0 }; // where the blade will land (no mark is drawn: watch the sword)
+    const m = K.columnMark(b.x + b.face * reach, 132, true); // where the blade will land (not drawn: watch the sword)
     G.audio.play('charge', { dur: track + lock });
     let e = 0;
     while (e < track) {
@@ -204,6 +277,7 @@
     while (e < lock) { e += yield; m.k = 0.7 + 0.3 * Math.min(1, e / lock); }
     b.fast = true; b.pose = 'slam';
     yield* wait(0.07);
+    m.dead = true;
     K.crush(m.x, FLOOR - 70, 60, 80, 2);
     K.impact(m.x, true);
     H.shockwave(m.x - 50, -1, 450, 46);
@@ -365,7 +439,7 @@
     G.ui.hint('whirl', 'Keep away from the spinning blade: run, dash through it, or take a platform');
     facePlayer();
     b.pose = 'whirl';
-    const tele = 0.85 * T, dur = B.phase === 3 ? 2.7 : 2.4, R = 80, TOP = 108;
+    const tele = 0.85 * T, dur = B.ring ? 1.7 : 2.4, R = 80, TOP = 108;
     G.audio.play('charge', { dur: tele });
     H.add({
       kind: 'whirl', layer: 'under', t: 0, r: R,
@@ -403,7 +477,7 @@
     }
     b.spinning = true;
     let e = 0, sfx = 0;
-    const speed = (K.gentle() ? 205 : 240) + (K.hard() ? 35 : 0);
+    const speed = ((K.gentle() ? 205 : 240) + (K.hard() ? 35 : 0)) * (B.ring ? 0.8 : 1);
     while (e < dur) {
       const dt = yield;
       e += dt; sfx -= dt;
@@ -544,7 +618,59 @@
     if (B.phase >= 2) { facePlayer(); yield* cut(true, 0.5 * T); }
   }
 
+  // A cut thrown off the blade along a line, at whatever height the hero is.
+  function flyingCut(x, y, ang, speed) {
+    const tint = tintNow(), c = Math.cos(ang), s = Math.sin(ang);
+    return H.add({
+      kind: 'flycut', x, y, tint, vx: c * speed, vy: s * speed,
+      update(dt) {
+        this.x += c * speed * dt; this.y += s * speed * dt; this.srcX = this.x - c * 30;
+        if (Math.random() < 0.7) G.fx.spawn({ x: this.x - c * 10 + G.rand(-12, 12), y: this.y - s * 10 + G.rand(-12, 12), vx: -c * G.rand(20, 90), vy: -s * G.rand(20, 90), life: G.rand(0.15, 0.4), size: G.rand(2, 5), color: tint.boss });
+        if (this.y > FLOOR - 8) { this.dead = true; G.fx.thud(this.x, FLOOR, 0.6, { col: tint.boss }); G.fx.shake(4); }
+        else if (this.x < G.WALL_L - 40 || this.x > G.WALL_R + 40 || this.y < -80) this.dead = true;
+      },
+      hits(P) { return G.rectsOverlap(P.box(), { cx: this.x, cy: this.y, hw: 17, hh: 17 }); },
+      draw(ctx) {
+        ctx.save(); ctx.translate(this.x, this.y); ctx.rotate(ang);
+        ctx.globalCompositeOperation = 'lighter';
+        D.glow(ctx, tint.boss, 0, 0, 60, 0.6);
+        for (const [col, q, a] of [[DANGER, 1, 0.85], [tint.hot, 0.55, 1]]) {
+          ctx.fillStyle = G.rgba(col, a);
+          ctx.beginPath();
+          ctx.moveTo(-14, -30 * q); ctx.quadraticCurveTo(30 * q, 0, -14, 30 * q);
+          ctx.quadraticCurveTo(6 * q, 0, -14, -30 * q);
+          ctx.closePath(); ctx.fill();
+        }
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.restore();
+      },
+    });
+  }
+
+  // Sever: its answer to a hero who will not come near. It throws cuts off the blade straight at
+  // them, wherever they are, in the air included, and then it comes for them at a run.
+  function* atkSever() {
+    const b = B.body, T = K.T();
+    const n = (B.phase === 3 ? 3 : 2) + (K.hard() ? 1 : 0);
+    for (let i = 0; i < n; i++) {
+      facePlayer();
+      b.fast = false; b.pose = i % 2 ? 'low' : 'raise';
+      const tele = (i ? 0.44 : 0.62) * T, ox = b.x + b.face * 44, oy = b.y - 92;
+      const aim = K.aim(ox, oy, tele, 0.17);
+      if (!i) G.audio.play('charge', { dur: tele });
+      yield* wait(tele);
+      b.fast = true; b.pose = i % 2 ? 'rise' : 'cleave';
+      G.audio.play('cleave'); G.audio.play('streak'); G.fx.shake(5);
+      flyingCut(ox, oy, aim.ang, K.gentle() ? 780 : 900);
+      yield* wait(0.26);
+    }
+    yield* approach(165, 560, 0.9);
+    yield* cut(true, 0.52 * T);
+    yield* drag();
+  }
+
   B.ATTACKS = {
+    sever: atkSever,
     hurl: atkHurl,
     cleave: atkCleave, cleave2: atkCleave2, overhead: atkOverhead, charge: atkCharge, grip: atkGrip, graves: atkGraves,
     wraiths: atkWraiths, desecrate: atkDesecrate, whirl: atkWhirl, rend: atkRend, leap: atkLeap, reap: atkReap,
@@ -571,18 +697,80 @@
     b.pose = 'idle';
     yield* wait(0.4);
   };
-  B.phaseIn = function* () {
+  // The second phase: it dies. The light goes out of it and for a breath the fight looks won. Then
+  // the bell tolls, its cape burns away in ghostfire, and the Host steps out of it: from here every
+  // cut it makes is made again by its own ghost.
+  // The third phase: the Blood Oath. It raises the burning blade, and greatswords fall out of the sky
+  // wall by wall until the ground left to fight on is a duelling ring. There is no keeping away now.
+  B.phaseIn = function* (n) {
     const b = B.body;
-    b.y = FLOOR; b.pose = 'kneel';
-    yield* wait(0.9);
-    b.pose = 'plant';
-    G.audio.play('bell');
-    yield* wait(0.5);
+    b.y = FLOOR; b.fast = false; b.pose = 'kneel';
+    if (n === 2) {
+      b.still = true; // no embers: it is dead
+      G.audio.setIntensity(0);
+      yield* wait(1.25);
+      G.audio.play('bell'); G.fx.shake(7);
+      // the cape catches
+      let e = 0;
+      while (e < 0.8) {
+        const dt = yield;
+        e += dt;
+        for (const q of B.cape) if (Math.random() < dt * 22) G.fx.spawn({ x: q.x + G.rand(-10, 10), y: q.y + G.rand(-6, 6), vx: G.rand(-30, 30), vy: -G.rand(60, 220), life: G.rand(0.3, 0.7), size: G.rand(3, 7), color: G.PAL[2].boss });
+      }
+      b.bare = true; b.still = false;
+      for (const q of B.cape) G.fx.burst(q.x, q.y, { n: 3, color: G.PAL[2].hot, speed: [40, 260], life: [0.3, 0.8], size: [2, 5], grav: -120 });
+      G.audio.play('whoosh');
+      b.pose = 'plant';
+      yield* wait(0.35);
+    } else {
+      yield* wait(0.6);
+      b.pose = 'walk';
+      while (Math.abs(b.x - 640) > 6) { const dt = yield; b.face = b.x < 640 ? 1 : -1; b.x += b.face * Math.min(Math.abs(640 - b.x), 420 * dt); }
+      facePlayer();
+      b.pose = 'overRaise'; b.blaze = 1;
+      G.audio.play('charge', { dur: 0.8 });
+      let e = 0;
+      while (e < 0.8) { const dt = yield; e += dt; K.aura(b.x, b.y, DANGER, 34, 120, 2); G.fx.shake(3); }
+    }
   };
-  B.phaseOut = function* () {
+  B.phaseOut = function* (n) {
     const b = B.body;
-    b.pose = 'overRaise';
-    yield* wait(1.3);
+    if (n === 2) {
+      b.pose = 'overRaise';
+      G.fx.shake(14);
+      // the Host: three of it step out and cut the air
+      const cuts = [[-170, -1, true], [170, 1, true], [0, b.face, false]];
+      for (const [dx, f, down] of cuts) {
+        const o = down ? { a0: -2.5, a1: 0.78, pose: 'cleave' } : { a0: 0.78, a1: -2.5, pose: 'rise' };
+        echo(G.clamp(b.x + dx, WL + 60, WR - 60), f, o, down ? 'raise' : 'low', true);
+        G.audio.play('orb');
+        let e = 0;
+        while (e < 0.3) { const dt = yield; e += dt; K.aura(b.x, b.y, G.PAL[2].boss, 30, 120, 2); }
+      }
+      yield* wait(0.9);
+    } else {
+      b.fast = true; b.pose = 'slam';
+      yield* wait(0.07);
+      K.impact(b.x + b.face * 40, true, DANGER);
+      G.fx.impact(b.x, b.y - 60, 0.08);
+      b.blaze = 0;
+      // blades fall, wall by wall, and the ground closes to a ring
+      const N = 5;
+      for (let i = 0; i < N; i++) {
+        const q = (i + 1) / N, l = G.lerp(G.WALL_L, RING_L, q), r = G.lerp(G.WALL_R, RING_R, q);
+        for (const x of [l, r]) {
+          B.swords.push({ x, t: 0, lean: G.rand(-0.12, 0.12), s: i === N - 1 ? 1.5 : G.rand(1.05, 1.35) });
+          G.fx.thud(x, FLOOR, 1.1, { col: G.PAL[3].boss });
+          G.fx.burst(x, FLOOR - 6, { n: 8, color: G.PAL[3].hot, speed: [150, 560], angle: -Math.PI / 2, spread: 1.6, life: [0.2, 0.5], kind: 'spark', size: [2, 4], grav: 900 });
+        }
+        G.audio.play('slam'); G.fx.shake(9);
+        WL = l; WR = r;
+        G.bounds = { l: WL + 13, r: WR - 13 };
+        yield* wait(0.13);
+      }
+      B.ring = true;
+      yield* wait(0.7);
+    }
     b.pose = 'idle';
   };
 
@@ -608,6 +796,7 @@
         }
       }
     }
+    for (const w of B.swords) w.t = Math.min(1, w.t + dt / 0.12);
     const target = b.pose === 'walk' ? walkPose(b.walkT) : (POSES[b.pose] || POSES.idle);
     const k = 1 - Math.exp(-(b.fast ? 46 : 11) * dt);
     for (let i = 0; i < NP; i++) {
@@ -620,7 +809,7 @@
       G.fx.spawn({ x: b.x + b.face * G.rand(-10, 70), y: b.y - G.rand(90, 200), vx: G.rand(-40, 40), vy: -G.rand(40, 160), life: G.rand(0.3, 0.7), size: G.rand(2, 4.5), color: DANGER, wob: 60, rot: G.rand(0, 6) });
     }
     // embers of whatever keeps it standing
-    if (!B.dead && Math.random() < 0.3) {
+    if (!B.dead && !b.still && Math.random() < 0.3) {
       G.fx.spawn({ x: b.x + G.rand(-26, 26), y: b.y - G.rand(10, 120), vx: G.rand(-14, 14), vy: G.rand(-70, -20), life: G.rand(0.4, 0.9), size: G.rand(1.5, 3.5), color: G.pal().boss, kind: 'glow' });
     }
     if (b.hurt && G.canHurt() && G.rectsOverlap(P.box(), { cx: b.x + b.face * 6, cy: b.y - 52, hw: 30, hh: 48 })) P.tryHit(1, b.x, b);
@@ -656,11 +845,41 @@
     const k = G.clamp(1 - (FLOOR - b.y) / 420, 0.2, 1);
     ctx.fillStyle = 'rgba(0,0,0,' + (0.48 * k) + ')';
     ctx.beginPath(); ctx.ellipse(b.x, FLOOR + 3, 52 * k, 8 * k, 0, 0, G.TAU); ctx.fill();
+    const pal = G.pal();
+    // struck from its hands: the sword turns over in the air and stands in the floor
+    if (B.lost) {
+      const q = B.lost, kk = q.k, x = G.lerp(q.x0, q.x1, kk), y = FLOOR - 96 - 4 * 190 * kk * (1 - kk) + 96 * 0;
+      const ang = kk < 1 ? kk * 11 * (q.x1 > q.x0 ? 1 : -1) + 1.2 : Math.PI / 2;
+      if (kk < 1) sword(ctx, x - Math.cos(ang) * 45, y - Math.sin(ang) * 45, ang, pal.boss, pal.hot);
+      else sword(ctx, q.x1, FLOOR - 108, Math.PI / 2 + Math.sin(G.t * 40) * 0.02, pal.boss, pal.hot);
+    }
+    // the Blood Oath's ring: greatswords driven into the ground, hilts up
+    for (const w of B.swords) {
+      const drop = (1 - G.ease.inQuad(w.t)) * 700;
+      ctx.save();
+      ctx.translate(w.x, FLOOR - 150 * w.s + 44 - drop); ctx.rotate(w.lean); ctx.scale(w.s, w.s);
+      sword(ctx, 0, 0, Math.PI / 2, pal.boss, pal.hot);
+      ctx.restore();
+    }
+    if (B.ring) {
+      // nothing to fight on beyond them
+      for (const [x0, x1] of [[G.WALL_L - 40, WL], [WR, G.WALL_R + 40]]) {
+        const gr = ctx.createLinearGradient(x0, 0, x1, 0), out = x0 < WL ? 0 : 1;
+        gr.addColorStop(out, 'rgba(4,2,6,0.62)'); gr.addColorStop(1 - out, 'rgba(4,2,6,0)');
+        ctx.fillStyle = gr; ctx.fillRect(x0, FLOOR - 420, x1 - x0, 420);
+      }
+    }
   };
 
   B.draw = function (ctx) {
     if (B.dead) return;
-    const b = B.body, p = b.p, pal = G.pal(), col = pal.boss, hot = pal.hot;
+    drawKnight(ctx, B.body, 1);
+  };
+
+  // The Knight, or (alpha below 1) one of the ghosts that cut beside it.
+  function drawKnight(ctx, b, alpha) {
+    if (alpha <= 0.01) return;
+    const p = b.p, pal = G.pal(), col = pal.boss, hot = pal.hot, real = b === B.body;
     const lean = p[0], hip = p[1];
     const dark = '#090c11', mid = '#18212b', plate = '#2b3846', trim = '#40536a';
     const jx = b.jit ? G.rand(-b.jit, b.jit) : 0;
@@ -669,17 +888,20 @@
     const sx = b.face * (Math.abs(turn) < 0.25 ? 0.25 * (turn < 0 ? -1 : 1) : turn);
 
     ctx.save();
+    ctx.globalAlpha = alpha;
     ctx.lineJoin = 'round'; ctx.lineCap = 'round';
-    // the cape: heavy and torn, in world space
-    D.ribbon(ctx, B.cape.map((q) => ({ x: q.x + jx, y: q.y })), 38, 58, 12);
-    ctx.fillStyle = '#07090d'; ctx.fill();
-    ctx.strokeStyle = G.rgba(col, 0.3); ctx.lineWidth = 1.5; ctx.stroke();
+    // the cape: heavy and torn, in world space (it burns away when the Host rises)
+    if (real && !b.bare) {
+      D.ribbon(ctx, B.cape.map((q) => ({ x: q.x + jx, y: q.y })), 38, 58, 12);
+      ctx.fillStyle = '#07090d'; ctx.fill();
+      ctx.strokeStyle = G.rgba(col, 0.3); ctx.lineWidth = 1.5; ctx.stroke();
+    }
 
     // nothing shows below the floor while it climbs out of the ground
     if (b.y > FLOOR) { ctx.beginPath(); ctx.rect(-80, -400, G.W + 160, FLOOR + 400); ctx.clip(); }
     ctx.translate(b.x + b.kx + jx, b.y);
     ctx.scale(sx, 1);
-    D.glow(ctx, col, 0, -70, 120, 0.2);
+    D.glow(ctx, col, 0, -70, 120, real ? 0.2 : 0.55);
 
     const shx = Math.sin(lean) * 46, shy = hip - Math.cos(lean) * 46; // shoulders
     const hx = p[6], hy = p[7], ang = p[8];
@@ -774,7 +996,7 @@
 
     if (b.flash > 0) D.glow(ctx, '255,255,255', 0, -70, 100, b.flash * 0.8);
     ctx.restore();
-  };
+  }
 
   G.makeBoss(B);
 })();

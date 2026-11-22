@@ -12,19 +12,20 @@
     blurb: 'A hooded killer that strikes from nowhere',
     tips: [
       'Every attack leaves the Veil open for a moment afterwards. Wait for it, then strike.',
-      'A lane on the floor means a lunge. Jump it, or dash through it for a perfect dodge.',
+      'When it sinks into a crouch and its blade catches the light, it is about to cross the floor. Jump it, or dash through it for a perfect dodge.',
       'When it drops from above its blade sticks in the floor, and it takes extra damage until it pulls free.',
       'Its shadows vanish at a single hit and give Starlight.',
       'A line across the arena is a cut. Step off it, or jump it if it lies flat.',
       'Listen to the tempo of its flurry. Three measured cuts end in a fan of knives; five quick ones end in a single knife that bursts for two health.',
     ],
     hudCols: [null, ['#a070ff', '#e4d4ff'], ['#40e0a8', '#c8ffe8'], ['#d8d8f0', '#ffffff']],
-    BASE_HP: 3000, poise0: 340, w: 36, h: 84, platformsFrom: 2,
+    BASE_HP: 3000, poise0: 340, w: 36, h: 84,
+    answer: 'hunt',
     gaps: [0, 0.8, 0.62, 0.5],
     bags: {
       1: ['lunge', 'flurry', 'knives', 'ambush', 'backstab', 'echo'],
       2: ['pincer', 'flurry', 'knives', 'ambush', 'backstab', 'mirror', 'rain', 'cross', 'echo'],
-      3: ['pincer', 'flurry', 'ambush', 'backstab', 'mirror', 'rain', 'cross', 'cuts', 'mark', 'echo'],
+      3: ['pincer', 'flurry', 'ambush', 'backstab', 'mirror', 'rain', 'cross', 'cuts', 'mark', 'echo', 'hunt'],
     },
     cards: { 2: ['SHADOWS', 'It no longer hunts alone'], 3: ['EXECUTION', 'No more warnings than these'] },
     first: { 1: 'lunge', 2: 'mirror', 3: 'cuts' },
@@ -57,10 +58,35 @@
     b.x = 900; b.y = -120; b.pose = 'dive'; b.hurt = false; b.p = POSES.dive.slice(); b.runT = 0;
     B.clones = []; B.serial = 0;
     B.scarf = D.chain(11, b.x, b.y - 70);
+    B.lights = true; B.dark = 0; B.wires = []; B.wireHit = 0;
   };
   B.onRelease = function () { const b = B.body; b.hurt = false; b.pose = 'idle'; b.hidden = false; };
   B.onInterrupt = function () { for (const c of B.clones) smoke(c.x, c.y - 40); B.clones.length = 0; };
   B.onStagger = function () { B.body.pose = 'kneel'; };
+  B.staggerWord = 'CAUGHT'; B.staggerMult = 1.9; B.staggerDur = 0.7;
+  B.staggerIn = function* () {
+    const b = B.body, dir = -(G.sign(G.player.x - b.x) || b.face);
+    const x0 = b.x, y0 = Math.min(b.y, FLOOR), tx = dir > 0 ? WR - 26 : WL + 26;
+    b.pose = 'air'; b.face = -dir;
+    G.audio.play('whoosh');
+    const dur = 0.2 + Math.abs(tx - x0) / 2600;
+    let e = 0;
+    while (e < dur) {
+      e += yield;
+      const k = Math.min(1, e / dur);
+      b.x = G.lerp(x0, tx, k); b.y = G.lerp(y0, FLOOR - 110, k) - 4 * 70 * k * (1 - k);
+      G.fx.spawn({ x: b.x - dir * 16, y: b.y - G.rand(10, 60), vx: -dir * G.rand(40, 200), vy: G.rand(-30, 30), life: 0.25, size: G.rand(4, 9), color: G.pal().boss });
+    }
+    // into the wall
+    G.audio.play('slam'); G.fx.shake(15); G.fx.stop(0.08); G.fx.impact(tx, b.y - 40, 0.06);
+    G.fx.burst(tx + dir * 10, b.y - 40, { n: 14, color: '24,20,34', speed: [150, 560], angle: dir > 0 ? Math.PI : 0, spread: 2.2, life: [0.5, 1.1], size: [5, 10], kind: 'chunk', grav: 1400 });
+    G.fx.dust(tx, b.y - 40, 6, { dir: -dir, speed: [60, 260], size: [8, 15], life: [0.5, 1], up: 30 });
+    G.fx.lines(tx, b.y - 40, 12, G.pal().hot, { r0: 20 });
+    yield* wait(0.12);
+    b.pose = 'kneel';
+    yield* tween(b, { y: FLOOR }, 0.28, E.inQuad);
+    G.fx.thud(b.x, FLOOR, 0.6, { noCrack: true });
+  };
   B.reckonName = 'DEATH MARK';
   B.onReckon = function (on) { B.body.pose = on ? 'crouch' : 'idle'; };
   B.onRecover = function () { B.body.pose = 'idle'; };
@@ -529,7 +555,38 @@
     b.exposed = false;
   }
 
+  // Hunt: its answer to a hero who keeps away, or keeps to the air. It is gone, and then it is beside
+  // them, at whatever height they are, already cutting. Three knives follow them down.
+  function* atkHunt() {
+    const b = B.body, P = G.player, T = K.T();
+    yield* vanish();
+    yield* wait(0.16);
+    const air = !P.onGround && P.y < FLOOR - 60;
+    const side = P.vx ? -G.sign(P.vx) : -(P.facing || 1); // behind the way they are moving
+    const x = G.clamp(P.x + side * 62, WL + 40, WR - 40), y = air ? Math.min(FLOOR, P.y + 14) : FLOOR;
+    appear(x, y, air ? 'air' : 'crouch');
+    G.fx.ring(b.x, b.y - 46, { r0: 56, r1: 8, life: 0.22, color: G.pal().hot, width: 3 });
+    const n = B.phase === 3 ? 2 : 1;
+    for (let i = 0; i < n; i++) {
+      if (Math.abs(P.x - b.x) > 16) b.face = P.x > b.x ? 1 : -1;
+      const tele = (i ? 0.26 : 0.36) * T;
+      if (i % 2 === 0) swing(b, { r: 112, a0: -2.1, a1: 0.95, tele, pose: 'slashA' });
+      else swing(b, { r: 112, a0: 1.0, a1: -2.0, tele, pose: 'slashB' });
+      yield* wait(tele + 0.1);
+    }
+    if (b.y < FLOOR) { b.pose = 'air'; yield* tween(b, { y: FLOOR }, 0.2, E.inQuad); }
+    b.face = P.x > b.x ? 1 : -1; b.pose = 'crouch';
+    const ox = b.x + b.face * 22, oy = b.y - 60, base = Math.atan2(P.y - 24 - oy, P.x - ox), tele = 0.4 * T;
+    volley(ox, oy, [base - 0.13, base, base + 0.13], tele, 820);
+    yield* wait(tele);
+    b.pose = 'throw';
+    yield* wait(0.3);
+    b.pose = 'skid';
+    yield* wait(0.7);
+  }
+
   B.ATTACKS = {
+    hunt: atkHunt,
     echo: atkEcho,
     lunge: atkLunge, pincer: atkPincer, flurry: atkFlurry, knives: atkKnives, ambush: atkAmbush, backstab: atkBackstab,
     mirror: atkMirror, rain: atkRain, cross: atkCross, cuts: atkCuts, mark: atkMark,
@@ -548,7 +605,13 @@
     b.pose = 'idle';
     yield* wait(0.3);
   };
-  B.phaseIn = function* () {
+  // The second phase: it puts the lights out. From here the arena is dark but for the hero's own
+  // light, and the Veil is a pair of eyes and whatever glints off its blades. A stagger brings the
+  // light back for as long as it lasts.
+  // The third phase: it tears the dark away and strings the air with wire, low over the middle of
+  // the floor and higher towards the walls. The ground is still open; the sky above it is not.
+  const WIRE_Y0 = 250, WIRE_Y1 = 398;
+  B.phaseIn = function* (n) {
     const b = B.body;
     if (b.y < FLOOR) b.y = FLOOR;
     b.pose = 'kneel';
@@ -556,17 +619,50 @@
     yield* vanish();
     yield* wait(0.25);
     appear(640, FLOOR, 'crouch');
+    if (n === 2) {
+      // one hand comes up, and closes
+      b.pose = 'throw';
+      yield* wait(0.45);
+      G.audio.play('pull'); G.audio.setIntensity(0);
+      B.lights = false;
+      G.fx.ring(b.x, b.y - 50, { r0: 900, r1: 10, life: 0.55, color: '10,8,20', width: 60, alpha: 0.9 });
+      yield* wait(0.9);
+    } else {
+      B.lights = true; B.dark = 0;
+      G.fx.flash(G.PAL[3].hot, 0.6, 0.5); G.fx.impact(b.x, b.y - 44, 0.08);
+      G.fx.shatter(b.x, b.y - 44, '14,10,26', 26, { hot: G.PAL[3].hot, r: 520, r0: 40 });
+      yield* wait(0.5);
+    }
   };
   B.phaseOut = function* (n) {
-    const b = B.body;
+    const b = B.body, P = G.player;
     if (n === 2) {
-      // its shadows step out of it
-      const a = clone(b.x - 10, FLOOR, -1, 'run'), c = clone(b.x + 10, FLOOR, 1, 'run');
-      yield* par(tween(a, { x: b.x - 260 }, 0.7, E.outCubic), tween(c, { x: b.x + 260 }, 0.7, E.outCubic));
-      a.pose = c.pose = 'crouch';
-      yield* wait(0.7);
-      for (const s of [a, c]) { s.gone = true; smoke(s.x, s.y - 40); }
-    } else yield* wait(1.2);
+      // eyes open in the dark: it is not alone in here
+      const a = clone(b.x - 260, FLOOR, 1, 'crouch'), c = clone(b.x + 260, FLOOR, -1, 'crouch');
+      for (const sh of [a, c]) { sh.hurt = false; G.audio.play('tink'); yield* wait(0.3); }
+      yield* wait(0.6);
+      for (const sh of [a, c]) { sh.gone = true; smoke(sh.x, sh.y - 40); }
+    } else {
+      // up, and a knife to each wall with a wire behind it
+      b.pose = 'air';
+      yield* tween(b, { y: WIRE_Y1 + 40 }, 0.24, E.outCubic);
+      for (const side of [-1, 1]) {
+        b.face = side; b.pose = 'throw';
+        const w = { x0: 640, y0: WIRE_Y1, x1: side < 0 ? WL : WR, y1: WIRE_Y0, k: 0, flash: 1 };
+        B.wires.push(w);
+        G.audio.play('arrowHeavy');
+        yield* tween(w, { k: 1 }, 0.16, E.outQuad);
+        G.audio.play('tink'); G.fx.shake(5);
+        G.fx.burst(w.x1, w.y1, { n: 10, color: G.PAL[3].hot, speed: [100, 420], angle: side < 0 ? 0 : Math.PI, spread: 2, life: [0.15, 0.4], kind: 'spark', size: [2, 3.5] });
+        G.fx.glint(w.x1 - side * 6, w.y1, 30, G.PAL[3].hot);
+        yield* wait(0.12);
+      }
+      b.pose = 'dive';
+      yield* tween(b, { y: FLOOR }, 0.16, E.inQuad);
+      b.pose = 'skid'; b.face = P.x > b.x ? 1 : -1;
+      G.fx.thud(b.x, FLOOR, 0.7, { noCrack: true }); G.audio.play('land');
+      yield* wait(0.6);
+    }
     b.pose = 'idle';
   };
 
@@ -594,7 +690,24 @@
     D.chainStep(B.scarf, b.x - b.face * 4, b.y + b.p[1] - 36, dt, { seg: 8, grav: 30, drift: 46, face: b.face, wave: 14, rate: 9 });
     for (const c of B.clones) stepPose(c, dt);
     B.clones = B.clones.filter((c) => !c.gone);
+    // the dark: full while the lights are out, thinner while it is staggered, gone when it dies
+    const darkTo = B.lights || B.dying || B.dead ? 0 : B.staggered ? 0.25 : 1;
+    B.dark = G.damp(B.dark, darkTo, darkTo > B.dark ? 2.2 : 5, dt);
+    B.wireHit = Math.max(0, B.wireHit - dt * 3);
+    for (const w of B.wires) w.flash = Math.max(0, w.flash - dt * 2.5);
     if (!G.canHurt()) return;
+    // the wires: live unless it is staggered, and a dash passes through them
+    if (B.wires.length && !B.staggered && P.iframes <= 0 && P.inv <= 0 && !P.ulting) {
+      for (const w of B.wires) {
+        if (w.k < 1 || G.distPointSeg(P.x, P.y - 22, w.x0, w.y0, w.x1, w.y1) > 17) continue;
+        if (P.tryHit(1, P.x + (P.vx >= 0 ? 30 : -30), { kind: 'wire', popVy: 260 })) {
+          w.flash = 1; B.wireHit = 1;
+          G.audio.play('blade');
+          G.fx.cut(P.x, P.y - 22, Math.atan2(w.y1 - w.y0, w.x1 - w.x0), 260, 5, DANGER, '255,240,230', 0.25);
+        }
+        break;
+      }
+    }
     const touch = (a) => {
       const low = a.pose === 'dash';
       return G.rectsOverlap(P.box(), { cx: a.x, cy: a.y - (low ? 28 : 40), hw: low ? 26 : 16, hh: low ? 26 : 38 });
@@ -721,9 +834,68 @@
     for (const c of B.clones) sh(c, 0.5);
   };
 
+  // Where a figure's eyes are, near enough, for showing them through the dark.
+  function eyeAt(a) {
+    const lean = a.p[0], hip = a.p[1];
+    return { x: a.x + a.face * (Math.sin(lean) * 34 + 7), y: a.y + hip - Math.cos(lean) * 34 - 13 };
+  }
+  let darkCv = null;
+  B.drawOver = function (ctx) {
+    if (B.dark < 0.01 || B.dead) return;
+    const b = B.body, P = G.player, pal = G.pal();
+    if (!darkCv) { darkCv = document.createElement('canvas'); darkCv.width = 720; darkCv.height = 440; }
+    const d = darkCv.getContext('2d');
+    d.setTransform(1, 0, 0, 1, 0, 0);
+    d.globalCompositeOperation = 'source-over';
+    d.clearRect(0, 0, 720, 440);
+    d.fillStyle = 'rgba(2,2,9,' + 0.94 * B.dark + ')';
+    d.fillRect(0, 0, 720, 440);
+    // the hero's own light, and a little round anything that is burning
+    d.globalCompositeOperation = 'destination-out';
+    const hole = (x, y, r, a) => {
+      const hx = (x - G.cam.x + 80) / 2, hy = (y - G.cam.y + 80) / 2, g = d.createRadialGradient(hx, hy, r * 0.12, hx, hy, r / 2);
+      g.addColorStop(0, 'rgba(0,0,0,' + a + ')'); g.addColorStop(0.6, 'rgba(0,0,0,' + a * 0.55 + ')'); g.addColorStop(1, 'rgba(0,0,0,0)');
+      d.fillStyle = g; d.fillRect(hx - r / 2, hy - r / 2, r, r);
+    };
+    // (r is the radius of the light in the arena's own pixels)
+    if (!P.dead) hole(P.x, P.y - 26, 230 + 26 * Math.min(4, G.flow.rank), 1);
+    for (const s of G.shots) hole(s.x, s.y, 80, 0.7);
+    if (B.staggered && !b.hidden) hole(b.x, b.y - 40, 170, 0.9);
+    ctx.drawImage(darkCv, G.cam.x - 80, G.cam.y - 80, 1440, 880);
+    // eyes in the dark
+    ctx.globalCompositeOperation = 'lighter';
+    const eye = (a, col, k) => {
+      const e = eyeAt(a);
+      D.glow(ctx, col, e.x, e.y, 20, 0.9 * k * B.dark);
+      ctx.fillStyle = G.rgba(pal.hot, k * B.dark);
+      ctx.beginPath(); ctx.ellipse(e.x, e.y, 4.2, 1.5, a.face * 0.25, 0, G.TAU); ctx.fill();
+    };
+    if (!b.hidden) eye(b, pal.boss, 1);
+    for (const c of B.clones) eye(c, pal.boss, c.hurt ? 1 : 0.7);
+    ctx.globalCompositeOperation = 'source-over';
+  };
+
   B.draw = function (ctx) {
     if (B.dead) return;
     const b = B.body, col = G.pal().boss;
+    // the wires of the third phase: a hair of the warning colour with light running along it
+    for (const w of B.wires) {
+      const x1 = G.lerp(w.x0, w.x1, w.k), y1 = G.lerp(w.y0, w.y1, w.k), slack = B.staggered || B.dying;
+      ctx.lineCap = 'round';
+      ctx.strokeStyle = slack ? 'rgba(150,150,170,0.28)' : G.rgba(DANGER, 0.5 + 0.5 * w.flash); ctx.lineWidth = 1.4 + 2.5 * w.flash;
+      ctx.beginPath(); ctx.moveTo(w.x0, w.y0);
+      if (slack) ctx.quadraticCurveTo((w.x0 + x1) / 2, (w.y0 + y1) / 2 + 46, x1, y1); else ctx.lineTo(x1, y1);
+      ctx.stroke();
+      if (!slack && w.k >= 1) {
+        ctx.globalCompositeOperation = 'lighter';
+        for (let i = 0; i < 3; i++) {
+          const q = (G.t * 0.35 + i / 3) % 1;
+          D.glow(ctx, '255,240,230', G.lerp(w.x0, w.x1, q), G.lerp(w.y0, w.y1, q), 9, 0.9 * Math.sin(Math.PI * q));
+        }
+        ctx.globalCompositeOperation = 'source-over';
+        dagger(ctx, w.x1, w.y1, w.x1 < 640 ? Math.PI : 0, col, G.pal().hot, false);
+      }
+    }
     for (const c of B.clones) {
       D.glow(ctx, col, c.x, c.y - 44, 60, 0.25);
       figure(ctx, c, 0.78);

@@ -45,7 +45,7 @@
       blurb: 'Slow, heavy and hard to kill. Every swing counts.',
       lines: ['Maul: a wide sweep, then a smash you can hold to charge', 'Starfall: slam down for a blast around you, passing through attacks as you fall', 'One more health; she cannot be knocked back while charging'],
       how: {
-        attack: 'Maul. A wide sweep in front of you (20), then a smash that shakes the ground (40). Keep the button held on the smash to charge it, up to double; fully charged it also throws a wave along the floor. While you charge you move slowly, but a blow cannot knock you back or stop you.',
+        attack: 'Maul. A wide sweep in front of you (20), then a smash that shakes the ground (40). Keep the button held on the smash to charge it, up to half again (60); fully charged it also throws a small wave along the floor. While you charge you move slowly, but a blow cannot knock you back or stop you.',
         aim: 'Hold up to heave the maul overhead. In the air, hold down to strike below and bounce off what you hit.',
         dash: 'She is slower to start and stop than the others. A sweep thrown straight out of a dash hits 40% harder.',
         special: 'Starfall: a blast of 46 around your feet. In the air you plunge first, passing through attacks until you land.',
@@ -69,7 +69,7 @@
         aim: 'Aim with the mouse, or hold a direction; with no direction held she fires the way she faces. Firing downward in the air lifts you.',
         dash: 'Three jumps instead of two. She has one less health than the others.',
         special: 'Moon Volley: a fan of five arrows, and a leap back from where you aimed.',
-        ult: 'Moonfall: one arrow into the sky; twelve fall on the boss for 15 each, then a beam of 70.',
+        ult: 'Moonfall: a moon rises behind you. One great arrow for 26, fourteen moonbeams for 11 each, then the cut that ends it, for 70.',
       },
     },
   ];

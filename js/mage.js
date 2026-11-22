@@ -26,6 +26,8 @@
     ],
     hudCols: [null, ['#7ea0ff', '#d8e4ff'], ['#ff7ea8', '#ffd4dc'], ['#ffe08a', '#ffffff']],
     BASE_HP: 3900, poise0: 380, w: 52, h: 112, platformsFrom: 1,
+    // its spells already reach anywhere; what it answers is a hero who will not come down out of the air
+    answer: 'shards', kiting: (P) => !P.onGround && P.y < FLOOR - 150,
     gaps: [0, 0.95, 0.75, 0.6],
     bags: {
       1: ['shards', 'rime', 'fireball', 'bolts', 'spheres', 'comet', 'invoke'],
@@ -42,6 +44,7 @@
     const b = B.body;
     b.x = 900; b.y = GY; b.homeY = GY; b.alpha = 0; b.cast = 0; b.want = 0; b.elem = null; b.spent = false; b.charge = 0;
     B.crystals = []; B.shards = []; B.spin = 1; B.blizz = 0; B.serial = 0;
+    B.iceK = 0; B.storm = 0; B.zap = 0; B.skyBolts = []; b.aflame = false;
     B.cape = D.chain(9, b.x, b.y - 92);
   };
   const setElem = (el) => { B.body.elem = el; };
@@ -64,6 +67,14 @@
   B.onRelease = function () { const b = B.body; b.want = 0; b.spent = false; b.charge = 0; b.hidden = false; b.alpha = 1; B.blizz = 0; b.gest = null; b.merge = 0; };
   B.onInterrupt = function () { B.shards.length = 0; };
   B.onStagger = function () { const b = B.body; b.alpha = 1; b.elem = null; };
+  B.staggerWord = 'SILENCED'; B.staggerMult = 1.2; B.staggerDur = 1.15;
+  B.onHit = function (dmg, info) {
+    if (!B.staggered) return;
+    G.player.gain(7);
+    const el = ELEMS[(B.spill = (B.spill || 0) + 1) % 3];
+    G.fx.burst(info.x, info.y, { n: 5, color: el.boss, speed: [120, 420], angle: -Math.PI / 2, spread: 2.4, life: [0.3, 0.7], size: [3, 6], grav: 600 });
+    G.fx.glint(info.x + G.rand(-14, 14), info.y - G.rand(6, 30), 18, el.hot, 0.2);
+  };
   B.reckonName = 'CONVERGENCE'; B.reckonY = GY;
   B.onReckon = function (on) { const b = B.body; b.want = on ? 1 : 0; B.spin = on ? 6 : 1; b.alpha = 1; };
   B.onRecover = function () { B.body.homeY = GY; };
@@ -686,16 +697,65 @@
     for (const el of ELEMS) { setElem(el); G.audio.play('orb'); yield* wait(0.3); }
     b.want = 0; b.elem = null; B.spin = 1;
   };
+  // The second phase: winter. The staff comes down and the whole floor freezes outward from under
+  // the Magus, and stays frozen: there is little grip to start, stop or turn with. The platforms are dry.
+  // The third phase: the storm. Thunderheads close over the arena and stay. Anyone who lingers up
+  // in them is struck. The floor is still ice, and the Magus itself now burns: all three at once.
+  const STORM_Y = FLOOR - 240; // above this height the storm takes notice
   B.phaseIn = function* (n) {
     const b = B.body;
     B.crystals.length = 0;
     yield* blink(640, FLOOR - 150);
-    b.want = 1; B.spin = 6; setElem(ELEMS[n - 1]);
-    yield* wait(0.7);
+    b.want = 1; B.spin = 6; setElem(n === 2 ? ICE : BOLT);
+    yield* wait(0.5);
+    if (n === 2) {
+      b.gest = 'plant';
+      yield* tween(b, { y: GY }, 0.22, E.inCubic);
+      b.homeY = GY;
+      G.audio.play('frost'); G.audio.play('shatter'); G.fx.shake(14); G.fx.impact(b.x, FLOOR - 20, 0.08);
+      G.fx.ring(b.x, FLOOR - 4, { r0: 20, r1: 420, life: 0.6, color: ICE.hot, width: 12 });
+      // the frost runs out along the floor both ways
+      let e = 0;
+      while (e < 0.9) {
+        const dt = yield;
+        e += dt;
+        B.iceK = Math.min(1, e / 0.9); G.slick = B.iceK;
+        for (const d of [-1, 1]) {
+          const fx = G.clamp(b.x + d * B.iceK * 640, WL, WR);
+          G.fx.burst(fx, FLOOR - 4, { n: 2, color: ICE.hot, speed: [80, 420], angle: -Math.PI / 2, spread: 1.4, life: [0.2, 0.5], kind: 'shard', size: [3, 7] });
+          if (Math.random() < 0.5) G.fx.dust(fx, FLOOR, 1, { dir: d, speed: [40, 160], size: [6, 11], up: 50, a: 0.34, color: '200,230,250' });
+        }
+      }
+      b.gest = null;
+    } else {
+      b.gest = 'high';
+      G.audio.play('charge', { dur: 1.0 });
+      let e = 0, next = 0.25;
+      while (e < 1.1) {
+        const dt = yield;
+        e += dt; next -= dt;
+        B.storm = Math.min(1, e / 1.0);
+        if (next <= 0) {
+          next = 0.26;
+          const x = G.rand(WL + 60, WR - 60);
+          B.skyBolts.push({ pts: boltPath(x, -40, x + G.rand(-120, 120), G.rand(120, 300)), life: 0.22 });
+          G.audio.play('zap'); G.fx.shake(6); G.fx.flash(BOLT.boss, 0.1, 0.12);
+        }
+      }
+      G.fx.impact(b.x, b.y - 60, 0.08);
+      b.gest = null;
+    }
   };
-  B.phaseOut = function* () {
+  B.phaseOut = function* (n) {
     const b = B.body;
-    yield* wait(1.5);
+    if (n === 3) {
+      // and fire: it sets itself alight
+      setElem(FIRE); b.aflame = true;
+      G.audio.play('boom');
+      G.fx.ring(b.x, b.y - 56, { r0: 20, r1: 200, life: 0.4, color: FIRE.boss, width: 9 });
+      G.fx.burst(b.x, b.y - 56, { n: 30, color: FIRE.boss, speed: [80, 420], life: [0.3, 0.8], size: [3, 8], grav: -200 });
+    }
+    yield* wait(0.9);
     b.want = 0; b.elem = null; B.spin = 1; b.homeY = GY;
   };
 
@@ -714,6 +774,30 @@
     D.chainStep(B.cape, b.x - b.face * 12, b.y - 92, dt, { seg: 13, grav: 50, drift: 24, face: b.face, wave: 10, rate: 5 });
     for (const s of B.shards) s.life -= dt;
     B.shards = B.shards.filter((s) => s.life > 0);
+    for (const s of B.skyBolts) s.life -= dt;
+    B.skyBolts = B.skyBolts.filter((s) => s.life > 0);
+    if (B.dying || B.dead) { B.iceK = Math.max(0, B.iceK - dt * 0.6); B.storm = Math.max(0, B.storm - dt * 0.6); b.aflame = false; }
+    G.slick = B.iceK;
+    // frost glitters on the frozen floor
+    if (B.iceK > 0 && Math.random() < dt * 9 * B.iceK) G.fx.glint(G.rand(640 - 610 * B.iceK, 640 + 610 * B.iceK), FLOOR + G.rand(0, 6), G.rand(5, 10), ICE.boss, 0.35);
+    if (b.aflame && !b.hidden && Math.random() < dt * 40) {
+      G.fx.spawn({ x: b.x + G.rand(-22, 22), y: b.y - G.rand(6, 110), vx: G.rand(-20, 20), vy: -G.rand(60, 190), life: G.rand(0.25, 0.6), size: G.rand(3, 7), color: FIRE.boss });
+    }
+    // the storm: it takes notice of anyone up in it, and after half a second it strikes them
+    if (B.storm >= 1 && G.canHurt() && !B.staggered) {
+      const up = P.y < STORM_Y && !P.ulting;
+      B.zap = up ? Math.min(0.5, B.zap + dt) : Math.max(0, B.zap - dt * 2);
+      if (up && Math.random() < dt * (20 + 90 * B.zap)) {
+        G.fx.spawn({ kind: 'spark', x: P.x + G.rand(-20, 20), y: P.y - G.rand(0, 50), vx: G.rand(-260, 260), vy: G.rand(-260, 260), life: G.rand(0.06, 0.14), size: G.rand(1.2, 2.2), color: BOLT.hot, len: 0.05 });
+      }
+      if (B.zap >= 0.5 && P.iframes <= 0 && P.inv <= 0) {
+        B.zap = 0;
+        B.skyBolts.push({ pts: boltPath(P.x + G.rand(-40, 40), -40, P.x, P.y - 22), life: 0.24 });
+        G.audio.play('zap'); G.fx.flash(BOLT.boss, 0.1, 0.12);
+        G.fx.lines(P.x, P.y - 22, 8, BOLT.hot, { r0: 14, speed: [400, 800] });
+        P.tryHit(1, P.x - P.facing * 10, { kind: 'storm', popVy: 320 });
+      }
+    } else B.zap = 0;
     // crystals count down and burst
     for (const c of B.crystals) {
       c.t += dt; c.flash = Math.max(0, c.flash - dt * 6); c.rise = Math.min(1, c.rise + dt / 0.3);
@@ -781,6 +865,48 @@
     const k = G.clamp(1 - (FLOOR - b.y) / 300, 0.3, 1) * b.alpha;
     ctx.fillStyle = 'rgba(0,0,0,' + (0.4 * k) + ')';
     ctx.beginPath(); ctx.ellipse(b.x, FLOOR + 3, 34 * k, 6 * k, 0, 0, G.TAU); ctx.fill();
+  };
+
+  // The frozen floor and the storm overhead: drawn over the arena, under the hero.
+  B.drawOver = function (ctx) {
+    if (B.iceK > 0.001) {
+      const l = Math.max(WL, 640 - 640 * B.iceK), r = Math.min(WR, 640 + 640 * B.iceK), w = r - l;
+      const g = ctx.createLinearGradient(0, FLOOR - 5, 0, FLOOR + 26);
+      g.addColorStop(0, G.rgba(ICE.hot, 0.75)); g.addColorStop(0.2, G.rgba(ICE.boss, 0.4)); g.addColorStop(1, G.rgba(ICE.boss, 0.04));
+      ctx.fillStyle = g; ctx.fillRect(l, FLOOR - 5, w, 31);
+      // icicle teeth along the lip of the slab, and long streaks of reflected light
+      ctx.fillStyle = G.rgba(ICE.hot, 0.5);
+      ctx.beginPath();
+      for (let x = Math.ceil(l / 46) * 46; x < r; x += 46) { const h = 8 + ((x * 7) % 13); ctx.moveTo(x - 7, FLOOR + 2); ctx.lineTo(x, FLOOR + 2 + h); ctx.lineTo(x + 7, FLOOR + 2); }
+      ctx.fill();
+      ctx.strokeStyle = G.rgba('255,255,255', 0.5); ctx.lineWidth = 1.5; ctx.lineCap = 'round';
+      ctx.beginPath();
+      for (let x = Math.ceil(l / 170) * 170; x < r - 60; x += 170) { ctx.moveTo(x + 10, FLOOR - 2); ctx.lineTo(x + 70, FLOOR - 2); }
+      ctx.stroke();
+    }
+    if (B.storm > 0.001) {
+      const a = B.storm, bot = STORM_Y + 30;
+      const g = ctx.createLinearGradient(0, -60, 0, bot);
+      g.addColorStop(0, 'rgba(10,6,24,' + 0.92 * a + ')'); g.addColorStop(0.6, 'rgba(26,16,54,' + 0.6 * a + ')'); g.addColorStop(1, 'rgba(26,16,54,0)');
+      ctx.fillStyle = g; ctx.fillRect(G.cam.x - 80, -80, G.W + 160, bot + 80);
+      // the underside of the cloud rolls
+      ctx.fillStyle = 'rgba(16,10,36,' + 0.55 * a + ')';
+      ctx.beginPath(); ctx.moveTo(-80, -80);
+      for (let x = -80; x <= G.W + 80; x += 40) ctx.lineTo(x, STORM_Y - 70 + Math.sin(x * 0.013 + G.t * 0.7) * 16 + Math.sin(x * 0.031 - G.t * 1.1) * 9);
+      ctx.lineTo(G.W + 80, -80); ctx.closePath(); ctx.fill();
+      ctx.globalCompositeOperation = 'lighter';
+      // its underside is lit from within, so where the storm begins can be read at a glance
+      ctx.strokeStyle = G.rgba(BOLT.boss, 0.34 * a); ctx.lineWidth = 3;
+      ctx.beginPath();
+      for (let x = -80; x <= G.W + 80; x += 40) { const y = STORM_Y - 70 + Math.sin(x * 0.013 + G.t * 0.7) * 16 + Math.sin(x * 0.031 - G.t * 1.1) * 9; if (x === -80) ctx.moveTo(x, y); else ctx.lineTo(x, y); }
+      ctx.stroke();
+      ctx.fillStyle = G.rgba(BOLT.boss, 0.07 * a); ctx.fillRect(G.cam.x - 80, -80, G.W + 160, STORM_Y - 60);
+      // it flickers inside, and brighter while it has someone in mind
+      const fl = Math.max(0, Math.sin(G.t * 7.3) * Math.sin(G.t * 3.1) - 0.72) * 3 + B.zap * 1.2;
+      if (fl > 0) { ctx.fillStyle = G.rgba(BOLT.boss, 0.16 * fl * a); ctx.fillRect(G.cam.x - 80, -80, G.W + 160, STORM_Y); }
+      for (const s of B.skyBolts) drawBolt(ctx, s.pts, Math.min(1, s.life / 0.12));
+      ctx.globalCompositeOperation = 'source-over';
+    }
   };
 
   B.draw = function (ctx) {

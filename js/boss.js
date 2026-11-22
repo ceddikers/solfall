@@ -46,7 +46,7 @@
     B.hands = [mkHand(-1), mkHand(1)];
     for (const h of B.hands) h.hp = h.maxHp = Math.round(B.maxHp * 0.07);
     B.shardA = 0; B.shardSpin = 0.9; B.haloR = 0; B.haloHurt = false;
-    B.campT = 0; B.campPlat = null; B.lastStand = false;
+    B.campT = 0; B.campPlat = null; B.lastStand = false; B.airT = 0;
     B.halo = { kind: 'blade' };
     G.bounds = null;
   };
@@ -181,7 +181,7 @@
     interrupt();
     B.staggered = true; B.poise = B.poiseMax;
     G.audio.play('stagger');
-    G.fx.stop(0.12); G.fx.shake(14); G.fx.flash(G.COL.starHot, 0.3, 0.3);
+    G.fx.stop(0.12); G.fx.shake(14); G.fx.flash(G.COL.starHot, 0.3, 0.3); G.fx.impact(B.core.x, B.core.y, 0.07);
     G.fx.ring(B.core.x, B.core.y, { r0: 60, r1: 320, life: 0.6, color: G.COL.starHot, width: 10 });
     G.fx.burst(B.core.x, B.core.y, { n: 30, color: G.pal().hot, speed: [200, 700], life: [0.3, 0.8], kind: 'spark', size: [2, 5] });
     G.fx.shatter(B.core.x, B.core.y, G.pal().boss, 20, { hot: G.pal().hot, r: 340, jitter: 30, r0: 60 });
@@ -225,43 +225,56 @@
     B.script = n === 2 ? toPhase2() : toPhase3();
   }
 
+  // Totality: the Warden drives both hands into the floor and tears two slabs of it up into the air.
+  // The platforms are its doing, and the floor it has broken open is what burns next.
   function* toPhase2() {
-    const c = B.core, [L, R] = B.hands;
+    const c = B.core, [L, R] = B.hands, plats = G.arena.platforms;
     c.ctrl = L.ctrl = R.ctrl = true;
     B.forceNext = 'tide';
     G.ui.letterbox(true);
-    G.fx.flash(G.COL.white, 0.5, 0.5); G.fx.shake(16); G.fx.slow(0.25, 0.7);
+    G.fx.impact(c.x, c.y, 0.09); G.fx.shake(16); G.fx.slow(0.25, 0.7);
     G.audio.play('stagger');
+    pushPlayer();
     yield* par(
-      tween(c, { x: 640, y: 262, open: 0.1 }, 0.8),
-      tween(L, { x: 640 - 150, y: 300, curl: 1, rot: 0.3 }, 0.8),
-      tween(R, { x: 640 + 150, y: 300, curl: 1, rot: -0.3 }, 0.8)
+      tween(c, { x: 640, y: 236, open: 0.1 }, 0.7),
+      tween(L, { x: plats[0].x + plats[0].w / 2, y: 330, curl: 1, rot: 0 }, 0.7),
+      tween(R, { x: plats[1].x + plats[1].w / 2, y: 330, curl: 1, rot: 0 }, 0.7)
     );
-    yield* wait(0.45);
+    yield* wait(0.25);
+    // down, into the floor
+    for (const h of [L, R]) h.hot = 1;
+    yield* par(tween(L, { y: FLOOR - 40 }, 0.11, E.inQuad), tween(R, { y: FLOOR - 40 }, 0.11, E.inQuad));
+    for (const h of [L, R]) impactFx(h.x, true);
+    G.fx.impact(640, FLOOR - 60, 0.08);
     G.arena.setPhase(2, 1.8);
-    G.arena.raisePlatforms();
     G.audio.setIntensity(2);
     G.audio.play('roar'); G.audio.play('card');
-    G.ui.card('II', 'TOTALITY', 'The light is swallowed whole');
-    G.fx.flash(G.PAL[2].boss, 0.45, 0.8); G.fx.shake(20);
+    G.ui.card('', 'TOTALITY', '');
     pushPlayer();
+    yield* wait(0.35);
+    // and up again, with the ground in its fists
+    G.arena.raisePlatforms();
     c.open = 1;
-    const fling = par(
-      tween(c, { y: 196 }, 1.1, E.outCubic),
-      tween(L, { x: 640 - 400, y: 250, curl: 0, rot: -0.35 }, 0.5, E.outBack),
-      tween(R, { x: 640 + 400, y: 250, curl: 0, rot: 0.35 }, 0.5, E.outBack)
-    );
-    let e = 0, ringT = 0;
-    while (e < 2.0) {
+    let e = 0;
+    const y0 = L.y, y1 = plats[0].top + 74;
+    while (e < 1.6) {
       const dt = yield;
-      e += dt; ringT -= dt;
-      fling.next(dt);
-      G.fx.shake(5 * (1 - e / 2));
-      if (ringT <= 0 && e < 1.2) {
-        ringT = 0.28;
-        G.fx.ring(c.x, c.y, { r0: c.r, r1: 760, life: 0.9, color: G.PAL[2].boss, width: 12, alpha: 0.7 });
+      e += dt;
+      const k = E.outCubic(Math.min(1, e / 1.6));
+      L.y = R.y = G.lerp(y0, y1, k);
+      c.y = G.lerp(236, 196, k);
+      G.fx.shake(6 * (1 - e / 1.6));
+      for (const h of [L, R]) {
+        if (Math.random() < dt * 40) G.fx.burst(h.x + G.rand(-90, 90), h.y - 60, { n: 1, color: '24,20,34', speed: [20, 200], angle: Math.PI / 2, spread: 1.2, life: [0.5, 1], size: [4, 9], kind: 'chunk', grav: 1400 });
+        if (Math.random() < dt * 14) G.fx.dust(h.x + G.rand(-80, 80), FLOOR, 1, { speed: [10, 70], size: [8, 14], life: [0.6, 1.1], up: 70, a: 0.36 });
       }
     }
+    for (const h of [L, R]) h.hot = 0;
+    yield* par(
+      tween(L, { x: 640 - 400, y: 250, curl: 0, rot: -0.35 }, 0.45, E.outBack),
+      tween(R, { x: 640 + 400, y: 250, curl: 0, rot: 0.35 }, 0.45, E.outBack)
+    );
+    G.fx.ring(c.x, c.y, { r0: c.r, r1: 760, life: 0.9, color: G.PAL[2].boss, width: 12, alpha: 0.7 });
     G.ui.letterbox(false);
     B.poiseMax = 500; B.invuln = false;
     release();
@@ -272,7 +285,7 @@
     c.ctrl = L.ctrl = R.ctrl = true;
     B.forceNext = 'dive';
     G.ui.letterbox(true);
-    G.fx.flash(G.COL.white, 0.5, 0.5); G.fx.shake(16); G.fx.slow(0.25, 0.7);
+    G.fx.impact(c.x, c.y, 0.09); G.fx.shake(16); G.fx.slow(0.25, 0.7);
     G.audio.play('stagger');
     yield* par(
       tween(c, { x: 640, y: 280, open: 0.1 }, 0.8),
@@ -296,7 +309,7 @@
     G.arena.setPhase(3, 1.8);
     G.audio.setIntensity(3);
     G.audio.play('roar'); G.audio.play('card');
-    G.ui.card('III', 'BLACK SUN', 'Nothing left to hold back');
+    G.ui.card('', 'BLACK SUN', '');
     B.hasShards = true; B.shardR = 30;
     pushPlayer();
     c.jit = 0; c.open = 1;
@@ -329,6 +342,7 @@
     c.ctrl = true; c.open = 0.1;
     B.shardsOut = true;
     G.fx.slow(0.12, 1.3); G.fx.flash(G.COL.white, 0.8, 0.7); G.fx.shake(22); G.fx.stop(0.2);
+    G.fx.impact(c.x, c.y, 0.1);
     G.audio.play('bossDie');
     yield* tween(c, { x: G.clamp(c.x, 300, 980), y: 290 }, 0.9, E.outCubic);
     let e = 0, next = 0;
@@ -413,6 +427,11 @@
     if (B.phase === 2 && B.campT > 2.4 && B.lastAtk !== 'swat' && canUse('swat') && G.arena.platforms.every((p) => p.rise >= 1)) {
       B.campT = 0; B.lastAtk = 'swat';
       return 'swat';
+    }
+    // nor will it let you live in the air: something aimed comes up after you
+    if (B.airT > 2.4) {
+      const pick = B.phase === 3 ? 'storm' : canUse('flick') ? 'flick' : B.phase === 2 ? 'lance3' : 'lance';
+      if (pick !== B.lastAtk) { B.airT = 0; B.lastAtk = pick; return pick; }
     }
     for (let guard = 0; guard < 40; guard++) {
       if (!B.bag.length) refillBag();
@@ -1388,6 +1407,7 @@
     c.lx = G.damp(c.lx, dx / d, 8, dt); c.ly = G.damp(c.ly, dy / d, 8, dt);
 
     // how long the player has been resting on a platform (see the swat attack)
+    B.airT = G.clamp(B.airT + (!P.onGround && P.y < FLOOR - 110 && !P.dead ? dt : -dt * 0.7), 0, 4);
     if (P.plat && !P.dead) { B.campT = Math.min(4, B.campT + dt); B.campPlat = P.plat; }
     else B.campT = Math.max(0, B.campT - dt * 0.5);
 

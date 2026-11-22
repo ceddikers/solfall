@@ -2,7 +2,7 @@
 
 A side-on boss rush for the browser: three heroes, four three-phase bosses, played as a run of
 ever-harder trials. You pick a hero and a relic before the run and win a boon after each victory.
-Version 1.3b.
+Version 1.4a.
 
 This is an early slice of a planned boss-rush roguelite (short runs, a boon after each boss,
 bosses drawn from a pool). A run meets the four bosses in a shuffled order, then meets them again, harder.
@@ -113,6 +113,74 @@ hero (`tools/feel-check.js`).
 - Settings, Reset progress erases Sunshards, upgrades, trophies and records (it has to be chosen twice).
 
 Not done: touch controls, a colour-blind alternative to red-orange warnings, gamepad rebinding.
+
+## Shounen (new in v1.4a)
+
+Asked for after a playtest: Lune too safe, phase changes all alike, red marks under melee hits, too much
+text, and "more anime".
+
+**Nothing explains itself in words during a fight.** The mechanic hints are gone, and call-outs are one
+word with no instruction under them. The setting that used to be "Mechanic hints" now only covers the
+controls reminder and the camp's welcome.
+
+**Melee hits are not marked on the floor.** A boss's swing, lunge, charge or whirl no longer draws a red
+slice, lane or box. The warning is the wind-up, and a **glint** on the blade (with a small ring of sound)
+a fifth of a second before it comes out; a blow that will take two health glints red. Things thrown, and
+blows from a boss that cannot be seen at the time, keep their marks. The Warden's fists keep theirs.
+
+**Clashes.** A heavy blow of the hero's (a finisher, a thrust out of a dash, anything from Aster's maul)
+that meets a boss's swing as it comes out turns the swing aside: both are thrown back a step, the
+boss's stagger bar fills a little, and the frame inverts for an instant. Two-health blows (red) cannot be met.
+
+**Impact frames** (`G.fx.impact`): the picture inverts for a few frames with lines running in to the
+blow. Used for staggers, phase breaks, deaths, clashes, Dawnbreak finishers, fully charged smashes and
+any hit that takes two health; never twice within half a second, and not inverted if Screen flashes are off.
+
+**Dawnbreak opens with a cut-in**: a slanted band across the screen with the hero's eyes and the name.
+
+**Moonfall (Lune) is rebuilt.** She springs up and a full moon rises behind her; she draws, and the
+moon wanes to a blade as its light runs into the arrow; the arrow goes through the boss (26), the moon
+answers with fourteen beams (11 each), she lands with her back turned, and then the cut arrives (70).
+250 in all, as before.
+
+**Keeping away is answered.** Each duelling boss counts how long the hero stays far off (or up in the
+air and out of reach); after about 2.6 s its next attack is its answer (`B.answer`, `B.kite` in `bosskit.js`):
+
+| Boss | Answer |
+|---|---|
+| Knight | **Sever**: cuts thrown off the blade straight at the hero, at any height, then it runs them down |
+| Veil | **Hunt**: it vanishes and is beside the hero, in the air if that is where they are, already cutting; then three knives |
+| Magus | its aimed **Shards**, when the hero will not come down out of the air |
+| Warden | **Flick** (or a lance; the shard storm in phase III) at a hero who lives in the air |
+
+Lune's downward shot also lifts her less each time before she next lands (100%, 70%, 40%, 10%, nothing).
+
+**Every phase change is the boss's own**, and none of them is "new colours and two platforms":
+
+| Boss | Phase II | Phase III |
+|---|---|---|
+| Warden | **Totality**: it drives both hands into the floor and tears the two platforms up out of it | **Black Sun**: it crushes its own hands into shards (as before) |
+| Knight | **The Host**: it dies; then the bell tolls, its cape burns away, and from here every cut it makes is made again half a second later by its own ghost | **Blood Oath**: greatswords fall wall by wall until the ground is a duelling ring 680 wide. No platforms in this fight any more |
+| Veil | **Shadows**: it puts the lights out. You see by your own light; the Veil is a pair of eyes. A stagger brings the light back | **Execution**: the dark is torn away and two wires are strung across the air, low over the middle and higher at the walls. One jump clears the floor; a second meets the wire. A dash passes through |
+| Magus | **Confluence**: the floor freezes and stays frozen (about a fifth of the grip); the platforms are dry | **Trinity**: a storm closes over the arena. Half a second up in it and you are struck. The floor is still ice and the Magus burns |
+
+**Every stagger is the boss's own** (`staggerIn`, `staggerOut`, `staggerMult`, `staggerDur`):
+
+| Boss | Stagger |
+|---|---|
+| Warden | the core drops to the floor (as before), x1.4 |
+| Knight | **Disarmed**: its sword is struck away and stands in the floor. x1.4. When it gets up it calls the sword home through anyone in the way |
+| Veil | **Caught**: thrown across the floor into the wall. 70% as long, x1.9 |
+| Magus | **Silenced**: it falls out of the air. 115% as long, only x1.2, but every hit knocks Starlight out of it |
+
+**Aster.** The first swing no longer hits behind her: it is a wide sweep on the side she swings to.
+A full charge now adds half again to the smash (60, was 80), takes 1.05 s (was 0.9), and its wave does
+14 (was 24) with a narrower quake.
+
+Checked with the scripted players: Warden 37 tests lose 0; the other three lose a handful in 166 runs
+(the Knight's whirl now that it has no platforms, one lightning strike, one storm strike). Each new
+scene was looked at as still frames. **None of this has been played by a person**: how the dark, the
+ice, the wires and the ring feel, and whether the glint is warning enough at speed, is unknown.
 
 ## Specials you can see thrown (new in v1.3c)
 
@@ -225,7 +293,7 @@ For testing: `G.debug.variant = 'plain'` turns every tell's second form off; a l
 - **Aster is her own character now.** The maul no longer shares the sword's three-hit chain. Her
   chain is two blows: a sweep that goes right round and hits whatever is on either side of her, then
   a smash. Keep the button held on the smash and she holds it back and charges it over 0.9 seconds,
-  up to double damage and a wider quake; fully charged it also sends a wave along the floor. While
+  up to half again the damage and a wider quake; fully charged it also sends a small wave along the floor. While
   she charges she moves at a third of her speed, but a blow that lands on her does not knock her
   back or lose the charge (it still costs health). She is slower to start and stop than the others,
   always lands hard, and her footsteps raise dust.
@@ -249,7 +317,7 @@ All three share movement, the dash, Starlight and mending. Weapon and special di
 | | Vesper, the Starblade | Aster, the Starmaul | Lune, the Moonbow |
 |---|---|---|---|
 | Health (Standard) | 5 | 6 | 4 |
-| Weapon | sword: 9, 11, then a 24 finisher | maul: a sweep that hits on both sides (20), then a smash that shakes the ground (40). Hold the smash to charge it, up to 80; fully charged it also throws a wave along the floor (24) | bow: arrows of 4, 5, then a piercing 10, in any direction; up to 60% stronger within 120px, up to 30% weaker past 240px |
+| Weapon | sword: 9, 11, then a 24 finisher | maul: a wide sweep in front (20), then a smash that shakes the ground (40). Hold the smash to charge it, up to 60; fully charged it also throws a wave along the floor (14) | bow: arrows of 4, 5, then a piercing 10, in any direction; up to 60% stronger within 120px, up to 30% weaker past 240px |
 | Special | Star Lance: a piercing shot at any range | Starfall: a blast around her; from the air she plunges first and passes through attacks | Moon Volley: a fan of five arrows and a leap backwards |
 | Extra | a slash out of a dash is a thrust | fills the stagger bar 35% faster; a little slower on foot | triple jump; firing downward in the air lifts her; moves at 60% speed while firing; arrows give less Starlight than melee hits |
 
@@ -294,7 +362,7 @@ Heroes are defined in `G.HEROES` in `js/run.js` (numbers, colours, text); the we
 |---|---|---|
 | Vesper | Thousand Stars | she vanishes; eight cuts of 20 from every side, then a cross-cut of 80 |
 | Aster | Worldbreaker | she rises and comes down for 250, 110 to anything else the boss has out, and everything that can be cut out of the air is destroyed |
-| Lune | Moonfall | one arrow into the sky; twelve fall on the boss for 15 each, then a beam of 70 |
+| Lune | Moonfall | a moon rises behind her; one great arrow (26), fourteen moonbeams (11 each), then a cut of 70 |
 
 The last blow of each fills the stagger bar like a Star Lance. When a boss falls, a finishing cut crosses the screen.
 Numbers are in `js/flow.js`.
@@ -470,7 +538,7 @@ for a moment afterwards.
 
 | Phase | Attack | The simple answer |
 |---|---|---|
-| I | Lunge: it crouches, a lane lights, it crosses the floor | jump it, or dash through for a perfect dodge |
+| I | Lunge: it crouches, its blade glints, it crosses the floor | jump it, or dash through for a perfect dodge |
 | | Flurry: it runs in and cuts three times, stepping forward | back out of reach, or dash past it |
 | | Knives: it springs back and throws a fan along dashed lines | jump the fan, dash through, or cut a knife down |
 | | Ambush: it vanishes, a column follows you, it drops | step out; its blade sticks in the floor and it takes 30% more damage |

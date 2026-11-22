@@ -5,7 +5,7 @@
 (function () {
   const { wait, tween } = G.seq;
   const E = G.ease, FLOOR = G.FLOOR, H = G.hazards;
-  const ROMAN = ['', 'I', 'II', 'III'];
+  const KITE_T = 2.6; // seconds of keeping away before a boss answers at range
 
   G.BOSS_IDS = ['warden', 'mage', 'assassin', 'knight'];
   G.setBoss = function (id) {
@@ -49,12 +49,13 @@
   };
 
   // A warning column that a script moves and fills by hand (k from 0 to 1), then removes.
-  K.columnMark = function (x, w) {
+  K.columnMark = function (x, w, quiet) {
     const DANGER = G.COL.danger;
     return H.add({
       kind: 'mark', layer: 'under', x, w, k: 0, locked: false,
       update() { },
       draw(ctx) {
+        if (quiet) return; // a blow whose warning is the body that deals it
         const l = this.x - this.w / 2, top = FLOOR - 330;
         const late = this.locked ? 0.5 + 0.5 * Math.sin(this.t * 55) : 0;
         const g = ctx.createLinearGradient(0, top, 0, FLOOR);
@@ -71,11 +72,44 @@
     });
   };
 
+  // A thin dashed line from (ox, oy) that follows the hero and then holds still: where something
+  // thrown is about to fly. Read its .ang when it has run out (tele); lock is how long it holds.
+  K.aim = function (ox, oy, tele, lock) {
+    const P = G.player, DANGER = G.COL.danger;
+    return H.add({
+      kind: 'aim', ox, oy, ang: Math.atan2(P.y - 24 - oy, P.x - ox),
+      update() {
+        if (this.t < tele - (lock || 0.16)) this.ang = Math.atan2(P.y - 24 - this.oy, P.x - this.ox);
+        if (this.t >= tele) this.dead = true;
+      },
+      draw(ctx) {
+        const k = Math.min(1, this.t / tele), held = this.t >= tele - (lock || 0.16);
+        ctx.strokeStyle = G.rgba(DANGER, 0.25 + 0.5 * k); ctx.lineWidth = held ? 3 : 1.5 + k;
+        ctx.setLineDash([10, 8]); ctx.lineDashOffset = -this.t * 90;
+        ctx.beginPath(); ctx.moveTo(this.ox, this.oy); ctx.lineTo(this.ox + Math.cos(this.ang) * 1500, this.oy + Math.sin(this.ang) * 1500); ctx.stroke();
+        ctx.setLineDash([]);
+      },
+    });
+  };
+
+  // An aura: streaks of the boss's light torn upward around it, for the moment it changes.
+  K.aura = function (x, y, col, w, h, n) {
+    for (let i = 0; i < (n || 3); i++) {
+      G.fx.spawn({ kind: 'spark', x: x + G.rand(-w, w), y: y - G.rand(0, h * 0.5), vx: G.rand(-30, 30), vy: -G.rand(500, 1100), life: G.rand(0.18, 0.4), size: G.rand(1.6, 3.4), color: col, len: 0.07 });
+    }
+  };
+
   // ------------------------------------------------------------------ the frame
   // B supplies: id, name, short, sub, taunt, theme, hudCols, BASE_HP, poise0, w, h (body size),
   // gaps, bags, cards, first, ATTACKS, and the hooks setup, enter, idle, tick, draw, drawGround.
   // Optional hooks: phaseIn, phaseOut, dying, onStagger, onRecover, onRelease, onInterrupt,
-  // extraTargets, vuln, blocked, finale (name of a once-only attack below 12% health).
+  // extraTargets, vuln, blocked, finale (name of a once-only attack below 12% health),
+  // answer (the attack it uses on a hero who keeps away from it; kiting(P, b) overrides the test),
+  // bounds() (walls of its own, kept up between attacks), drawOver (drawn above the arena and the boss).
+  //
+  // A change of phase is the boss's own scene. The frame stops the fight, runs phaseIn(n) (how it
+  // falls), turns the arena's colours and shows the phase's name, runs phaseOut(n) (what it becomes),
+  // then lets the fight go on. Nothing else is shared: no rings, no platforms, no second line of text.
   G.makeBoss = function (B) {
     G.bosses[B.id] = B;
     B.kit = true;
@@ -86,7 +120,7 @@
       B.phase = 1; B.poise = 0; B.poiseMax = B.poise0; B.staggered = false;
       B.invuln = true; B.active = false; B.dead = false; B.dying = false;
       B.script = null; B.attackName = ''; B.bag = []; B.lastAtk = ''; B.forceNext = (B.first && B.first[1]) || '';
-      B.t = 0; B.lastStand = false;
+      B.t = 0; B.lastStand = false; B.kite = 0;
       B.body = { x: 900, y: FLOOR, face: -1, flash: 0, kick: 0, kx: 0, ctrl: true, hidden: false, exposed: false, jit: 0 };
       B.core = { x: 900, y: FLOOR - B.h * 0.55, r: B.w * 0.5 };
       G.bounds = null; G.wind = 0;
@@ -123,7 +157,7 @@
         if (G.moments.wardHit(B, amount, info)) { if (B.onReckon) B.onReckon(false); stagger(); }
         return true;
       }
-      let mult = B.staggered ? (G.relic('eye') ? 1.82 : 1.4) : 1;
+      let mult = B.staggered ? (B.staggerMult || 1.4) * (G.relic('eye') ? 1.3 : 1) : 1;
       if (b.exposed) mult *= 1.3;
       if (B.vuln) mult *= B.vuln(t, info);
       const dmg = Math.round(amount * mult);
@@ -152,7 +186,7 @@
     function release() {
       const b = B.body;
       b.ctrl = false; b.exposed = false; b.jit = 0;
-      G.wind = 0; G.bounds = null;
+      G.wind = 0; G.bounds = B.bounds ? B.bounds() : null;
       if (B.onRelease) B.onRelease();
     }
     function interrupt() {
@@ -177,20 +211,24 @@
       B.staggered = true; B.poise = B.poiseMax;
       const b = B.body, cy = b.y - B.h / 2;
       G.audio.play('stagger');
-      G.fx.stop(0.12); G.fx.shake(14); G.fx.flash(G.COL.starHot, 0.3, 0.3);
+      G.fx.stop(0.12); G.fx.shake(14); G.fx.flash(G.COL.starHot, 0.3, 0.3); G.fx.impact(b.x, cy, 0.07);
       G.fx.ring(b.x, cy, { r0: 40, r1: 280, life: 0.6, color: G.COL.starHot, width: 10 });
       G.fx.burst(b.x, cy, { n: 26, color: G.pal().hot, speed: [200, 700], life: [0.3, 0.8], kind: 'spark', size: [2, 5] });
       G.fx.shatter(b.x, cy, G.pal().boss, 18, { hot: G.pal().hot, r: 300, jitter: B.w * 0.4 });
       G.fx.punch(0.022);
-      G.ui.callout('STAGGERED', 'Strike now');
+      G.ui.callout(B.staggerWord || 'STAGGERED');
       B.script = staggerScript();
     }
+    // What a full stagger bar does is each boss's own: staggerIn (how it goes down), staggerOut (how
+    // it gets up), staggerMult (damage taken while down, 1.4 unless given) and staggerDur (a scale on
+    // how long it lasts). The Knight is disarmed, the Veil is thrown into a wall, the Magus is grounded.
     function* staggerScript() {
-      const b = B.body, dur = G.diff().stagger + (G.relic('sunstone') ? 1.5 : 0);
+      const b = B.body, dur = G.diff().stagger * (B.staggerDur || 1) + (G.relic('sunstone') ? 1.5 : 0);
       b.ctrl = true; b.hidden = false;
       if (B.onStagger) B.onStagger();
       b.x = G.clamp(b.x, G.WALL_L + 90, G.WALL_R - 90);
-      if (b.y < FLOOR - 1) {
+      if (B.staggerIn) yield* B.staggerIn();
+      else if (b.y < FLOOR - 1) {
         yield* tween(b, { y: FLOOR }, 0.3, E.inCubic);
         G.fx.shake(8); G.audio.play('boom');
         G.fx.thud(b.x, FLOOR, 1.2);
@@ -208,6 +246,7 @@
       if (G.arena.gust) G.arena.gust(b.x, b.y - B.h / 2, 1.4);
       B.pushPlayer(480, 260);
       if (B.onRecover) B.onRecover();
+      if (B.staggerOut) yield* B.staggerOut();
       yield* wait(0.45);
       release();
     }
@@ -224,33 +263,17 @@
       b.ctrl = true; b.hidden = false;
       B.forceNext = (B.first && B.first[n]) || '';
       G.ui.letterbox(true);
-      G.fx.flash(G.COL.white, 0.5, 0.5); G.fx.shake(16); G.fx.slow(0.25, 0.7);
+      G.fx.impact(b.x, b.y - B.h / 2, 0.09); G.fx.shake(16); G.fx.slow(0.25, 0.7);
       G.audio.play('stagger');
+      B.pushPlayer();
       if (B.phaseIn) yield* B.phaseIn(n);
       G.arena.setPhase(n, 1.8);
-      if (B.platformsFrom === n) G.arena.raisePlatforms();
       G.audio.setIntensity(n);
       G.audio.play('roar'); G.audio.play('card');
-      G.ui.card(ROMAN[n], B.cards[n][0], B.cards[n][1]);
-      G.fx.flash(G.PAL[n].boss, 0.45, 0.8); G.fx.shake(20);
-      G.fx.shatter(b.x, b.y - B.h / 2, G.PAL[n].boss, 20, { hot: G.PAL[n].hot, r: 420, jitter: B.w * 0.4, r0: 50 });
-      for (const d of [-1, 1]) G.fx.dust(b.x + d * 40, FLOOR, 7, { dir: d, speed: [160, 620], size: [8, 15], life: [0.6, 1.1], up: 50 });
-      if (G.arena.gust) G.arena.gust(b.x, b.y - B.h / 2, 2.2);
-      B.pushPlayer();
-      const out = B.phaseOut ? B.phaseOut(n) : null;
-      let e = 0, ringT = 0, outDone = !out;
-      while (e < 1.9 || !outDone) {
-        const dt = yield;
-        e += dt; ringT -= dt;
-        if (!outDone && out.next(dt).done) outDone = true;
-        G.fx.shake(5 * Math.max(0, 1 - e / 2));
-        if (ringT <= 0 && e < 1.2) {
-          ringT = 0.28;
-          G.fx.ring(b.x, b.y - B.h / 2, { r0: 40, r1: 760, life: 0.9, color: G.PAL[n].boss, width: 12, alpha: 0.7 });
-        }
-      }
+      G.ui.card('', B.cards[n][0], '');
+      if (B.phaseOut) yield* B.phaseOut(n);
       G.ui.letterbox(false);
-      B.poiseMax = B.poise0 + 60 * (n - 1); B.invuln = false;
+      B.poiseMax = B.poise0 + 60 * (n - 1); B.invuln = false; B.kite = 0;
       release();
     }
 
@@ -264,6 +287,7 @@
       const b = B.body;
       b.ctrl = true; b.hidden = false;
       G.fx.slow(0.12, 1.3); G.fx.flash(G.COL.white, 0.8, 0.7); G.fx.shake(22); G.fx.stop(0.2);
+      G.fx.impact(b.x, b.y - B.h / 2, 0.1);
       G.audio.play('bossDie');
       if (B.dying0) B.dying0();
       if (b.y < FLOOR - 1) yield* tween(b, { y: FLOOR }, 0.5, E.inCubic);
@@ -354,6 +378,8 @@
       if (name === 'none') return; // tests: stand idle
       if (!name && low && B.finale && !B.lastStand) { B.lastStand = true; name = B.finale; }
       if (!name && G.moments.due(B)) name = 'reckoning';
+      // a hero who keeps away for too long is answered at range
+      if (!name && !B.forceNext && B.answer && B.kite >= KITE_T && B.lastAtk !== B.answer) { name = B.answer; B.lastAtk = name; B.kite = 0; }
       if (!name) name = nextAttack();
       if (!B.ATTACKS[name]) name = B.bags[B.phase][0];
       B.attackName = name;
@@ -373,6 +399,11 @@
       }
       if (!B.script && B.active && !B.dead && !B.dying && G.state === 'fight' && !P.dead) B.script = think();
       if (!b.ctrl && !B.dead && !B.dying && !B.staggered) B.idle(dt);
+      // keeping away: far off along the floor, or up in the air and out of reach, for a few seconds on end
+      if (B.active && !B.invuln && !B.staggered && !P.dead && G.state === 'fight') {
+        const away = B.kiting ? B.kiting(P, b) : (Math.abs(P.x - b.x) > 330 || (!P.onGround && P.y < FLOOR - 120 && Math.abs(P.x - b.x) > 140));
+        B.kite = G.clamp(B.kite + (away ? dt : -dt * 0.7), 0, KITE_T + 1.5);
+      }
       B.tick(dt);
       B.core.x = b.x; B.core.y = b.y - B.h * 0.55;
     };

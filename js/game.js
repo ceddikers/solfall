@@ -272,6 +272,7 @@
     if (G.state === 'hub') G.hub.draw(ctx);
     if (G.boss.kit) drawBoss();
     G.moments.draw(ctx);
+    if (G.boss.drawOver) G.boss.drawOver(ctx); // e.g. the Veil's darkness: over the arena and the boss, under the hero
     G.drawShots(ctx);
     G.player.draw(ctx);
     G.hazards.draw(ctx, 'over');
@@ -283,6 +284,7 @@
     G.arena.drawFront(ctx);
     if (G.debug.boxes) G.boss.drawDebug(ctx);
     ctx.restore();
+    G.flow.drawCutin(ctx);
     F.drawFlash(ctx);
   }
 

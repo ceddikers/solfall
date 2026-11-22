@@ -17,7 +17,8 @@
     ARROW_GAIN: 6, ARROW_GAIN_HEAVY: 12, // Starlight per arrow hit: less than a melee hit
     BOW_SLOW: 0.6,                       // Lune's speed while she is drawing and loosing
     STARFALL_DMG: 46, STARFALL_R: 165,
-    CHARGE_T: 0.9, // how long Aster's smash takes to charge fully
+    CHARGE_T: 1.05, // how long Aster's smash takes to charge fully
+    CHARGE_DMG: 0.5, // how much a full charge adds to the smash (0.5 = half again)
   };
   const GOLD = '255,214,140'; // the finisher's colour
   // The active hero and its two light colours; set in P.reset.
@@ -26,6 +27,7 @@
   const P = G.player = {};
   G.shots = [];
   G.wind = 0;
+  G.slick = 0; // how frozen the floor is (the Magus's second phase)
 
   const _box = { cx: 0, cy: 0, hw: 11, hh: 21 };
   P.box = function () { _box.cx = P.x; _box.cy = P.y - 22; return _box; };
@@ -63,7 +65,7 @@
     });
     for (let i = 0; i < STYLE[H.id].tail.n; i++) P.scarf.push({ x: P.x, y: P.y - 40 });
     G.shots.length = 0;
-    G.wind = 0;
+    G.wind = 0; G.slick = 0;
   };
 
   function ground() {
@@ -247,7 +249,10 @@
     } else {
       // firing the bow slows her, so shooting and dodging cannot both be done at full speed
       const target = mx * P.run * (P.atk && P.atk.kind === 'shot' ? C.BOW_SLOW : P.atk && P.atk.hold > 0 && !P.atk.swung ? 0.3 : 1);
-      const acc = (P.onGround ? C.ACC_G : C.ACC_A) * (H.accel || 1) * dt; // the heavy hero takes longer to start and stop
+      // (on a frozen floor, G.slick, everyone does: far less grip to start, stop or turn with; platforms stay dry)
+      const grip = P.onGround && !P.plat ? 1 - 0.8 * G.slick : 1;
+      const acc = (P.onGround ? C.ACC_G : C.ACC_A) * (H.accel || 1) * grip * dt; // the heavy hero takes longer to start and stop
+      if (grip < 1 && Math.abs(P.vx) > 150 && Math.random() < dt * 26) G.fx.spawn({ kind: 'spark', x: P.x - G.sign(P.vx) * 8, y: P.y - 2, vx: -P.vx * 0.3 + G.rand(-30, 30), vy: -G.rand(20, 110), life: G.rand(0.15, 0.3), size: G.rand(1.2, 2.2), color: '225,245,255' });
       if (P.onGround && mx && P.vx * mx < -140) {
         P.skidT -= dt;
         if (P.skidT <= 0) { P.skidT = 0.045; G.fx.dust(P.x + G.sign(P.vx) * 9, P.y, 1, { dir: G.sign(P.vx), speed: [40, 130], size: [4, 8], up: 20, a: 0.34 }); }
@@ -473,8 +478,8 @@
 
   function swing(a) {
     if (a.canCharge) {
-      // a charged smash hits up to twice as hard and reaches further
-      if (a.charge > 0) a.dmg = Math.round(a.dmg * (1 + a.charge));
+      // a charged smash hits up to half again as hard and reaches further
+      if (a.charge > 0) a.dmg = Math.round(a.dmg * (1 + C.CHARGE_DMG * a.charge));
       slashArc(a, 0);
       P.atkCd = Math.max(P.atkCd, (H.combo[2].cd - H.combo[2].wind) * haste());
     }
@@ -502,7 +507,7 @@
       G.fx.thud(P.x + a.dir * 90, FLOOR, 1.15 + 0.8 * ck, { col: STAR });
       // fully charged: the blow runs on along the floor as a wave of light
       if (ck >= 1) {
-        G.shots.push({ wave: true, x: P.x + a.dir * 120, y: FLOOR - 30, vx: a.dir * 980, vy: 0, t: 0, life: 0.5, hit: new Set(), dmg: Math.round(24 * G.dmgMult()) });
+        G.shots.push({ wave: true, x: P.x + a.dir * 120, y: FLOOR - 30, vx: a.dir * 980, vy: 0, t: 0, life: 0.5, hit: new Set(), dmg: Math.round(14 * G.dmgMult()) });
         G.fx.thud(P.x + a.dir * 200, FLOOR, 1.2, { col: GOLD });
       }
       G.fx.burst(P.x + a.dir * 90, FLOOR - 4, { n: 8, color: STAR, speed: [150, 520], angle: -Math.PI / 2, spread: 2.2, life: [0.2, 0.5], kind: 'spark', size: [2, 3.5], grav: 900 });
@@ -593,7 +598,7 @@
   function checkHits(a) {
     clash(a);
     const boxes = [atkBox(a)];
-    if (a.quake) boxes.push({ cx: P.x + a.dir * (100 + 40 * (a.charge || 0)), cy: FLOOR - 26, hw: 130 + 80 * (a.charge || 0), hh: 30 });
+    if (a.quake) boxes.push({ cx: P.x + a.dir * (100 + 20 * (a.charge || 0)), cy: FLOOR - 26, hw: 130 + 40 * (a.charge || 0), hh: 30 });
     let bounced = false;
     for (const hb of boxes) {
       for (const t of G.boss.targets()) {
@@ -1248,6 +1253,12 @@
       }
       // the near arm throws, so the sword passes to the far hand for a moment and trails behind
       return { fx: -6, fy: -25, ang: 2.5, len: 36, bx, by, swap: true, behind: true, javelin: !c.thrown, jang: ang };
+    }
+    if (c.kind === 'draw') {
+      // Moonfall: the bow held out along the aim and drawn as far as c.pull says
+      const ang = Math.atan2(c.dy, Math.abs(c.dx)), co = Math.cos(ang), sn = Math.sin(ang);
+      const fx = 0.5 + co * 13.5, fy = SH + sn * 13.5, pull = c.pull || 0;
+      return { fx, fy, bx: fx - co * (5 + 9 * pull), by: fy - sn * (5 + 9 * pull), ang, pull, len: 0, twang: c.twang || 0 };
     }
     if (c.kind === 'volley') {
       const ang = Math.atan2(c.dy, Math.abs(c.dx)), co = Math.cos(ang), sn = Math.sin(ang);
