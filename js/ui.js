@@ -470,19 +470,11 @@
   };
   U.callout = function (big, small) {
     el.callout.querySelector('.big').textContent = big;
-    el.callout.querySelector('.small').textContent = small || '';
+    el.callout.querySelector('.small').textContent = ''; // one word, no instructions: the fight explains itself
     retrigger(el.callout, 'show');
   };
-  // Each mechanic explains itself the first two times it appears.
-  U.hint = function (key, text) {
-    if (!G.settings.hints) return;
-    U.seen[key] = (U.seen[key] || 0) + 1;
-    if (U.seen[key] > 2) return;
-    el.hint.textContent = text;
-    el.hint.classList.remove('calm');
-    el.hint.classList.add('show');
-    H.hintT = 3.6;
-  };
+  // Mechanics are no longer explained in words during a fight (v1.4a): a boss's body says what is coming.
+  U.hint = function () { };
   // A controls reminder over the boss's entrance, for the first two fights of a session.
   // A welcome over the camp, the first time you arrive in a session.
   U.campHint = function () {

@@ -110,7 +110,7 @@
     const f = a.face;
     const m = (ang) => (f > 0 ? ang : Math.PI - ang);
     return H.arc({
-      x: a.x + f * 8, y: a.y - 44, r: o.r, a0: m(o.a0), a1: m(o.a1), tele: o.tele, active: 0.1,
+      x: a.x + f * 8, y: a.y - 44, r: o.r, a0: m(o.a0), a1: m(o.a1), tele: o.tele, active: 0.1, owner: a,
       follow(h) { if (!h.fired) { h.x = a.x + a.face * 8; h.y = a.y - 44; } },
       onFire() { G.audio.play('blade'); a.pose = o.pose || 'slashA'; G.fx.shake(3); },
     });
@@ -120,8 +120,12 @@
   function* lunge(a, toX, tele) {
     const dir = G.sign(toX - a.x) || 1;
     a.face = dir; a.pose = 'crouch';
-    H.lane({ x: WL, y: a.y - 66, w: WR - WL, h: 66, dir, dur: tele });
-    yield* wait(tele);
+    H.lane({ x: WL, y: a.y - 66, w: WR - WL, h: 66, dir, dur: tele, quiet: true });
+    // no lane on the floor: it sinks into its crouch, and the blade catches the light before it goes
+    yield* wait(Math.max(0, tele - 0.2));
+    if (a.gone) return;
+    G.fx.glint(a.x + dir * 20, a.y - 44, 26, a.clone ? '170,160,210' : G.pal().hot); G.audio.play('glint');
+    yield* wait(Math.min(tele, 0.2));
     if (a.gone) return;
     a.pose = 'dash'; a.hurt = true;
     G.audio.play('streak');
@@ -449,7 +453,7 @@
     const tele = 1.45 * T, lockT = 0.24 * T;
     G.audio.play('charge', { dur: tele });
     const h = H.arc({
-      x: P.x, y: P.y - 22, r: 118, a0: -Math.PI * 0.999, a1: Math.PI * 0.999, tele, active: 0.11,
+      x: P.x, y: P.y - 22, r: 118, a0: -Math.PI * 0.999, a1: Math.PI * 0.999, tele, active: 0.11, mark: true, heavy: true,
       follow(hz) { if (hz.t < tele - lockT) { hz.x = P.x; hz.y = P.y - 22; } },
       onFire(hz) {
         const gy = FLOOR;

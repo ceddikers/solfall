@@ -114,6 +114,14 @@
       noise({ dur: 0.05, vol: 0.24, type: 'highpass', f0: 2600 });
     },
     tink() { tone({ type: 'triangle', f0: 1900, f1: 1500, dur: 0.07, vol: 0.12 }); },
+    // the ring of a blade catching the light, just before it swings
+    glint() { tone({ type: 'sine', f0: 2600, f1: 3400, dur: 0.11, vol: 0.07 }); tone({ type: 'triangle', f0: 5200, f1: 4800, dur: 0.06, vol: 0.03 }); },
+    // two blades meeting
+    clash() {
+      tone({ type: 'square', f0: 1500, f1: 700, dur: 0.09, vol: 0.14 });
+      tone({ type: 'triangle', f0: 2900, f1: 2100, dur: 0.3, vol: 0.12 });
+      noise({ dur: 0.16, vol: 0.4, f0: 5000, f1: 1800, q: 0.9 });
+    },
     jump() { tone({ type: 'sine', f0: 320, f1: 560, dur: 0.09, vol: 0.12 }); },
     jump2() {
       tone({ type: 'sine', f0: 480, f1: 880, dur: 0.1, vol: 0.12 });

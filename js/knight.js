@@ -82,7 +82,7 @@
     const b = B.body, f = b.face;
     const m = (ang) => (f > 0 ? ang : Math.PI - ang);
     return H.arc({
-      x: b.x + f * 10, y: b.y - 86, r: o.r || 185, a0: m(o.a0), a1: m(o.a1), tele: o.tele, active: 0.13, dmg: o.dmg || 1,
+      x: b.x + f * 10, y: b.y - 86, r: o.r || 185, a0: m(o.a0), a1: m(o.a1), tele: o.tele, active: 0.13, dmg: o.dmg || 1, heavy: (o.dmg || 1) > 1, owner: b,
       follow(h) { if (!h.fired) { h.x = b.x + b.face * 10; h.y = b.y - 86; } },
       onFire() { G.audio.play('cleave'); b.fast = true; b.pose = o.pose; G.fx.shake(7); },
     });
@@ -187,7 +187,7 @@
     facePlayer();
     b.fast = false; b.pose = 'overRaise';
     const reach = 138;
-    const m = K.columnMark(b.x + b.face * reach, 132);
+    const m = { x: b.x + b.face * reach, k: 0 }; // where the blade will land (no mark is drawn: watch the sword)
     G.audio.play('charge', { dur: track + lock });
     let e = 0;
     while (e < track) {
@@ -198,12 +198,12 @@
       if ((want - b.x) * b.face > 4) b.x = G.clamp(b.x + b.face * Math.min(230, Math.abs(want - b.x) * 6) * dt, WL + 50, WR - 50);
       m.x = b.x + b.face * reach; m.k = e / track * 0.7;
     }
-    m.locked = true;
+    // the blade stops following and catches the light: it is coming down
+    G.fx.glint(b.x - b.face * 8, b.y - 212, 34, DANGER, 0.3); G.audio.play('glint');
     e = 0;
     while (e < lock) { e += yield; m.k = 0.7 + 0.3 * Math.min(1, e / lock); }
     b.fast = true; b.pose = 'slam';
     yield* wait(0.07);
-    m.dead = true;
     K.crush(m.x, FLOOR - 70, 60, 80, 2);
     K.impact(m.x, true);
     H.shockwave(m.x - 50, -1, 450, 46);
@@ -224,9 +224,16 @@
     facePlayer();
     const dir = b.face, tele = 0.85 * T;
     b.pose = 'chargeUp';
-    H.lane({ x: WL, y: FLOOR - 108, w: WR - WL, h: 108, dir, dur: tele });
+    H.lane({ x: WL, y: FLOOR - 108, w: WR - WL, h: 108, dir, dur: tele, quiet: true });
     G.audio.play('charge', { dur: tele });
-    yield* wait(tele);
+    // it lowers its shoulder and its back foot tears at the ground
+    let ce = 0, glinted = false;
+    while (ce < tele) {
+      const dt = yield;
+      ce += dt;
+      if (Math.random() < dt * 30) G.fx.dust(b.x - dir * 26, FLOOR, 1, { dir: -dir, speed: [60, 260], size: [6, 11], life: [0.3, 0.6], up: 40, a: 0.4 });
+      if (!glinted && ce >= tele - 0.22) { glinted = true; G.fx.glint(b.x + dir * 22, b.y - 84, 30, G.pal().hot); G.audio.play('glint'); }
+    }
     b.pose = 'charge'; b.hurt = true;
     G.audio.play('sweep');
     const tx = dir > 0 ? WR - 56 : WL + 56, speed = K.gentle() ? 880 : 1020;
@@ -365,33 +372,35 @@
       update() { this.srcX = b.x; if (this.t > tele + dur) this.dead = true; },
       hits(Pl) { return this.t >= tele && this.t < tele + dur && Math.abs(Pl.x - b.x) < R + 4 && Pl.y > FLOOR - TOP + 6; },
       draw(ctx) {
-        const x = b.x;
+        // no box and no red: the wind gathering round the blade, then the blade itself
+        const x = b.x, pal = G.pal();
+        ctx.globalCompositeOperation = 'lighter'; ctx.lineCap = 'round';
         if (this.t < tele) {
-          const k = this.t / tele, late = k > 0.8 ? 0.5 + 0.5 * Math.sin(this.t * 55) : 0;
-          ctx.fillStyle = G.rgba(DANGER, 0.06 + 0.07 * k + 0.08 * late);
-          ctx.fillRect(x - R, FLOOR - TOP, R * 2, TOP);
-          ctx.fillStyle = G.rgba(DANGER, 0.3);
-          ctx.beginPath(); ctx.ellipse(x, FLOOR - 1, R * k, 10 * k, 0, 0, G.TAU); ctx.fill();
-          ctx.strokeStyle = G.rgba(DANGER, 0.5 + 0.4 * k); ctx.lineWidth = 2;
-          ctx.beginPath(); ctx.ellipse(x, FLOOR - 1, R, 10, 0, 0, G.TAU); ctx.stroke();
-          ctx.beginPath(); ctx.moveTo(x - R, FLOOR); ctx.lineTo(x - R, FLOOR - TOP); ctx.lineTo(x + R, FLOOR - TOP); ctx.lineTo(x + R, FLOOR); ctx.stroke();
+          const k = this.t / tele;
+          for (let i = 0; i < 2; i++) {
+            const a = this.t * (5 + 9 * k) + i * Math.PI;
+            ctx.strokeStyle = G.rgba(pal.boss, 0.12 + 0.3 * k); ctx.lineWidth = 2 + 4 * k;
+            ctx.beginPath(); ctx.ellipse(x, FLOOR - 58, (R - 8) * (0.5 + 0.5 * k), (R - 8) * 0.28 * (0.5 + 0.5 * k), 0, a, a + 0.5 + 0.9 * k); ctx.stroke();
+          }
         } else {
-          const pal = G.pal(), f = Math.min(1, (tele + dur - this.t) / 0.25);
-          ctx.fillStyle = G.rgba(DANGER, 0.1 * f);
-          ctx.fillRect(x - R, FLOOR - TOP, R * 2, TOP);
-          ctx.strokeStyle = G.rgba(DANGER, 0.6 * f); ctx.lineWidth = 2;
-          ctx.beginPath(); ctx.moveTo(x - R, FLOOR); ctx.lineTo(x - R, FLOOR - TOP); ctx.lineTo(x + R, FLOOR - TOP); ctx.lineTo(x + R, FLOOR); ctx.stroke();
-          ctx.globalCompositeOperation = 'lighter';
+          const f = Math.min(1, (tele + dur - this.t) / 0.25);
           for (let i = 0; i < 3; i++) {
             const a = this.t * 15 + i * G.TAU / 3;
-            ctx.strokeStyle = G.rgba(i ? pal.boss : pal.hot, (i ? 0.5 : 0.9) * f); ctx.lineWidth = i ? 15 : 7; ctx.lineCap = 'round';
+            ctx.strokeStyle = G.rgba(i ? pal.boss : pal.hot, (i ? 0.5 : 0.9) * f); ctx.lineWidth = i ? 15 : 7;
             ctx.beginPath(); ctx.ellipse(x, FLOOR - 62 + i * 8, R - 8, (R - 8) * 0.3, 0, a, a + 1.5); ctx.stroke();
           }
-          ctx.globalCompositeOperation = 'source-over';
         }
+        ctx.globalCompositeOperation = 'source-over';
       },
     });
-    yield* wait(tele);
+    // leaves and dust are drawn in to it while it winds up
+    let we = 0, wg = false;
+    while (we < tele) {
+      const dt = yield;
+      we += dt;
+      if (Math.random() < dt * 26) { const s = Math.random() < 0.5 ? -1 : 1; G.fx.dust(b.x + s * G.rand(70, 130), FLOOR, 1, { dir: -s, speed: [80, 240], size: [5, 9], life: [0.3, 0.6], up: 30, a: 0.34 }); }
+      if (!wg && we >= tele - 0.22) { wg = true; G.fx.glint(b.x + b.face * 74, b.y - 70, 32, G.pal().hot); G.audio.play('glint'); }
+    }
     b.spinning = true;
     let e = 0, sfx = 0;
     const speed = (K.gentle() ? 205 : 240) + (K.hard() ? 35 : 0);

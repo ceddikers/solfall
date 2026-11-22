@@ -113,7 +113,7 @@
     const H = P.hero;
     aim = { x: t.cx, y: t.cy };
     P.ult = 0; FL.ready = false;
-    P.ulting = true; P.atk = null; P.dashT = 0; P.plunge = false; P.healT = 0; P.flT = 0; P.vx = 0; P.vy = 0; P.stun = 0;
+    P.ulting = true; P.atk = null; P.cast = null; P.dashT = 0; P.plunge = false; P.healT = 0; P.flT = 0; P.vx = 0; P.vy = 0; P.stun = 0;
     P.facing = G.sign(t.cx - P.x) || P.facing;
     G.audio.play('ult');
     G.ui.callout(FL.NAMES[H.id], 'Dawnbreak');

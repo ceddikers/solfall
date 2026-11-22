@@ -12,6 +12,7 @@
     SEG: 100, SEGS: 3,
     GAIN_HIT: 8, GAIN_HEAVY: 16, GAIN_PERFECT: 34, GAIN_ORB: 6,
     LANCE_DMG: 42, LANCE_SPEED: 1700,
+    LANCE_WIND: 0.09, // Vesper draws her arm back with the lance before it flies
     ARROW_SPEED: 1350, ARROW_LIFE: 0.4, VOLLEY_DMG: 10,
     ARROW_GAIN: 6, ARROW_GAIN_HEAVY: 12, // Starlight per arrow hit: less than a melee hit
     BOW_SLOW: 0.6,                       // Lune's speed while she is drawing and loosing
@@ -54,7 +55,8 @@
       dead: false, deadT: 0, hidden: false,
       squash: 0, runT: 0, stepN: 0, skidT: 0, hurtFlash: 0, emberFlash: 0,
       ult: 0, ulting: false, vanish: false, shroudT: 0,
-      flT: 0, flCd: 0, flBrazen: false,
+      flT: 0, flCd: 0, flBrazen: false, lifts: 0,
+      cast: null, // a special's body motion: Vesper's throw, Lune's release, Aster's slam (see castPose)
       rig: {}, // pose memory for drawing (see drawBody)
       scarf: [], ghosts: [], slashes: [], bolts: [],
       stats: { dmg: 0, hits: 0, perfect: 0, heals: 0, lances: 0 },
@@ -65,7 +67,7 @@
   };
 
   function ground() {
-    P.vy = 0; P.onGround = true; P.airJumps = P.maxAir; P.airDashes = P.maxDash; P.coyote = C.COYOTE;
+    P.vy = 0; P.onGround = true; P.airJumps = P.maxAir; P.airDashes = P.maxDash; P.coyote = C.COYOTE; P.lifts = 0;
   }
 
   P.gain = function (n) {
@@ -132,11 +134,18 @@
     if (!P.onGround) P.coyote = Math.max(0, P.coyote - dt);
     // Aftershock: the second Starfall blast
     if (P.afterT > 0) { P.afterT -= dt; if (P.afterT <= 0) starfallBlast(P.afterScale, 0.5); }
+    // a special in motion: the lance leaves the hand when the arm comes through
+    if (P.cast) {
+      const c = P.cast;
+      c.t += dt;
+      if (!c.thrown && c.t >= c.wind) { c.thrown = true; if (c.kind === 'lance') throwLance(c); }
+      if (c.t >= c.dur) P.cast = null;
+    }
     // Starfall's plunge passes through attacks until it lands
     if (P.plunge) P.iframes = Math.max(P.iframes, 0.1);
 
     const ctl = G.playerControl();
-    const free = !P.plunge; // nothing else can be started mid-plunge
+    const free = !P.plunge && !(P.cast && !P.cast.thrown); // nothing else can be started mid-plunge or mid-throw
     let mx = ctl ? I.axisX() : 0;
     const up = ctl && I.down.up, down = ctl && I.down.down;
     if (ctl) {
@@ -197,11 +206,13 @@
     }
 
     // --- dash
-    if (P.dashBuf > 0 && free && P.dashT <= 0 && P.dashCd <= 0 && P.stun <= 0 && (P.onGround || P.airDashes > 0)) {
+    if (P.dashBuf > 0 && !P.plunge && P.dashT <= 0 && P.dashCd <= 0 && P.stun <= 0 && (P.onGround || P.airDashes > 0)) {
       P.dashBuf = 0;
       P.dashT = C.DASH_T; P.dashDir = mx || P.facing; P.facing = P.dashDir;
       P.iframes = C.IFRAME; P.pdDone = false;
       if (!P.onGround) P.airDashes--;
+      if (P.cast && !P.cast.thrown && P.cast.kind === 'lance') throwLance(P.cast);
+      P.cast = null;
       P.atk = null; P.healT = 0; P.ghostT = 0; P.dashHit.clear();
       G.audio.play('dash');
       G.fx.burst(P.x, P.y - 22, { n: 8, color: STAR, speed: [80, 300], angle: P.dashDir > 0 ? Math.PI : 0, spread: 0.9, life: [0.15, 0.4], kind: 'spark', size: [2, 3] });
@@ -309,6 +320,7 @@
     if (P.plunge && P.onGround) {
       // Starfall lands
       P.plunge = false; P.squash = -0.3; P.iframes = Math.max(P.iframes, 0.12);
+      P.cast = { kind: 'slam', t: 0.05, wind: 0, dur: 0.4, thrown: true };
       starfallBlast(1.2, 1);
     } else if (landed && fallSpeed > 260) {
       // the longer the fall, the deeper the crouch, the more dust, and past a point the ground answers
@@ -333,7 +345,7 @@
     // --- weapon
     const charging = P.atk && P.atk.canCharge && !P.atk.swung;
     if (P.atkBuf > 0 && free && P.atkCd <= 0 && P.dashT <= 0 && P.stun <= 0 && P.healT === 0 && !charging) {
-      P.atkBuf = 0;
+      P.atkBuf = 0; P.cast = null;
       if (H.weapon === 'bow') startShot(mx, up, down);
       else startSwing(mx, up, down);
     }
@@ -411,7 +423,7 @@
     const idx = nextStep(kind !== 'down');
     const heavy = idx === (H.chain || 3) - 1;
     const st = H.combo[heavy ? 2 : idx === 1 ? 1 : 0];
-    // the maul: its first swing goes right round and hits on both sides; its smash can be held and charged
+    // the maul: its first swing is a wide sweep in front of her; its smash can be held and charged
     const sweep = !!H.heavy && !heavy && kind === 'side', canCharge = !!H.heavy && heavy && kind !== 'down';
     // a slash thrown straight out of a dash becomes a thrust: more damage, more reach
     const thrust = kind === 'side' && P.sinceDash < 0.2;
@@ -424,7 +436,6 @@
     P.atkCd = st.cd * haste();
     // the arc of light for the swing; a smash that may be held shows its arc when it is let go (see swing)
     if (!canCharge) slashArc(P.atk, -st.wind);
-    if (sweep) { P.slashes.push({ kind, dir: -P.facing, heavy: false, thrust: false, idx, t: -st.wind - 0.05, dur: 0.22, reach: (1 + 0.25 * G.boon('reach')) * H.reach, thick: H.thick }); }
     if (heavy) G.fx.burst(P.x - P.facing * 8, P.y - 34, { n: 5, color: GOLD, speed: [30, 140], life: [0.15, 0.35], kind: 'spark', size: [2, 3] });
   }
 
@@ -515,7 +526,8 @@
       return { cx: P.x + a.dir * 6, cy: P.y - 34 - hh, hw: (a.heavy ? 54 : 42) * (0.6 + 0.4 * H.reach), hh };
     }
     if (a.kind === 'down') return { cx: P.x, cy: P.y - 28 + 42 * r, hw: 36, hh: 42 * r };
-    if (a.sweep) return { cx: P.x, cy: P.y - 28, hw: (a.thrust ? 104 : 84) * r, hh: 38 };
+    // the maul's sweep: wide and tall, but only on the side the maul is swung to
+    if (a.sweep) { const hw = (a.thrust ? 64 : 54) * r; return { cx: P.x + a.dir * (hw - 6), cy: P.y - 30, hw, hh: 42 }; }
     // side: the finisher is bigger, a thrust is longer and narrower
     const hw = ((a.heavy ? 66 : 48) + (a.thrust ? 22 : 0)) * r;
     return { cx: P.x + a.dir * (hw - (a.heavy ? 4 : 0)), cy: P.y - 26, hw, hh: a.thrust ? 32 : a.heavy ? 48 : 36 };
@@ -548,7 +560,38 @@
     }
   }
 
+  // A clash: a heavy blow of the hero's (a finisher, a thrust, anything from the maul) meets a boss's
+  // swing as it comes out. The swing is turned aside, both are thrown back a step and the boss's
+  // stagger bar fills a little. Blows that burn red (two health) cannot be met this way.
+  function clash(a) {
+    if (a.clashed || !(a.heavy || a.thrust || H.heavy) || a.kind === 'down') return;
+    const hb = atkBox(a);
+    for (const h of G.hazards.list) {
+      if (h.kind !== 'arc' || h.dead || !h.owner || h.heavy || h.mark) continue;
+      if (h.t < h.tele - 0.1 || h.t > h.tele + h.active) continue;
+      if (!G.circleRect(h.x, h.y, h.r * 0.8, hb)) continue;
+      a.clashed = true; h.dead = true;
+      const o = h.owner, B = G.boss, dir = G.sign(P.x - o.x) || -a.dir;
+      const cx = (P.x + o.x) / 2, cy = Math.min(P.y, o.y) - 44;
+      if (o.kx != null) o.kx = G.clamp(o.kx - dir * 16, -18, 18);
+      if (B.kit && !B.staggered && o === B.body) B.poise = Math.min(B.poiseMax - 1, B.poise + 46 * H.poise);
+      P.vx = dir * 330; P.iframes = Math.max(P.iframes, 0.16); P.pdDone = true;
+      P.gain(C.GAIN_HIT); G.flow.add(8);
+      G.audio.play('clash');
+      G.fx.stop(0.13); G.fx.shake(11); G.fx.punch(0.03); G.fx.impact(cx, cy, 0.06);
+      G.fx.glint(cx, cy, 70, GOLD, 0.3);
+      G.fx.ring(cx, cy, { r0: 10, r1: 150, life: 0.3, color: HOT, width: 6 });
+      G.fx.lines(cx, cy, 16, HOT, { r0: 20, speed: [600, 1300] });
+      G.fx.burst(cx, cy, { n: 22, color: GOLD, speed: [200, 900], life: [0.15, 0.5], kind: 'spark', size: [2, 4.5], grav: 500 });
+      G.fx.light(cx, cy, 240, HOT, 0.2, 0.7);
+      if (P.onGround) G.fx.dust(P.x, P.y, 4, { dir, speed: [80, 260], size: [5, 10] });
+      G.feats.bump('clash');
+      return;
+    }
+  }
+
   function checkHits(a) {
+    clash(a);
     const boxes = [atkBox(a)];
     if (a.quake) boxes.push({ cx: P.x + a.dir * (100 + 40 * (a.charge || 0)), cy: FLOOR - 26, hw: 130 + 80 * (a.charge || 0), hh: 30 });
     let bounced = false;
@@ -559,7 +602,7 @@
         const c = contact(hb, t);
         // a riposte or a sunder makes this blow worth more (see moments.js)
         const em = G.moments.strike(a.heavy);
-        const res = G.boss.damage(Math.round(a.dmg * em.mult), t, { x: c.x, y: c.y, heavy: a.heavy || a.thrust, finisher: a.heavy || em.mult > 1, dir: a.sweep ? (G.sign(t.cx - P.x) || a.dir) : a.dir, poise: H.poise });
+        const res = G.boss.damage(Math.round(a.dmg * em.mult), t, { x: c.x, y: c.y, heavy: a.heavy || a.thrust, finisher: a.heavy || em.mult > 1, dir: a.dir, poise: H.poise });
         if (res) {
           P.gain(a.heavy ? C.GAIN_HEAVY : C.GAIN_HIT);
           // the freeze, the shake and the kick all scale with the blow; the maul's are heavier
@@ -569,6 +612,7 @@
           if (a.heavy) {
             // the finisher lands with a gold burst so it reads as the big hit
             G.fx.punch(0.016);
+            if ((a.charge || 0) >= 1 || em.mult > 1) G.fx.impact(c.x, c.y, 0.06);
             G.fx.ring(c.x, c.y, { r0: 8, r1: 92, life: 0.28, color: GOLD, width: 6 });
             G.fx.burst(c.x, c.y, { n: 8, color: GOLD, speed: [160, 620], life: [0.15, 0.45], kind: 'spark', size: [2.5, 4.5] });
           }
@@ -637,7 +681,11 @@
     arrow(a.dx, a.dy, a.dmg, a.heavy);
     G.audio.play(a.heavy ? 'arrowHeavy' : 'arrow');
     // firing downward in the air lifts her
-    if (a.dy > 0.5 && !P.onGround) { P.vy = Math.min(P.vy, -370); P.squash = 0.15; }
+    // (each shot before she next lands lifts less than the last, so she cannot hang in the sky)
+    if (a.dy > 0.5 && !P.onGround) {
+      const f = Math.max(0, 1 - 0.3 * P.lifts);
+      P.vy = Math.min(P.vy, G.lerp(P.vy, -370, f)); P.squash = 0.15 * f; P.lifts++;
+    }
     G.fx.burst(P.x + a.dx * 24, P.y - 38 + a.dy * 24, { n: a.heavy ? 6 : 3, color: a.heavy ? GOLD : STAR, kind: 'spark', angle: Math.atan2(a.dy, a.dx), spread: 0.9, speed: [140, 460], life: [0.08, 0.2], size: [1.3, 2.2] });
     if (a.heavy) {
       P.vx -= a.dx * 120;
@@ -671,9 +719,23 @@
     G.fx.burst(P.x + dx * 20, P.y - 36 + dy * 20, { n: 14, color: STAR, speed: [100, 500], angle: Math.atan2(dy, dx), spread: 1.1, life: [0.15, 0.4], kind: 'spark', size: [2, 4] });
   }
 
-  // Vesper: a piercing lance.
+  // Vesper: a piercing lance. She draws her free arm back with it, then hurls it (throwLance).
   function castLance(dx, dy) {
+    P.cast = { kind: 'lance', t: 0, wind: C.LANCE_WIND, dur: C.LANCE_WIND + 0.32, dx, dy, thrown: false };
+    G.audio.play('whoosh');
+    const hx = P.x - P.facing * 14, hy = P.y - 60;
+    G.fx.light(hx, hy, 90, STAR, 0.12, 0.45);
+    for (let i = 0; i < 7; i++) {
+      const a = G.rand(0, G.TAU), r = G.rand(22, 40);
+      G.fx.spawn({ x: hx + Math.cos(a) * r, y: hy + Math.sin(a) * r, vx: -Math.cos(a) * r * 9, vy: -Math.sin(a) * r * 9, life: 0.1, size: 2.5, color: HOT });
+    }
+  }
+  function throwLance(c) {
+    const { dx, dy } = c, n = G.shots.length;
     fireLance(dx, dy);
+    // the lance is drawn leaving her hand and settles onto its true line within a tenth of a second
+    const hx = P.x + P.facing * 1.3 * (1 + Math.abs(dx) * 15), hy = P.y - 1.3 * (39 - dy * 15);
+    for (let i = n; i < G.shots.length; i++) { const s = G.shots[i]; s.vox = hx - s.x; s.voy = hy - s.y; }
     P.vx -= dx * 240;
     if (dy > 0) P.vy = Math.min(P.vy, -420);
     G.audio.play('flare');
@@ -691,6 +753,7 @@
     P.vx = -dx * 420;
     if (dy > -0.5) { P.vy = Math.min(P.vy, -330); P.onGround = false; P.plat = null; }
     P.atk = null;
+    P.cast = { kind: 'volley', t: 0, wind: 0, dur: 0.34, dx, dy, thrown: true };
     G.audio.play('flare');
     muzzle(dx, dy);
   }
@@ -698,7 +761,7 @@
   // Aster: on the ground the blast is immediate; in the air she plunges first.
   function castStarfall() {
     P.atk = null;
-    if (P.onGround) { starfallBlast(1, 1); return; }
+    if (P.onGround) { P.cast = { kind: 'slam', t: 0, wind: 0, dur: 0.36, thrown: true }; starfallBlast(1, 1); return; }
     P.plunge = true; P.pdDone = false; P.dashT = 0;
     G.audio.play('dash');
     G.fx.ring(P.x, P.y - 22, { r0: 50, r1: 14, life: 0.2, color: HOT, width: 4 });
@@ -770,6 +833,8 @@
       return false;
     }
     P.hp -= dmg; P.stats.hits++;
+    if (P.cast && !P.cast.thrown) P.ember += C.SEG; // caught mid wind-up: the lance never left, the Starlight comes back
+    P.cast = null;
     P.lastHit = { kind: src && src.kind, attack: G.boss.attackName || '' }; // for the defeat screen
     const braced = !!(P.atk && P.atk.canCharge && !P.atk.swung && P.atk.hold > 0.12) && P.hp > 0;
     const dir = G.sign(P.x - srcX) || -P.facing;
@@ -784,6 +849,7 @@
       P.vx = dir * 430; P.vy = (src && typeof src.popVy === 'number') ? src.popVy : -430; P.onGround = false; P.plat = null; P.jumpHeld = false;
     }
     G.fx.stop(0.14); G.fx.shake(13); G.fx.flash('255,50,50', 0.26, 0.35);
+    if (dmg >= 2) G.fx.impact(P.x, P.y - 22, 0.07); // the blows that take two health land like it
     G.fx.burst(P.x, P.y - 22, { n: 16, color: '255,120,120', speed: [100, 420], life: [0.2, 0.55], kind: 'spark', size: [2, 4] });
     G.fx.hurt(P.x, P.y - 22, dir, STAR);
     G.flow.hurt();
@@ -913,12 +979,17 @@
         ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(s.x, s.y); ctx.stroke();
         continue;
       }
-      const tx = s.x - s.vx * 0.05, ty = s.y - s.vy * 0.05;
+      // the Star Lance: a streak with a spearhead; just thrown, it is still drawn coming off the hand
+      const off = s.vox ? Math.max(0, 1 - s.t / 0.1) : 0, x = s.x + (s.vox || 0) * off, y = s.y + (s.voy || 0) * off;
+      const tail = Math.min(0.05, s.t + 0.012), tx = x - s.vx * tail, ty = y - s.vy * tail;
       ctx.strokeStyle = G.rgba(STAR, 0.35); ctx.lineWidth = 16;
-      ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(s.x, s.y); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(x, y); ctx.stroke();
       ctx.strokeStyle = G.rgba(HOT, 1); ctx.lineWidth = 5;
-      ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(s.x, s.y); ctx.stroke();
-      ctx.drawImage(G.fx.glow(STAR), s.x - 34, s.y - 34, 68, 68);
+      ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(x, y); ctx.stroke();
+      ctx.save(); ctx.translate(x, y); ctx.rotate(Math.atan2(s.vy, s.vx));
+      ctx.fillStyle = G.rgba(HOT, 1); poly(ctx, [-4, -5.5, 14, 0, -4, 5.5, 0, 0]); ctx.fill();
+      ctx.restore();
+      ctx.drawImage(G.fx.glow(STAR), x - 34, y - 34, 68, 68);
     }
     ctx.globalCompositeOperation = 'source-over';
   };
@@ -1114,6 +1185,20 @@
       if (h.weapon === 'maul') return { fx, fy, bx: fx - Math.cos(ang) * 7.5, by: fy - Math.sin(ang) * 7.5, ang, len: 34 };
       return { fx: 5, fy: SH - 14 * k, bx: -5, by: -22, ang: -1.25 * k, pull: 0, len: 0 };
     }
+    if (s.cast && !a) { const p = castPose(h, s.cast, SH); if (p) return p; }
+    if (s.stun > 0 && !a) {
+      // knocked back: arms flung out, the weapon thrown wide
+      if (h.weapon === 'sword') return { fx: 9, fy: SH - 6, bx: -10, by: SH + 1, ang: -2.3, len: 36 };
+      if (h.weapon === 'maul') return { fx: 3, fy: SH - 4, bx: -3, by: SH - 1, ang: -2.75, len: 34, behind: true };
+      return { fx: 10, fy: SH - 7, bx: -9, by: SH + 1, ang: -0.9, pull: 0, len: 0 };
+    }
+    if (s.healT > 0 && !a) {
+      // mending: the hands come together at the chest and the weapon is lowered
+      const k = G.clamp(s.healT / 0.12, 0, 1), q = Math.sin(G.t * 9) * 0.4;
+      if (h.weapon === 'sword') return { fx: 5, fy: -27 + q, bx: 2.5, by: -28.5 + q, ang: G.lerp(2.55, 1.62, k), len: 36 };
+      if (h.weapon === 'maul') return { fx: 6, fy: -26 + q, bx: 3, by: -29 + q, ang: G.lerp(-2.42, 1.42, k), len: 34 };
+      return { fx: 6.5, fy: -26 + q, bx: 3, by: -28.5 + q, ang: G.lerp(0.16, 1.25, k), pull: 0, len: 0 };
+    }
     if (h.weapon === 'sword') {
       if (a && a.kind !== 'shot') {
         const ang = swingAngle(a), c = Math.cos(ang), sn = Math.sin(ang), r = a.thrust ? 12.5 : 11;
@@ -1129,6 +1214,7 @@
       let ang = -2.42, fx = 5.5, fy = -27.5 + (run ? sw * 0.8 : breath * 0.3);
       if (a && a.kind !== 'shot') { ang = swingAngle(a); fx = 1 + Math.cos(ang) * 10.5; fy = SH + Math.sin(ang) * 10.5; }
       else if (s.dash) { ang = Math.PI - 0.35; fx = -2; fy = -29; }
+      else if (s.plunge) { ang = -1.75; fx = 2 + Math.cos(ang) * 10.5; fy = SH - 4 + Math.sin(ang) * 10.5; return { fx, fy, bx: fx - Math.cos(ang) * 7.5, by: fy - Math.sin(ang) * 7.5, ang, len: 34 }; }
       return { fx, fy, bx: fx - Math.cos(ang) * 7.5, by: fy - Math.sin(ang) * 7.5, ang, len: 34, behind: !a };
     }
     // bow
@@ -1140,6 +1226,55 @@
     }
     if (s.dash) return { fx: -2, fy: -28, bx: -6, by: -27, ang: 0.1, pull: 0, len: 0 };
     return { fx: 12.5 + (run ? sw * 2 : 0), fy: -27.5 + breath * 0.3, bx: -3.5 + (run ? -sw * 3 : 0), by: -25.5, ang: 0.16, pull: 0, len: 0 };
+  }
+
+  // The body motion of a special (P.cast). Vesper: the free arm cocks back behind the head with the
+  // lance, then whips through along the aim and follows through. Lune: the bow pushed out along the
+  // aim, the string hand snapped back past the ear. Aster: the maul brought down from overhead into
+  // the floor (the overhead hold itself is the plunge, see the maul pose).
+  function castPose(h, c, SH) {
+    if (c.kind === 'lance') {
+      const ang = Math.atan2(c.dy, Math.abs(c.dx)), co = Math.cos(ang), sn = Math.sin(ang);
+      const cockX = -10 - co * 2, cockY = SH - 7 - sn * 2; // behind and above the head
+      const outX = 1 + co * 15, outY = SH + sn * 15;       // thrown through, along the aim
+      let bx, by;
+      if (!c.thrown) {
+        const k = G.ease.outCubic(G.clamp(c.t / c.wind, 0, 1));
+        bx = G.lerp(6, cockX, k); by = G.lerp(-24, cockY, k);
+      } else {
+        const u = G.ease.outCubic(G.clamp((c.t - c.wind) / 0.06, 0, 1));
+        // the hand travels a slight arc over the shoulder on its way through
+        bx = G.lerp(cockX, outX, u); by = G.lerp(cockY, outY, u) - Math.sin(u * Math.PI) * 4;
+      }
+      // the near arm throws, so the sword passes to the far hand for a moment and trails behind
+      return { fx: -6, fy: -25, ang: 2.5, len: 36, bx, by, swap: true, behind: true, javelin: !c.thrown, jang: ang };
+    }
+    if (c.kind === 'volley') {
+      const ang = Math.atan2(c.dy, Math.abs(c.dx)), co = Math.cos(ang), sn = Math.sin(ang);
+      const k = G.clamp(c.t / 0.08, 0, 1), fx = 0.5 + co * 13.5, fy = SH + sn * 13.5;
+      return { fx, fy, bx: G.lerp(fx - co * 13, -7, k), by: G.lerp(fy - sn * 13, SH - 4, k), ang, pull: 0, len: 0, twang: 1 - G.clamp(c.t / 0.25, 0, 1) };
+    }
+    if (c.kind === 'slam' && h.weapon === 'maul') {
+      const k = G.ease.outCubic(G.clamp(c.t / 0.07, 0, 1)), ang = G.lerp(-1.75, 1.2, k);
+      const fx = 2 + Math.cos(ang) * 10.5, fy = SH + 3 + Math.sin(ang) * 10.5;
+      return { fx, fy, bx: fx - Math.cos(ang) * 7.5, by: fy - Math.sin(ang) * 7.5, ang, len: 34 };
+    }
+    return null;
+  }
+
+  // A lance of light held in Vesper's free hand while she winds up the throw.
+  function drawJavelin(ctx, W, h, t) {
+    const k = G.clamp(t / 0.09, 0, 1), len = 16 + 22 * k;
+    ctx.save();
+    ctx.translate(W.bx, W.by); ctx.rotate(W.jang);
+    ctx.globalCompositeOperation = 'lighter';
+    glowAt(ctx, STAR, 4, 0, 26, 0.5 + 0.4 * k);
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = G.rgba(STAR, 0.45); ctx.lineWidth = 6; line(ctx, -len * 0.45, 0, len * 0.55, 0);
+    ctx.strokeStyle = G.rgba(h.hot, 1); ctx.lineWidth = 2; line(ctx, -len * 0.45, 0, len * 0.55, 0);
+    ctx.fillStyle = G.rgba(h.hot, 1); poly(ctx, [len * 0.55 - 2, -3, len * 0.55 + 7, 0, len * 0.55 - 2, 3]); ctx.fill();
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.restore();
   }
 
   // ---- weapons, drawn at the front hand
@@ -1202,7 +1337,7 @@
     }
     ctx.fillStyle = G.rgba(h.hot, 1); poly(ctx, [0, -2.8, 3.6, 0, 0, 2.8, -1.4, 0]); ctx.fill(); // grip
     // string, pulled back to the other hand
-    const nx = -5.2 - 8 * W.pull;
+    const nx = -5.2 - 8 * W.pull + (W.twang ? Math.sin(G.t * 90) * 2.2 * W.twang : 0);
     ctx.globalCompositeOperation = 'lighter';
     ctx.strokeStyle = G.rgba(h.hot, 0.8); ctx.lineWidth = 0.8;
     ctx.beginPath(); ctx.moveTo(-7.4, -18); ctx.lineTo(nx, 0); ctx.lineTo(-7.4, 18); ctx.stroke();
@@ -1393,7 +1528,12 @@
     ctx.save();
     ctx.translate(s.x, s.y);
     ctx.scale(s.facing * SC * (1 - 0.34 * turn), SC);
-    ctx.rotate(ease('lean', s.dash ? 0.42 : G.clamp(s.vx * s.facing / h.run, -1.6, 1.6) * 0.13, 30));
+    const c = s.cast, lean0 = s.dash ? 0.42 : G.clamp(s.vx * s.facing / h.run, -1.6, 1.6) * 0.13;
+    let leanT = lean0;
+    if (c && !a) leanT = c.kind === 'lance' ? (c.thrown ? 0.3 : -0.16) : c.kind === 'slam' ? 0.34 : -0.12; // rock back to wind up, fall into the throw
+    else if (s.stun > 0) leanT = -0.32;
+    else if (s.healT > 0) leanT = 0.1;
+    ctx.rotate(ease('lean', leanT, c ? 45 : 30));
     ctx.scale(1 - s.squash * 0.55, 1 + s.squash);
     ctx.lineCap = 'round'; ctx.lineJoin = 'round';
 
@@ -1428,7 +1568,7 @@
     ctx.translate(0, bob - breath * 0.5);
     let W = weaponPose(h, s, breath);
     if (R) {
-      if (a || s.flT > 0 || R.wang == null) { R.wfx = W.fx; R.wfy = W.fy; R.wbx = W.bx; R.wby = W.by; R.wang = W.ang; }
+      if (a || s.flT > 0 || s.cast || R.wang == null) { R.wfx = W.fx; R.wfy = W.fy; R.wbx = W.bx; R.wby = W.by; R.wang = W.ang; }
       else {
         // back to rest after a swing, or from one carry to another: quick, but not in one frame
         const kk = 1 - Math.exp(-22 * rdt);
@@ -1439,7 +1579,7 @@
     }
     W.fy -= LIFT; W.by -= LIFT;
     const arm = (front) => {
-      const sx = front ? (id === 'aster' ? 6.4 : 3) : (id === 'aster' ? -6 : -2.6), tx = front ? W.fx : W.bx, ty = front ? W.fy : W.by;
+      const sx = front ? (id === 'aster' ? 6.4 : 3) : (id === 'aster' ? -6 : -2.6), held = front !== !!W.swap, tx = held ? W.fx : W.bx, ty = held ? W.fy : W.by;
       const k = ik(sx, SHY, tx, ty, 8.4, 8.8, 1);
       ctx.fillStyle = front ? st.mid : st.dark;
       DR.limb(ctx, sx, SHY, k.jx, k.jy, A[0], A[1]); ctx.fill();
@@ -1475,6 +1615,7 @@
     if (!W.behind) weapon();
     arm(true);
     if (id === 'aster') pauldron(ctx, h, st, 9.2, SHY - 1, 1, st.plate);
+    if (W.javelin) drawJavelin(ctx, W, h, s.cast.t);
 
     if (s.hurtFlash > 0) glowAt(ctx, '255,90,90', 0, -30, 38, s.hurtFlash);
     ctx.restore();

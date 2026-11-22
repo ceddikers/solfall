@@ -440,6 +440,7 @@
       kind: 'lane', dur: 0.8, layer: 'under',
       update() { if (this.t >= this.dur) this.dead = true; },
       draw(ctx) {
+        if (this.quiet) return; // a body about to cross the floor is its own warning
         const k = Math.min(1, this.t / this.dur);
         const late = k > 0.8 ? 0.5 + 0.5 * Math.sin(this.t * 55) : 0;
         ctx.fillStyle = G.rgba(DANGER, 0.06 + 0.07 * k + 0.08 * late);
@@ -464,12 +465,21 @@
 
   // ------------------------------------------------------------ melee swing (a slice of a circle)
   // o: x, y, r, r0 (inner radius), a0 -> a1 (the sweep, canvas angles), tele, active, follow(h, dt), onFire(h)
+  // A swing is not drawn as a warning: the wind-up of whoever swings it is the warning, and a glint
+  // runs along the blade a fifth of a second before it comes out. mark: true draws the old red slice,
+  // for a cut with nobody visible behind it. heavy: true marks a blow the hero cannot clash with.
   H.arc = function (o) {
     return H.add(Object.assign({
       kind: 'arc', r: 150, r0: 0, a0: -1, a1: 1, tele: 0.5, active: 0.12, fade: 0.2, fired: false,
       get firing() { return this.t >= this.tele && this.t < this.tele + this.active; },
       update(dt) {
         if (this.follow) this.follow(this, dt);
+        if (!this.mark && !this.glinted && this.t >= this.tele - 0.2) {
+          this.glinted = true;
+          const r = this.r * 0.62;
+          G.fx.glint(this.x + Math.cos(this.a0) * r, this.y + Math.sin(this.a0) * r, 18 + this.r * 0.1, this.heavy ? DANGER : pal(this).hot);
+          G.audio.play('glint');
+        }
         if (this.t >= this.tele && !this.fired) {
           this.fired = true;
           if (this.onFire) this.onFire(this);
@@ -511,6 +521,7 @@
         ctx.save();
         ctx.beginPath(); ctx.rect(-80, -400, G.W + 160, G.FLOOR + 400); ctx.clip();
         if (this.t < this.tele) {
+          if (!this.mark) { ctx.restore(); return; }
           const k = this.t / this.tele;
           const late = k > 0.75 ? 0.5 + 0.5 * Math.sin(this.t * 55) : 0;
           ctx.fillStyle = G.rgba(DANGER, 0.07 + 0.07 * k + 0.1 * late);

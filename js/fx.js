@@ -84,6 +84,7 @@
     F.decals.length = 0; F.lights.length = 0; F.cuts.length = 0;
     F.shakeAmp = 0; F.flashA = 0; F.zoom = 0; F.vigA = 0;
     F.kx = F.ky = F.kvx = F.kvy = 0; F.rattleA = 0; F.joltCd = 0;
+    F.glints.length = 0; F.imp = null;
   };
 
   // kind: 'glow' (soft light), 'spark' (a streak along its motion), 'chunk' (tumbling debris),
@@ -176,6 +177,28 @@
   F.cut = function (x, y, ang, len, w, color, hot, life) {
     if (F.cuts.length > 40) F.cuts.shift();
     F.cuts.push({ x, y, ang, len, w, color, hot: hot || G.COL.white, life: life || 0.2, max: life || 0.2 });
+  };
+
+  // A star of light on a blade's edge: the moment before a swing comes out. It stands in for the
+  // red warning a melee hit used to draw, so the eye stays on the weapon and not on the floor.
+  F.glints = [];
+  F.glint = function (x, y, size, color, life) {
+    if (F.glints.length > 24) F.glints.shift();
+    F.glints.push({ x, y, size: size || 26, color: color || G.COL.white, life: life || 0.24, max: life || 0.24, rot: rnd(-0.3, 0.3) });
+  };
+
+  // An impact frame: for a few frames the whole picture is inverted and streaked with lines that
+  // run in to the point of the blow. Kept for the biggest hits only, and never twice within half
+  // a second, so it stays a punctuation mark and cannot strobe.
+  let lastImp = -1;
+  F.imp = null;
+  F.impact = function (x, y, dur) {
+    const now = performance.now();
+    if (now - lastImp < 520) return;
+    lastImp = now;
+    const lines = [];
+    for (let i = 0; i < 30; i++) lines.push({ a: (i + rnd(0, 0.9)) / 30 * G.TAU, r: rnd(90, 260), w: rnd(0.006, 0.03) });
+    F.imp = { x, y, t: dur || 0.075, max: dur || 0.075, lines };
   };
 
   // ------------------------------------------------------------------ marks left on the floor
@@ -385,7 +408,7 @@
     }
     parts.length = w;
 
-    for (const list of [F.rings, F.lights, F.cuts]) {
+    for (const list of [F.rings, F.lights, F.cuts, F.glints]) {
       w = 0;
       for (let i = 0; i < list.length; i++) {
         const r = list[i];
@@ -431,6 +454,7 @@
     F.zoom *= Math.exp(-7 * dt);
     if (F.zoom < 0.0005) F.zoom = 0;
     if (F.joltCd > 0) F.joltCd -= dt;
+    if (F.imp) { F.imp.t -= dt; if (F.imp.t <= 0) F.imp = null; }
   };
 
   // ------------------------------------------------------------------ drawing
@@ -546,6 +570,22 @@
         ctx.closePath(); ctx.fill();
       }
     }
+    // glints: a four-pointed star that snaps open and thins away
+    for (let i = 0; i < F.glints.length; i++) {
+      const g = F.glints[i], k = g.life / g.max, open = G.ease.outCubic(Math.min(1, (1 - k) * 3.2));
+      const L = g.size * (0.35 + 0.65 * open), w = Math.max(0.6, g.size * 0.11 * k);
+      ctx.globalAlpha = Math.min(1, k * 2.4);
+      ctx.drawImage(F.glow(g.color), g.x - L * 0.8, g.y - L * 0.8, L * 1.6, L * 1.6);
+      ctx.fillStyle = G.rgba(G.COL.white, 1);
+      for (let q = 0; q < 2; q++) {
+        const a = g.rot + q * Math.PI / 2, c = Math.cos(a), s = Math.sin(a), LL = q ? L * 0.55 : L;
+        ctx.beginPath();
+        ctx.moveTo(g.x - c * LL, g.y - s * LL); ctx.lineTo(g.x - s * w, g.y + c * w);
+        ctx.lineTo(g.x + c * LL, g.y + s * LL); ctx.lineTo(g.x + s * w, g.y - c * w);
+        ctx.closePath(); ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+    }
     for (let i = 0; i < F.rings.length; i++) {
       const r = F.rings[i];
       const k = 1 - r.life / r.max;
@@ -574,8 +614,27 @@
       ctx.drawImage(vigSprite(F.vigC), 0, 0, G.W, G.H);
       ctx.globalAlpha = 1;
     }
-    if (F.flashA <= 0) return;
-    ctx.fillStyle = G.rgba(F.flashC, Math.min(1, F.flashA));
-    ctx.fillRect(-60, -60, G.W + 120, G.H + 120);
+    if (F.flashA > 0) {
+      ctx.fillStyle = G.rgba(F.flashC, Math.min(1, F.flashA));
+      ctx.fillRect(-60, -60, G.W + 120, G.H + 120);
+    }
+    if (F.imp) {
+      const m = F.imp, x = m.x - G.cam.x, y = m.y - G.cam.y, far = 1600;
+      // with Screen flashes turned off the picture is not inverted; the lines alone carry it
+      if ((G.settings.flash == null ? 1 : G.settings.flash) > 0) {
+        ctx.globalCompositeOperation = 'difference';
+        ctx.fillStyle = '#fff'; ctx.fillRect(-60, -60, G.W + 120, G.H + 120);
+        ctx.globalCompositeOperation = 'source-over';
+      }
+      ctx.fillStyle = '#000';
+      ctx.beginPath();
+      for (const l of m.lines) {
+        ctx.moveTo(x + Math.cos(l.a) * l.r, y + Math.sin(l.a) * l.r);
+        ctx.lineTo(x + Math.cos(l.a - l.w) * far, y + Math.sin(l.a - l.w) * far);
+        ctx.lineTo(x + Math.cos(l.a + l.w) * far, y + Math.sin(l.a + l.w) * far);
+        ctx.closePath();
+      }
+      ctx.fill();
+    }
   };
 })();

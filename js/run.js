@@ -8,7 +8,7 @@
   // ------------------------------------------------------------------ heroes
   // combo: three steps of { dmg, cd (time to the next swing), dur, wind (wind-up), act (active time) }.
   // chain: how many swings make a chain (the last is the finisher, combo[2]); 3 unless given.
-  // heavy: the maul's own rules (a sweep on both sides, a smash that can be charged, more weight in every step).
+  // heavy: the maul's own rules (a wide sweep, a smash that can be charged, more weight in every step).
   // how: what each button does for this hero, for the Moves page.
   // hp is added to the difficulty's health; reach, thick and poise scale melee reach, arc width and stagger.
   G.HEROES = [
@@ -28,7 +28,7 @@
         attack: 'Sword. Two quick cuts (9, 11), then a finisher (24). Hold the button to keep cutting.',
         aim: 'Hold up to cut overhead. In the air, hold down to strike below and bounce off what you hit, getting your jump and dash back.',
         dash: 'A cut thrown straight out of a dash becomes a thrust: 40% more damage and a longer reach.',
-        special: 'Star Lance: a piercing shot of 42 that crosses the arena. Aim with the mouse, or hold a direction.',
+        special: 'Star Lance: she draws back and throws a piercing lance of 42 that crosses the arena. Aim with the mouse, or hold a direction. Dash during the throw and it flies at once; get hit first and the Starlight comes back.',
         ult: 'Thousand Stars: you vanish and cut from every side, eight times for 20 and once for 80.',
       },
     },
@@ -43,9 +43,9 @@
       ],
       down: 15, special: 'starfall', specialName: 'Starfall', verb: 'starfall',
       blurb: 'Slow, heavy and hard to kill. Every swing counts.',
-      lines: ['Maul: a sweep that hits on both sides, then a smash you can hold to charge', 'Starfall: slam down for a blast around you, passing through attacks as you fall', 'One more health; she cannot be knocked back while charging'],
+      lines: ['Maul: a wide sweep, then a smash you can hold to charge', 'Starfall: slam down for a blast around you, passing through attacks as you fall', 'One more health; she cannot be knocked back while charging'],
       how: {
-        attack: 'Maul. A sweep that hits on both sides of you (20), then a smash that shakes the ground (40). Keep the button held on the smash to charge it, up to double; fully charged it also throws a wave along the floor. While you charge you move slowly, but a blow cannot knock you back or stop you.',
+        attack: 'Maul. A wide sweep in front of you (20), then a smash that shakes the ground (40). Keep the button held on the smash to charge it, up to double; fully charged it also throws a wave along the floor. While you charge you move slowly, but a blow cannot knock you back or stop you.',
         aim: 'Hold up to heave the maul overhead. In the air, hold down to strike below and bounce off what you hit.',
         dash: 'She is slower to start and stop than the others. A sweep thrown straight out of a dash hits 40% harder.',
         special: 'Starfall: a blast of 46 around your feet. In the air you plunge first, passing through attacks until you land.',

@@ -114,6 +114,23 @@ hero (`tools/feel-check.js`).
 
 Not done: touch controls, a colour-blind alternative to red-orange warnings, gamepad rebinding.
 
+## Specials you can see thrown (new in v1.3c)
+
+**Vesper throws the Star Lance.** She rocks back, her near arm draws a lance of light back over her
+shoulder (the sword passes to her other hand for a moment), and then the arm whips through along the
+aim and the lance leaves her hand. The wind-up is 0.09 s (`LANCE_WIND` in `G.PLAYER`); it used to
+fire on the press. A dash during the wind-up throws it at once, so a dodge never eats it; a hit during
+the wind-up cancels it and gives the Starlight back. The lance in flight now has a spearhead.
+
+**The other specials and two plain states have a pose.** Lune pushes the bow out along her aim and
+snaps the string hand back past her ear, with the string still shaking. Aster holds the maul overhead
+through the Starfall plunge and brings it down into the floor when it lands (on the ground the slam
+is immediate). Mending, the hands come together at the chest and the weapon is lowered. Knocked back
+by a hit, the hero leans away with the arms flung out.
+
+The poses are drawing only except for the lance's wind-up. Tests: Warden 37 tests lose 0, the other
+bosses 0 in 158 runs, as Vesper on seed 1.
+
 ## Help, and smoother, sharper drawing (new in v1.3b)
 
 **Help.** The title screen and the pause menu have a Help page in place of How to play. On the left
