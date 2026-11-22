@@ -138,6 +138,11 @@
       tone({ f0: f, f1: f * 1.01, dur: 0.16, vol: 0.085 });
       if (n >= 3) { tone({ f0: f * 1.5, dur: 0.5, vol: 0.06, delay: 0.05 }); tone({ type: 'triangle', f0: f * 2, dur: 0.6, vol: 0.035, delay: 0.1 }); }
     },
+    // something went past close enough to feel: air, and a thin high tick
+    graze() {
+      noise({ dur: 0.1, vol: 0.16, f0: 5200, f1: 1800, q: 1.6 });
+      tone({ type: 'sine', f0: 3100, f1: 2500, dur: 0.07, vol: 0.05 });
+    },
     jump() { tone({ type: 'sine', f0: 320, f1: 560, dur: 0.09, vol: 0.12 }); },
     jump2() {
       tone({ type: 'sine', f0: 480, f1: 880, dur: 0.1, vol: 0.12 });
@@ -371,6 +376,7 @@
     const f = S[name];
     if (!f) return;
     vary = VARY[name] ? Math.pow(2, (Math.random() * 2 - 1) * VARY[name] / 12) : 1;
+    if (opts && opts.pitch) vary *= opts.pitch; // e.g. hits that climb as a run of them goes on
     f(opts || {});
     vary = 1;
   };

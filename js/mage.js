@@ -971,6 +971,7 @@
     ctx.strokeStyle = G.rgba(col, 0.4); ctx.lineWidth = 1.5; ctx.stroke();
 
     ctx.translate(b.x + b.kx + jx, b.y + bob);
+    K.recoil(ctx, b);
     ctx.scale(b.face, 1);
     if (down) ctx.rotate(0.28);
 

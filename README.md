@@ -2,7 +2,7 @@
 
 A side-on boss rush for the browser: four heroes, four three-phase bosses, played as a run of
 ever-harder trials. You pick a hero and a relic before the run and win a boon after each victory.
-Version 1.6d.
+Version 1.7a.
 
 This is an early slice of a planned boss-rush roguelite (short runs, a boon after each boss,
 bosses drawn from a pool). A run meets the four bosses in a shuffled order, then meets them again, harder.
@@ -113,6 +113,29 @@ hero (`tools/feel-check.js`).
 - Settings, Reset progress erases Sunshards, upgrades, trophies and records (it has to be chosen twice).
 
 Not done: touch controls, a colour-blind alternative to red-orange warnings, gamepad rebinding.
+
+## Every second of a fight (new in v1.7a)
+
+A pass over the things that happen all the time, not the big moments. None of it adds brightness.
+
+| When | What is new |
+|---|---|
+| You hit a boss | The Magus, the Veil and the Knight **rock back from the blow about their feet and are pressed down by it**, then spring upright, a little past it and back. The harder the blow, the further. The press is held for the whole of the hit-freeze, so the freeze shows a struck pose instead of a still one. (`K.recoil` in `bosskit.js`.) |
+| You hit a boss | The hero is pressed into the blow for the same instant. |
+| You keep hitting | **Each hit in a run sounds higher than the last**: three quarters of a tone a hit, up to six tones. It drops back after 1.25 s without a hit, or when you are struck. |
+| You swing | **The body goes with the weapon**: it rocks back while the weapon is carried up, drives in behind the cut, and the front foot steps in under it. Aster leans back the whole time she holds a charge. Lune is kicked back a little by each shot. |
+| Something just misses you | **A near miss**: a streak of your light off the side it passed, a thin sound, and a little Flow (2) and Dawnbreak. It needs no dash: walking or jumping clear by a hair does it. Once per attack, and not while you are passing through things anyway. No word for it. |
+| You set off from a standstill | The back foot throws dust and the view is nudged the way you go. |
+| You fall a long way | Thin streaks of the air you came through, above the hero. |
+| You are at close quarters | **The view leans in**, by 2.5% at most, and a little more while the boss is staggered. It eases back out as you part. |
+
+Also in this build, more of the v1.6d rule that nothing whites the picture out: a boss's **blast** is its
+own colour with a hot rim (it was a solid white disc), and a **Clash** crosses in gold with a thin white
+core (it was two white bars).
+
+Measured: the scripted tests are unchanged (Warden 37 lose 0; others lose 5 in 166 runs). Random-input
+fights, four heroes against four bosses through every phase, ran without errors and produced 26 near
+misses between them. Not yet played by a person.
 
 ## Less light, more weight (v1.6d)
 

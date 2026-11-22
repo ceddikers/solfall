@@ -184,6 +184,10 @@
   F.stop = function (t) { G.hitstop = Math.max(G.hitstop || 0, t); };
   F.slow = function (scale, dur) { G.slowScale = scale; G.slowT = dur; };
   F.punch = function (z) { F.zoom = Math.max(F.zoom, z); };
+  // How far the view is pushed in right now: the punch of a blow, on top of a slow lean-in while
+  // hero and boss are at close quarters (set in game.js).
+  F.zoomBase = 0;
+  F.zoomNow = () => 1 + F.zoom + F.zoomBase;
   // Knock the view about (dx, dy) pixels; it springs back. Unlike shake, it has a direction.
   F.kick = function (dx, dy) {
     F.kvx = G.clamp(F.kvx + dx * 60, -1100, 1100); F.kvy = G.clamp(F.kvy + dy * 60, -1100, 1100);
@@ -502,7 +506,7 @@
   // picture is drawn again a little larger about the ring's centre, so everything behind it bends.
   F.drawRipples = function (ctx, canvas, k) {
     if (!F.ripples.length) return;
-    const z = 1 + F.zoom;
+    const z = F.zoomNow();
     ctx.save();
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';

@@ -39,7 +39,8 @@
   G.slick = 0; // how frozen the floor is (the Magus's second phase)
 
   const _box = { cx: 0, cy: 0, hw: 11, hh: 21 };
-  P.box = function () { _box.cx = P.x; _box.cy = P.y - 22; return _box; };
+  // (P.pad swells the box for an instant when a hazard asks whether it only just missed: see H.update and P.graze)
+  P.box = function () { _box.cx = P.x; _box.cy = P.y - 22; _box.hw = 11 + (P.pad || 0); _box.hh = 21 + (P.pad || 0); return _box; };
 
   P.reset = function () {
     H = G.hero(); STAR = H.col; HOT = H.hot;
@@ -71,6 +72,7 @@
       recov: null, // how the weapon comes back to rest after the last attack (see recoverPose)
       // Eos: the stance she is holding, the Focus gathered in it, the draw carrying her, and the cuts made but not yet landed
       hold: null, focus: 0, drawT: 0, drawV: null, owed: [], arc2: null, hush: null,
+      pad: 0, grazeCd: 0, streakN: 0, streakT: 0, fallT: 0,
       rig: {}, // pose memory for drawing (see drawBody)
       scarf: [], ghosts: [], slashes: [], bolts: [],
       stats: { dmg: 0, hits: 0, perfect: 0, heals: 0, lances: 0 },
@@ -138,6 +140,8 @@
 
     P.inv = Math.max(0, P.inv - dt);
     P.iframes = Math.max(0, P.iframes - dt);
+    P.grazeCd = Math.max(0, P.grazeCd - dt);
+    P.streakT = Math.max(0, P.streakT - dt);
     P.dashCd = Math.max(0, P.dashCd - dt);
     P.atkCd = Math.max(0, P.atkCd - dt);
     // a dash does not use up the combo window, so you can dodge and still land the finisher
@@ -378,6 +382,19 @@
       if (P.plat) G.arena.bob(P.plat, 30 + 50 * k);
     }
     if (P.onGround && Math.abs(P.vx) > 40) P.runT += dt * Math.abs(P.vx) * 0.055;
+    // setting off from a standstill, the back foot throws dust
+    if (ctl && P.onGround && P.dashT <= 0 && P.stun <= 0 && Math.abs(P.vx) < 70 && ((I.pressed.left && mx < 0) || (I.pressed.right && mx > 0))) {
+      G.fx.dust(P.x - mx * 6, P.y, 3, { dir: -mx, speed: [50, 200], size: [4, 9], up: 30, a: 0.34 });
+      G.fx.kick(mx * 1.2, 0);
+    }
+    // a long fall leaves the air it came through: thin streaks above the hero
+    if (!P.onGround && P.vy > 780 && !P.plunge && P.dashT <= 0) {
+      P.fallT -= dt;
+      if (P.fallT <= 0) {
+        P.fallT = 0.028;
+        G.fx.spawn({ kind: 'spark', x: P.x + G.rand(-12, 12), y: P.y - G.rand(30, 64), vx: 0, vy: -P.vy * 0.45, life: G.rand(0.1, 0.2), size: G.rand(1, 1.8), color: STAR, len: 0.06 });
+      }
+    }
     // footfalls: a puff and a soft step each time a foot comes down
     const stepN = Math.floor(P.runT / Math.PI);
     if (stepN !== P.stepN) {
@@ -676,7 +693,8 @@
             G.fx.ring(c.x, c.y, { r0: 8, r1: 92, life: 0.28, color: GOLD, width: 6 });
             G.fx.burst(c.x, c.y, { n: 8, color: GOLD, speed: [160, 620], life: [0.15, 0.45], kind: 'spark', size: [2.5, 4.5] });
           }
-          G.audio.play(a.heavy ? 'hitHeavy' : 'hit');
+          G.audio.play(a.heavy ? 'hitHeavy' : 'hit', { pitch: hitPitch() });
+          P.squash = Math.min(P.squash, a.heavy ? -0.1 : -0.05); // pressed into the blow for the length of the freeze
           struck(t, c.x, c.y);
           G.moments.landed(em, c.x, c.y, swingAng(a), a.heavy || a.thrust);
         } else {
@@ -1022,7 +1040,7 @@
         G.fx.burst(x, y, { n: 12, color: GOLD, speed: [200, 760], life: [0.15, 0.5], kind: 'spark', size: [2.5, 4.5] });
         G.audio.play('slam');
       }
-      G.audio.play(lvl >= 2 ? 'hitHeavy' : 'hit');
+      G.audio.play(lvl >= 2 ? 'hitHeavy' : 'hit', { pitch: hitPitch() });
       if (counter) counterLand(x, y, o);
       struck(t, x, y);
       G.moments.landed(em, x, y, o.ang, o.heavy);
@@ -1076,6 +1094,30 @@
     P.vx -= c.dx * 160;
     G.audio.play('draw'); G.audio.play('flare');
     muzzle(c.dx, c.dy);
+  }
+
+  // A near miss. Something went by close enough to feel and did not touch: a streak of the hero's
+  // light off the side it passed, a thin sound, and a little Flow. No word for it.
+  P.canGraze = () => !P.dead && !P.hidden && !P.ulting && P.iframes <= 0 && P.inv <= 0 && P.stun <= 0 && P.grazeCd <= 0;
+  P.graze = function (h) {
+    P.grazeCd = 0.3;
+    const hx = h.srcX != null ? h.srcX : h.x != null ? h.x : P.x + P.facing * 40, hy = h.y != null ? h.y : P.y - 22;
+    const ang = Math.atan2(hy - (P.y - 22), hx - P.x), cx = P.x + Math.cos(ang) * 16, cy = P.y - 22 + Math.sin(ang) * 20;
+    G.audio.play('graze');
+    G.flow.add(2); P.ult = Math.min(100, P.ult + 0.6);
+    G.fx.glint(cx, cy, 15, HOT, 0.16);
+    G.fx.burst(cx, cy, { n: 6, color: STAR, kind: 'spark', angle: ang + Math.PI / 2, spread: 0.5, speed: [260, 620], life: [0.1, 0.22], size: [1.3, 2.2] });
+    G.fx.burst(cx, cy, { n: 6, color: HOT, kind: 'spark', angle: ang - Math.PI / 2, spread: 0.5, speed: [260, 620], life: [0.1, 0.22], size: [1.3, 2.2] });
+    G.fx.ring(P.x, P.y - 22, { r0: 26, r1: 40, life: 0.18, color: STAR, width: 1.5, alpha: 0.5 });
+    G.feats.bump && G.feats.bump('graze');
+  };
+
+  // Hits that keep coming climb in pitch: three quarters of a tone a hit, up to six tones, and
+  // back to the bottom after a second and a bit without one or when the hero is struck.
+  function hitPitch() {
+    P.streakN = P.streakT > 0 ? Math.min(8, P.streakN + 1) : 0;
+    P.streakT = 1.25;
+    return Math.pow(2, P.streakN * 0.75 / 12);
   }
 
   // An attack connected while the player was dashing (or plunging) through it.
@@ -1142,6 +1184,7 @@
     const dir = G.sign(P.x - srcX) || -P.facing;
     P.inv = C.HURT_INV; P.dashT = 0; P.healT = 0; P.hurtFlash = 1; P.plunge = false;
     P.drawT = 0; if (!braced) { P.hold = null; P.focus = 0; } // and whatever Focus Eos had gathered is gone
+    P.streakT = 0;
     if (P.flT > 0) { P.flT = 0; P.flCd = 2; } // caught showing off
     G.feats.bump('hurt');
     if (braced) {
@@ -1216,7 +1259,7 @@
             if (res) {
               P.gain(s.heavy ? C.ARROW_GAIN_HEAVY : C.ARROW_GAIN);
               G.fx.stop(s.heavy ? 0.06 : 0.016); G.fx.shake(s.heavy ? 6 : 1.2);
-              G.audio.play(s.heavy ? 'hitHeavy' : 'hit');
+              G.audio.play(s.heavy ? 'hitHeavy' : 'hit', { pitch: hitPitch() });
               G.fx.hit(s.x, s.y, Math.atan2(s.vy, s.vx), { heavy: s.heavy, power: s.heavy ? 0.8 : 0.75, col: s.heavy ? GOLD : STAR, hot: HOT });
               if (s.heavy) G.fx.ring(s.x, s.y, { r0: 6, r1: 70, life: 0.25, color: GOLD, width: 5 });
               struck(t, s.x, s.y);
@@ -1564,6 +1607,8 @@
       return [[Math.sin(p) * 10.5, -Math.max(0, Math.cos(p)) * 7], [Math.sin(p + Math.PI) * 10.5, -Math.max(0, Math.cos(p + Math.PI)) * 7]];
     }
     if (st.lunge && s.hold && s.focus > 0.12) return [[9.5, 0], [-8.5, 0]]; // set in her stance
+    // a swing on the ground: the front foot steps in under it as it comes down
+    if (s.atk && s.atk.kind !== 'shot' && s.atk.t >= s.atk.a0 * 0.6) { const w = s.atk.heavy ? 5.5 : 3.5; return [[st.stance + w, 0], [-st.stance - 1, 0]]; }
     return [[st.stance, 0], [-st.stance, 0]];
   }
 
@@ -2153,10 +2198,16 @@
     else if (s.stun > 0) leanT = -0.32;
     else if (s.healT > 0) leanT = 0.1;
     else if (h.draw && a && a.kind === 'draw') leanT = 0.5; // thrown forward along the cut
+    else if (a && a.kind === 'shot') leanT = a.swung ? lean0 - 0.11 * Math.max(0, 1 - (a.t - a.a0) / 0.1) : lean0 + 0.04; // the bow kicks her back as it looses
+    else if (a) {
+      // the body goes with the swing: it rocks back as the weapon is carried up, and drives in behind the cut
+      const w = h.heavy ? 1.5 : a.heavy ? 1.3 : 1, wind = a.t < a.a0, dir = a.kind === 'up' ? -0.5 : 1;
+      leanT = lean0 + (wind ? -0.1 * w : (a.thrust ? 0.3 : 0.17 * w) * dir * Math.max(0.35, 1 - Math.max(0, a.t - a.a1) / 0.16));
+    }
     else if (h.draw && s.recov && s.recov.kind === 'noto' && !s.dash) leanT = s.recov.t < s.recov.dur * s.recov.at ? 0.32 : 0.08;
     else if (h.draw && s.hold && s.focus > 0.12 && s.onGround && !s.dash) leanT = 0.2;
     const drawing = !!(a && a.kind === 'draw');
-    const leanNow = ease('lean', leanT, c || drawing ? 45 : 30);
+    const leanNow = ease('lean', leanT, c || drawing ? 45 : a ? 38 : 30);
     ctx.rotate(leanNow);
     // Eos sinks into her stance, lower with each mark, and lowest of all in the lunge after a draw
     let crouchT = 0;

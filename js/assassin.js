@@ -774,6 +774,7 @@
     const body = sh ? '#0a0814' : '#14112a', mid = sh ? '#0e0c1a' : '#262244', plate = sh ? '#131022' : '#3c3668';
     ctx.save();
     ctx.translate(a.x + (a.kx || 0) + (a.jit ? G.rand(-a.jit, a.jit) : 0), a.y);
+    K.recoil(ctx, a);
     ctx.scale(a.face, 1);
     ctx.globalAlpha = alpha;
     ctx.lineJoin = 'round'; ctx.lineCap = 'round';

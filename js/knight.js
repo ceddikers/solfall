@@ -955,6 +955,7 @@
     // nothing shows below the floor while it climbs out of the ground
     if (b.y > FLOOR) { ctx.beginPath(); ctx.rect(-80, -400, G.W + 160, FLOOR + 400); ctx.clip(); }
     ctx.translate(b.x + b.kx + jx, b.y);
+    if (real) K.recoil(ctx, b);
     ctx.scale(sx, 1);
     D.glow(ctx, col, 0, -70, 120, real ? 0.2 : 0.55);
 

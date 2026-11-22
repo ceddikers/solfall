@@ -226,6 +226,14 @@
     if (G.state === 'hub') G.cam.x = G.damp(G.cam.x, G.hub.camTarget(), 5, dt); // the camp is wide: the view follows the hero across it
     else G.cam.x = G.damp(G.cam.x, follow * (P.x - G.W / 2) * 0.026, 3.5, dt);
     G.cam.y = G.damp(G.cam.y, follow * G.clamp((P.y - G.FLOOR) * 0.035, -10, 0), 3.5, dt);
+    // at close quarters the view leans in a little (2.5% at most), and a little more while the boss is down
+    let lean = 0;
+    if (G.state === 'fight' && G.boss.active && !G.boss.dying && !G.boss.dead && !P.dead && !P.hidden) {
+      let d = 1e9;
+      for (const t of G.boss.targets()) d = Math.min(d, Math.hypot(t.cx - P.x, (t.cy - (P.y - 24)) * 0.7) - (t.r || t.hw || 0));
+      lean = 0.025 * G.clamp(1 - (d - 70) / 260, 0, 1) + (G.boss.staggered ? 0.012 : 0);
+    }
+    F.zoomBase = G.damp(F.zoomBase, lean, lean > F.zoomBase ? 2.4 : 1.4, dt);
     if (G.state === 'fight' && G.boss.active && !G.boss.dying && !G.boss.dead) G.time += sdt;
     if (G.state === 'dead') {
       G.deadT += dt;
@@ -253,7 +261,7 @@
     ctx.fillStyle = '#000';
     ctx.fillRect(0, 0, G.W, G.H);
     ctx.save();
-    const z = 1 + F.zoom;
+    const z = F.zoomNow();
     ctx.translate(G.W / 2 + F.shakeX, G.H / 2 + F.shakeY);
     ctx.scale(z, z);
     ctx.translate(-G.W / 2 - G.cam.x, -G.H / 2 - G.cam.y);

@@ -93,6 +93,14 @@
   };
 
   // An aura: streaks of the boss's light torn upward around it, for the moment it changes.
+  // A boss that is struck rocks back from the blow about its feet and is pressed down for an
+  // instant, then springs upright. Called by each boss's draw, right after it moves to its feet.
+  // (The squash is set the moment the blow lands, so it is held for the whole of the hit-freeze.)
+  K.recoil = function (ctx, b) {
+    if (b.rec) ctx.rotate(b.rec);
+    if (b.sq) ctx.scale(1 + b.sq * 0.7, 1 - b.sq);
+  };
+
   K.aura = function (x, y, col, w, h, n) {
     for (let i = 0; i < (n || 3); i++) {
       G.fx.spawn({ kind: 'spark', x: x + G.rand(-w, w), y: y - G.rand(0, h * 0.5), vx: G.rand(-30, 30), vy: -G.rand(500, 1100), life: G.rand(0.18, 0.4), size: G.rand(1.6, 3.4), color: col, len: 0.07 });
@@ -166,6 +174,10 @@
       G.player.stats.dmg += dmg; G.flow.dealt(dmg);
       b.flash = 1;
       b.kx = G.clamp(b.kx + (info.dir || G.sign(b.x - G.player.x) || 1) * (info.lance ? 14 : info.heavy ? 10 : 5), -18, 18);
+      // it rocks away from the blow and is pressed down by it (see K.recoil)
+      const big = info.finisher ? 1.5 : info.lance ? 1.25 : info.heavy ? 1 : 0.45;
+      b.recV = G.clamp((b.recV || 0) + (info.dir || G.sign(b.x - G.player.x) || 1) * 2.4 * big, -5, 5);
+      b.sq = Math.max(b.sq || 0, 0.045 + 0.05 * big);
       if (G.settings.numbers) {
         G.fx.text(info.x + G.rand(-12, 12), info.y - 16, String(dmg), {
           color: (B.staggered || b.exposed || info.finisher) ? '255,226,140' : '255,255,255',
@@ -404,6 +416,12 @@
       const b = B.body, P = G.player;
       b.flash = Math.max(0, b.flash - dt * 6);
       b.kx *= Math.exp(-13 * dt);
+      // the rock is a spring, a little under-damped, so it comes back past upright once and settles
+      b.recV = (b.recV || 0) + (-(b.rec || 0) * 300 - (b.recV || 0) * 17) * dt;
+      b.rec = (b.rec || 0) + b.recV * dt;
+      b.sq = (b.sq || 0) * Math.exp(-15 * dt);
+      if (Math.abs(b.rec) < 0.0005 && Math.abs(b.recV) < 0.01) { b.rec = 0; b.recV = 0; }
+      if (b.sq < 0.002) b.sq = 0;
       if (B.script) {
         if (B.script.next(dt).done) B.script = null;
       }

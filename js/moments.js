@@ -143,7 +143,7 @@
         G.audio.play('clash');
         F.text(mx, my - 60, 'CLASH', { color: '255,255,255', size: 30, life: 1 });
         F.stop(0.17); F.slow(0.35, 0.35); F.shake(15); F.punch(0.04); F.flash('255,255,255', 0.3, 0.25);
-        F.cut(mx, my, 0.8, 520, 16, '255,255,255', GOLD, 0.34); F.cut(mx, my, -0.8, 520, 16, '255,255,255', GOLD, 0.34);
+        F.cut(mx, my, 0.8, 520, 11, GOLD, '255,255,255', 0.34); F.cut(mx, my, -0.8, 520, 11, GOLD, '255,255,255', 0.34);
         F.burst(mx, my, { n: 34, color: GOLD, speed: [200, 900], life: [0.2, 0.6], kind: 'spark', size: [2, 4.5], grav: 600 });
         F.lines(mx, my, 16, '255,255,255', { r0: 20 });
         F.ring(mx, my, { r0: 10, r1: 240, life: 0.4, color: '255,255,255', width: 8 });

@@ -38,6 +38,12 @@
       if (!h.dead && canHurt && h.hits && h.hits(P)) {
         const hurt = P.tryHit(h.dmg, h.srcX != null ? h.srcX : (h.x != null ? h.x : P.x), h);
         if (hurt && h.once && h.pop) h.pop();
+      } else if (!h.dead && canHurt && h.hits && !h.grazed && P.canGraze()) {
+        // a near miss: it did not touch the hero, but it would have touched someone a little bigger
+        P.pad = 15;
+        const near = h.hits(P);
+        P.pad = 0;
+        if (near) { h.grazed = true; P.graze(h); }
       }
     }
     let w = 0;
@@ -318,9 +324,15 @@
       },
       draw(ctx) {
         if (this.fired) {
+          // (v1.7a: the blast is the boss's colour with a hot rim and a small hot heart; it used to be a solid white disc)
+          const P = pal(this);
           ctx.globalCompositeOperation = 'lighter';
-          ctx.fillStyle = G.rgba(pal(this).hot, 0.75);
+          ctx.fillStyle = G.rgba(P.boss, 0.36);
           ctx.beginPath(); ctx.arc(this.x, this.y, this.r, 0, G.TAU); ctx.fill();
+          ctx.fillStyle = G.rgba(P.hot, 0.34);
+          ctx.beginPath(); ctx.arc(this.x, this.y, this.r * 0.4, 0, G.TAU); ctx.fill();
+          ctx.strokeStyle = G.rgba(P.hot, 0.85); ctx.lineWidth = 5;
+          ctx.beginPath(); ctx.arc(this.x, this.y, this.r - 2.5, 0, G.TAU); ctx.stroke();
           ctx.globalCompositeOperation = 'source-over';
           return;
         }
