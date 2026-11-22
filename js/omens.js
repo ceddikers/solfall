@@ -23,6 +23,7 @@
   R.rollOmens = function () {
     const forced = G.debug.omen;
     if (forced) { R.omens = String(forced).split(',').filter((id) => byId[id]); }
+    else if (G.practice) { R.omens = []; }
     else {
       const n = R.trial >= 6 ? 2 : R.trial >= 2 ? 1 : 0;
       // never the same omen two trials running

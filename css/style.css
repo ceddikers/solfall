@@ -190,7 +190,7 @@ kbd {
   position: absolute; inset: 0;
   background: linear-gradient(180deg, rgba(4, 3, 10, 0.3) 0%, rgba(4, 3, 10, 0.12) 34%, rgba(4, 3, 10, 0.8) 66%, rgba(4, 3, 10, 0.96) 100%);
 }
-.titleblock { position: absolute; left: 0; right: 0; top: 298px; text-align: center; }
+.titleblock { position: absolute; left: 0; right: 0; top: 356px; text-align: center; }
 .titleblock h1 {
   margin: 0; font: 400 88px/1.08 var(--display); letter-spacing: 0.4em; padding-left: 0.4em;
   background: linear-gradient(180deg, #fff 18%, #ffd9a0 58%, #ff9a4a 100%);
@@ -399,3 +399,23 @@ ul.tips b { color: var(--ink); font-weight: 600; }
 @keyframes bought { 0% { background: rgba(255, 214, 140, 0.3); } 100% { background: transparent; } }
 .stats .n.gold { color: var(--gold); }
 #winCards .card { min-width: 0; }
+
+/* ---------------------------------------------------------------- v1.0a: camp HUD, controls, tighter How to play */
+#hud.camp #bhud, #hud.camp #timer, #hud.camp #flow, #hud.camp #omen, #hud.camp #hp, #hud.camp #mend, #hud.camp #boons, #hud.camp #card, #hud.camp #callout { display: none; }
+#hud.camp #hint { top: 96px; }
+.item.kv { display: flex; align-items: center; gap: 18px; padding: 5px 34px; font-size: 16px; }
+.item.kv .k { flex: 1; text-align: left; }
+.item.kv .v { min-width: 200px; text-align: right; color: var(--gold); letter-spacing: 0.12em; }
+.item.kv.wait .v { color: #fff; animation: lowpulse 0.8s ease-in-out infinite; }
+.panel.keys { width: 620px; padding-top: 26px; padding-bottom: 20px; }
+.panel.keys h2 { margin-bottom: 8px; }
+.panel.keys .lead { text-align: center; margin-bottom: 12px; font-size: 13px; }
+.panel.narrow .lead, .panel.narrow .over { text-align: center; }
+.panel.narrow .lead { margin-bottom: 14px; font-size: 13px; line-height: 1.5; }
+.panel.wide { padding-top: 26px; padding-bottom: 20px; }
+.panel.wide h2 { margin-bottom: 14px; }
+.panel.wide ul.tips { font-size: 13.5px; line-height: 1.42; }
+.panel.wide ul.tips li { margin-bottom: 8px; }
+.panel.wide table.keys td { padding: 5px 0; }
+.panel.wide nav.row { margin-top: 12px; }
+#s-settings .panel nav .item { padding-top: 6px; padding-bottom: 6px; }

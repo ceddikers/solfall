@@ -45,13 +45,25 @@
     G.startFight();
   };
   // After a fall: same hero, straight back to the gate for a fresh choice of relics.
-  G.newRun = function () { G.toHub('gate'); G.openGate(); };
+  G.newRun = function () {
+    if (G.practice) { G.startPractice(G.practice.phase, G.practice.boss); return; } // R in a practice fight tries it again
+    G.toHub('gate'); G.openGate();
+  };
+  // Practice: one boss, from the phase you choose. No relic, no omens, no rewards, nothing lost.
+  G.practice = null;
+  G.startPractice = function (phase, boss) {
+    const pick = boss || (G.BOSS_IDS.includes(G.settings.firstFoe) ? G.settings.firstFoe : G.pick(G.BOSS_IDS));
+    G.practice = { boss: pick, phase, left: phase - 1 };
+    G.run.reset();
+    G.startFight();
+  };
   // The gate in the camp: choose a relic, then the first trial.
-  G.openGate = function () { G.run.reset(); G.ui.showRelics(G.run.rollRelics()); };
+  G.openGate = function () { G.practice = null; G.run.reset(); G.ui.showRelics(G.run.rollRelics()); };
 
   // The Vigil: the camp between runs, where the hero walks about (see hub.js).
   // where: 'fire' (coming from the title) or 'gate' (coming back from a run).
   G.toHub = function (where) {
+    G.practice = null;
     G.run.reset();
     G.setBoss('dummy');
     G.arena.reset(); G.hazards.clear(); F.reset();
@@ -60,7 +72,8 @@
     G.cam.x = G.hub.camTarget(); G.cam.y = 0; // the view starts on the hero, it does not slide there
     G.player.ember = G.PLAYER.SEG * G.player.segs; // the special can be tried freely here
     G.state = 'hub'; G.paused = false; G.hitstop = 0; G.slowT = 0;
-    G.ui.resetHud(); G.ui.hud(false); G.ui.close(); G.ui.buildRun();
+    G.ui.resetHud(); G.ui.close(); G.ui.buildHp(G.player.maxHp); G.ui.buildRun(); G.ui.hud(true, true);
+    if (where === 'fire') G.ui.campHint();
     G.ui.fade(); G.ui.mood('fight');
     G.audio.init(); G.audio.startMusic(); G.audio.setIntensity(0); G.audio.duck(1);
     G.input.endStep();
@@ -73,7 +86,7 @@
 
   G.startFight = function () {
     G.seed((Date.now() ^ (Math.random() * 1e9)) >>> 0);
-    G.setBoss(G.debug.boss || G.run.foe());
+    G.setBoss(G.debug.boss || (G.practice ? G.practice.boss : G.run.foe()));
     G.cam.x = 0; G.cam.y = 0; // the camp scrolls; an arena does not
     G.run.rollOmens(); // before the boss works out its health
     G.arena.reset(); G.hazards.clear(); F.reset();
@@ -87,6 +100,7 @@
   };
 
   G.toTitle = function () {
+    G.practice = null;
     G.run.reset();
     G.cam.x = 0; G.cam.y = 0;
     G.setBoss('warden');
@@ -177,6 +191,11 @@
     G.hazards.update(bdt);
     G.omens.update(sdt);
     G.flow.update(sdt);
+    // a practice fight that starts in a later phase: push the boss there as soon as it can be hit
+    if (G.practice && G.practice.left > 0 && G.state === 'fight') {
+      const B = G.boss;
+      if (B.active && !B.invuln && !B.dying && B.phase === G.practice.phase - G.practice.left) { G.practice.left--; G.debug.nextPhase(); }
+    }
     G.moments.update(sdt);
     G.updateShots(sdt);
     F.update(sdt);
@@ -193,7 +212,14 @@
     }
     if (G.state === 'won') {
       G.wonT += dt;
-      if (G.wonT > 1.4 && !G.endShown) { G.endShown = true; G.audio.setIntensity(0); G.audio.duck(0.9); G.ui.showWin(result()); }
+      if (G.wonT > 1.4 && !G.endShown) {
+        G.endShown = true; G.audio.setIntensity(0); G.audio.duck(0.9);
+        if (G.practice) {
+          // a practice win goes straight back to the ring it started from
+          const t = G.time, name = G.boss.short;
+          G.toHub('ring'); G.hub.say(name + ' beaten in ' + G.ui.fmtTime(t));
+        } else G.ui.showWin(result());
+      }
     }
   }
   G.step = step;

@@ -2,8 +2,15 @@
 // relics that the first victory over each boss adds to the relic pool. Kept in the browser's storage.
 'use strict';
 (function () {
-  const M = G.meta = Object.assign({ shards: 0, earned: 0, up: {}, kills: {}, runs: 0 }, G.store.load('meta', {}));
-  const save = () => G.store.save('meta', { shards: M.shards, earned: M.earned, up: M.up, kills: M.kills, runs: M.runs });
+  const M = G.meta = Object.assign({ shards: 0, earned: 0, up: {}, kills: {}, runs: 0, best: {} }, G.store.load('meta', {}));
+  const save = () => G.store.save('meta', { shards: M.shards, earned: M.earned, up: M.up, kills: M.kills, runs: M.runs, best: M.best });
+  // Erase everything that lasts between runs (Settings, Reset progress).
+  M.reset = function () {
+    M.shards = 0; M.earned = 0; M.up = {}; M.kills = {}; M.runs = 0; M.best = {};
+    save(); G.store.save('best', {}); G.store.save('depth', {});
+  };
+  // Fastest first-trial win against a boss on the current difficulty, in seconds (or undefined).
+  M.bestTime = (bossId) => (M.best[bossId] || {})[G.settings.difficulty];
   M.save = save;
 
   // ------------------------------------------------------------------ the Shrine
@@ -45,15 +52,20 @@
 
   // ------------------------------------------------------------------ Sunshards
   // Tests and god mode earn nothing (G.debug.meta = true forces it, for checking this file).
-  const earning = () => G.debug.meta || !(G.debug.freeze || G.debug.god);
+  const earning = () => !G.practice && (G.debug.meta || !(G.debug.freeze || G.debug.god));
   const GRADE = { S: 1.5, A: 1.25, B: 1.1, C: 1 }, DIFF = [0.75, 1, 1.4];
   const base = () => 12 + 5 * (G.run.trial - 1);
   const scale = () => (DIFF[G.settings.difficulty] || 1) * (1 + 0.1 * G.up('fortune')) * (1 + 0.25 * G.run.omens.length);
 
   // A boss fell. Returns what was earned, for the victory screen.
   M.onVictory = function (grade, bossId) {
-    const out = { shards: 0, first: false, relic: null, lines: [] };
+    const out = { shards: 0, first: false, relic: null, lines: [], record: 0 };
     if (!earning()) return out;
+    // the fastest first-trial win against each boss is kept, per difficulty
+    if (G.run.trial === 1) {
+      const d = G.settings.difficulty, t = Math.round(G.time * 10) / 10, b = M.best[bossId] = M.best[bossId] || {};
+      if (!b[d] || t < b[d]) { b[d] = t; out.record = t; }
+    }
     let n = base() * (GRADE[grade] || 1);
     const rank = G.flow.peak;
     if (rank > 0) { n += 2 * rank; out.lines.push('Flow ' + G.flow.RANKS[rank].name + ' +' + 2 * rank); }

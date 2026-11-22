@@ -8,6 +8,7 @@
   const OPTS = {
     difficulty: { values: [0, 1, 2], label: (v) => G.DIFFS[v].name },
     shake: { values: [0, 0.5, 1], label: (v) => (v === 0 ? 'Off' : v === 0.5 ? 'Half' : 'Full') },
+    flash: { values: [0, 0.4, 1], label: (v) => (v === 0 ? 'Off' : v === 0.4 ? 'Reduced' : 'Full') },
     numbers: { values: [false, true], label: (v) => (v ? 'On' : 'Off') },
     hints: { values: [false, true], label: (v) => (v ? 'On' : 'Off') },
     firstFoe: { values: ['random', 'warden', 'mage', 'assassin', 'knight'], label: (v) => (G.bosses[v] ? G.bosses[v].short : 'Random') },
@@ -40,7 +41,7 @@
       'hint', 'lowhp', 'lbTop', 'lbBot', 'diffNote', 'bestLine', 'ver', 'deadLead', 'deadFill', 'deadStats',
       'pauseBoons', 'boons', 'trial', 'winOver', 'winPick', 'winCards', 'heroName', 'heroCards', 'relicCards', 'relicOver',
       'deadTip', 'winStats', 'winBest', 'gradeLetter', 'gradeTitle', 'gradeSub', 'stage',
-      'ult', 'ultFill', 'ultKey', 'flow', 'flowRank', 'flowFill', 'omen', 'shardCount', 'shrineLead', 'shrineList', 'shrineTrophies', 'rerollItem']) el[id] = $(id);
+      'practiceOver', 'keyList', 'resetItem', 'ult', 'ultFill', 'ultKey', 'flow', 'flowRank', 'flowFill', 'omen', 'shardCount', 'shrineLead', 'shrineList', 'shrineTrophies', 'rerollItem']) el[id] = $(id);
     el.segs = Array.from(document.querySelectorAll('#ember .seg'));
     el.bbar = document.querySelector('.bbar');
     el.bname = document.getElementById('bname');
@@ -137,6 +138,11 @@
     else if (name === 'back') U.back();
     else if (name === 'resume') G.resume();
     else if (name === 'quit') G.toTitle();
+    else if (/^practice\d$/.test(name)) G.startPractice(Number(name.slice(8)));
+    else if (name === 'controls') U.showKeys();
+    else if (/^key-/.test(name)) capture(name.slice(4));
+    else if (name === 'keyreset') { G.input.resetKeys(); U.fillKeys(); }
+    else if (name === 'reset') resetProgress();
     else if (name === 'fullscreen') {
       if (document.fullscreenElement) document.exitFullscreen();
       else if (document.documentElement.requestFullscreen) document.documentElement.requestFullscreen().catch(() => { });
@@ -216,6 +222,45 @@
       + (got.length ? ': ' + got.map((t) => t.name).join(', ') + '.' : '. The first victory over each boss adds its relic to those you can be offered.');
   };
   U.showShrine = function () { U.fillShrine(); U.show('shrine', true); };
+  // ---- the proving ring: practise against one boss, from any phase
+  U.showPractice = function () {
+    const f = G.settings.firstFoe;
+    el.practiceOver.textContent = G.bosses[f] && f !== 'dummy' ? G.bosses[f].short : 'A foe at random';
+    U.show('practice', true);
+  };
+  // ---- Settings, Controls: choose a row, then press the key it should use
+  const ACTIONS = { left: 'Move left', right: 'Move right', up: 'Aim up', down: 'Aim down, drop', jump: 'Jump', attack: 'Attack', dash: 'Dash', flare: 'Special', heal: 'Mend, use', ult: 'Dawnbreak' };
+  U.fillKeys = function () {
+    Array.from(el.keyList.children).forEach((row) => {
+      const a = (row.dataset.act || '').slice(4);
+      if (!ACTIONS[a]) return;
+      row.querySelector('.k').textContent = ACTIONS[a];
+      row.querySelector('.v').textContent = U.capturing === a ? 'press a key\u2026' : G.input.keys(a).join('  ');
+      row.classList.toggle('wait', U.capturing === a);
+    });
+  };
+  U.showKeys = function () { U.capturing = null; U.fillKeys(); U.show('keys', true); };
+  function capture(action) {
+    if (U.capturing) return;
+    U.capturing = action; U.fillKeys();
+    // the input layer hands the next key press here and does nothing else with it
+    G.input.grab = (code) => {
+      U.capturing = null;
+      if (code !== 'Escape') G.audio.play(G.input.bind(action, code) ? 'uiSelect' : 'empty');
+      U.fillKeys(); U.buildPrompts();
+    };
+  }
+  // Erase Sunshards, upgrades, trophies and records. It has to be chosen twice.
+  let armed = 0;
+  function resetProgress() {
+    if (performance.now() - armed < 4000) {
+      armed = 0; G.meta.reset(); G.audio.play('shatter');
+      U.refresh();
+      el.resetItem.textContent = 'Progress erased';
+    } else { armed = performance.now(); el.resetItem.textContent = 'Choose again to erase everything'; G.audio.play('empty'); }
+  }
+  // Key names shown in prompts follow the bindings.
+  U.buildPrompts = function () { H.mend = null; if (el.ultKey) el.ultKey.innerHTML = G.input.device === 'gamepad' ? '<kbd>RT</kbd>' : '<kbd>' + G.input.label('ult') + '</kbd>'; };
   function buy(i) {
     if (G.meta.buy(i)) {
       G.audio.play('segment');
@@ -240,8 +285,10 @@
       ? G.diff().name + ': deepest trial ' + G.roman(depth) + (best ? ' \u00b7 fastest first trial ' + U.fmtTime(best.time) + ' (' + best.grade + ')' : '')
       : 'No victory on ' + G.diff().name + ' yet';
     const held = G.run.held(), relic = G.relicDef(G.run.relic);
-    el.pauseBoons.innerHTML = (held.length || relic)
-      ? '<h3>' + G.hero().name + '\u2019s run</h3>'
+    el.resetItem.textContent = 'Reset progress';
+    const omens = G.run.omens.map((id) => '<p><b>Omen: ' + G.omenDef(id).name + '</b> ' + G.omenDef(id).desc + '</p>').join('');
+    el.pauseBoons.innerHTML = (held.length || relic || omens)
+      ? '<h3>' + G.hero().name + '\u2019s run</h3>' + omens
         + (relic ? '<p><b>' + relic.name + '</b> ' + relic.desc + '</p>' : '')
         + held.map((h) => '<p><b>' + h.def.name + (h.n > 1 ? ' \u00d7' + h.n : '') + '</b> ' + h.def.desc + '</p>').join('')
       : '';
@@ -250,7 +297,8 @@
   // ------------------------------------------------------------------ in-fight display
   const H = { hp: -1, max: -1, ember: -1, full: -1, fill: -1, chip: 1, chipShown: -1, poise: -1, timer: '', phase: 0, low: null, mend: null, broken: null, introK: 1, introDelay: 0, hintT: 0, hitT: 0, lastHp: 0 };
 
-  U.hud = function (on) { el.hud.classList.toggle('off', !on); };
+  // camp: only the hero's name, Starlight and Dawnbreak, with no boss, timer or Flow.
+  U.hud = function (on, camp) { el.hud.classList.toggle('off', !on); el.hud.classList.toggle('camp', !!camp); };
 
   function retrigger(node, cls) {
     node.classList.remove(cls);
@@ -271,9 +319,9 @@
   // Trial label, boon list and Starlight segments for the fight that is starting.
   U.buildRun = function () {
     const R = G.run;
-    el.trial.textContent = R.trial > 1 ? 'Trial ' + G.roman(R.trial) : '';
+    el.trial.textContent = G.practice ? 'Practice' : R.trial > 1 ? 'Trial ' + G.roman(R.trial) : '';
     el.omen.innerHTML = R.omens.map((id) => '<b>Omen \u00b7 ' + G.omenDef(id).name + '</b>' + G.omenDef(id).desc).join('');
-    el.ultKey.innerHTML = G.input.device === 'gamepad' ? '<kbd>RT</kbd>' : '<kbd>Q</kbd>';
+    U.buildPrompts();
     H.ult = -1; H.ready = null; H.frank = -1; H.ffill = -1;
     const hero = G.hero(), relic = G.relicDef(R.relic);
     el.heroName.textContent = hero.name.toUpperCase();
@@ -320,12 +368,20 @@
     H.hintT = 3.6;
   };
   // A controls reminder over the boss's entrance, for the first two fights of a session.
+  // A welcome over the camp, the first time you arrive in a session.
+  U.campHint = function () {
+    if (!G.settings.hints || U.campSeen) return;
+    U.campSeen = true;
+    el.hint.innerHTML = 'Welcome to the Vigil. Try your moves on the <b>sparring post</b>, then walk right to <b>the gate</b> to begin a run.';
+    el.hint.classList.add('show', 'calm');
+    H.hintT = 9;
+  };
   U.keysHint = function () {
     U.fights = (U.fights || 0) + 1;
     if (!G.settings.hints || U.fights > 2) return;
     el.hint.innerHTML = G.input.device === 'gamepad'
       ? 'Stick move &middot; <b>A</b> jump &middot; <b>X</b> attack &middot; <b>B</b> dash &middot; <b>Y</b> special &middot; hold <b>LB</b> mend &middot; <b>RT</b> Dawnbreak'
-      : '<kbd>A</kbd><kbd>D</kbd> move &middot; <kbd>Space</kbd> jump &middot; <kbd>J</kbd> or click attack &middot; <kbd>K</kbd> dash &middot; <kbd>L</kbd> or right click special &middot; hold <kbd>E</kbd> mend &middot; <kbd>Q</kbd> Dawnbreak';
+      : (() => { const k = (a) => '<kbd>' + G.input.label(a) + '</kbd>'; return k('left') + k('right') + ' move &middot; ' + k('jump') + ' jump &middot; ' + k('attack') + ' or click attack &middot; ' + k('dash') + ' dash &middot; ' + k('flare') + ' or right click special &middot; hold ' + k('heal') + ' mend &middot; ' + k('ult') + ' Dawnbreak'; })();
     el.hint.classList.add('show', 'calm');
     H.hintT = 7;
   };
@@ -392,7 +448,7 @@
       el.mend.classList.toggle('on', ready);
       if (ready) {
         const pad = G.input.device === 'gamepad';
-        el.mend.innerHTML = (pad ? '<kbd>Y</kbd>' : '<kbd>L</kbd> or right click') + ' ' + G.hero().verb
+        el.mend.innerHTML = (pad ? '<kbd>Y</kbd>' : '<kbd>' + G.input.label('flare') + '</kbd> or right click') + ' ' + G.hero().verb
           + (P.hp < P.maxHp ? ' &middot; hold ' + (pad ? '<kbd>LB</kbd>' : '<kbd>E</kbd>') + ' to mend' : '');
       }
     }
@@ -447,10 +503,21 @@
     return rows.map((r) => '<div><span class="n">' + r[0] + '</span><span class="l">' + r[1] + '</span></div>').join('');
   }
 
+  // What landed the last blow, in words: the boss's attack by name, or the omen that did it.
+  function felledBy(P, B) {
+    const h = P.lastHit || {}, omen = { zone: 'storm', meteor: 'embers', orb: 'hunted' }[h.kind];
+    if (h.attack) {
+      const name = h.attack === 'reckoning' ? (B.reckonName || 'Reckoning').toLowerCase() : h.attack.replace(/\d+$/, '').replace(/([A-Z])/g, ' $1').toLowerCase();
+      return 'The last blow was its ' + name + '.';
+    }
+    if (omen && G.omen(omen)) return 'The last blow came from the omen, ' + G.omenDef(omen).name + '.';
+    return '';
+  }
+
   U.showDead = function () {
     const P = G.player, B = G.boss;
     const pct = Math.max(1, Math.ceil(B.hp / B.maxHp * 100));
-    el.deadLead.textContent = 'You fell in trial ' + G.roman(G.run.trial) + '. ' + B.short + ' endured with ' + pct + '% of its strength, in phase ' + ROMAN[B.phase] + '.';
+    el.deadLead.textContent = (G.practice ? 'Practice. ' : 'You fell in trial ' + G.roman(G.run.trial) + '. ') + felledBy(P, B) + ' ' + B.short + ' endured with ' + pct + '% of its strength, in phase ' + ROMAN[B.phase] + '.';
     el.deadFill.style.transition = 'none';
     el.deadFill.style.width = '100%';
     void el.deadFill.offsetWidth;
@@ -464,6 +531,7 @@
     ]);
     el.deadStats.lastElementChild.firstElementChild.classList.add('gold');
     el.deadTip.textContent = G.pick(TIPS.concat(B.tips || [], B.tips || []));
+    document.querySelector('#s-dead [data-act=retry]').innerHTML = (G.practice ? 'Try again' : 'New run') + ' <kbd>R</kbd>';
     U.hud(false);
     U.lockUntil = performance.now() + 500;
     U.show('dead');
@@ -483,6 +551,7 @@
     el.winStats.lastElementChild.firstElementChild.classList.add('gold');
     el.winOver.textContent = 'Victory \u00b7 trial ' + G.roman(res.trial);
     el.winBest.textContent = res.meta.relic ? 'Trophy won: ' + res.meta.relic.name + ' joins the relics you can be offered.'
+      : res.meta.record ? 'Your fastest win against ' + G.boss.short + ' on ' + G.diff().name + ': ' + U.fmtTime(res.meta.record) + '.'
       : res.meta.lines.length ? res.meta.lines.join(' \u00b7 ')
       : res.newBest ? 'New fastest first trial on ' + G.diff().name + '.'
       : res.newDepth ? 'Your deepest trial yet on ' + G.diff().name + '.' : '';

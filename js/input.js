@@ -16,8 +16,13 @@
     retry: ['KeyR'],
     confirm: ['Enter', 'NumpadEnter'],
   };
-  const codeToAction = {};
-  for (const a in MAP) for (const c of MAP[a]) codeToAction[c] = a;
+  const DEFAULTS = {};
+  for (const a in MAP) DEFAULTS[a] = MAP[a].slice();
+  let codeToAction = {};
+  function rebuild() { codeToAction = {}; for (const a in MAP) for (const c of MAP[a]) codeToAction[c] = a; }
+  // bindings saved from an earlier session
+  if (G.settings.keys) for (const a in G.settings.keys) if (MAP[a] && Array.isArray(G.settings.keys[a]) && G.settings.keys[a].length) MAP[a] = G.settings.keys[a].slice();
+  rebuild();
 
   const I = G.input = {
     down: {},       // action -> held now
@@ -54,6 +59,8 @@
   }
 
   window.addEventListener('keydown', (e) => {
+    // the Controls screen is waiting for a key: it takes this press, whatever it is
+    if (I.grab) { const g = I.grab; I.grab = null; e.preventDefault(); if (!e.repeat) g(e.code); else I.grab = g; return; }
     const a = codeToAction[e.code];
     if (!a) return;
     if (e.ctrlKey || e.metaKey || e.altKey) return;
@@ -68,6 +75,30 @@
     if (a) release(a, e.code);
   });
   window.addEventListener('blur', releaseAll);
+
+  // ---- rebinding (Settings, Controls)
+  I.REBIND = ['left', 'right', 'up', 'down', 'jump', 'attack', 'dash', 'flare', 'heal', 'ult'];
+  const FIXED = ['Escape', 'Enter', 'NumpadEnter'];
+  // Make `code` the first key for an action. A key does one thing, so it is taken from whatever had it.
+  I.bind = function (action, code) {
+    if (!I.REBIND.includes(action) || !code || FIXED.includes(code)) return false;
+    for (const a in MAP) if (a !== action) MAP[a] = MAP[a].filter((c) => c !== code);
+    MAP[action] = [code].concat(MAP[action].filter((c) => c !== code)).slice(0, 4);
+    // nothing may be left without a key
+    for (const a of I.REBIND) if (!MAP[a].length) MAP[a] = DEFAULTS[a].filter((c) => !codeToActionNow(c, a)).slice(0, 1);
+    save(); rebuild(); releaseAll();
+    return true;
+  };
+  function codeToActionNow(code, except) { for (const a in MAP) if (a !== except && MAP[a].includes(code)) return true; return false; }
+  function save() { const k = {}; for (const a in MAP) k[a] = MAP[a].slice(); G.settings.keys = k; G.saveSettings(); }
+  I.resetKeys = function () { for (const a in MAP) MAP[a] = DEFAULTS[a].slice(); G.settings.keys = null; G.saveSettings(); rebuild(); releaseAll(); };
+  const NAMES = { Space: 'Space', ShiftLeft: 'Shift', ShiftRight: 'R Shift', ControlLeft: 'Ctrl', ControlRight: 'R Ctrl', AltLeft: 'Alt', AltRight: 'R Alt',
+    ArrowLeft: '\u2190', ArrowRight: '\u2192', ArrowUp: '\u2191', ArrowDown: '\u2193', Tab: 'Tab', Backspace: 'Bksp', CapsLock: 'Caps',
+    Comma: ',', Period: '.', Slash: '/', Semicolon: ';', Quote: '\'', BracketLeft: '[', BracketRight: ']', Backslash: '\\', Minus: '-', Equal: '=', Backquote: '`' };
+  I.keyName = (code) => NAMES[code] || (code || '?').replace(/^Key/, '').replace(/^Digit/, '').replace(/^Numpad/, 'Num ');
+  // The first key bound to an action, for prompts.
+  I.label = (action) => (MAP[action] && MAP[action].length ? I.keyName(MAP[action][0]) : '?');
+  I.keys = (action) => (MAP[action] || []).map(I.keyName);
 
   // Mouse: left click slashes, right click fires the lance, both aimed at the cursor.
   // Listens on the whole window so clicks land wherever the cursor is, and the browser's

@@ -68,7 +68,7 @@
     const before = Math.floor(P.ember / C.SEG);
     P.ember = Math.min(C.SEG * P.segs, P.ember + n * (1 + 0.4 * G.boon('vein')));
     if (Math.floor(P.ember / C.SEG) > before) { G.audio.play('segment'); P.emberFlash = 1; }
-    G.flow.add(n * 0.5); // whatever earns Starlight also builds Flow
+    G.flow.hit(n); // whatever earns Starlight also builds Flow
   };
 
   // The Warden entered a new phase: the Wardstone recharges.
@@ -677,6 +677,7 @@
       return false;
     }
     P.hp -= dmg; P.stats.hits++;
+    P.lastHit = { kind: src && src.kind, attack: G.boss.attackName || '' }; // for the defeat screen
     P.inv = C.HURT_INV; P.stun = 0.2; P.dashT = 0; P.atk = null; P.healT = 0; P.hurtFlash = 1; P.plunge = false;
     const dir = G.sign(P.x - srcX) || -P.facing;
     P.vx = dir * 430; P.vy = (src && typeof src.popVy === 'number') ? src.popVy : -430; P.onGround = false; P.plat = null; P.jumpHeld = false;

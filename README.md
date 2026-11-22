@@ -2,7 +2,7 @@
 
 A side-on boss rush for the browser: three heroes, four three-phase bosses, played as a run of
 ever-harder trials. You pick a hero and a relic before the run and win a boon after each victory.
-Version 0.9b.
+Version 1.0a.
 
 This is an early slice of a planned boss-rush roguelite (short runs, a boon after each boss,
 bosses drawn from a pool). A run meets the four bosses in a shuffled order, then meets them again, harder.
@@ -34,6 +34,13 @@ then open http://localhost:8321. There is no build step and no dependency.
 | Drop through a platform | S + Space | down + A |
 | Pause | Esc or P | Start |
 | Use something in the camp | E or F, or Enter | LB |
+
+Keyboard keys can be changed in Settings, Controls: choose an action, press the key it should use. A key
+does one thing, so it is taken from whatever had it. Prompts in the game follow your bindings. The mouse
+and gamepad are fixed.
+
+| | | |
+|---|---|---|
 | Retry (works the moment you fall) | R | |
 
 ## The Vigil (new in v0.9a)
@@ -50,6 +57,7 @@ menu options are places in it, left to right:
 | The training yard | nothing to press: hit the sparring post. It shows the damage of your last flurry, cannot be destroyed, and charges Dawnbreak three times as fast, so every move can be tried here. Starlight starts full. |
 | The brazier | step the difficulty: Gentle, Standard, Merciless. The flame grows and changes colour with it. |
 | The banners | choose the first foe. One banner for each boss hangs on the rail; the lit one comes first, and all four lit means whoever comes. |
+| The proving ring | practise against the foe the banners show (or one at random), starting from phase I, II or III. No relic, no omen, no reward, nothing lost; R tries again. |
 | The gate | begin a run: choose a relic, then the first trial. You come back out of it when a run ends. |
 
 The backdrop is painted once into four layers that slide at different speeds as you walk: the sky (with
@@ -61,6 +69,44 @@ Nothing can hurt you in the camp. Esc opens the menu (settings, how to play, qui
 **New run** goes straight back to the gate's relic choice, and **Back to camp** returns you to the Vigil.
 The camp is `js/hub.js`; the sparring post is a stand-in boss (`G.bosses.dummy`), which is why every
 weapon, special and Dawnbreak works on it unchanged.
+
+## Polish and quality of life (v1.0a)
+
+This build came from three things: reading what players and designers say made games of this kind a
+treat, looking at every screen as a player sees it, and measuring the playtest questions with a scripted
+hero (`tools/feel-check.js`).
+
+**What the reading said, and what was done about it**
+
+| What makes these games a treat | In Solfall |
+|---|---|
+| Failure should still feel like progress, and getting back in should be quick (Hades) | Every fight already pays Sunshards win or lose. The defeat screen now says what landed the last blow. R is still an instant retry. |
+| Players want to practise the boss or phase they failed, not replay everything before it (Furi, Cuphead) | The proving ring in the camp: any boss, from any phase, at no cost. |
+| Forgiving input: a jump just after leaving a ledge, a press just before landing (Celeste) | Already here: 0.09 s of coyote time, 0.13 s buffers on jump, attack, dash and special, and presses made during a dash are kept. |
+| Attacks must be readable and fair even when fast | Unchanged rule: every warning is the same red-orange. Smoke is drawn behind warnings. |
+| Flashes, shake and bindings should be the player's choice (Xbox accessibility guidelines) | New Screen flashes setting (Full, Reduced, Off); flashes less than a third of a second apart are damped whatever the setting; keyboard keys can be rebound. Screen shake already had a setting. |
+
+**What looking at every screen found**
+
+- The How to play panel had grown taller than the screen, hiding its own Back button. Rewritten shorter; it fits.
+- The title overlapped the Warden's eye. Moved down.
+- The camp had no display for Starlight or Dawnbreak, so charging Dawnbreak on the post could not be seen. It now shows the hero's name and both bars.
+
+**What the measurements found** (scripted hero that cannot be hurt, attacks without stopping, never dodges)
+
+- Dawnbreak fills 2 or 3 times a fight for every hero against every boss, the first at 15 to 36 seconds. That was the aim; left alone.
+- A Reckoning's ward breaks in 1 to 4 seconds of steady attacking, against 6.5 allowed. Left alone.
+- Flow reached SS within ten seconds of steady attacking and stayed there, so the rank meant nothing. It now always drains, faster the higher it stands; heroes who swing slower earn more per hit; a perfect dodge is worth more. The same scripted hero now peaks at A or S and holds A or better for between a tenth and two thirds of a fight, so reaching the top takes dodges.
+
+**Also new**
+
+- Your fastest first-trial win against each boss is kept per difficulty and shown at the banners, with how often you have beaten it.
+- A welcome line the first time you arrive in the camp each session.
+- Dawnbreak in the camp only fires within reach of the sparring post.
+- The pause menu lists the trial's omen.
+- Settings, Reset progress erases Sunshards, upgrades, trophies and records (it has to be chosen twice).
+
+Not done: touch controls, a colour-blind alternative to red-orange warnings, gamepad rebinding.
 
 ## The heroes
 
@@ -370,6 +416,7 @@ To use these in a new attack, call the ready-made mixes in `js/fx.js`: `G.fx.hit
 | `js/omens.js` | the omens (`G.OMENS`) and what each one does during a fight |
 | `js/moments.js` | Reckoning, Riposte, Sunder, Clash, Last Light and the last push |
 | `js/hub.js` | the Vigil: the camp between runs, its places, and the sparring post |
+| `tools/feel-check.js` | whole fights played by a scripted hero, to measure Dawnbreak, Flow and Reckonings |
 | `js/input.js` | keyboard, mouse and gamepad mapped to actions |
 | `js/audio.js` | every sound and the music, synthesised in code (no audio files) |
 | `js/fx.js` | particles, smoke, shards, cut marks, floor cracks and scorch marks, screen shake and kick, flashes, hit-freeze, slow motion |
@@ -437,6 +484,10 @@ Open the browser console on the running game.
   were run and looked at in captures, and the numbers above were checked in the running game. Whether
   Flow climbs at a satisfying rate, how often Dawnbreak fills in a real fight (the aim was two to four
   times), and whether Sunshard prices are fair are first guesses.
+- **v1.0a was checked on screen and by script, still not by hand.** Every menu and the fight display
+  were looked at in screenshots of the real page; rebinding was tested with simulated key presses, not a
+  keyboard; practice fights were started, lost, retried and won by script. Flow's new pace is tuned
+  against a scripted hero that never gets hit, so a person's numbers will be lower.
 - **The camp's look was judged from captures** taken at each place along it; it costs about 0.6 ms a
   frame on the machine it was written on. How the scrolling feels, and whether three screens is too far
   to walk each time, is unknown.

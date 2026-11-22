@@ -141,8 +141,16 @@
     F.shakeAmp = Math.max(F.shakeAmp, a);
     if (a >= 14) F.jolt(a / 14); // anything this hard is felt across the whole arena
   };
+  // Full-screen flashes follow the Screen flashes setting, and are never allowed to strobe: a second
+  // flash within a third of a second of the last comes through at a third of its strength.
+  let lastFlash = -1;
   F.flash = function (color, a, dur) {
-    F.flashC = color; F.flashA = Math.max(F.flashA, a); F.flashDecay = a / (dur || 0.25);
+    const set = G.settings.flash == null ? 1 : G.settings.flash;
+    if (set <= 0) return;
+    const now = performance.now();
+    a *= set * (now - lastFlash < 340 ? 0.35 : 1);
+    lastFlash = now;
+    F.flashC = color; F.flashA = Math.max(F.flashA, a); F.flashDecay = Math.max(a, 0.01) / (dur || 0.25);
   };
   F.stop = function (t) { G.hitstop = Math.max(G.hitstop || 0, t); };
   F.slow = function (scale, dur) { G.slowScale = scale; G.slowT = dur; };
@@ -153,7 +161,10 @@
   };
   F.rattle = function (a) { F.rattleA = Math.max(F.rattleA, a); };
   // Coloured edges of the screen (red when the hero is hurt).
-  F.vig = function (color, a, dur) { F.vigC = color; F.vigA = Math.max(F.vigA, a); F.vigDecay = a / (dur || 0.5); };
+  F.vig = function (color, a, dur) {
+    a *= G.settings.flash == null ? 1 : Math.max(0.3, G.settings.flash); // kept faintly even when flashes are off: it says you were hit
+    F.vigC = color; F.vigA = Math.max(F.vigA, a); F.vigDecay = a / (dur || 0.5);
+  };
 
   // A burst of light that lights nothing but reads as if it did.
   F.light = function (x, y, r, color, life, a) {

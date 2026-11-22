@@ -15,13 +15,13 @@
   const FLAME = ['150,215,255', '255,170,90', '255,70,60'];
   // where things stand
   const ECHO_X = [420, 590, 760], SHRINE_X = 1130, FIRE_X = 1560, POST_X = 1950, BRAZIER_X = 2390, BANNER_X = 2770, GATE_X = 3270;
-  const BANNERS = [2665, 2735, 2805, 2875];
+  const BANNERS = [2665, 2735, 2805, 2875], RING_X = 2996;
 
   const HUB = G.hub = { near: null, t: 0, lastX: FIRE_X - 70, msg: '', msgT: 0, W: HW, layers: null, flies: [], blades: [] };
   HUB.maxCam = HW - W;
   // Where the view wants to be: on the hero, a little ahead of the way they face.
   HUB.camTarget = () => G.clamp(G.player.x - W / 2 + G.player.facing * 70, 0, HUB.maxCam);
-  HUB.spawn = (where) => (where === 'gate' ? GATE_X - 150 : FIRE_X - 70);
+  HUB.spawn = (where) => (where === 'gate' ? GATE_X - 150 : where === 'ring' ? RING_X - 40 : FIRE_X - 70);
 
   function lcg(seed) { let s = seed; return () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; }; }
 
@@ -106,6 +106,7 @@
     { id: 'post', x: POST_X, reach: 0, top: 140 },
     { id: 'brazier', x: BRAZIER_X, reach: 70, top: 222 },
     { id: 'banner', x: BANNER_X, reach: 150, top: 292 },
+    { id: 'ring', x: RING_X, reach: 44, top: 150 },
     { id: 'gate', x: GATE_X, reach: 110, top: 474 },
   ];
   const foeName = (v) => (G.bosses[v] ? G.bosses[v].short : 'Whoever comes');
@@ -119,7 +120,14 @@
     }
     if (s.id === 'shrine') return ['The Shrine', '◆ ' + G.meta.shards + ' Sunshards', 'spend them'];
     if (s.id === 'brazier') return ['The Brazier: ' + G.diff().name, NOTES[G.settings.difficulty], 'change the difficulty'];
-    if (s.id === 'banner') return ['First foe: ' + foeName(G.settings.firstFoe), 'Who waits behind the gate', 'choose another'];
+    if (s.id === 'banner') {
+      // what you have done against the chosen foe: how often it fell, and your fastest first-trial win
+      const f = G.settings.firstFoe, kills = G.meta.kills[f] || 0, best = G.meta.bestTime(f);
+      const rec = !G.bosses[f] ? 'Who waits behind the gate' : !kills ? 'Not yet beaten'
+        : 'Beaten ' + kills + (kills > 1 ? ' times' : ' time') + (best ? ' \u00b7 fastest ' + G.ui.fmtTime(best) + ' on ' + G.diff().name : '');
+      return ['First foe: ' + foeName(f), rec, 'choose another'];
+    }
+    if (s.id === 'ring') return ['The Proving Ring', 'Practise against ' + (G.bosses[G.settings.firstFoe] ? G.bosses[G.settings.firstFoe].short : 'a foe at random') + ', from any phase', 'step in'];
     if (s.id === 'gate') {
       const deep = G.store.load('depth', {})[G.settings.difficulty];
       return ['The Gate', deep ? 'Deepest trial on ' + G.diff().name + ': ' + G.roman(deep) : 'No trial won yet on ' + G.diff().name, 'begin a run'];
@@ -128,10 +136,11 @@
   }
   function shortName(s) {
     if (s.id === 'echo') return G.HEROES[s.hero].id === G.run.hero ? '' : G.HEROES[s.hero].name;
-    return { shrine: 'The Shrine', post: 'Sparring post', brazier: G.diff().name, banner: 'First foe', gate: 'The Gate' }[s.id];
+    return { shrine: 'The Shrine', post: 'Sparring post', brazier: G.diff().name, banner: 'First foe', ring: 'Practice', gate: 'The Gate' }[s.id];
   }
 
-  function say(text) { HUB.msg = text; HUB.msgT = 2.2; }
+  function say(text) { HUB.msg = text; HUB.msgT = 3; }
+  HUB.say = say;
 
   function use(s) {
     const P = G.player;
@@ -164,6 +173,8 @@
       const i = FOES.indexOf(G.settings.firstFoe) - 1;
       for (const k of (i < 0 ? [0, 1, 2, 3] : [i])) F.burst(BANNERS[k], FLOOR - 170, { n: 10, color: foeCol(FOES[k + 1]), speed: [40, 220], life: [0.3, 0.8], size: [2, 4] });
       say(foeName(G.settings.firstFoe));
+    } else if (s.id === 'ring') {
+      G.audio.play('uiSelect'); G.ui.showPractice();
     } else if (s.id === 'gate') {
       G.audio.play('uiSelect'); G.openGate();
     }
@@ -484,6 +495,7 @@
     drawYard(ctx, t);
     drawBrazier(ctx, t);
     drawBanners(ctx, t);
+    drawRing(ctx, t);
     drawGate(ctx, t);
   };
 
@@ -693,6 +705,22 @@
     }
   }
 
+  // The proving ring: two marker stones and a circle cut in the floor, where a single foe can be practised.
+  function drawRing(ctx, t) {
+    if (!seen(RING_X, 300)) return;
+    const x = RING_X, on = HUB.near && HUB.near.id === 'ring', c = foeCol(G.settings.firstFoe);
+    for (const side of [-1, 1]) {
+      poly(ctx, [x + side * 46 - 9, FLOOR, x + side * 46 - 6, FLOOR - 58, x + side * 46 + 2, FLOOR - 70, x + side * 46 + 8, FLOOR - 54, x + side * 46 + 10, FLOOR], STONE);
+      ctx.globalCompositeOperation = 'lighter'; diamond(ctx, x + side * 46 + 1, FLOOR - 40, 3.5, 7, G.rgba(c, on ? 1 : 0.7)); ctx.globalCompositeOperation = 'source-over';
+    }
+    glow(ctx, c, x, FLOOR - 30, on ? 90 : 64, on ? 0.5 : 0.3);
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.strokeStyle = G.rgba(c, on ? 0.95 : 0.6); ctx.lineWidth = 2; ctx.setLineDash([8, 6]); ctx.lineDashOffset = t * 16;
+    ctx.beginPath(); ctx.ellipse(x, FLOOR + 1, 40, 5, 0, 0, TAU); ctx.stroke();
+    ctx.setLineDash([]); ctx.globalCompositeOperation = 'source-over';
+    pool(ctx, c, x, 90, on ? 0.5 : 0.3);
+  }
+
   // The gate: steps, two fire-bowls on tall plinths, and the light of the trials turning in the arch.
   function drawGate(ctx, t) {
     if (!seen(GATE_X, 560)) return;
@@ -805,21 +833,22 @@
     if (D.sum > 0) text(ctx, D.sum + ' damage', POST_X, FLOOR - 164, 16, GOLD, Math.min(1, D.sumT * 2));
     if (P.ult > 0 && Math.abs(P.x - POST_X) < 240) {
       const full = P.ult >= 100;
-      text(ctx, full ? 'Dawnbreak ready: press ' + (pad ? 'RT' : 'Q') : 'Dawnbreak ' + Math.round(P.ult) + '%', POST_X, FLOOR - 186, 13, GOLD, full ? 0.7 + 0.3 * Math.sin(HUB.t * 8) : 0.7);
+      text(ctx, full ? 'Dawnbreak ready: press ' + (pad ? 'RT' : G.input.label('ult')) : 'Dawnbreak ' + Math.round(P.ult) + '%', POST_X, FLOOR - 186, 13, GOLD, full ? 0.7 + 0.3 * Math.sin(HUB.t * 8) : 0.7);
     }
     if (near && !G.ui.current) {
       const Lb = label(near), x = G.clamp(near.x, cam + 200, cam + W - 200), y = FLOOR - near.top - 40;
       text(ctx, Lb[0].toUpperCase(), x, y, 18, '255,255,255', 1);
       text(ctx, Lb[1], x, y + 22, 13, '236,233,244', 0.85, '500');
-      text(ctx, (pad ? 'LB' : 'E') + '  ' + Lb[2], x, y + 44, 14, GOLD, 0.85 + 0.15 * Math.sin(HUB.t * 6));
+      text(ctx, (pad ? 'LB' : G.input.label('heal')) + '  ' + Lb[2], x, y + 44, 14, GOLD, 0.85 + 0.15 * Math.sin(HUB.t * 6));
     }
     if (HUB.msgT > 0) text(ctx, HUB.msg.toUpperCase(), P.x, P.y - 104, 15, GOLD, Math.min(1, HUB.msgT * 2));
     if (!G.ui.current) {
       text(ctx, 'THE VIGIL', cam + W / 2, 40, 20, '236,233,244', 0.75, '400');
       text(ctx, pad ? 'Stick move  ·  A jump  ·  X attack  ·  B dash  ·  LB use  ·  Start menu'
-        : 'A / D move  ·  Space jump  ·  J or click attack  ·  K dash  ·  L special  ·  E use  ·  Esc menu',
+        : [G.input.label('left') + ' / ' + G.input.label('right') + ' move', G.input.label('jump') + ' jump', G.input.label('attack') + ' or click attack', G.input.label('dash') + ' dash',
+          G.input.label('flare') + ' special', G.input.label('heal') + ' use', 'Esc menu'].join('  \u00b7  '),
         cam + W / 2, 66, 12, '236,233,244', 0.45, '500');
-      text(ctx, G.hero().name.toUpperCase() + '   ◆ ' + G.meta.shards, cam + 116, 40, 13, GOLD, 0.8);
+      text(ctx, '\u25c6 ' + G.meta.shards + ' Sunshards', cam + W - 112, 66, 12, GOLD, 0.8);
       // which way the gate lies, until it is in view
       if (GATE_X > cam + W + 40) text(ctx, 'THE GATE  ›', cam + W - 96, 40, 12, GOLD, 0.5 + 0.2 * Math.sin(HUB.t * 3));
     }

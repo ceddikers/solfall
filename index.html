@@ -134,18 +134,15 @@
           <div>
             <h3>Reading the fight</h3>
             <ul class="tips">
-              <li><span class="sw danger"></span><b>Red-orange is a warning.</b> It marks where an attack will land. When it fills and flashes, the attack fires.</li>
-              <li><span class="sw star"></span><b>Dash through an attack</b> at the last moment for a perfect dodge. Time slows and your Starlight fills.</li>
-              <li><b>Starlight</b> fills as you land hits. Spend a segment on your hero's special, or hold Mend while standing to restore one health.</li>
-              <li><b>Every third attack is a finisher.</b> It hits harder than the first two together, and a dash does not break the chain.</li>
-              <li><b>With the sword or maul, strike downward in the air</b> to bounce off a boss and get your jump and dash back.</li>
-              <li><b>Fill the stagger bar</b> under a boss's health and it is helpless for a few seconds, taking extra damage.</li>
-              <li><b>Every boss is open after its big attacks:</b> a stuck fist, a blade in the floor, a caster mid-spell. That is when to strike.</li>
-              <li><b>Dawnbreak</b> fills as you deal damage. When the bar is full, one press unleashes your hero's greatest blow, and nothing can touch you while it plays.</li>
-              <li><b>Moments:</b> the first hit after a perfect dodge is a Riposte for double. The first finisher on a staggered boss is a Sunder. When a boss wards itself and a ring starts to close, break the ward before it shuts.</li>
-              <li><b>Flow</b> climbs from C to SS while you keep hitting and dodging, and falls when you are hit. Each rank adds 3% damage.</li>
-              <li><b>The Vigil</b> is the camp between runs. Walk up to the echoes to change hero, the Shrine to spend Sunshards, the brazier for difficulty, the banner for the first foe, the post to practise, and the gate to begin.</li>
-              <li><b>A run starts with a hero and a relic.</b> Each victory grants a boon and a harder trial; later trials carry an omen that changes the rules. Sunshards from every fight buy lasting upgrades at the Shrine.</li>
+              <li><span class="sw danger"></span><b>Red-orange is a warning.</b> It marks where an attack will land; when it fills and flashes, it fires.</li>
+              <li><span class="sw star"></span><b>Dash through an attack</b> at the last moment for a perfect dodge. Your next hit is a Riposte for double.</li>
+              <li><b>Starlight</b> fills as you land hits. Spend a segment on your special, or hold Mend to restore one health.</li>
+              <li><b>Every third attack is a finisher.</b> The first one on a staggered boss is a Sunder for more than double.</li>
+              <li><b>Strike downward in the air</b> with the sword or maul to bounce off a boss.</li>
+              <li><b>When a boss wards itself</b> and a ring closes on it, break the ward before the ring shuts.</li>
+              <li><b>Dawnbreak</b> fills as you deal damage. One press when it is full; nothing can touch you while it plays.</li>
+              <li><b>Flow</b> climbs from C to SS as you hit and dodge without being hit. Each rank adds 3% damage.</li>
+              <li><b>The Vigil</b> is your camp: echoes change hero, the Shrine spends Sunshards, the brazier sets difficulty, the ring is for practice, the gate begins a run.</li>
             </ul>
           </div>
         </div>
@@ -160,9 +157,47 @@
           <div class="item opt slider" data-opt="music"><span class="k">Music</span><span class="track"><i></i></span><span class="v"></span></div>
           <div class="item opt slider" data-opt="sfx"><span class="k">Sound effects</span><span class="track"><i></i></span><span class="v"></span></div>
           <div class="item opt" data-opt="shake"><span class="k">Screen shake</span><span class="v"></span></div>
+          <div class="item opt" data-opt="flash"><span class="k">Screen flashes</span><span class="v"></span></div>
           <div class="item opt" data-opt="numbers"><span class="k">Damage numbers</span><span class="v"></span></div>
           <div class="item opt" data-opt="hints"><span class="k">Mechanic hints</span><span class="v"></span></div>
+          <div class="item" data-act="controls">Controls</div>
           <div class="item" data-act="fullscreen">Toggle fullscreen</div>
+          <div class="item" data-act="reset" id="resetItem">Reset progress</div>
+          <div class="item" data-act="back">Back</div>
+        </nav>
+      </div>
+    </section>
+
+    <section id="s-keys" class="screen panelscreen">
+      <div class="panel keys">
+        <h2>Controls</h2>
+        <p class="lead">Choose an action, then press the key it should use. Esc cancels. The mouse and gamepad stay as they are.</p>
+        <nav id="keyList">
+          <div class="item kv" data-act="key-left"><span class="k"></span><span class="v"></span></div>
+          <div class="item kv" data-act="key-right"><span class="k"></span><span class="v"></span></div>
+          <div class="item kv" data-act="key-up"><span class="k"></span><span class="v"></span></div>
+          <div class="item kv" data-act="key-down"><span class="k"></span><span class="v"></span></div>
+          <div class="item kv" data-act="key-jump"><span class="k"></span><span class="v"></span></div>
+          <div class="item kv" data-act="key-attack"><span class="k"></span><span class="v"></span></div>
+          <div class="item kv" data-act="key-dash"><span class="k"></span><span class="v"></span></div>
+          <div class="item kv" data-act="key-flare"><span class="k"></span><span class="v"></span></div>
+          <div class="item kv" data-act="key-heal"><span class="k"></span><span class="v"></span></div>
+          <div class="item kv" data-act="key-ult"><span class="k"></span><span class="v"></span></div>
+          <div class="item" data-act="keyreset">Restore defaults</div>
+          <div class="item" data-act="back">Back</div>
+        </nav>
+      </div>
+    </section>
+
+    <section id="s-practice" class="screen panelscreen">
+      <div class="panel narrow">
+        <p class="over" id="practiceOver"></p>
+        <h2>Practise</h2>
+        <p class="lead">No relic, no omen, no reward, and nothing lost if you fall. <kbd>R</kbd> tries again.</p>
+        <nav>
+          <div class="item" data-act="practice1">From phase I</div>
+          <div class="item" data-act="practice2">From phase II</div>
+          <div class="item" data-act="practice3">From phase III</div>
           <div class="item" data-act="back">Back</div>
         </nav>
       </div>

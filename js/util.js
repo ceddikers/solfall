@@ -3,7 +3,7 @@
 
 const G = window.G = {};
 
-G.VERSION = '0.9b';
+G.VERSION = '1.0a';
 G.W = 1280;          // logical view size
 G.H = 720;
 G.FLOOR = 612;       // y of the arena floor surface
@@ -150,7 +150,7 @@ G.store = {
 };
 
 G.settings = Object.assign(
-  { music: 0.55, sfx: 0.8, shake: 1, numbers: true, difficulty: 1, hints: true, firstFoe: 'random' },
+  { music: 0.55, sfx: 0.8, shake: 1, flash: 1, numbers: true, difficulty: 1, hints: true, firstFoe: 'random', keys: null },
   G.store.load('settings', {})
 );
 G.saveSettings = () => G.store.save('settings', G.settings);

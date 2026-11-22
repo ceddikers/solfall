@@ -15,6 +15,11 @@
   FL.NAMES = { vesper: 'THOUSAND STARS', aster: 'WORLDBREAKER', lune: 'MOONFALL' };
   FL.SLOW = 0.05; // how fast the boss and its attacks run while a Dawnbreak plays
 
+  // Heroes land hits at different rates, so each hit is worth more for the slower ones: steady
+  // attacking earns every hero about the same Flow per second.
+  const HIT_K = { vesper: 1, aster: 1.4, lune: 1.25 };
+  FL.hit = function (n) { FL.add(n * 0.3 * (HIT_K[P.hero.id] || 1)); };
+
   function rankOf(v) { let r = 0; for (let i = 1; i < FL.RANKS.length; i++) if (v >= FL.RANKS[i].at) r = i; return r; }
   // How far through the current rank the meter is, 0 to 1 (for the display).
   FL.frac = function () {
@@ -49,6 +54,7 @@
   };
   FL.perfect = function () {
     if (!P.ulting) P.ult = Math.min(100, P.ult + 6);
+    FL.add(10); // on top of what the Starlight it earns already gives
     if (G.relic('shroud')) P.shroudT = 3;
   };
 
@@ -59,8 +65,10 @@
     FL.dark = G.damp(FL.dark, P.ulting ? 1 : 0, P.ulting ? 14 : 5, dt);
     // Flow only runs down while there is a boss to hit
     if (G.state === 'fight' && B.active && !B.invuln && !B.dying && !P.ulting) {
+      // It always drains, faster the higher it stands and faster again when nothing has landed for a
+      // while: steady attacking holds about rank B, and it takes perfect dodges to climb past A.
       FL.idle += dt;
-      if (FL.idle > 2.2 && FL.v > 0) { FL.v = Math.max(0, FL.v - (5 + FL.rank * 2.5) * dt); FL.rank = rankOf(FL.v); }
+      if (FL.v > 0) { FL.v = Math.max(0, FL.v - ((FL.idle > 2.2 ? 9 : 3) + FL.rank * 2.5) * dt); FL.rank = rankOf(FL.v); }
     }
     if (!FL.ready && P.ult >= 100 && !P.dead) {
       FL.ready = true;
@@ -100,7 +108,8 @@
   FL.tryUlt = function () {
     if (P.ulting || P.dead || (G.state !== 'fight' && G.state !== 'hub')) return false;
     const t = main();
-    if (P.ult < 100 || !t) { G.audio.play('empty'); return false; }
+    // in the camp it needs the sparring post within reach
+    if (P.ult < 100 || !t || (G.state === 'hub' && Math.abs(t.cx - P.x) > 420)) { G.audio.play('empty'); return false; }
     const H = P.hero;
     aim = { x: t.cx, y: t.cy };
     P.ult = 0; FL.ready = false;
