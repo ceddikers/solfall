@@ -1049,7 +1049,7 @@
     arm(true);
     pauldron(shx + 14, shy, 1, plate);
 
-    if (b.flash > 0) D.glow(ctx, '255,255,255', 0, -70, 100, b.flash * 0.8);
+    if (b.flash > 0) D.glow(ctx, '255,255,255', 0, -70, 84, b.flash * 0.3); // (v1.6d: a tint, not a white dome)
     ctx.restore();
   }
 

@@ -2,7 +2,7 @@
 
 A side-on boss rush for the browser: four heroes, four three-phase bosses, played as a run of
 ever-harder trials. You pick a hero and a relic before the run and win a boon after each victory.
-Version 1.6b.
+Version 1.6d.
 
 This is an early slice of a planned boss-rush roguelite (short runs, a boon after each boss,
 bosses drawn from a pool). A run meets the four bosses in a shuffled order, then meets them again, harder.
@@ -113,6 +113,48 @@ hero (`tools/feel-check.js`).
 - Settings, Reset progress erases Sunshards, upgrades, trophies and records (it has to be chosen twice).
 
 Not done: touch controls, a colour-blind alternative to red-orange warnings, gamepad rebinding.
+
+## Less light, more weight (v1.6d)
+
+Big moments used to be made of brightness: a flash, a wide white cut, a glow over the boss, and bloom on
+top of all three, which could white out the middle of the screen. Nothing is allowed to do that now.
+The changes are in the shared effect code (`js/fx.js`, `js/post.js`), so they apply to every hero and boss.
+
+| What | Before | Now |
+|---|---|---|
+| Full-screen flashes | as bright as asked for | two fifths of that, never more than a sixth of the way to solid |
+| Glows (`F.light`) | added together until white | about half as strong, the wide ones less still, and screened on, so several on one spot settle at their own colour |
+| Cut marks | a white bar with a coloured edge | a band of colour with a thin bright core |
+| The impact frame | the picture inverted (a night scene turned white) | a dark frame: everything sinks to black except blades, eyes and the cut |
+| Bloom | | about three fifths of what it was |
+| A boss that is struck | a white dome over it | a tint over its body |
+| The Warden's Sunburst | near white from wall to wall | the boss's colour over the arena, hot only round the core |
+
+What replaces the light:
+
+- **A pinch of darkness.** Whatever asks for a flash also darkens the edges of the view for a moment, so
+  a big blow closes the frame in on itself.
+- **A ripple in the air** (`F.ripple`). A ring runs out from heavy hits and impact frames and bends
+  what is behind it, like heat. It adds no light.
+- **What the blow does to the place.** Eos's counter now cracks the floor under the boss, throws up
+  stone and sends dust out along the ground both ways.
+
+The Screen flashes setting still scales or removes the flashes, the dark frame and the edge darkening.
+
+## Eos's counter lands like one (v1.6c)
+
+A three-mark draw through a blow was already her best play (a perfect dodge, then a cut of 200), but it
+looked like any other heavy hit. Now it has two beats of its own:
+
+- **The held breath.** The moment she passes through the blow, the arena goes dark and time runs at
+  60% until the blade is home (about 0.8 s). The line of the cut hangs behind her in gold. This happens
+  for a counter at any number of marks, and also if she dashes through a blow while a cut is still on
+  its way. A counter that cut nothing lets go of the dark at once.
+- **The landing** (three marks only). The cut crosses the whole arena, the picture slips along it as
+  it does in Horizon (about half as far, for less time), the ground under the boss cracks, a bell
+  rings, and light falls like petals along the length of the line.
+
+Damage is unchanged. `hush` and `counterLand` in `js/player.js`.
 
 ## Fewer words (v1.6b)
 

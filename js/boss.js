@@ -1303,9 +1303,10 @@
           ctx.fillRect(WL, FLOOR - 6, (WR - WL) * k, 6);
         } else if (f > 0) {
           ctx.globalCompositeOperation = 'lighter';
-          ctx.fillStyle = G.rgba(pal.boss, 0.5 * f); ctx.fillRect(WL, top, WR - WL, FLOOR - top);
+          // (v1.6d: the burn is the boss's colour laid over the arena, hot only round the core; it used to be near white from wall to wall)
+          ctx.fillStyle = G.rgba(pal.boss, 0.34 * f); ctx.fillRect(WL, top, WR - WL, FLOOR - top);
           const g = ctx.createRadialGradient(c.x, c.y, 20, c.x, c.y, 760);
-          g.addColorStop(0, G.rgba(pal.hot, 0.95 * f)); g.addColorStop(1, G.rgba(pal.hot, 0.35 * f));
+          g.addColorStop(0, G.rgba(pal.hot, 0.6 * f)); g.addColorStop(0.35, G.rgba(pal.hot, 0.2 * f)); g.addColorStop(1, G.rgba(pal.hot, 0.06 * f));
           ctx.fillStyle = g; ctx.fillRect(WL, top, WR - WL, FLOOR - top);
         }
         ctx.restore();
@@ -1588,7 +1589,7 @@
 
     if (c.flash > 0) {
       ctx.globalCompositeOperation = 'lighter';
-      ctx.fillStyle = 'rgba(255,255,255,' + (c.flash * 0.55) + ')';
+      ctx.fillStyle = 'rgba(255,255,255,' + (c.flash * 0.34) + ')';
       ctx.beginPath(); ctx.arc(0, 0, r, 0, G.TAU); ctx.fill();
       ctx.globalCompositeOperation = 'source-over';
     }
@@ -1719,7 +1720,7 @@
     ctx.fillStyle = G.rgba(danger ? DANGER : P.hot, 0.9 * dimK);
     ctx.beginPath(); ctx.arc(0, 12, 4.5, 0, G.TAU); ctx.fill();
     if (h.flash > 0) {
-      ctx.fillStyle = 'rgba(255,255,255,' + (h.flash * 0.5) + ')';
+      ctx.fillStyle = 'rgba(255,255,255,' + (h.flash * 0.32) + ')';
       G.roundRect(ctx, -57, -48, 114, 114, 28); ctx.fill();
     }
     ctx.globalCompositeOperation = 'source-over';

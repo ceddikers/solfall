@@ -84,9 +84,10 @@
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
     ctx.globalCompositeOperation = 'lighter';
-    ctx.globalAlpha = 0.2; ctx.drawImage(b1, 0, 0, W, H);
-    ctx.globalAlpha = 0.24; ctx.drawImage(b2, 0, 0, W, H);
-    ctx.globalAlpha = 0.28; ctx.drawImage(b3, 0, 0, W, H);
+    // (v1.6d: about three fifths of what it was, so a bright blow glows at its edges without swallowing its middle)
+    ctx.globalAlpha = 0.12; ctx.drawImage(b1, 0, 0, W, H);
+    ctx.globalAlpha = 0.15; ctx.drawImage(b2, 0, 0, W, H);
+    ctx.globalAlpha = 0.17; ctx.drawImage(b3, 0, 0, W, H);
     // tone: the arena's own light from above, a cool dusk below
     ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'soft-light';
     ctx.drawImage(grade(G.pal().rim, W, H), 0, 0, W, H);

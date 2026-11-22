@@ -1092,7 +1092,7 @@
     for (const m of motes) if (!m.back && (m.e !== el || b.mk > 0.05)) mote(ctx, m.e, m.x, m.y, 1 + 0.5 * (b.mk || 0), dim);
     if (b.mk > 0.3) { const S1 = staff(c); D.glow(ctx, '255,255,255', S1.hx + Math.sin(S1.tilt) * 96, S1.hy - Math.cos(S1.tilt) * 96, 70 * b.mk, 0.8 * b.mk); }
 
-    if (b.flash > 0) D.glow(ctx, '255,255,255', 0, -70, 95, b.flash * 0.8);
+    if (b.flash > 0) D.glow(ctx, '255,255,255', 0, -70, 80, b.flash * 0.3); // (v1.6d: a tint, not a white dome)
     ctx.restore();
   };
 

@@ -36,6 +36,26 @@
     return c;
   };
 
+  // The sprite for F.light: the same soft round shape with half the heart, so several lights on one
+  // spot tint it instead of burning a white hole in the picture.
+  const lamps = new Map();
+  function lamp(color) {
+    let c = lamps.get(color);
+    if (c) return c;
+    c = document.createElement('canvas');
+    c.width = c.height = 64;
+    const x = c.getContext('2d');
+    const g = x.createRadialGradient(32, 32, 0, 32, 32, 32);
+    g.addColorStop(0, G.rgba(color, 0.5));
+    g.addColorStop(0.3, G.rgba(color, 0.3));
+    g.addColorStop(0.65, G.rgba(color, 0.09));
+    g.addColorStop(1, G.rgba(color, 0));
+    x.fillStyle = g;
+    x.fillRect(0, 0, 64, 64);
+    lamps.set(color, c);
+    return c;
+  }
+
   // A flatter, cloudier sprite for smoke and dust. It is drawn solid, not as light.
   function puff(color) {
     let c = puffs.get(color);
@@ -85,6 +105,7 @@
     F.shakeAmp = 0; F.flashA = 0; F.zoom = 0; F.vigA = 0;
     F.kx = F.ky = F.kvx = F.kvy = 0; F.rattleA = 0; F.joltCd = 0;
     F.glints.length = 0; F.imp = null;
+    F.dimA = 0; F.ripples.length = 0;
   };
 
   // kind: 'glow' (soft light), 'spark' (a streak along its motion), 'chunk' (tumbling debris),
@@ -144,13 +165,20 @@
   };
   // Full-screen flashes follow the Screen flashes setting, and are never allowed to strobe: a second
   // flash within a third of a second of the last comes through at a third of its strength.
+  // Nothing is allowed to white the picture out (v1.6d). A flash is two fifths of what was asked
+  // for and never more than a sixth of the way to solid; what it loses in light it gets back as a
+  // pinch of darkness at the edges of the view, so a big blow still closes the frame in on itself.
   let lastFlash = -1;
+  F.dimA = 0; F.dimDecay = 1;
   F.flash = function (color, a, dur) {
     const set = G.settings.flash == null ? 1 : G.settings.flash;
     if (set <= 0) return;
     const now = performance.now();
     a *= set * (now - lastFlash < 340 ? 0.35 : 1);
     lastFlash = now;
+    const dim = Math.min(0.62, a * 1.15);
+    if (dim > F.dimA) { F.dimA = dim; F.dimDecay = Math.max(dim, 0.01) / ((dur || 0.25) * 1.7); }
+    a = Math.min(0.16, a * 0.4);
     F.flashC = color; F.flashA = Math.max(F.flashA, a); F.flashDecay = Math.max(a, 0.01) / (dur || 0.25);
   };
   F.stop = function (t) { G.hitstop = Math.max(G.hitstop || 0, t); };
@@ -170,7 +198,16 @@
   // A burst of light that lights nothing but reads as if it did.
   F.light = function (x, y, r, color, life, a) {
     if (F.lights.length > 40) F.lights.shift();
-    F.lights.push({ x, y, r, color, life: life || 0.15, max: life || 0.15, a: a == null ? 0.5 : a });
+    // (v1.6d: dimmer, and the wide ones most of all: a light is there to tint what is near it, not to hide it)
+    F.lights.push({ x, y, r, color, life: life || 0.15, max: life || 0.15, a: (a == null ? 0.5 : a) * (r > 260 ? 0.42 : r > 140 ? 0.55 : 0.7) });
+  };
+
+  // A ripple in the air: a ring that runs out from a blow and bends what is behind it, like heat.
+  // It adds no light at all. Drawn on the finished frame (see drawRipples).
+  F.ripples = [];
+  F.ripple = function (x, y, r, life, power) {
+    if (F.ripples.length >= 4) F.ripples.shift();
+    F.ripples.push({ x, y, r: r || 260, life: life || 0.34, max: life || 0.34, p: power || 1 });
   };
 
   // The bright line a blade leaves where it lands.
@@ -199,6 +236,7 @@
     const lines = [];
     for (let i = 0; i < 30; i++) lines.push({ a: (i + rnd(0, 0.9)) / 30 * G.TAU, r: rnd(90, 260), w: rnd(0.006, 0.03) });
     F.imp = { x, y, t: dur || 0.075, max: dur || 0.075, lines };
+    F.ripple(x, y, 420, 0.42, 1.3);
   };
 
   // ------------------------------------------------------------------ marks left on the floor
@@ -332,6 +370,7 @@
     if (o.heavy) {
       F.lines(x, y, 9, hot);
       F.dust(x, y, 3, { speed: [30, 120], size: [8, 15], life: [0.3, 0.6], up: 50, a: 0.26, color: SMOKE, jitter: 10 });
+      F.ripple(x, y, 120 + 90 * p, 0.26, 0.7 * p);
     }
     F.kick(c * (1.2 + 4.6 * p), s * (1.2 + 4.6 * p));
     F.rattle(1.6 + 4.4 * p);
@@ -455,6 +494,31 @@
     if (F.zoom < 0.0005) F.zoom = 0;
     if (F.joltCd > 0) F.joltCd -= dt;
     if (F.imp) { F.imp.t -= dt; if (F.imp.t <= 0) F.imp = null; }
+    if (F.dimA > 0) F.dimA = Math.max(0, F.dimA - F.dimDecay * dt);
+    for (let i = F.ripples.length - 1; i >= 0; i--) { F.ripples[i].life -= dt; if (F.ripples[i].life <= 0) F.ripples.splice(i, 1); }
+  };
+
+  // The ripples, drawn on the finished frame in the canvas's own pixels: inside each ring the
+  // picture is drawn again a little larger about the ring's centre, so everything behind it bends.
+  F.drawRipples = function (ctx, canvas, k) {
+    if (!F.ripples.length) return;
+    const z = 1 + F.zoom;
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
+    for (const r of F.ripples) {
+      const u = 1 - r.life / r.max, e = G.ease.outCubic(u);
+      const cx = ((r.x - G.cam.x - G.W / 2) * z + G.W / 2 + F.shakeX) * k, cy = ((r.y - G.cam.y - G.H / 2) * z + G.H / 2 + F.shakeY) * k;
+      const R = (20 + r.r * e) * k, w = (10 + 26 * r.p * (1 - u)) * k, s = 1 + 0.045 * r.p * (1 - u);
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(cx, cy, R + w, 0, G.TAU); ctx.arc(cx, cy, Math.max(0.1, R - w), 0, G.TAU, true);
+      ctx.clip();
+      ctx.translate(cx, cy); ctx.scale(s, s); ctx.translate(-cx, -cy);
+      ctx.drawImage(canvas, 0, 0);
+      ctx.restore();
+    }
+    ctx.restore();
   };
 
   // ------------------------------------------------------------------ drawing
@@ -504,12 +568,13 @@
 
   F.draw = function (ctx) {
     const parts = F.parts;
-    // light first, so smoke and debris sit in front of it
-    ctx.globalCompositeOperation = 'lighter';
+    // light first, so smoke and debris sit in front of it. It is screened on, not added: piled up,
+    // it comes to rest at its own colour instead of at white.
+    ctx.globalCompositeOperation = 'screen';
     for (let i = 0; i < F.lights.length; i++) {
       const l = F.lights[i], k = l.life / l.max;
-      ctx.globalAlpha = l.a * k * k;
-      ctx.drawImage(F.glow(l.color), l.x - l.r, l.y - l.r, l.r * 2, l.r * 2);
+      ctx.globalAlpha = Math.min(1, l.a * 1.5 * k * k);
+      ctx.drawImage(lamp(l.color), l.x - l.r, l.y - l.r, l.r * 2, l.r * 2);
     }
     ctx.globalAlpha = 1;
     ctx.globalCompositeOperation = 'source-over';
@@ -560,7 +625,9 @@
       const q = F.cuts[i], k = q.life / q.max;
       const L = q.len * (0.45 + 0.55 * G.ease.outCubic(Math.min(1, (1 - k) * 4))) / 2, w = q.w * k;
       const c = Math.cos(q.ang), s = Math.sin(q.ang);
-      for (const [col, ws, al] of [[q.color, 1, 0.75], [q.hot, 0.42, 1]]) {
+      // (v1.6d: a band of colour with a thin bright core, not a white bar; the wider the cut, the thinner its core's share)
+      const core = Math.min(0.42, (2.2 + q.w * 0.1) / Math.max(1, q.w));
+      for (const [col, ws, al] of [[q.color, 1, q.w > 14 ? 0.34 : 0.56], [q.hot, core, 0.85]]) {
         ctx.fillStyle = G.rgba(col, al * Math.min(1, k * 1.6));
         ctx.beginPath();
         ctx.moveTo(q.x - c * L, q.y - s * L);
@@ -614,17 +681,30 @@
       ctx.drawImage(vigSprite(F.vigC), 0, 0, G.W, G.H);
       ctx.globalAlpha = 1;
     }
+    if (F.dimA > 0) {
+      // the pinch of darkness a flash brings with it
+      ctx.globalAlpha = Math.min(0.75, F.dimA);
+      ctx.drawImage(vigSprite('0,0,0'), 0, 0, G.W, G.H);
+      ctx.globalAlpha = 1;
+    }
     if (F.flashA > 0) {
       ctx.fillStyle = G.rgba(F.flashC, Math.min(1, F.flashA));
       ctx.fillRect(-60, -60, G.W + 120, G.H + 120);
     }
     if (F.imp) {
       const m = F.imp, x = m.x - G.cam.x, y = m.y - G.cam.y, far = 1600;
-      // with Screen flashes turned off the picture is not inverted; the lines alone carry it
+      // The impact frame is a dark one (v1.6d; it used to invert the picture, which turned a night
+      // scene white). The picture is multiplied by itself, nearly twice, so everything sinks to black except
+      // what was brightest: for a few frames only blades, eyes and the cut itself are left, with
+      // black wedges running in to the blow. With Screen flashes off, the wedges alone carry it.
       if ((G.settings.flash == null ? 1 : G.settings.flash) > 0) {
-        ctx.globalCompositeOperation = 'difference';
-        ctx.fillStyle = '#fff'; ctx.fillRect(-60, -60, G.W + 120, G.H + 120);
-        ctx.globalCompositeOperation = 'source-over';
+        ctx.save();
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.globalCompositeOperation = 'multiply';
+        ctx.drawImage(ctx.canvas, 0, 0);
+        ctx.globalAlpha = 0.6; // (the second pass is held back a little, so the arena is still faintly there)
+        ctx.drawImage(ctx.canvas, 0, 0);
+        ctx.restore();
       }
       ctx.fillStyle = '#000';
       ctx.beginPath();

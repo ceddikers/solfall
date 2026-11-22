@@ -853,7 +853,7 @@
     ctx.strokeStyle = G.rgba(col, sh ? 0.3 : 0.8); ctx.lineWidth = 1; ctx.stroke();
     arm(0);
 
-    if (a.flash > 0) D.glow(ctx, '255,255,255', 0, -44, 62, a.flash * 0.8);
+    if (a.flash > 0) D.glow(ctx, '255,255,255', 0, -44, 54, a.flash * 0.3); // (v1.6d: a tint, not a white dome)
     ctx.restore();
   }
 

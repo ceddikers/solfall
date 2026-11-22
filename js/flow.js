@@ -62,7 +62,9 @@
     const B = G.boss;
     if (P.shroudT > 0) P.shroudT -= dt;
     FL.pop = Math.max(0, FL.pop - dt * 2.5);
-    FL.dark = G.damp(FL.dark, P.ulting ? 1 : 0, P.ulting ? 14 : 5, dt);
+    // (Eos's counter dims the arena too, a little less, while its cut is on the way: see hush in player.js)
+    const dk = P.ulting ? 1 : P.hush && !P.dead ? 0.66 : 0;
+    FL.dark = G.damp(FL.dark, dk, dk ? 14 : 5, dt);
     // Flow only runs down while there is a boss to hit
     if (G.state === 'fight' && B.active && !B.invuln && !B.dying && !P.ulting) {
       // It always drains, faster the higher it stands and faster again when nothing has landed for a
@@ -390,7 +392,7 @@
     if (t >= s.dur) { FL.split = null; return; }
     const u = t / s.dur, W = canvas.width, Hh = canvas.height;
     // apart in an instant, held, then eased back together
-    const off = 20 * k * (u < 0.07 ? u / 0.07 : u < 0.45 ? 1 : Math.pow(1 - (u - 0.45) / 0.55, 2));
+    const off = 20 * (s.amp || 1) * k * (u < 0.07 ? u / 0.07 : u < 0.45 ? 1 : Math.pow(1 - (u - 0.45) / 0.55, 2));
     if (!splitCv || splitCv.width !== W || splitCv.height !== Hh) { splitCv = document.createElement('canvas'); splitCv.width = W; splitCv.height = Hh; }
     const sc = splitCv.getContext('2d');
     sc.globalCompositeOperation = 'copy'; sc.drawImage(canvas, 0, 0);

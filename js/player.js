@@ -70,7 +70,7 @@
       cast: null, // a special's body motion: Vesper's throw, Lune's release, Aster's slam (see castPose)
       recov: null, // how the weapon comes back to rest after the last attack (see recoverPose)
       // Eos: the stance she is holding, the Focus gathered in it, the draw carrying her, and the cuts made but not yet landed
-      hold: null, focus: 0, drawT: 0, drawV: null, owed: [], arc2: null,
+      hold: null, focus: 0, drawT: 0, drawV: null, owed: [], arc2: null, hush: null,
       rig: {}, // pose memory for drawing (see drawBody)
       scarf: [], ghosts: [], slashes: [], bolts: [],
       stats: { dmg: 0, hits: 0, perfect: 0, heals: 0, lances: 0 },
@@ -990,13 +990,15 @@
   function drawn(a) {
     const o = a.owe, len = G.dist(a.x0, a.y0, P.x, P.y), cx = (a.x0 + P.x) / 2, cy = (a.y0 + P.y) / 2 - 30;
     G.fx.cut(cx, cy, o.ang, len + 110, 6 + 3 * a.lvl, STAR, HOT, 0.13);
-    G.fx.cut(cx, cy, o.ang, len + 170, 1.4 + 0.5 * a.lvl, a.heavy ? GOLD : HOT, HOT, o.t + 0.1);
+    G.fx.cut(cx, cy, o.ang, len + 170, 1.4 + 0.5 * a.lvl + (o.counter ? 1.6 : 0), a.heavy || o.counter ? GOLD : HOT, HOT, o.t + 0.1);
+    if (o.counter && !o.cuts.length) { P.hush = null; G.slowT = Math.min(G.slowT || 0, 0.12); } // it cut nothing: no counter to wait for
     if (a.heavy && G.boon('crescent')) wave(P.x + a.dx * 20, P.y - 30 + a.dy * 20, a.dx, a.dy);
   }
 
   // The blade is home, and what it cut finds out.
   function landCut(o) {
     G.audio.play('sheath');
+    if (P.hush === o) P.hush = null;
     for (const c of o.cuts) {
       const t = G.boss.targets().find((q) => q.id === c.id);
       if (!t) continue;
@@ -1006,23 +1008,54 @@
       if (!res) { G.audio.play('tink'); G.fx.tink(x, y, o.ang); continue; }
       P.gain(C.DRAW_GAIN[lvl - 1]);
       G.fx.stop([0.05, 0.08, 0.14][lvl - 1]); G.fx.shake([4, 8, 16][lvl - 1]);
-      G.fx.cut(x, y, o.ang, [240, 440, 900][lvl - 1], [9, 16, 28][lvl - 1], STAR, HOT, [0.22, 0.3, 0.42][lvl - 1]);
+      G.fx.cut(x, y, o.ang, [240, 440, 900][lvl - 1], [9, 15, 20][lvl - 1], STAR, HOT, [0.22, 0.3, 0.42][lvl - 1]);
       G.fx.hit(x, y, o.ang, { heavy: lvl >= 2, thrust: lvl < 2, power: 0.8 + 0.2 * lvl, col: o.heavy ? GOLD : STAR, hot: HOT });
       // light that drifts down from the cut like petals
       G.fx.burst(x, y, { n: 4 + 5 * lvl, color: STAR, speed: [30, 210], life: [0.7, 1.5], size: [1.6, 3.2], grav: 90, wob: 110, drag: 1.4, jitter: 18 });
       if (lvl >= 2) G.fx.ring(x, y, { r0: 8, r1: 60 + 30 * lvl, life: 0.3, color: o.heavy ? GOLD : STAR, width: 3 + 2 * lvl });
+      const counter = o.heavy && em.kind === 'riposte';
       if (o.heavy) {
-        G.fx.cut(x, y, o.ang, 900, 13, GOLD, HOT, 0.52);
-        G.fx.punch(0.04); G.fx.flash(HOT, 0.1, 0.25); G.fx.impact(x, y, 0.07);
+        G.fx.cut(x, y, o.ang, 900, 7, GOLD, HOT, 0.52);
+        G.fx.punch(0.04); G.fx.flash(HOT, 0.1, 0.25); G.fx.impact(x, y, counter ? 0.11 : 0.07);
         G.fx.lines(x, y, 14, HOT, { r0: 24 });
         G.fx.light(x, y, 220, HOT, 0.25, 0.45);
         G.fx.burst(x, y, { n: 12, color: GOLD, speed: [200, 760], life: [0.15, 0.5], kind: 'spark', size: [2.5, 4.5] });
         G.audio.play('slam');
       }
       G.audio.play(lvl >= 2 ? 'hitHeavy' : 'hit');
+      if (counter) counterLand(x, y, o);
       struck(t, x, y);
       G.moments.landed(em, x, y, o.ang, o.heavy);
     }
+  }
+
+  // The full draw, landed as a counter: the biggest thing she does outside her Dawnbreak. The cut
+  // crosses the whole arena, the picture slips along it, the ground under the boss gives, and the
+  // light that comes off it falls like petals the length of the line.
+  function counterLand(x, y, o) {
+    const cs = Math.cos(o.ang), sn = Math.sin(o.ang);
+    G.fx.stop(0.2); G.fx.shake(24); G.fx.punch(0.065); G.fx.kick(cs * 14, sn * 14);
+    G.fx.flash(GOLD, 0.2, 0.3);
+    G.fx.cut(x, y, o.ang, 2800, 16, STAR, HOT, 0.26);
+    G.fx.cut(x, y, o.ang, 2800, 6, GOLD, HOT, 0.7);
+    // what the blow does to the place, rather than how bright it is: the air bends twice, the floor
+    // under the boss cracks and throws up stone, and dust runs out along the ground both ways
+    G.fx.ripple(x, y, 620, 0.55, 1.6);
+    G.fx.crack(x, 1.6, STAR);
+    G.fx.burst(x, FLOOR - 4, { n: 14, color: '22,18,32', speed: [220, 760], angle: -Math.PI / 2, spread: 2.2, life: [0.6, 1.2], size: [5, 11], kind: 'chunk', grav: 1500 });
+    for (const d of [-1, 1]) G.fx.dust(x + d * 30, FLOOR, 7, { dir: d, speed: [160, 620], size: [8, 15], life: [0.5, 1.1], up: 30, a: 0.4 });
+    G.flow.split = { t0: performance.now(), x: x - G.cam.x, y: y - G.cam.y, ang: o.ang, dur: 0.42, amp: 0.55 };
+    G.fx.shatter(x, y, STAR, 22, { hot: HOT, r: 440, r0: 40 });
+    G.fx.ring(x, y, { r0: 20, r1: 340, life: 0.5, color: GOLD, width: 10 });
+    G.fx.ring(x, y, { r0: 10, r1: 200, life: 0.36, color: HOT, width: 6 });
+    G.fx.lines(x, y, 22, GOLD, { r0: 30, speed: [700, 1400] });
+    G.fx.light(x, y, 240, GOLD, 0.4, 0.5);
+    G.fx.thud(x, FLOOR, 1.6, { col: STAR });
+    for (let i = -3; i <= 3; i++) {
+      G.fx.burst(x + cs * i * 90, y + sn * i * 90, { n: 7, color: i % 2 ? HOT : STAR, speed: [30, 260], life: [0.9, 1.9], size: [1.8, 3.6], grav: 80, wob: 120, drag: 1.3, jitter: 40 });
+    }
+    G.fx.burst(x, y, { n: 26, color: GOLD, speed: [260, 1000], life: [0.2, 0.6], kind: 'spark', size: [2.5, 5], grav: 500 });
+    G.audio.play('finish'); G.audio.play('bell'); G.audio.play('shatter');
   }
 
   // Eos's special: a cut thrown across the arena as a crescent of light.
@@ -1067,6 +1100,21 @@
       if (H.weapon === 'bow') { arrow(dx / d, dy / d, Math.round(H.combo[2].dmg * 2 * weaponMult(true)), true, 0.7); G.audio.play('arrowHeavy'); }
       else { fireLance(dx / d, dy / d); G.audio.play('flare'); }
     }
+    if (H.draw) hush();
+  }
+
+  // Eos drew through a blow (or slipped one while a cut of hers was still on its way): that cut is
+  // now a counter. The arena goes dark and slow around her and holds its breath until the blade is
+  // home (see landCut for what happens then).
+  function hush() {
+    const o = P.owed.find((q) => !q.counter && (q.cuts.length || (P.atk && P.atk.owe === q)));
+    if (!o) return;
+    o.counter = true; P.hush = o;
+    G.fx.slow(0.6, o.t / 0.6 + 0.06);
+    G.fx.stop(0.09);
+    G.fx.vig(GOLD, 0.34, o.t / 0.6 + 0.3);
+    G.fx.glint(mouthX(), mouthY(), 54, GOLD, 0.3);
+    G.audio.play('pulse', { k: 0.6 });
   }
 
   P.tryHit = function (dmg, srcX, src) {
