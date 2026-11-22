@@ -280,10 +280,15 @@
     if (G.state === 'hub') {
       G.hub.drawFore(ctx); G.hub.drawOver(ctx);
       ctx.translate(G.cam.x, 0); // the vignette stays on the view, not on the ground
+    } else {
+      // the floor takes a faint reflection of whatever is bright above it (see post.js)
+      G.post.reflect(ctx, canvas, ((G.FLOOR - G.cam.y - G.H / 2) * z + G.H / 2 + F.shakeY) * k, k);
     }
     G.arena.drawFront(ctx);
     if (G.debug.boxes) G.boss.drawDebug(ctx);
     ctx.restore();
+    G.post.finish(ctx, canvas, 1 / 60);
+    ctx.setTransform(k, 0, 0, k, 0, 0);
     G.flow.drawCutin(ctx);
     F.drawFlash(ctx);
   }

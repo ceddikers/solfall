@@ -45,6 +45,10 @@
     dive: [0.15, -40, 2.75, 5, -8, -6, -2, 12, -74, -1.5, -8, -74, -1.65],
     stuck: [0.75, -22, 0, 19, 0, -19, 0, 21, -8, 1.57, -10, -30, 2.7],
     kneel: [0.8, -20, 0, 15, 0, -21, 0, 12, -6, 1.6, -8, -9, 1.75],
+    // on the way back to rest: a flick that throws the blades out to either side, and the hands
+    // crossing at the waist as a spent throwing arm comes home
+    flick: [0.05, -40, 0, 15, 0, -14, 0, 31, -42, 0.85, -27, -44, 2.3],
+    sheathe: [0.28, -37, 0, 12, 0, -12, 0, 7, -43, 1.95, -3, -41, 1.15],
   };
   const NP = 13;
   function runPose(t) {
@@ -584,6 +588,37 @@
     b.pose = 'skid';
     yield* wait(0.7);
   }
+
+  // Back to rest. After a cut it flicks both blades clean; after a throw the arm comes home across
+  // its waist; after an ambush it tears the blade out of the floor and springs back off it.
+  const THROWS = { knives: 1, rain: 1, hunt: 1, flurry: 1 };
+  B.recover = function* (name) {
+    const b = B.body, P = G.player;
+    if (b.hidden || b.y < FLOOR - 1) return;
+    if (b.pose === 'stuck' || b.pose === 'kneel') {
+      G.audio.play('tink');
+      G.fx.dust(b.x, FLOOR, 4, { speed: [30, 150], size: [5, 9], up: 40 });
+      G.fx.burst(b.x + b.face * 14, FLOOR - 6, { n: 6, color: G.pal().hot, speed: [100, 380], angle: -Math.PI / 2, spread: 1.6, life: [0.15, 0.35], kind: 'spark', size: [1.6, 3], grav: 800 });
+      const x0 = b.x, x1 = G.clamp(b.x - b.face * 58, WL + 40, WR - 40);
+      b.pose = 'air';
+      let e = 0;
+      while (e < 0.24) { e += yield; const k = Math.min(1, e / 0.24); b.x = G.lerp(x0, x1, k); b.y = FLOOR - 4 * 34 * k * (1 - k); }
+      b.y = FLOOR; b.face = P.x > b.x ? 1 : -1; b.pose = 'crouch';
+      yield* wait(0.1);
+    } else if (THROWS[name]) {
+      b.pose = 'sheathe';
+      yield* wait(0.22);
+    } else {
+      b.face = P.x > b.x ? 1 : -1; b.pose = 'flick';
+      G.audio.play('glint');
+      yield* wait(0.06);
+      for (const s of [1, -1]) G.fx.glint(b.x + b.face * s * 40, b.y - 34, 16, G.pal().hot, 0.18);
+      G.fx.burst(b.x + b.face * 40, b.y - 34, { n: 4, color: G.pal().boss, kind: 'spark', angle: b.face > 0 ? 0.6 : Math.PI - 0.6, spread: 0.6, speed: [120, 340], life: [0.1, 0.25], size: [1.2, 2.2], grav: 500 });
+      yield* wait(0.18);
+    }
+    b.pose = 'idle';
+    yield* wait(0.1);
+  };
 
   B.ATTACKS = {
     hunt: atkHunt,

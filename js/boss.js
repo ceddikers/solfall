@@ -454,6 +454,11 @@
     if (!ATTACKS[name] || !canUse(name)) name = B.phase === 3 ? 'rain' : 'lance';
     B.attackName = name;
     yield* ATTACKS[name]();
+    // back to rest: a hand that was used shakes itself out and flexes on its way home; if it was the
+    // core's doing alone, the eye closes for a moment
+    const used = B.hands.filter((h) => h.ctrl && usable(h));
+    for (const h of used) h.flex = 1;
+    if (!used.length && !B.core.embedded) B.core.blink = 0.24;
     B.attackName = '';
     release();
   }
@@ -1391,8 +1396,11 @@
       const tx = G.clamp(c.x + h.side * (B.spread + Math.sin(B.t * 0.8 + h.side) * 16), 90, 1190);
       const ty = c.y + 128 + Math.cos(B.t * 1.1 + h.side * 2) * 18;
       h.x = G.damp(h.x, tx, 4.5, dt); h.y = G.damp(h.y, ty, 4.5, dt);
-      h.rot = G.damp(h.rot, h.side * 0.1, 7, dt);
-      h.curl = G.damp(h.curl, 0.13 + 0.07 * Math.sin(B.t * 1.3 + h.side * 1.7), 7, dt);
+      // after an attack: it shakes itself out, closes to a fist once and opens again
+      const fl = h.flex || 0;
+      h.flex = Math.max(0, fl - dt * 1.7);
+      h.rot = G.damp(h.rot, h.side * 0.1 + Math.sin(B.t * 27 + h.side) * 0.16 * fl * fl, 7, dt);
+      h.curl = G.damp(h.curl, 0.13 + 0.07 * Math.sin(B.t * 1.3 + h.side * 1.7) + 0.8 * Math.sin(Math.PI * Math.min(1, fl * 1.25)) * (fl > 0 ? 1 : 0), fl > 0 ? 12 : 7, dt);
     }
 
     // an occasional blink while it is not busy

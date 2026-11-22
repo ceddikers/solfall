@@ -676,6 +676,39 @@
     yield* wait(0.5);
   }
 
+  // Back to rest. The staff comes down and what is left of the spell leaves it in its element's own
+  // way: ice drops off the head of the staff in splinters, fire goes out in smoke, lightning crawls
+  // down the wood and earths itself. Then the Magus sinks a little in the air and floats back up.
+  const ELEM_OF = { shards: ICE, rime: ICE, crystals: ICE, blizzard: ICE, fireball: FIRE, firewall: FIRE, comet: FIRE, cataclysm: FIRE, bolts: BOLT, spheres: BOLT, storm: BOLT, invoke: BOLT };
+  B.recover = function* (name) {
+    const b = B.body, el = ELEM_OF[name] || ICE;
+    if (b.hidden || b.spent) return;
+    const o = tip();
+    b.want = 0; b.charge = 0; setElem(el);
+    if (el === ICE) {
+      G.audio.play('shard');
+      G.fx.shards(o.x, o.y, 7, ICE.boss, { speed: [20, 160], size: [2, 5], life: [0.5, 0.9], spread: 2.4 });
+      G.fx.dust(o.x, o.y, 2, { speed: [10, 40], size: [7, 12], life: [0.5, 0.9], up: -20, a: 0.3, color: '200,230,250' });
+    } else if (el === FIRE) {
+      G.fx.dust(o.x, o.y, 5, { speed: [10, 60], size: [8, 15], life: [0.6, 1.1], up: 110, a: 0.42, color: '70,62,66' });
+      G.fx.burst(o.x, o.y, { n: 6, color: FIRE.boss, speed: [20, 110], life: [0.4, 0.9], size: [1.6, 3], grav: -120, wob: 80 });
+    } else G.audio.play('zap');
+    const y0 = b.y;
+    let e = 0;
+    while (e < 0.34) {
+      const dt = yield;
+      e += dt;
+      const k = Math.min(1, e / 0.34);
+      b.y = y0 + Math.sin(k * Math.PI) * 9; // sinks, and floats back
+      if (el === BOLT && Math.random() < dt * 60) {
+        // it runs down the staff to the hand
+        const q = Math.random(), hx = b.x + b.face * 26, hy = b.y - 62;
+        G.fx.spawn({ kind: 'spark', x: G.lerp(o.x, hx, q) + G.rand(-4, 4), y: G.lerp(o.y, hy, q), vx: G.rand(-140, 140), vy: G.rand(60, 260), life: G.rand(0.06, 0.14), size: G.rand(1.2, 2.2), color: BOLT.hot, len: 0.05 });
+      }
+    }
+    b.y = y0; b.elem = null;
+  };
+
   B.ATTACKS = {
     invoke: atkInvoke,
     comet: atkComet,

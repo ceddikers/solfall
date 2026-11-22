@@ -59,6 +59,7 @@
       ult: 0, ulting: false, vanish: false, shroudT: 0,
       flT: 0, flCd: 0, flBrazen: false, lifts: 0,
       cast: null, // a special's body motion: Vesper's throw, Lune's release, Aster's slam (see castPose)
+      recov: null, // how the weapon comes back to rest after the last attack (see recoverPose)
       rig: {}, // pose memory for drawing (see drawBody)
       scarf: [], ghosts: [], slashes: [], bolts: [],
       stats: { dmg: 0, hits: 0, perfect: 0, heals: 0, lances: 0 },
@@ -363,7 +364,17 @@
       } else a.t += dt;
       if (!a.swung && a.t >= a.a0) { a.swung = true; if (a.kind === 'shot') loose(a); else swing(a); }
       if (a.kind !== 'shot' && a.t >= a.a0 && a.t <= a.a1) checkHits(a);
-      if (a.t >= a.dur) P.atk = null;
+      if (a.t >= a.dur) { P.atk = null; P.recov = recoverOf(a); }
+    }
+    // the way back to rest: only ever a picture, it never holds a button back
+    if (P.recov) {
+      const r = P.recov;
+      r.t += dt;
+      if (P.atk || P.dashT > 0 || P.stun > 0 || P.cast || P.healT > 0 || P.flT > 0) P.recov = null;
+      else {
+        if (!r.fx && r.t >= r.dur * r.at) { r.fx = true; recoverFx(r); }
+        if (r.t >= r.dur) P.recov = null;
+      }
     }
 
     // --- Dawnbreak: the ultimate, when its meter is full
@@ -1154,6 +1165,72 @@
     ctx.globalCompositeOperation = 'source-over';
   }
 
+  // ---- the way back to rest. Every attack ends in its own: Vesper lets a first cut swing back to
+  // her side, brings a rising cut down behind her, and flicks the light off the blade after a
+  // finisher; Aster heaves the maul over the top onto her shoulder (after a smash she has to wrench
+  // it out of the ground first); Lune lets the bow drop after a shot and spins it once after the
+  // heavy arrow. It is drawing only: any button cuts it short.
+  function recoverOf(a) {
+    if (a.kind === 'shot') return { kind: a.heavy ? 'spin' : 'drop', t: 0, dur: a.heavy ? 0.4 : 0.22, at: 0.05, dx: a.dx, dy: a.dy };
+    if (a.thrust) return { kind: 'thrust', t: 0, dur: 0.24, at: 2 };
+    if (a.kind !== 'side') return null;
+    if (H.weapon === 'maul') return a.heavy ? { kind: 'smash', t: 0, dur: 0.5, at: 0.3 } : { kind: 'sweep', t: 0, dur: 0.34, at: 0.8 };
+    if (a.heavy) return { kind: 'fin', t: 0, dur: 0.4, at: 0.2 };
+    return a.idx === 1 ? { kind: 'cut2', t: 0, dur: 0.28, at: 2 } : { kind: 'cut1', t: 0, dur: 0.24, at: 2 };
+  }
+  function recoverFx(r) {
+    const f = P.facing;
+    if (r.kind === 'fin') {
+      // the flick: light thrown off the blade
+      const x = P.x + f * 50, y = P.y - 22;
+      G.audio.play('glint');
+      G.fx.glint(x, y, 22, HOT, 0.2);
+      G.fx.burst(x, y, { n: 7, color: STAR, kind: 'spark', angle: f > 0 ? 0.5 : Math.PI - 0.5, spread: 0.7, speed: [160, 460], life: [0.12, 0.3], size: [1.4, 2.4], grav: 600 });
+    } else if (r.kind === 'smash') {
+      // wrenched out of the ground
+      G.audio.play('tink');
+      G.fx.burst(P.x + f * 52, P.y - 4, { n: 5, color: '22,18,32', speed: [80, 300], angle: -Math.PI / 2, spread: 1.6, life: [0.4, 0.8], size: [3, 7], kind: 'chunk', grav: 1400 });
+      if (P.onGround) G.fx.dust(P.x + f * 50, P.y, 3, { speed: [20, 110], size: [5, 9], up: 40 });
+    } else if (r.kind === 'sweep') {
+      // it lands on her shoulder
+      if (P.onGround) { P.squash = Math.min(P.squash, -0.07); G.audio.play('stepHeavy'); }
+    } else if (r.kind === 'spin') G.audio.play('whoosh');
+  }
+  // rest: where the weapon would be held if nothing had just happened
+  function recoverPose(h, r, SH, rest) {
+    const u = G.clamp(r.t / r.dur, 0, 1), sm = (x) => { x = G.clamp(x, 0, 1); return x * x * (3 - 2 * x); };
+    const home = sm((u - 0.45) / 0.55); // how far the hands have gone back to where they rest
+    const toRest = (from, k) => from + G.angDiff(from, rest.ang) * k;
+    if (h.weapon === 'sword') {
+      let ang, len = 36;
+      if (r.kind === 'cut1') ang = u < 0.25 ? G.lerp(1.3, 0.95, sm(u / 0.25)) : toRest(0.95, sm((u - 0.25) / 0.75));
+      else if (r.kind === 'cut2') ang = u < 0.22 ? G.lerp(-1.6, -1.95, sm(u / 0.22)) : toRest(-1.95, sm((u - 0.22) / 0.78));
+      else if (r.kind === 'fin') { ang = u < 0.2 ? G.lerp(1.5, 0.62, sm(u / 0.2)) : u < 0.5 ? 0.62 : toRest(0.62, sm((u - 0.5) / 0.5)); len = G.lerp(40, 36, u); }
+      else ang = u < 0.3 ? -0.05 : toRest(-0.05, sm((u - 0.3) / 0.7));
+      const fx = G.lerp(1 + Math.cos(ang) * 11, rest.fx, home), fy = G.lerp(SH + Math.sin(ang) * 11, rest.fy, home);
+      return { fx, fy, bx: G.lerp(-4, rest.bx, home), by: G.lerp(-27, rest.by, home), ang, len };
+    }
+    if (h.weapon === 'maul') {
+      // over the top: down in front, up, and back onto the shoulder, running a little past it and settling
+      const start = r.kind === 'smash' ? 1.5 : 1.3, hold = r.kind === 'smash' ? 0.3 : 0.08;
+      let ang = start;
+      if (u > hold) {
+        const q = (u - hold) / (1 - hold);
+        ang = q < 0.75 ? G.lerp(start, -2.66, sm(q / 0.75)) : G.lerp(-2.66, -2.42, sm((q - 0.75) / 0.25));
+      }
+      const fx = G.lerp(1 + Math.cos(ang) * 10.5, rest.fx, home), fy = G.lerp(SH + Math.sin(ang) * 10.5, rest.fy, home);
+      return { fx, fy, bx: fx - Math.cos(ang) * 7.5, by: fy - Math.sin(ang) * 7.5, ang, len: 34, behind: ang < -1.7 };
+    }
+    // bow
+    const aimA = Math.atan2(r.dy, Math.max(0.001, Math.abs(r.dx)));
+    let ang;
+    if (r.kind === 'spin') ang = G.lerp(aimA, rest.ang + G.TAU, sm(u));           // once round on its way down
+    else ang = u < 0.4 ? G.lerp(aimA, aimA + 0.5, sm(u / 0.4)) : toRest(aimA + 0.5, sm((u - 0.4) / 0.6));
+    const c = Math.cos(aimA), sn = Math.sin(aimA);
+    const fx = G.lerp(0.5 + c * 12.5, rest.fx, home), fy = G.lerp(SH + sn * 12.5, rest.fy, home);
+    return { fx, fy, bx: G.lerp(fx - c * 5, rest.bx, home), by: G.lerp(fy - sn * 5, rest.by, home), ang, pull: 0, len: 0, twang: r.kind === 'drop' ? 1 - u : 0 };
+  }
+
   // Angle of a melee weapon through its swing: w0 (where the wind-up starts) to a0 (where the cut
   // starts) to a1 (where it ends). A chain goes down, then up, then down: the first cut is lifted
   // overhead and falls; the second rides that weight back up from where the first ended; the
@@ -1211,6 +1288,10 @@
       if (h.weapon === 'sword') return { fx: 5, fy: -27 + q, bx: 2.5, by: -28.5 + q, ang: G.lerp(2.55, 1.62, k), len: 36 };
       if (h.weapon === 'maul') return { fx: 6, fy: -26 + q, bx: 3, by: -29 + q, ang: G.lerp(-2.42, 1.42, k), len: 34 };
       return { fx: 6.5, fy: -26 + q, bx: 3, by: -28.5 + q, ang: G.lerp(0.16, 1.25, k), pull: 0, len: 0 };
+    }
+    if (s.recov && !a && !s.dash && !s.plunge) {
+      const rest = weaponPose(h, Object.assign({}, s, { recov: null }), breath);
+      return recoverPose(h, s.recov, SH, rest);
     }
     if (h.weapon === 'sword') {
       if (a && a.kind !== 'shot') {
@@ -1587,7 +1668,7 @@
     ctx.translate(0, bob - breath * 0.5);
     let W = weaponPose(h, s, breath);
     if (R) {
-      if (a || s.flT > 0 || s.cast || R.wang == null) { R.wfx = W.fx; R.wfy = W.fy; R.wbx = W.bx; R.wby = W.by; R.wang = W.ang; }
+      if (a || s.flT > 0 || s.cast || s.recov || R.wang == null) { R.wfx = W.fx; R.wfy = W.fy; R.wbx = W.bx; R.wby = W.by; R.wang = W.ang; }
       else {
         // back to rest after a swing, or from one carry to another: quick, but not in one frame
         const kk = 1 - Math.exp(-22 * rdt);

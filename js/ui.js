@@ -10,6 +10,7 @@
     shake: { values: [0, 0.5, 1], label: (v) => (v === 0 ? 'Off' : v === 0.5 ? 'Half' : 'Full') },
     flash: { values: [0, 0.4, 1], label: (v) => (v === 0 ? 'Off' : v === 0.4 ? 'Reduced' : 'Full') },
     numbers: { values: [false, true], label: (v) => (v ? 'On' : 'Off') },
+    polish: { values: [false, true], label: (v) => (v ? 'On' : 'Off') },
     hints: { values: [false, true], label: (v) => (v ? 'On' : 'Off') },
     firstFoe: { values: ['random', 'warden', 'mage', 'assassin', 'knight'], label: (v) => (G.bosses[v] ? G.bosses[v].short : 'Random') },
     music: { slider: true },

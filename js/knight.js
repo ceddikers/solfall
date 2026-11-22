@@ -55,6 +55,11 @@
     whirl: [0.1, -54, 20, 0, -20, 0, 30, -70, 0.02, 999, 0],
     air: [0.0, -58, 12, -16, -14, -8, 4, -120, -1.75, 999, 0],
     kneel: [0.5, -34, 24, 0, -30, 0, 26, -98, 1.5708, -6, -30],
+    // on the way back to rest: the blade stood up in front of it, leaning back against a sword that
+    // is stuck, and pushing itself up off one knee
+    heft: [-0.04, -60, 18, 0, -18, 0, 18, -98, -1.25, 999, 0],
+    wrench: [-0.22, -52, 22, 0, -22, 0, 30, -86, 1.42, 999, 0],
+    push: [0.34, -38, 24, 0, -28, 0, 26, -88, 1.5708, -8, -30],
   };
   const NP = 11;
   function walkPose(t) {
@@ -672,6 +677,39 @@
     yield* cut(true, 0.52 * T);
     yield* drag();
   }
+
+  // Back to rest. Whatever it has just done, the sword ends on its shoulder, and how it gets there
+  // depends on where the sword was left: stuck in the ground it is wrenched free; dropped after a
+  // crash it is pushed up off; low or out in front it is stood up and let fall back.
+  B.recover = function* () {
+    const b = B.body, at = b.pose;
+    if (b.unarmed || b.y < FLOOR - 1) return;
+    b.fast = false; b.spinning = false;
+    if (at === 'slam' || at === 'plant' || at === 'kneel') {
+      b.pose = 'wrench';
+      yield* wait(0.14);
+      G.audio.play('tink'); G.fx.shake(3);
+      G.fx.burst(b.x + b.face * 44, FLOOR - 4, { n: 6, color: '22,18,32', speed: [100, 360], angle: -Math.PI / 2, spread: 1.6, life: [0.4, 0.8], size: [4, 8], kind: 'chunk', grav: 1400 });
+      G.fx.dust(b.x + b.face * 44, FLOOR, 3, { speed: [20, 110], size: [6, 10], up: 40 });
+      b.fast = true; b.pose = 'heft';
+      yield* wait(0.16);
+      b.fast = false;
+    } else if (at === 'crash') {
+      b.pose = 'push';
+      yield* wait(0.3);
+      b.pose = 'heft';
+      yield* wait(0.2);
+    } else {
+      b.pose = 'heft';
+      yield* wait(0.22);
+    }
+    b.pose = 'idle';
+    yield* wait(0.24);
+    // it comes down on the shoulder and the whole frame takes the weight
+    if (b.pv) b.pv[1] += 46;
+    G.audio.play('stepHeavy'); G.fx.kick(0, 1.2);
+    yield* wait(0.1);
+  };
 
   B.ATTACKS = {
     sever: atkSever,

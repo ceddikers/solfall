@@ -3,7 +3,7 @@
 
 const G = window.G = {};
 
-G.VERSION = '1.4b';
+G.VERSION = '1.5a';
 G.bgK = 1; // how many pixels per unit the painted backdrops are kept at (set in game.js, resize)
 G.W = 1280;          // logical view size
 G.H = 720;
@@ -151,7 +151,7 @@ G.store = {
 };
 
 G.settings = Object.assign(
-  { music: 0.55, sfx: 0.8, shake: 1, flash: 1, numbers: true, difficulty: 1, hints: true, firstFoe: 'random', keys: null },
+  { music: 0.55, sfx: 0.8, shake: 1, flash: 1, numbers: true, polish: true, difficulty: 1, hints: true, firstFoe: 'random', keys: null },
   G.store.load('settings', {})
 );
 G.saveSettings = () => G.store.save('settings', G.settings);

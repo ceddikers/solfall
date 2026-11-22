@@ -2,7 +2,7 @@
 
 A side-on boss rush for the browser: three heroes, four three-phase bosses, played as a run of
 ever-harder trials. You pick a hero and a relic before the run and win a boon after each victory.
-Version 1.4b.
+Version 1.5a.
 
 This is an early slice of a planned boss-rush roguelite (short runs, a boon after each boss,
 bosses drawn from a pool). A run meets the four bosses in a shuffled order, then meets them again, harder.
@@ -113,6 +113,50 @@ hero (`tools/feel-check.js`).
 - Settings, Reset progress erases Sunshards, upgrades, trophies and records (it has to be chosen twice).
 
 Not done: touch controls, a colour-blind alternative to red-orange warnings, gamepad rebinding.
+
+## A finished picture, and a way back to rest (new in v1.5a)
+
+**The finishing pass** (`js/post.js`). Nothing about what is drawn changed; this is what is done to
+the frame afterwards, the way a film is graded.
+
+- **Bloom.** A small copy of the frame, multiplied by itself so only what is bright survives, is
+  laid back over it as light at three sizes. Blades, eyes, spells and the eclipse now spill a little
+  past their edges instead of ending in a hard line.
+- **Tone.** The arena's own light from above and a cool dusk below, as a soft-light wash.
+- **Grain.** A fine film grain that moves 24 times a second, so large flat fills stop looking flat.
+- **Reflection.** The floor takes a faint, quickly fading reflection of whatever is bright just above it.
+- **Depth.** Far scenery stands in haze up to its knees; shafts of the arena's light slant down behind
+  the fight; a little fog drifts in front of it as well as behind.
+- **The floor** is dressed stone: a lit lip, blocks of uneven width, a grain to the face.
+
+All of it (the floor's stonework aside) goes off with **Settings > Glow, grain and reflections**, for
+slow machines or taste. It costs three small copies of the frame and four full-screen draws.
+
+**Every move has its own way back to rest.**
+
+| Who | After | The way back |
+|---|---|---|
+| Vesper | the first cut | a small flick outward, then the blade swings back to her side |
+| | the rising cut | it carries on up a little, then comes down behind her |
+| | the finisher | she flicks the light off the blade, holds, and lowers it |
+| | a thrust | the arm stays out a moment, then the point drops and comes back |
+| Aster | the sweep | the maul goes over the top and lands on her shoulder (she takes the weight) |
+| | the smash | she wrenches it out of the ground first |
+| Lune | a shot | the bow drops with the string still humming |
+| | the heavy arrow | the bow goes once round on its way down |
+| Knight | any cut | the blade is stood up in front of it and let fall back onto the shoulder |
+| | sword in the ground | it leans back and wrenches it free |
+| | a crash or a whirl | it pushes itself up off one knee |
+| Veil | a cut or a lunge | it flicks both blades clean |
+| | a throw | the arm comes home across its waist |
+| | an ambush | it tears the blade from the floor and springs back off it |
+| Magus | ice / fire / lightning | splinters drop from the staff / it goes out in smoke / it crawls down the wood; then the Magus sinks and floats back |
+| Warden | a hand attack | the hand shakes itself out and makes a fist once on its way home |
+| | the core alone | the eye closes for a moment |
+
+For the heroes it is drawing only: any button cuts it short, so nothing is slower to respond. For the
+duelling bosses the time it takes is taken out of the wait before their next attack, so the pace of a
+fight is unchanged (`B.recover`, `B.recT` in `bosskit.js`).
 
 ## Swings with weight (new in v1.4b)
 

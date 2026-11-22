@@ -451,17 +451,36 @@
     else if (P.scene === 'camp') camp(x, P, F);
     else colonnade(x, P, F);
 
-    // floor slab
+    // air between here and there: everything far away stands in haze up to its knees, so the
+    // skyline sits behind the fight instead of on top of it
+    g = x.createLinearGradient(0, F - 230, 0, F + 4);
+    g.addColorStop(0, G.rgba(P.rim, 0)); g.addColorStop(0.7, G.rgba(P.rim, 0.1)); g.addColorStop(1, G.rgba(P.rim, 0.24));
+    x.fillStyle = g; x.fillRect(L, F - 230, R - L, 234);
+
+    // floor slab: dressed stone with a worn, lit lip, a course of blocks under it, and a grain to the face
     g = x.createLinearGradient(0, F, 0, B);
-    g.addColorStop(0, P.floorTop); g.addColorStop(0.16, P.floor); g.addColorStop(1, '#000');
+    g.addColorStop(0, P.floorTop); g.addColorStop(0.1, P.floor); g.addColorStop(0.5, '#05040a'); g.addColorStop(1, '#000');
     x.fillStyle = g; x.fillRect(L, F, R - L, B - F);
-    x.fillStyle = G.rgba(P.rim, 0.5); x.fillRect(L, F, R - L, 2);
-    x.fillStyle = G.rgba(P.rim, 0.1); x.fillRect(L, F + 2, R - L, 5);
-    x.strokeStyle = 'rgba(0,0,0,0.45)'; x.lineWidth = 2;
-    for (let px = 80; px < G.W; px += 96) {
-      x.beginPath(); x.moveTo(px, F + 3); x.lineTo(px, F + 22); x.stroke();
+    r = lcg(203);
+    for (let i = 0; i < 520; i++) {
+      const sx = L + r() * (R - L), sy = F + 4 + r() * r() * 70, sw = 1 + r() * 5;
+      x.fillStyle = r() < 0.5 ? G.rgba(P.rim, 0.035) : 'rgba(0,0,0,0.12)';
+      x.fillRect(sx, sy, sw, 1);
     }
-    x.fillStyle = 'rgba(0,0,0,0.35)'; x.fillRect(L, F + 22, R - L, 2);
+    // the lip: a bright line where the top meets the face, light spilling a little way down it
+    g = x.createLinearGradient(0, F, 0, F + 14);
+    g.addColorStop(0, G.rgba(P.rim, 0.26)); g.addColorStop(1, G.rgba(P.rim, 0));
+    x.fillStyle = g; x.fillRect(L, F, R - L, 14);
+    x.fillStyle = G.rgba(P.rim, 0.7); x.fillRect(L, F, R - L, 1.5);
+    x.fillStyle = 'rgba(255,255,255,0.16)'; x.fillRect(L, F, R - L, 0.75);
+    // a course of blocks: seams that are not all the same width apart, each with a lit edge
+    r = lcg(57);
+    for (let px = 40; px < G.W; px += 70 + r() * 70) {
+      x.fillStyle = 'rgba(0,0,0,0.5)'; x.fillRect(px, F + 2, 1.5, 22);
+      x.fillStyle = G.rgba(P.rim, 0.1); x.fillRect(px + 1.5, F + 2, 1, 22);
+    }
+    x.fillStyle = 'rgba(0,0,0,0.5)'; x.fillRect(L, F + 24, R - L, 1.5);
+    x.fillStyle = G.rgba(P.rim, 0.08); x.fillRect(L, F + 25.5, R - L, 1);
     // phase 3: glowing cracks across the floor
     if (pi === 3) {
       r = lcg(91);
@@ -755,6 +774,20 @@
     } else {
       ctx.drawImage(A.bgs[A.phase], -PAD, -PAD, BW, BH);
     }
+    // shafts of the arena's light, slanting down behind the fight
+    if (G.post.on()) {
+      const sh = shaft(G.pal().rim);
+      ctx.globalCompositeOperation = 'lighter';
+      for (let i = 0; i < 5; i++) {
+        const sx = 120 + i * 262 + Math.sin(G.t * 0.11 + i * 1.7) * 40, wd = 90 + (i * 53) % 80;
+        ctx.globalAlpha = 0.5 + 0.3 * Math.sin(G.t * 0.23 + i * 2.3);
+        ctx.save();
+        ctx.transform(1, 0, -0.42, 1, sx, -60); // a column, leaned over
+        ctx.drawImage(sh, -wd / 2, 0, wd, G.FLOOR + 40);
+        ctx.restore();
+      }
+      ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
+    }
     // low mist drifting across the floor
     const mist = G.fx.glow(G.pal().rim);
     ctx.globalCompositeOperation = 'lighter';
@@ -797,7 +830,38 @@
     }
   };
 
+  // A soft column of light, brightest at the top and gone by the floor. One per colour, kept.
+  const shafts = new Map();
+  function shaft(color) {
+    let c = shafts.get(color);
+    if (!c) {
+      if (shafts.size > 10) shafts.clear();
+      c = document.createElement('canvas'); c.width = 64; c.height = 256;
+      const x = c.getContext('2d');
+      let g = x.createLinearGradient(0, 0, 64, 0);
+      g.addColorStop(0, G.rgba(color, 0)); g.addColorStop(0.5, G.rgba(color, 0.13)); g.addColorStop(1, G.rgba(color, 0));
+      x.fillStyle = g; x.fillRect(0, 0, 64, 256);
+      x.globalCompositeOperation = 'destination-in';
+      g = x.createLinearGradient(0, 0, 0, 256);
+      g.addColorStop(0, 'rgba(0,0,0,1)'); g.addColorStop(0.55, 'rgba(0,0,0,0.5)'); g.addColorStop(1, 'rgba(0,0,0,0)');
+      x.fillStyle = g; x.fillRect(0, 0, 64, 256);
+      shafts.set(color, c);
+    }
+    return c;
+  }
+
   A.drawFront = function (ctx) {
+    // a little fog in front of the fight as well as behind it, so feet stand in the place
+    if (G.post.on()) {
+      const fog = G.fx.glow(G.pal().rim);
+      ctx.globalCompositeOperation = 'lighter';
+      for (let i = 0; i < 3; i++) {
+        const span = G.W + 1100, fx = span - ((i * 610 + G.t * (14 + i * 5)) % span) - 550;
+        ctx.globalAlpha = 0.045 + 0.02 * Math.sin(G.t * 0.5 + i * 2.1);
+        ctx.drawImage(fog, fx, G.FLOOR - 46 + i * 7, 900, 120);
+      }
+      ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
+    }
     drawWeather(ctx, true);
     ctx.drawImage(vignette, -PAD, -PAD, G.W + PAD * 2, G.H + PAD * 2);
   };

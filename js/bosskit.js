@@ -373,7 +373,9 @@
     }
     function* think() {
       const low = B.phase === 3 && B.hp < B.maxHp * 0.12;
-      yield* wait(B.gaps[B.phase] * G.diff().pace * (low ? 0.6 : 1));
+      // (the time its last attack took to come back to rest is taken out of the wait, so the pace is as it was)
+      yield* wait(Math.max(0.12, B.gaps[B.phase] * G.diff().pace * (low ? 0.6 : 1) - (B.recT || 0)));
+      B.recT = 0;
       let name = G.debug.forceAttack || '';
       if (name === 'none') return; // tests: stand idle
       if (!name && low && B.finale && !B.lastStand) { B.lastStand = true; name = B.finale; }
@@ -385,6 +387,14 @@
       B.attackName = name;
       B.body.ctrl = true;
       yield* B.ATTACKS[name]();
+      // every attack ends in its own way back to rest (B.recover): the Knight shoulders its sword, the
+      // Veil flicks its blades clean, the Magus lets the spell gutter out of its staff
+      if (B.recover) {
+        const t0 = B.t;
+        B.body.exposed = false;
+        yield* B.recover(name);
+        B.recT = B.t - t0;
+      }
       B.attackName = '';
       release();
     }
