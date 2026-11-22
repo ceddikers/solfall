@@ -73,8 +73,9 @@
     if (!FL.ready && P.ult >= 100 && !P.dead) {
       FL.ready = true;
       G.audio.play('ultReady');
+      // (no words: the sound, the ring and the bar under Starlight say it)
       F.ring(P.x, P.y - 24, { r0: 80, r1: 16, life: 0.4, color: GOLD, width: 4 });
-      F.text(P.x, P.y - 110, 'DAWNBREAK READY', { color: GOLD, size: 15, life: 1.2 });
+      F.lines(P.x, P.y - 24, 8, GOLD, { r0: 22, speed: [300, 600] });
     }
     if (P.ult < 100) FL.ready = false;
     // from rank A up, light lifts off the hero

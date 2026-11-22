@@ -476,7 +476,6 @@
   };
   // Mechanics are no longer explained in words during a fight (v1.4a): a boss's body says what is coming.
   U.hint = function () { };
-  // A controls reminder over the boss's entrance, for the first two fights of a session.
   // A welcome over the camp, the first time you arrive in a session.
   U.campHint = function () {
     if (!G.settings.hints || U.campSeen) return;
@@ -485,9 +484,10 @@
     el.hint.classList.add('show', 'calm');
     H.hintT = 9;
   };
+  // (v1.6b: not shown any more. The camp lists the controls and Tab opens the Moves page; a fight has no help text.)
   U.keysHint = function () {
     U.fights = (U.fights || 0) + 1;
-    if (!G.settings.hints || U.fights > 2) return;
+    if (U.fights > 0) return;
     el.hint.innerHTML = G.input.device === 'gamepad'
       ? 'Stick move &middot; <b>A</b> jump &middot; <b>X</b> attack &middot; <b>B</b> dash &middot; <b>Y</b> special &middot; hold <b>LB</b> mend &middot; <b>RT</b> Dawnbreak'
       : (() => { const k = (a) => '<kbd>' + G.input.label(a) + '</kbd>'; return k('left') + k('right') + ' move &middot; ' + k('jump') + ' jump &middot; ' + k('attack') + ' or click attack &middot; ' + k('dash') + ' dash &middot; ' + k('flare') + ' or right click special &middot; hold ' + k('heal') + ' mend &middot; ' + k('ult') + ' Dawnbreak'; })();

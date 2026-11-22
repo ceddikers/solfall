@@ -2,7 +2,7 @@
 
 A side-on boss rush for the browser: four heroes, four three-phase bosses, played as a run of
 ever-harder trials. You pick a hero and a relic before the run and win a boon after each victory.
-Version 1.6a.
+Version 1.6b.
 
 This is an early slice of a planned boss-rush roguelite (short runs, a boon after each boss,
 bosses drawn from a pool). A run meets the four bosses in a shuffled order, then meets them again, harder.
@@ -113,6 +113,15 @@ hero (`tools/feel-check.js`).
 - Settings, Reset progress erases Sunshards, upgrades, trophies and records (it has to be chosen twice).
 
 Not done: touch controls, a colour-blind alternative to red-orange warnings, gamepad rebinding.
+
+## Fewer words (v1.6b)
+
+Help text that was still shown inside a fight is gone: the **SHADOW** label on the safe ground during
+the Warden's Sunburst (the dark and its pale frame say it), **DAWNBREAK READY** over the hero (the
+sound, the gold ring and the bar under Starlight say it), and the row of controls that appeared over
+the first two fights of a session (the camp lists them, and Tab opens the Moves page). What is still written in a fight is what
+happened, not what to do: damage numbers, PERFECT, RIPOSTE, SUNDER, CLASH, the Flow rank, and a boss's
+one-word state (STAGGERED, SPENT and the like).
 
 ## Eos, the Sheathed Dawn (new in v1.6a)
 

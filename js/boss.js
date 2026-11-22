@@ -1310,6 +1310,7 @@
         }
         ctx.restore();
         // the shadows themselves: dark, edged in the hero's own pale light, so they read as shelter
+        // (no word on them: the dark and the frame say it)
         for (const s of this.shades) {
           ctx.fillStyle = 'rgba(4,4,14,' + (0.3 + 0.25 * k) + ')';
           ctx.fillRect(s.x0, FLOOR - 184, s.x1 - s.x0, 184);
@@ -1317,9 +1318,6 @@
           ctx.setLineDash([12, 8]); ctx.lineDashOffset = -this.t * 30;
           ctx.strokeRect(s.x0 + 2, FLOOR - 184, s.x1 - s.x0 - 4, 184);
           ctx.setLineDash([]);
-          ctx.fillStyle = G.rgba(G.COL.star, 0.8);
-          ctx.font = '600 12px Bahnschrift, "Segoe UI", sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-          ctx.fillText('SHADOW', (s.x0 + s.x1) / 2, FLOOR - 166);
         }
       },
     });
