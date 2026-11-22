@@ -438,10 +438,10 @@
 
   // ------------------------------------------------------------------ painted layers
   function canvas(w) {
-    const c = document.createElement('canvas');
-    c.width = Math.ceil(w); c.height = G.H + PAD * 2;
+    const c = document.createElement('canvas'), q = G.bgK;
+    c.width = Math.ceil(w * q); c.height = Math.ceil((G.H + PAD * 2) * q);
     const x = c.getContext('2d');
-    x.translate(0, PAD);
+    x.scale(q, q); x.translate(0, PAD);
     return [c, x];
   }
   function ridge(x, seed, base, amp, col, w) {
@@ -674,7 +674,7 @@
   HUB.drawBack = function (ctx) {
     if (!HUB.layers) build();
     const cam = G.cam.x, t = HUB.t;
-    for (const L of HUB.layers) ctx.drawImage(L.c, cam * (1 - L.f) - PAD, -PAD);
+    for (const L of HUB.layers) ctx.drawImage(L.c, cam * (1 - L.f) - PAD, -PAD, L.c.width / G.bgK, L.c.height / G.bgK);
     // stars that twinkle (fixed to the view, like the sky they sit in)
     ctx.globalCompositeOperation = 'lighter';
     const img = F.glow('255,255,255');

@@ -389,10 +389,10 @@
 
   function buildBg(pi) {
     const P = G.PAL[pi];
-    const c = document.createElement('canvas');
-    c.width = G.W + PAD * 2; c.height = G.H + PAD * 2;
+    const c = document.createElement('canvas'), q = G.bgK;
+    c.width = Math.round((G.W + PAD * 2) * q); c.height = Math.round((G.H + PAD * 2) * q);
     const x = c.getContext('2d');
-    x.translate(PAD, PAD);
+    x.scale(q, q); x.translate(PAD, PAD);
     const L = -PAD, R = G.W + PAD, T = -PAD, B = G.H + PAD, F = G.FLOOR;
 
     // sky
@@ -737,14 +737,23 @@
     }
   }
 
+  // The window changed size: paint the current backdrops again at the new resolution.
+  A.rescale = function () {
+    if (!vignette) return; // not started yet; A.init paints them
+    const set = [];
+    for (let i = 1; i <= 4; i++) set[i] = i > 1 && G.PAL[i] === G.PAL[1] ? set[1] : buildBg(i);
+    A.cache = {}; A.cache[A.theme] = set; A.bgs = set;
+  };
+
+  const BW = G.W + PAD * 2, BH = G.H + PAD * 2;
   A.drawBack = function (ctx) {
     if (A.fade < 1) {
-      ctx.drawImage(A.bgs[A.prevPhase], -PAD, -PAD);
+      ctx.drawImage(A.bgs[A.prevPhase], -PAD, -PAD, BW, BH);
       ctx.globalAlpha = G.ease.inOutQuad(A.fade);
-      ctx.drawImage(A.bgs[A.phase], -PAD, -PAD);
+      ctx.drawImage(A.bgs[A.phase], -PAD, -PAD, BW, BH);
       ctx.globalAlpha = 1;
     } else {
-      ctx.drawImage(A.bgs[A.phase], -PAD, -PAD);
+      ctx.drawImage(A.bgs[A.phase], -PAD, -PAD, BW, BH);
     }
     // low mist drifting across the floor
     const mist = G.fx.glow(G.pal().rim);

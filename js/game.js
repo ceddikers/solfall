@@ -24,6 +24,10 @@
     k = G.clamp(s * (window.devicePixelRatio || 1), 0.5, 2);
     canvas.width = Math.round(G.W * k);
     canvas.height = Math.round(G.H * k);
+    // Backdrops are painted once and kept. Paint them at the size they will be shown (up to 1.5
+    // times, in quarter steps, to keep memory in hand) so they are not stretched and soft.
+    const q = G.clamp(Math.ceil(k * 4 - 0.01) / 4, 1, 1.5);
+    if (q !== G.bgK) { G.bgK = q; if (G.arena.rescale) G.arena.rescale(); if (G.hub) G.hub.layers = null; }
   }
 
   // ------------------------------------------------------------------ state changes

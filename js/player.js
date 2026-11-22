@@ -55,6 +55,7 @@
       squash: 0, runT: 0, stepN: 0, skidT: 0, hurtFlash: 0, emberFlash: 0,
       ult: 0, ulting: false, vanish: false, shroudT: 0,
       flT: 0, flCd: 0, flBrazen: false,
+      rig: {}, // pose memory for drawing (see drawBody)
       scarf: [], ghosts: [], slashes: [], bolts: [],
       stats: { dmg: 0, hits: 0, perfect: 0, heals: 0, lances: 0 },
     });
@@ -1376,16 +1377,30 @@
     const run = !air && sp > 40, idle = !air && !run && !a;
     const breath = idle ? Math.sin(G.t * 3) : 0;
     const gold = s.primed || !!(a && a.heavy);
+    // Pose memory. Only the live hero has one (afterimages, echoes and portraits are drawn exactly as
+    // posed). With it the limbs, the lean and the weapon at rest ease from one pose to the next over
+    // a few frames, so nothing snaps; a swing, a shot and the flourish are always shown exactly.
+    const R = s.rig || null;
+    let rdt = 0;
+    if (R) { rdt = R.t == null ? 0 : G.clamp(G.t - R.t, 0, 0.05); R.t = G.t; }
+    const ease = (key, v, rate) => { if (!R) return v; R[key] = R[key] == null ? v : G.damp(R[key], v, rate, rdt); return R[key]; };
+    let turn = 0;
+    if (R) {
+      // turning round: the figure narrows for an instant, like a card flipping
+      if (R.face !== s.facing) { if (R.face != null) R.turn = 1; R.face = s.facing; }
+      R.turn = G.damp(R.turn || 0, 0, 24, rdt); turn = R.turn;
+    }
     ctx.save();
     ctx.translate(s.x, s.y);
-    ctx.scale(s.facing * SC, SC);
-    ctx.rotate(s.dash ? 0.42 : G.clamp(s.vx * s.facing / h.run, -1.6, 1.6) * 0.13);
+    ctx.scale(s.facing * SC * (1 - 0.34 * turn), SC);
+    ctx.rotate(ease('lean', s.dash ? 0.42 : G.clamp(s.vx * s.facing / h.run, -1.6, 1.6) * 0.13, 30));
     ctx.scale(1 - s.squash * 0.55, 1 + s.squash);
     ctx.lineCap = 'round'; ctx.lineJoin = 'round';
 
     const bob = run ? Math.abs(Math.sin(s.runT)) * 1.3 : 0;
     const hip = -24 + bob;
-    const feet = footTargets(s, st), L = st.leg, A = st.arm;
+    const ft = footTargets(s, st), L = st.leg, A = st.arm, fr = run ? 44 : 26;
+    const feet = R ? [[ease('f0x', ft[0][0], fr), ease('f0y', ft[0][1], fr)], [ease('f1x', ft[1][0], fr), ease('f1y', ft[1][1], fr)]] : ft;
     const leg = (i) => {
       const hx = i ? -1.6 : 1.6, k = ik(hx, hip, feet[i][0], feet[i][1], 12.7, 12.7, -1);
       ctx.fillStyle = i ? st.dark : st.mid;
@@ -1411,7 +1426,17 @@
 
     // everything above the hips rides the run bob and the idle breath
     ctx.translate(0, bob - breath * 0.5);
-    const W = weaponPose(h, s, breath);
+    let W = weaponPose(h, s, breath);
+    if (R) {
+      if (a || s.flT > 0 || R.wang == null) { R.wfx = W.fx; R.wfy = W.fy; R.wbx = W.bx; R.wby = W.by; R.wang = W.ang; }
+      else {
+        // back to rest after a swing, or from one carry to another: quick, but not in one frame
+        const kk = 1 - Math.exp(-22 * rdt);
+        R.wfx += (W.fx - R.wfx) * kk; R.wfy += (W.fy - R.wfy) * kk; R.wbx += (W.bx - R.wbx) * kk; R.wby += (W.by - R.wby) * kk;
+        R.wang += G.angDiff(R.wang, W.ang) * kk;
+        W = Object.assign({}, W, { fx: R.wfx, fy: R.wfy, bx: R.wbx, by: R.wby, ang: R.wang });
+      }
+    }
     W.fy -= LIFT; W.by -= LIFT;
     const arm = (front) => {
       const sx = front ? (id === 'aster' ? 6.4 : 3) : (id === 'aster' ? -6 : -2.6), tx = front ? W.fx : W.bx, ty = front ? W.fy : W.by;

@@ -41,7 +41,7 @@
       'hint', 'lowhp', 'lbTop', 'lbBot', 'diffNote', 'bestLine', 'ver', 'deadLead', 'deadFill', 'deadStats',
       'pauseBoons', 'boons', 'trial', 'winOver', 'winPick', 'winCards', 'heroName', 'heroCards', 'relicCards', 'relicOver',
       'deadTip', 'winStats', 'winBest', 'gradeLetter', 'gradeTitle', 'gradeSub', 'stage',
-      'practiceOver', 'keyList', 'resetItem', 'movesOver', 'movesTitle', 'movesBody', 'movesFoot', 'ult', 'ultFill', 'ultKey', 'flow', 'flowRank', 'flowFill', 'omen', 'shardCount', 'shrineLead', 'shrineList', 'shrineTrophies', 'rerollItem', 'featsLead', 'featsBody']) el[id] = $(id);
+      'practiceOver', 'keyList', 'resetItem', 'movesOver', 'movesTitle', 'movesBody', 'movesFoot', 'ult', 'ultFill', 'ultKey', 'flow', 'flowRank', 'flowFill', 'omen', 'shardCount', 'shrineLead', 'shrineList', 'shrineTrophies', 'rerollItem', 'featsLead', 'featsBody', 'helpBody', 'helpTabs']) el[id] = $(id);
     el.segs = Array.from(document.querySelectorAll('#ember .seg'));
     el.bbar = document.querySelector('.bbar');
     el.bname = document.getElementById('bname');
@@ -82,6 +82,8 @@
     const items = U.items();
     U.focus = G.clamp(i, 0, items.length - 1);
     items.forEach((it, k) => it.classList.toggle('focus', k === U.focus));
+    const act = U.current === 'help' && items[U.focus] ? items[U.focus].dataset.act || '' : '';
+    if (/^help\d$/.test(act)) U.fillHelp(Number(act.slice(4)));
   };
   U.show = function (name, push) {
     if (push && U.current) U.stack.push(U.current);
@@ -134,6 +136,8 @@
     else if (name === 'shrine') U.showShrine();
     else if (/^shrine\d$/.test(name)) buy(Number(name.slice(6)));
     else if (name === 'how') U.show('how', true);
+    else if (name === 'help') U.showHelp();
+    else if (/^help\d$/.test(name)) U.fillHelp(Number(name.slice(4)));
     else if (name === 'settings') U.show('settings', true);
     else if (name === 'back' && U.current === 'moves' && !U.stack.length) G.resume(); // opened with Tab: back to the fight
     else if (name === 'back') U.back();
@@ -224,6 +228,85 @@
       + (got.length ? ': ' + got.map((t) => t.name).join(', ') + '.' : '. The first victory over each boss adds its relic to those you can be offered.');
   };
   U.showShrine = function () { U.fillShrine(); U.show('shrine', true); };
+  // ---- Help: how a fight goes, and every word the game uses, by subject
+  // steps: a numbered account. words: [the word, what it means].
+  const HELP = [
+    { name: 'How a fight works', lead: 'One hero, one boss, one arena. The run goes on, boss after boss, until you fall.', steps: [
+      '<b>The boss has three phases.</b> Its health bar is cut in three. Each time a third is gone it changes: new attacks, less rest.',
+      '<b>Red-orange is a warning.</b> It marks where an attack will land. When it fills and flashes, the attack fires.',
+      '<b>Leave the marked place, or dash through the attack.</b> A dash passes straight through anything.',
+      '<b>Strike between its attacks.</b> Every hit fills your Starlight, your Flow, your Dawnbreak and the boss’s stagger bar.',
+      '<b>Fill the stagger bar</b> and the boss is thrown down, open, for a few seconds. Save your biggest blows for then.',
+      '<b>Twice it wards itself</b> and gathers a blast: a Reckoning. Break the ward before the ring closes on it.',
+      '<b>When its health is gone it falls.</b> You are graded, paid in Sunshards and offered a boon. Then the next trial: another boss, harder.',
+      '<b>When your health is gone the run ends</b> and you wake in the Vigil. What you bought at the Shrine is still yours.',
+    ] },
+    { name: 'Attacking', lead: 'What your weapon does, and the blows that are worth more.', words: [
+      ['Chain', 'Your attacks in a row. Hold the button to keep it going; a dash does not break it.'],
+      ['Finisher', 'The last blow of a chain, drawn in gold. It hits hardest and fills the most Starlight and stagger.'],
+      ['Aim', 'Hold up or down to strike that way. With the sword or the maul, striking down in the air bounces you off what you hit.'],
+      ['Thrust', 'Sword or maul: a blow thrown straight out of a dash deals 40% more.'],
+      ['Special', 'Your hero’s second attack. It costs one segment of Starlight.'],
+      ['Stagger', 'The thin bar under the boss’s health. Fill it with hits and the boss is thrown down and cannot act.'],
+      ['Sunder', 'The first finisher on a staggered boss: 2.2 times the damage. One for each stagger.'],
+      ['Riposte', 'The first weapon hit within 1.5 seconds of a perfect dodge: double damage.'],
+      ['Clash', 'A finisher, thrust or heavy arrow that lands just as the Veil’s or the Knight’s swing is about to: the swing is stopped dead and you are pushed back unharmed.'],
+    ] },
+    { name: 'Your meters', lead: 'The bars at the top left, and what fills them.', words: [
+      ['Health', 'The diamonds. Most attacks cost one; a few, marked by a tell, cost two.'],
+      ['Starlight', 'Three segments, filled by landing hits and by perfect dodges. Spend one on your special or on mending.'],
+      ['Mend', 'Stand still and hold the button: one segment of Starlight becomes one health. Jumping or dashing cancels it.'],
+      ['Flow', 'A rank from C to SS that climbs as you hit and dodge without being hit. Each rank adds 3% damage. It drains when you stop, and a blow taken costs most of it.'],
+      ['Dawnbreak', 'Your greatest attack. Its bar fills as you deal damage; press once when it is full. Nothing can touch you while it plays, and it breaks a ward outright.'],
+      ['Flourish', 'A salute that leaves you open for most of a second. Finishing one raises Flow and Dawnbreak.'],
+      ['Brazen', 'A flourish finished while the boss is in the middle of an attack. Worth three times as much.'],
+    ] },
+    { name: 'Staying alive', lead: 'Everything that keeps you standing.', words: [
+      ['Warning', 'Red-orange on the ground or in the air: where an attack will land. It fills, flashes, then fires.'],
+      ['Dash', 'A burst of speed that nothing can hit. It has a short rest before it can be used again.'],
+      ['Perfect dodge', 'A dash through an attack at the last moment. Time slows, Starlight fills by a third of a segment and your next hit is a Riposte.'],
+      ['Tell', 'A small thing a boss does before an attack that says which form is coming: how fast the Veil cuts, how the Magus holds its staff. Learn them and you know sooner than the warning shows.'],
+      ['Last Light', 'The first time in a fight that a blow leaves you on one health: time slows, nothing can hurt you for 2.4 seconds, and Dawnbreak and Starlight both rise.'],
+      ['Wardstone, Second Dawn', 'Some relics and boons turn a blow aside or save you once. The pause menu lists what you carry.'],
+    ] },
+    { name: 'Bosses', lead: 'Words for what a boss does.', words: [
+      ['Phase', 'A third of a boss’s health, marked I, II, III beside its name. Each one brings new attacks.'],
+      ['Reckoning', 'Once in phase I and once in phase II the boss goes to the middle, wards itself and gathers a blast while a red ring closes on it for 6.5 seconds.'],
+      ['Ward', 'The shell round the boss during a Reckoning. Your hits go to it, shown as a gold arc. Break it and the boss is staggered and Dawnbreak gains a quarter of its bar.'],
+      ['Tell', 'See Staying alive. Each boss tells in its own way: the Veil by tempo, the Knight by its foot and blade, the Magus by its staff, the Warden by its eye and fist.'],
+      ['One last push', 'Called out when a boss is under a tenth of its health.'],
+      ['Omen', 'From the second trial a fight carries an omen that changes it (a storm, falling embers, a faster or tougher boss); from the sixth, two. Each adds 25% Sunshards.'],
+    ] },
+    { name: 'A run', lead: 'From the gate to the fall.', words: [
+      ['Trial', 'One fight of a run. Each trial is against another boss and is harder than the last.'],
+      ['Relic', 'One power chosen at the reliquary before the gate. It lasts the whole run.'],
+      ['Boon', 'A smaller power chosen after each victory. They add up through the run.'],
+      ['Grade', 'S, A, B or C for a victory. Every blow you take lowers it, and so does a fight that runs past two and a half minutes; perfect dodges raise it. A better grade pays more.'],
+      ['Sunshards', 'What every fight pays, win or lose. They are kept between runs and spent at the Shrine.'],
+      ['Trophy', 'The first victory over each boss adds its relic to those the reliquary can offer.'],
+      ['Feat', 'One of eighteen things worth doing once, each paying Sunshards. The Tally stone in the Vigil lists them.'],
+    ] },
+    { name: 'The Vigil', lead: 'Your camp, from left to right.', words: [
+      ['The old bell, the lantern', 'Toys. Keep the bell ringing; keep the lantern off the ground.'],
+      ['Hall of Echoes', 'Three alcoves, one for each hero. Use one to play as that hero.'],
+      ['The Tally', 'A standing stone with a mark for every feat.'],
+      ['The Shrine', 'Spend Sunshards on things that last: health, damage, a fourth relic or boon to choose from.'],
+      ['Sparring post', 'It cannot be hurt for good. Try every attack on it; Dawnbreak charges three times as fast here.'],
+      ['The Brazier', 'Its flame is the difficulty: more health and longer warnings, or fewer and shorter.'],
+      ['The Banners, the Proving Ring', 'Choose which boss comes first, then practise against it from any phase, with nothing at stake.'],
+      ['The Reliquary, the Gate', 'Take a relic from a plinth, then step through the gate to begin the run.'],
+    ] },
+  ];
+  U.fillHelp = function (i) {
+    const h = HELP[i];
+    if (!h || U.helpPage === i) return;
+    U.helpPage = i;
+    el.helpBody.innerHTML = '<h3>' + h.name + '</h3><p class="lead">' + h.lead + '</p>'
+      + (h.steps ? '<ol class="helpsteps">' + h.steps.map((s) => '<li>' + s + '</li>').join('') + '</ol>'
+        : '<dl class="helpwords">' + h.words.map((w) => '<dt>' + w[0] + '</dt><dd>' + w[1] + '</dd>').join('') + '</dl>');
+    Array.from(el.helpTabs.children).forEach((it) => it.classList.toggle('open', it.dataset.act === 'help' + i));
+  };
+  U.showHelp = function () { U.helpPage = -1; U.fillHelp(0); U.show('help', true); };
   // ---- the Tally: every feat, done or not, and what it pays
   U.showFeats = function () {
     const FE = G.feats;

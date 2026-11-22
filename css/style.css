@@ -421,6 +421,22 @@ ul.tips b { color: var(--ink); font-weight: 600; }
 #s-settings .panel nav .item { padding-top: 6px; padding-bottom: 6px; }
 
 /* ---------------------------------------------------------------- the Moves page */
+.panel.help { width: 1100px; padding: 24px 36px 22px; }
+.panel.help h2 { margin-bottom: 14px; }
+.helpcols { display: grid; grid-template-columns: 250px 1fr; gap: 0 34px; align-items: start; }
+.panel.help nav .item { text-align: left; padding: 8px 8px 8px 30px; font-size: 15px; letter-spacing: 0.16em; }
+.panel.help nav .item::after { display: none; }
+.panel.help nav .item.open { color: var(--gold); }
+#helpBody { min-height: 470px; border-left: 1px solid rgba(255, 255, 255, 0.1); padding-left: 34px; }
+#helpBody h3 { margin: 2px 0 4px; font: 400 20px var(--display); letter-spacing: 0.16em; color: var(--ink); text-transform: uppercase; }
+#helpBody .lead { margin: 0 0 14px; color: var(--dim); font-size: 13.5px; }
+.helpsteps { margin: 0; padding-left: 22px; font-size: 14px; line-height: 1.45; color: var(--dim); }
+.helpsteps li { margin-bottom: 9px; padding-left: 4px; }
+.helpsteps li::marker { color: var(--gold); font-weight: 600; }
+.helpsteps b { color: var(--ink); font-weight: 600; }
+.helpwords { margin: 0; display: grid; grid-template-columns: 176px 1fr; gap: 0 18px; font-size: 13.5px; line-height: 1.42; }
+.helpwords dt { color: var(--gold); font-weight: 600; font-size: 12px; letter-spacing: 0.16em; text-transform: uppercase; padding: 8px 0 7px; border-bottom: 1px solid rgba(255, 255, 255, 0.07); }
+.helpwords dd { margin: 0; color: var(--dim); padding: 7px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.07); }
 .panel.feats { width: 1080px; padding: 26px 36px 18px; }
 .panel.feats .over { color: var(--gold); text-align: center; }
 .panel.feats h2 { margin-bottom: 8px; }

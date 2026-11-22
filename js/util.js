@@ -3,7 +3,8 @@
 
 const G = window.G = {};
 
-G.VERSION = '1.3a';
+G.VERSION = '1.3b';
+G.bgK = 1; // how many pixels per unit the painted backdrops are kept at (set in game.js, resize)
 G.W = 1280;          // logical view size
 G.H = 720;
 G.FLOOR = 612;       // y of the arena floor surface

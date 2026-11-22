@@ -2,7 +2,7 @@
 
 A side-on boss rush for the browser: three heroes, four three-phase bosses, played as a run of
 ever-harder trials. You pick a hero and a relic before the run and win a boon after each victory.
-Version 1.3a.
+Version 1.3b.
 
 This is an early slice of a planned boss-rush roguelite (short runs, a boon after each boss,
 bosses drawn from a pool). A run meets the four bosses in a shuffled order, then meets them again, harder.
@@ -34,6 +34,7 @@ then open http://localhost:8321. There is no build step and no dependency.
 | Flourish (a salute that leaves you open) | T or G | Back, or press the right stick |
 | Drop through a platform | S + Space | down + A |
 | Your hero's moves (the fight waits while it is up) | hold Tab, or Moves in the pause menu | |
+| Help: how a fight works and what every word means | Help on the title screen or in the pause menu | |
 | Pause | Esc or P | Start |
 | Use something in the camp | E or F, or Enter | LB |
 
@@ -112,6 +113,34 @@ hero (`tools/feel-check.js`).
 - Settings, Reset progress erases Sunshards, upgrades, trophies and records (it has to be chosen twice).
 
 Not done: touch controls, a colour-blind alternative to red-orange warnings, gamepad rebinding.
+
+## Help, and smoother, sharper drawing (new in v1.3b)
+
+**Help.** The title screen and the pause menu have a Help page in place of How to play. On the left
+are seven subjects; moving onto one shows it on the right at once. The first, How a fight works, is
+eight numbered steps from the first warning to the next trial. The others are lists of the game's
+own words with what each means: Attacking (chain, finisher, thrust, stagger, Sunder, Riposte, Clash),
+Your meters (health, Starlight, mend, Flow, Dawnbreak, flourish), Staying alive (warning, dash,
+perfect dodge, tell, Last Light), Bosses (phase, Reckoning, ward, omen), A run (trial, relic, boon,
+grade, Sunshards, trophy, feat) and The Vigil (every place in the camp). Controls, the old How to
+play page, is the last entry. The text is the `HELP` list in `js/ui.js`.
+
+**The hero moves between poses instead of jumping between them.** Feet, lean and the weapon at rest
+used to change in a single frame when the hero went from standing to running, left the ground,
+landed, or finished a swing. They now ease across over a few frames (the sword takes about an eighth
+of a second to come back to rest after a cut), and turning round narrows the figure for an instant
+like a card flipping. A swing, a shot and the flourish are still drawn exactly as timed, so attacks
+are as sharp as before. Only the drawing changed: hitboxes and timings are the same, and the tests
+give the same results. The bosses already eased between their poses.
+
+**Backdrops are painted at the size they are shown.** The arena backdrops and the camp's four
+scrolling layers are painted once and kept. They were kept at 1280 by 720 and stretched to fit the
+window, which made them soft on a large window or a high-density screen while the characters drawn
+over them stayed sharp. They are now painted at up to one and a half times that (in quarter steps,
+to keep memory in hand) and painted again when the window changes size.
+
+The frame pacing was checked and left alone: the game already advances in equal steps that land on
+each frame, and already draws the canvas at the screen's own pixel density.
 
 ## Fun things (new in v1.3a)
 
@@ -574,6 +603,12 @@ Open the browser console on the running game.
   were run and looked at in captures, and the numbers above were checked in the running game. Whether
   Flow climbs at a satisfying rate, how often Dawnbreak fills in a real fight (the aim was two to four
   times), and whether Sunshard prices are fair are first guesses.
+- **v1.3b was measured, not watched.** The pose easing was checked by reading the drawn foot, lean
+  and weapon angle frame by frame (they change gradually where they used to jump) and the sharper
+  backdrops by emulating a 1920 by 1080 window. Nobody has watched it in motion on a real screen, so
+  whether the hero now feels smoother, or a touch slow to settle, is for a person to say. The sharper
+  backdrops use more memory (about twice as much at the largest size); how that runs on a small
+  laptop is unknown.
 - **v1.3a has not been played.** The flourish was run in a fight (plain, brazen, and caught in the
   middle), the bell was rung to a full peal, a scripted hero kept the lantern up for 19 blows by
   striking upward on the exact frame, and a scripted win paid three feats and named them on the
