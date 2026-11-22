@@ -12,7 +12,7 @@
   G.hitstop = 0; G.slowT = 0; G.slowScale = 1;
   G.deadT = 0; G.wonT = 0; G.endShown = false;
   // boss: fight this one whatever the run says. omen: force these omens ('storm', 'storm,hunted'). meta: earn Sunshards even in tests.
-  G.debug = { god: false, boxes: false, forceAttack: '', freeze: false, boss: '', omen: '', meta: false };
+  G.debug = { god: false, boxes: false, forceAttack: '', freeze: false, boss: '', omen: '', meta: false, variant: '' }; // variant: see K.chance in bosskit.js
   G.cam = { x: 0, y: 0 }; // small view offset that follows the hero
 
   G.canHurt = () => G.state === 'fight' && !G.player.dead && !G.boss.dying && !G.boss.dead;

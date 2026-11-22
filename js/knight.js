@@ -16,6 +16,8 @@
       'Jump the low wave; stay on the ground for the high one.',
       'Its charge is too tall for one jump. Dash through it, or jump twice.',
       'Rotting ground fades after a few seconds. Fight on what is left.',
+      'Watch its feet. If the Knight stamps after a cut, another cut is coming; if the blade just drags, it is open.',
+      'A blade that burns red as it rises takes two health and throws a wave along the floor. Get behind it, or get out and jump.',
     ],
     hudCols: [null, ['#6ab4ff', '#d4ecff'], ['#8ce04a', '#e0ffc8'], ['#ff4c46', '#ffd0c8']],
     BASE_HP: 4300, poise0: 460, w: 62, h: 122, platformsFrom: 2,
@@ -61,7 +63,7 @@
     b.x = 900; b.y = FLOOR + 150; b.pose = 'kneel'; b.p = POSES.kneel.slice(); b.walkT = 0; b.hurt = false; b.spin = 0; b.spinning = false; b.fast = false;
     B.cape = D.chain(9, b.x, b.y - 100);
   };
-  B.onRelease = function () { const b = B.body; b.hurt = false; b.pose = 'idle'; b.spinning = false; b.fast = false; b.unarmed = false; };
+  B.onRelease = function () { const b = B.body; b.hurt = false; b.pose = 'idle'; b.spinning = false; b.fast = false; b.unarmed = false; b.blaze = 0; };
   B.onStagger = function () { B.body.pose = 'kneel'; };
   B.reckonName = 'DIRGE';
   B.onReckon = function (on) { B.body.pose = on ? 'overRaise' : 'idle'; };
@@ -84,12 +86,17 @@
       onFire() { G.audio.play('cleave'); b.fast = true; b.pose = o.pose; G.fx.shake(7); },
     });
   }
-  function* cut(down, tele, r) {
+  // blaze: the blade burns red through the wind-up. That swing takes two health and throws a wave along the floor.
+  function* cut(down, tele, r, blaze) {
     const b = B.body;
-    b.fast = false; b.pose = down ? 'raise' : 'low';
-    if (down) swing({ a0: -2.5, a1: 0.78, tele, pose: 'cleave', r });
-    else swing({ a0: 0.78, a1: -2.5, tele, pose: 'rise', r });
+    b.fast = false; b.pose = down ? 'raise' : 'low'; b.blaze = blaze ? 1 : 0;
+    if (blaze) { G.audio.play('charge', { dur: tele }); G.audio.play('whoosh'); }
+    const o = down ? { a0: -2.5, a1: 0.78, tele, pose: 'cleave', r } : { a0: 0.78, a1: -2.5, tele, pose: 'rise', r };
+    if (blaze) o.dmg = 2;
+    swing(o);
     yield* wait(tele);
+    if (blaze) { H.shockwave(b.x + b.face * 84, b.face, 560, 46, { boss: DANGER, hot: '255,236,220' }); G.fx.shake(11); G.audio.play('boom'); }
+    b.blaze = 0;
     yield* tween(b, { x: G.clamp(b.x + b.face * 34, WL + 50, WR - 50) }, 0.14, E.outCubic);
     yield* wait(0.12);
   }
@@ -134,22 +141,43 @@
     facePlayer();
   }
 
+  // The Knight's tells are in its body, not its tempo.
+  //   It stamps its back foot after a cut: another cut is coming. No stamp: the blade drags, and it is open.
+  //   Its blade burns red while it winds up: that swing takes two health and throws a wave. Do not trade with it.
+  const BLAZE = [0, 0.25, 0.35, 0.45];
+  function* stamp() {
+    const b = B.body;
+    G.audio.play('stomp'); G.fx.shake(5); G.fx.kick(0, 3);
+    G.fx.thud(b.x - b.face * 20, FLOOR, 0.7, { noCrack: true });
+    G.fx.ring(b.x - b.face * 20, FLOOR - 4, { r0: 10, r1: 96, life: 0.3, color: G.pal().hot, width: 4 });
+    b.stamp = 1;
+    yield* wait(0.34);
+    facePlayer();
+  }
+  function* drag() {
+    const b = B.body;
+    b.fast = false; b.pose = 'low';
+    yield* wait(0.8);
+  }
   function* atkCleave() {
     const T = K.T();
     G.ui.hint('knightback', 'Its swings do not reach behind it. Dash through and strike its back');
     yield* approach(150, 300, 0.7);
-    yield* cut(true, 0.78 * T);
-    if (K.hard()) { facePlayer(); yield* cut(false, 0.5 * T); }
-    yield* wait(0.75);
+    const blaze = K.chance(BLAZE[1], 'blaze');
+    yield* cut(true, (blaze ? 0.92 : 0.78) * T, null, blaze);
+    if (K.hard() || K.chance(0.35, 'follow')) { yield* stamp(); yield* cut(false, 0.5 * T); }
+    yield* drag();
   }
   function* atkCleave2() {
     const T = K.T();
     yield* approach(150, 320, 0.7);
-    yield* cut(true, 0.72 * T);
-    facePlayer();
-    yield* cut(false, 0.48 * T);
-    if (K.hard()) { facePlayer(); yield* cut(true, 0.46 * T); }
-    yield* wait(0.75);
+    const blaze = K.chance(BLAZE[2], 'blaze');
+    yield* cut(true, (blaze ? 0.86 : 0.72) * T, null, blaze);
+    if (K.chance(0.7, 'follow')) {
+      yield* stamp(); yield* cut(false, 0.48 * T);
+      if (K.hard() || K.chance(0.4, 'follow')) { yield* stamp(); yield* cut(true, 0.46 * T); }
+    }
+    yield* drag();
   }
 
   // The sword comes down on a marked spot and sticks there.
@@ -432,10 +460,13 @@
   function* atkReap() {
     const T = K.T();
     yield* approach(150, 340, 0.7);
-    yield* cut(true, 0.66 * T);
-    facePlayer();
+    const blaze = K.chance(BLAZE[3], 'blaze');
+    yield* cut(true, (blaze ? 0.8 : 0.66) * T, null, blaze);
+    yield* stamp();
     yield* cut(false, 0.44 * T);
-    yield* overhead(0.42 * T, 0.28 * T, 1.05);
+    // a second stamp, and the overhead follows; without it the Knight is spent
+    if (K.chance(0.6, 'follow')) { yield* stamp(); yield* overhead(0.42 * T, 0.28 * T, 1.05); }
+    else yield* drag();
   }
 
   // Hurl: the Knight throws its sword the length of the arena. It sticks in the far wall, and until
@@ -575,6 +606,9 @@
       b.p[i] += (target[i] - b.p[i]) * k;
     }
     D.chainStep(B.cape, b.x - b.face * 12, b.y + b.p[1] - 42, dt, { seg: 13, grav: 90, drift: 12, face: b.face, wave: 5, rate: 4, floor: FLOOR - 2 });
+    if (b.blaze && Math.random() < dt * 70) {
+      G.fx.spawn({ x: b.x + b.face * G.rand(-10, 70), y: b.y - G.rand(90, 200), vx: G.rand(-40, 40), vy: -G.rand(40, 160), life: G.rand(0.3, 0.7), size: G.rand(2, 4.5), color: DANGER, wob: 60, rot: G.rand(0, 6) });
+    }
     // embers of whatever keeps it standing
     if (!B.dead && Math.random() < 0.3) {
       G.fx.spawn({ x: b.x + G.rand(-26, 26), y: b.y - G.rand(10, 120), vx: G.rand(-14, 14), vy: G.rand(-70, -20), life: G.rand(0.4, 0.9), size: G.rand(1.5, 3.5), color: G.pal().boss, kind: 'glow' });
@@ -720,7 +754,11 @@
     for (const vx of [3, 6.5, 10]) D.line(ctx, vx, 3, vx, 10);
     ctx.restore();
 
-    if (!b.unarmed) sword(ctx, hx, hy, ang, col, hot); // thrown: see atkHurl
+    if (!b.unarmed) {
+      // a burning blade: the warning colour, and a glow that grows through the wind-up
+      if (b.blaze) { ctx.save(); ctx.translate(hx, hy); ctx.rotate(ang); D.glow(ctx, DANGER, 64, 0, 96, 0.75); ctx.restore(); }
+      sword(ctx, hx, hy, ang, b.blaze ? DANGER : col, b.blaze ? '255,236,220' : hot); // thrown: see atkHurl
+    }
     arm(true);
     pauldron(shx + 14, shy, 1, plate);
 

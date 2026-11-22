@@ -15,6 +15,8 @@
       'A Star Lance aimed upward reaches the core from the ground. Hold up and fire.',
       'When the floor burns, the platforms are safe.',
       'A hand that takes enough damage breaks, and the Warden is weaker until it mends.',
+      'Count the blinks. The eye shuts once for each lance it is about to throw.',
+      'A fist that glows and trembles on the way up lands for two health, and a second wave follows the first.',
     ],
     hudCols: [null, ['#ff8a3c', '#ffd07a'], ['#ff3c5a', '#ffa2ac'], ['#b6a6ff', '#ffffff']],
   };
@@ -498,10 +500,12 @@
     G.audio.play('charge', { dur: 0.95 * T });
     const m = columnMark(h.x, 156);
     let e = 0;
-    const trackT = o.track * T;
+    // heavy: the fist glows and trembles all the way up. It lands for two, and a second wave follows the first.
+    const trackT = o.track * T * (o.heavy ? 1.2 : 1);
     while (e < trackT) {
       const dt = yield;
       e += dt;
+      if (o.heavy) { h.hot = 1; h.kx = G.rand(-6, 6); if (Math.random() < dt * 40) G.fx.spawn({ x: h.x + G.rand(-50, 50), y: h.y + G.rand(-40, 60), vx: G.rand(-30, 30), vy: -G.rand(40, 140), life: G.rand(0.3, 0.6), size: G.rand(2, 4.5), color: DANGER, wob: 50, rot: G.rand(0, 6) }); }
       const tx = G.clamp(P.x + P.vx * 0.14, WL + 80, WR - 80);
       h.x = G.damp(h.x, tx, 7.5, dt); h.y = G.damp(h.y, 226, 7, dt);
       h.curl = G.damp(h.curl, 1, 12, dt); h.rot = G.damp(h.rot, 0, 12, dt);
@@ -516,20 +520,27 @@
       h.y = y0 - 36 * E.outCubic(k);
       m.k = 0.7 + 0.3 * k;
     }
-    h.hurt = true; h.hurtDmg = 1;
+    h.hurt = true; h.hurtDmg = o.heavy ? 2 : 1;
     yield* tween(h, { y: FLOOR - 64 }, 0.085, E.inQuad);
     m.dead = true;
-    impactFx(h.x, false);
+    impactFx(h.x, !!o.heavy);
     H.shockwave(h.x - 56, -1, o.wave, 46);
     H.shockwave(h.x + 56, 1, o.wave, 46);
     yield* wait(0.07);
     h.hurt = false; h.hot = 0; h.stuck = true;
+    if (o.heavy) {
+      yield* wait(0.42);
+      G.fx.shake(8); G.audio.play('boom');
+      H.shockwave(h.x - 56, -1, o.wave, 46);
+      H.shockwave(h.x + 56, 1, o.wave, 46);
+      yield* wait(0.4); // it took more out of the hand: it is stuck for longer
+    }
     yield* wait(o.stuck);
     h.stuck = false;
   }
 
   function* atkSlam() {
-    yield* slam(nearHand(), { track: 0.72, stuck: 1.2, wave: 470 });
+    yield* slam(nearHand(), { track: 0.72, stuck: 1.2, wave: 470, heavy: chance(0.3, 'heavy') });
   }
 
   function* sweepOnce(h, fromX, toX, tele) {
@@ -619,8 +630,21 @@
     L.stuck = R.stuck = false;
   }
 
-  function* lances(n) {
+  // blink: the eye shuts once, quickly, for each lance it is about to throw. That is the tell.
+  function* lances(n, blink) {
     const c = B.core, T = G.diff().tele, P = G.player;
+    if (blink) {
+      c.blink = 0; c.blinkT = Math.max(c.blinkT, 2.4); // no idle blink in the middle of the count
+      yield* wait(0.2);
+      for (let k = 0; k < n; k++) {
+        G.audio.play('uiMove');
+        G.fx.ring(c.x, c.y, { r0: 104, r1: 62, life: 0.16, color: '255,236,190', width: 3 });
+        yield* tween(c, { open: 0.06 }, 0.07, E.inQuad);
+        yield* tween(c, { open: 1 }, 0.09, E.outQuad);
+        yield* wait(0.13);
+      }
+      yield* wait(0.12);
+    }
     for (let i = 0; i < n; i++) {
       const tele = (i === 0 ? 0.85 : 0.55) * T;
       c.charge = 1;
@@ -640,8 +664,13 @@
     }
     c.charge = 0;
   }
-  function* atkLance() { yield* lances(1); }
-  function* atkLance3() { yield* lances(3); }
+  const chance = (p, tag) => G.kit.chance(p, tag);
+  function* atkLance() { yield* lances(chance(0.45, 'n2') ? 2 : 1, true); }
+  function* atkLance3() {
+    // one, two or three; with variants turned off for a test it is three, as it always was
+    const n = G.debug.variant === 'plain' ? 3 : chance(0.34, 'n1') ? 1 : chance(0.5, 'n2') ? 2 : 3;
+    yield* lances(n, true);
+  }
 
   function* atkRain() {
     const c = B.core, T = G.diff().tele, P = G.player;
@@ -1349,7 +1378,7 @@
 
     // an occasional blink while it is not busy
     c.blink = Math.max(0, c.blink - dt);
-    if (!B.staggered && !B.dying && c.charge <= 0 && c.open > 0.9) {
+    if (!B.staggered && !B.dying && !B.attackName && c.charge <= 0 && c.open > 0.9) {
       c.blinkT -= dt;
       if (c.blinkT <= 0) { c.blink = 0.17; c.blinkT = G.rand(2.4, 6); }
     }

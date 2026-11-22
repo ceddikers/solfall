@@ -16,6 +16,7 @@
       'When it drops from above its blade sticks in the floor, and it takes extra damage until it pulls free.',
       'Its shadows vanish at a single hit and give Starlight.',
       'A line across the arena is a cut. Step off it, or jump it if it lies flat.',
+      'Listen to the tempo of its flurry. Three measured cuts end in a fan of knives; five quick ones end in a single knife that bursts for two health.',
     ],
     hudCols: [null, ['#a070ff', '#e4d4ff'], ['#40e0a8', '#c8ffe8'], ['#d8d8f0', '#ffffff']],
     BASE_HP: 3000, poise0: 340, w: 36, h: 84, platformsFrom: 2,
@@ -181,8 +182,12 @@
     yield* wait(0.8);
   }
 
+  // Flurry. The tell is tempo: how fast it cuts says how many cuts there are and how it ends.
+  //   measured cuts: three, then it springs back and throws a fan of knives
+  //   quick, small cuts: five, then it springs back and throws one knife that sticks and bursts for 2
   function* atkFlurry() {
     const b = B.body, P = G.player, T = K.T();
+    const fast = K.chance(B.phase === 1 ? 0.4 : 0.5, 'fast');
     // close the distance
     b.pose = 'run';
     let e = 0;
@@ -192,24 +197,54 @@
       b.face = P.x > b.x ? 1 : -1;
       b.x = G.clamp(b.x + b.face * 640 * dt, WL + 30, WR - 30);
     }
-    const n = 3 + (B.phase === 3 ? 1 : 0) + (K.hard() ? 1 : 0);
+    const n = fast ? 5 : 3;
     for (let i = 0; i < n; i++) {
-      const last = i === n - 1;
-      if (Math.abs(P.x - b.x) > 20) b.face = P.x > b.x ? 1 : -1;
+      // taking its time, it turns to follow the hero between cuts; in a hurry it commits to the way it faces,
+      // so getting behind it (a dash straight through) is safe for the rest of the flurry
+      if ((!fast || i === 0) && Math.abs(P.x - b.x) > 20) b.face = P.x > b.x ? 1 : -1;
       b.pose = 'crouch';
-      const tele = (i === 0 ? 0.46 : last ? 0.4 : 0.27) * T;
-      if (i % 2 === 0) swing(b, { r: last ? 132 : 106, a0: -2.1, a1: 0.95, tele, pose: 'slashA' });
-      else swing(b, { r: 106, a0: 1.0, a1: -2.0, tele, pose: 'slashB' });
+      const tele = (fast ? (i === 0 ? 0.4 : 0.19) : (i === 0 ? 0.5 : 0.4)) * T, r = fast ? 86 : 112;
+      if (i % 2 === 0) swing(b, { r, a0: -2.1, a1: 0.95, tele, pose: 'slashA' });
+      else swing(b, { r, a0: 1.0, a1: -2.0, tele, pose: 'slashB' });
       yield* wait(tele);
-      // each cut carries it a step forward
-      const x1 = G.clamp(b.x + b.face * (last ? 70 : 44), WL + 30, WR - 30);
-      yield* tween(b, { x: x1 }, 0.1, E.outCubic);
-      yield* wait(0.06);
+      // each cut carries it forward: a full step when it is taking its time, a shuffle when it is not
+      const x1 = G.clamp(b.x + b.face * (fast ? 12 : 46), WL + 30, WR - 30);
+      yield* tween(b, { x: x1 }, fast ? 0.06 : 0.1, E.outCubic);
+      yield* wait(fast ? 0.02 : 0.1);
+    }
+    // the ender: spring away from the hero, then throw
+    const away = b.x > P.x ? 1 : -1, tx = G.clamp(b.x + away * 200, WL + 50, WR - 50), x0 = b.x;
+    b.face = -away; b.pose = 'air';
+    e = 0;
+    while (e < 0.3) { e += yield; const k = Math.min(1, e / 0.3); b.x = G.lerp(x0, tx, k); b.y = FLOOR - 4 * 90 * k * (1 - k); }
+    b.y = FLOOR; b.face = P.x > b.x ? 1 : -1; b.pose = 'crouch';
+    const ox = b.x + b.face * 22, oy = b.y - 60;
+    if (!fast) {
+      const base = Math.atan2(P.y - 24 - oy, P.x - ox), angs = [];
+      for (let i = 0; i < 5; i++) angs.push(base + (i - 2) * 0.14);
+      const tele = 0.42 * T;
+      volley(ox, oy, angs, tele, 780);
+      yield* wait(tele);
+      b.pose = 'throw';
+      yield* wait(0.3);
+    } else {
+      // one knife, lobbed to where the hero stands: it sticks, hisses, and takes two health from anyone still near
+      yield* wait(0.26 * T);
+      b.pose = 'throw';
+      G.audio.play('arrowHeavy');
+      const tf = 0.5, g = 1400, lx = G.clamp(P.x, WL + 60, WR - 60);
+      H.orb(ox, oy, (lx - ox) / tf, (FLOOR - 14 - oy) / tf - 0.5 * g * tf, {
+        r: 10, grav: g, blade: true, slashable: false, tint: { boss: DANGER, hot: '255,240,220' },
+        onPop(ob) {
+          G.audio.play('tink');
+          H.blast({ x: G.clamp(ob.x, WL + 40, WR - 40), y: FLOOR - 12, r: 128, tele: 0.62 * T, dmg: 2 });
+        },
+      });
+      yield* wait(tf + 0.62 * T + 0.2);
     }
     b.pose = 'skid';
-    yield* wait(0.85);
+    yield* wait(0.7);
   }
-
   function* atkKnives() {
     const b = B.body, P = G.player, T = K.T();
     // spring away from the hero, then throw

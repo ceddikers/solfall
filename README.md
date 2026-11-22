@@ -2,7 +2,7 @@
 
 A side-on boss rush for the browser: three heroes, four three-phase bosses, played as a run of
 ever-harder trials. You pick a hero and a relic before the run and win a boon after each victory.
-Version 1.1a.
+Version 1.2a.
 
 This is an early slice of a planned boss-rush roguelite (short runs, a boon after each boss,
 bosses drawn from a pool). A run meets the four bosses in a shuffled order, then meets them again, harder.
@@ -111,6 +111,28 @@ hero (`tools/feel-check.js`).
 - Settings, Reset progress erases Sunshards, upgrades, trophies and records (it has to be chosen twice).
 
 Not done: touch controls, a colour-blind alternative to red-orange warnings, gamepad rebinding.
+
+## Tells (new in v1.2a)
+
+Each boss now has attacks that come in two or three forms, and a small thing in how it moves that says
+which form is coming. Nothing on screen spells it out; the warning marks are the same as ever and still
+show where it will hurt. The tell is for a player who has met the boss before and wants to know sooner.
+Each boss tells in a different way.
+
+| Boss | Watch | What it means |
+|---|---|---|
+| The Veil | **how fast it cuts** in a flurry | Three unhurried cuts: it springs back and throws a fan of five knives, so jump or dash through. Five quick, short cuts: it springs back and lobs one knife that bursts where it lands for **2 health**, so get well clear of the mark. The quick cuts are shorter in reach and the Veil does not turn during them, so behind it is safe |
+| The Knight | **its foot and its blade** | A stamp after a cut: another cut is coming. The sword dragged along the ground: it is finished, go in. A blade that turns red and sheds embers: that cut does **2 health** and throws a wave along the floor, so be out of reach and ready to jump |
+| The Magus | **how it holds its staff** | Invocation: raised with a thread of light going up, the bolt comes from above; levelled like a spear, a beam along the floor, so jump; planted with a ring at its foot, the ground under you and then two waves. Fireball: one mote burning in the staff is the ordinary one; all three motes flying into the staff is the great fireball, slower, with a much wider burst for **2 health** and fire left on the floor |
+| The Warden | **its eye and its fist** | The eye shuts once, with a ring of light, for each lance it is about to throw (one, two or three). A fist that glows red and trembles before a slam comes down harder: **2 health** under it and a second pair of waves just behind the first |
+
+How often each form comes rises with the phase (for example the burning blade: one cut in four in
+phase I, almost half in phase III). The boss's tips between attempts mention its tells.
+
+For testing: `G.debug.variant = 'plain'` turns every tell's second form off; a list such as
+`'fast,blaze'` forces forms on. The names are `fast` (Veil), `follow` and `blaze` (Knight), `great`,
+`high`, `level` and `plant` (Magus), `heavy`, `n1` and `n2` (Warden). In code a boss asks
+`G.kit.chance(p, tag)`.
 
 ## What changed in v1.1a
 
@@ -466,10 +488,10 @@ Open the browser console on the running game.
 
 - **Dodge tests:** `fetch('/tools/dodge-tests.js').then(r => r.text()).then(t => console.log((0, eval)(t)))`
   runs each of the Warden's attacks against a simple scripted player and reports health lost. There are
-  35 tests and all lose 0 as of v1.1a. Set `window.TEST_HERO = 'aster'` (or `'lune'`) to test another hero
+  37 tests and all lose 0 as of v1.2a. Set `window.TEST_HERO = 'aster'` (or `'lune'`) to test another hero
   and `window.TEST_SEED = 2` for a different, repeatable set of boss choices.
 - **Tests for the other three bosses:** `fetch('/tools/boss-tests.js').then(r => r.text()).then(t => console.log((0, eval)(t)))`
-  runs every attack of the Magus, the Veil and the Knight in every phase that uses it (152 runs since v1.1a) against one
+  runs every attack of the Magus, the Veil and the Knight in every phase that uses it (158 runs since v1.2a) against one
   scripted player that follows plain rules: step off marked ground, jump low things, leave a swing's reach,
   dash when there is no time to walk. As of v0.6a it loses 0 health as Vesper on seed 1. Across three
   heroes and three seeds it lost between 0 and 6 in 134 runs when last measured (v0.5a), in the Veil's Cuts, the Knight's Whirl and,
@@ -511,11 +533,19 @@ Open the browser console on the running game.
   were run and looked at in captures, and the numbers above were checked in the running game. Whether
   Flow climbs at a satisfying rate, how often Dawnbreak fills in a real fight (the aim was two to four
   times), and whether Sunshard prices are fair are first guesses.
+- **v1.2a has not been played.** Each tell was looked at in still frames of the running game and both
+  forms of each attack were run against the scripted players, with each form forced in turn: Vesper
+  loses no health to any of them on two seeds, and the Warden's 37 tests lose none. Aster loses 4 in
+  158 runs and Lune 7, to the Veil's Cuts, the Knight's Whirl, the Comet and, as Lune, knives and
+  wraiths; that is what they lost in v1.1a (4 and 6) plus one knife from the Veil's fan. Whether the
+  tells can be read at full speed, and whether the 2-health forms come too often, is for a person to
+  say. The sounds that go with them (a tick for each blink, a stamp) are unheard.
 - **v1.1a has not been played.** Aster's sweep, tap smash and fully charged smash were measured on the
   sparring post (20, 40, and 80 plus a 24 wave), and her whole fights by script take about as long as
   before (59 to 64 seconds for a hero that never stops attacking). Whether she now feels heavy in the
   hand is for a person to say. The four new attacks were each run and looked at; the scripted players
-  lose no health to them as Vesper (as Aster, 1 in 152 runs, to the Comet's second rally).
+  lose no health to them as Vesper (as Aster, 1 in 152 runs, to the Comet's second rally; over every
+  attack Aster loses 4 and Lune 6).
 - **v1.0a was checked on screen and by script, still not by hand.** Every menu and the fight display
   were looked at in screenshots of the real page; rebinding was tested with simulated key presses, not a
   keyboard; practice fights were started, lost, retried and won by script. Flow's new pace is tuned

@@ -21,14 +21,16 @@
       'A wall of flame is low: a platform clears it, and so does a dash straight through.',
       'Break the crystals before their rings empty and they never burst.',
       'Lightning marks a column before it strikes. One step to the side is enough.',
+      'Watch the staff, not the spell. Held straight up, the lightning comes from the sky; levelled at you, along the ground; driven into the floor, through the floor.',
+      'One mote burning in the staff is an ordinary fireball. All three flying into it is the great one: two health, and a wide blast.',
     ],
     hudCols: [null, ['#7ea0ff', '#d8e4ff'], ['#ff7ea8', '#ffd4dc'], ['#ffe08a', '#ffffff']],
     BASE_HP: 3900, poise0: 380, w: 52, h: 112, platformsFrom: 1,
     gaps: [0, 0.95, 0.75, 0.6],
     bags: {
-      1: ['shards', 'rime', 'fireball', 'bolts', 'spheres', 'comet'],
-      2: ['shards', 'rime', 'fireball', 'bolts', 'spheres', 'firewall', 'crystals', 'storm', 'comet'],
-      3: ['shards', 'fireball', 'bolts', 'firewall', 'crystals', 'storm', 'blizzard', 'rime', 'comet'],
+      1: ['shards', 'rime', 'fireball', 'bolts', 'spheres', 'comet', 'invoke'],
+      2: ['shards', 'rime', 'fireball', 'bolts', 'spheres', 'firewall', 'crystals', 'storm', 'comet', 'invoke'],
+      3: ['shards', 'fireball', 'bolts', 'firewall', 'crystals', 'storm', 'blizzard', 'rime', 'comet', 'invoke'],
     },
     cards: { 2: ['CONFLUENCE', 'The spells begin to overlap'], 3: ['TRINITY', 'Every element answers'] },
     first: { 1: 'shards', 2: 'crystals', 3: 'blizzard' },
@@ -45,13 +47,21 @@
   const setElem = (el) => { B.body.elem = el; };
   const face = () => { const b = B.body; b.face = G.player.x >= b.x ? 1 : -1; };
   // the staff: where the front hand holds it, how far it tips forward, and where its head is in the world
-  const staff = (c) => ({ hx: 23 + 9 * c, hy: -62 - 18 * c, tilt: 0.07 + 0.42 * c });
+  // The staff is also the Magus's tell. For an Invocation it is held one of three ways through the
+  // cast, and each way says where the lightning will come from: straight up overhead (from the sky),
+  // levelled at the hero (along the ground), or driven into the floor (through the floor).
+  const GEST = { high: { hx: 12, hy: -112, tilt: -0.24 }, level: { hx: 34, hy: -56, tilt: 1.45 }, plant: { hx: 40, hy: -34, tilt: 0 } };
+  const staff = (c) => {
+    const b = B.body, k = b.gk || 0, g = GEST[b.gest || b.gestWas];
+    const s = { hx: 23 + 9 * c, hy: -62 - 18 * c, tilt: 0.07 + 0.42 * c };
+    return g && k > 0.001 ? { hx: G.lerp(s.hx, g.hx, k), hy: G.lerp(s.hy, g.hy, k), tilt: G.lerp(s.tilt, g.tilt, k) } : s;
+  };
   const tip = () => {
     const b = B.body, s = staff(b.cast);
     return { x: b.x + b.face * (s.hx + Math.sin(s.tilt) * 96), y: b.y + s.hy - Math.cos(s.tilt) * 96 };
   };
 
-  B.onRelease = function () { const b = B.body; b.want = 0; b.spent = false; b.charge = 0; b.hidden = false; b.alpha = 1; B.blizz = 0; };
+  B.onRelease = function () { const b = B.body; b.want = 0; b.spent = false; b.charge = 0; b.hidden = false; b.alpha = 1; B.blizz = 0; b.gest = null; b.merge = 0; };
   B.onInterrupt = function () { B.shards.length = 0; };
   B.onStagger = function () { const b = B.body; b.alpha = 1; b.elem = null; };
   B.reckonName = 'CONVERGENCE'; B.reckonY = GY;
@@ -339,12 +349,13 @@
   }
 
   // Fire: a slow ball of flame that leans after the hero and bursts where it lands.
-  function fireball(speed) {
+  // great: all three motes went into it. It is slower and bigger, and its blast is wide and takes two health.
+  function fireball(speed, great) {
     const P = G.player, o = tip();
     const a = Math.atan2(P.y - 30 - o.y, P.x - o.x);
-    G.audio.play('whoosh');
+    G.audio.play('whoosh'); if (great) G.audio.play('roar');
     H.orb(o.x, o.y, Math.cos(a) * speed, Math.sin(a) * speed, {
-      r: 21, slashable: false, tint: FIRE, life: 2.6,
+      r: great ? 34 : 21, slashable: false, tint: great ? { boss: '255,200,150', hot: '255,255,255' } : FIRE, life: great ? 3.2 : 2.6,
       steer(ob, dt) {
         if (ob.t < 1.3) {
           const cur = Math.atan2(ob.vy, ob.vx), want = Math.atan2(P.y - 24 - ob.y, P.x - ob.x);
@@ -354,14 +365,24 @@
         if (ob.life < 0.05) ob.pop();
       },
       onPop(ob) {
-        H.blast({ x: ob.x, y: Math.min(ob.y, FLOOR - 12), r: 96, tele: 0.4, tint: FIRE });
-        if (B.phase >= 2 && ob.y > FLOOR - 60) H.pool({ x: G.clamp(ob.x, WL + 80, WR - 80), w: 160, tele: 0.45, active: 3, tint: FIRE });
+        H.blast({ x: ob.x, y: Math.min(ob.y, FLOOR - 12), r: great ? 172 : 96, tele: great ? 0.55 : 0.4, tint: FIRE, dmg: great ? 2 : 1 });
+        if ((B.phase >= 2 || great) && ob.y > FLOOR - 60) H.pool({ x: G.clamp(ob.x, WL + 80, WR - 80), w: 160, tele: 0.45, active: 3, tint: FIRE });
       },
     });
   }
   function* atkFireball() {
     yield* reposition();
     const T = K.T();
+    // the tell: one mote burning in the staff is an ordinary fireball; all three flying into it is the great one
+    if (K.chance([0, 0.25, 0.35, 0.45][B.phase], 'great')) {
+      const b = B.body;
+      face(); b.merge = 1;
+      yield* cast(FIRE, 1.15 * T);
+      fireball(K.gentle() ? 330 : 370, true);
+      b.merge = 0;
+      yield* wait(1.4);
+      return;
+    }
     const n = 1 + (B.phase >= 2 ? 1 : 0) + (K.hard() ? 1 : 0);
     for (let i = 0; i < n; i++) {
       face();
@@ -604,7 +625,47 @@
     } else yield* wait(0.5);
   }
 
+  // Invocation: lightning, two to four times, each from a different quarter. The red warning comes
+  // late and short on purpose. What gives you time is the staff: how it is held through the cast
+  // says where the bolt will come from (see GEST above).
+  function* atkInvoke() {
+    const b = B.body, P = G.player, T = K.T();
+    // always from the ground, well away from the hero
+    yield* blink(P.x < 640 ? 1010 : 270, GY);
+    const n = 2 + (B.phase - 1) + (K.hard() ? 1 : 0), late = 0.44 * T;
+    let last = '';
+    for (let i = 0; i < n; i++) {
+      face();
+      const forced = ['high', 'level', 'plant'].find((g) => String(G.debug.variant || '').split(',').includes(g));
+      const g = forced || G.rpick(['high', 'level', 'plant'].filter((q) => q !== last));
+      last = g;
+      b.gest = g;
+      yield* cast(BOLT, 0.72 * T);
+      if (g === 'high') {
+        strike(G.clamp(P.x + P.vx * 0.15, WL + 40, WR - 40), late, 88);
+      } else if (g === 'level') {
+        H.beam({ ox: b.x + b.face * 44, oy: FLOOR - 30, ang: b.face > 0 ? 0 : Math.PI, width: 30, tele: late, lock: late, active: 0.16, tint: BOLT, sfx: 'zap', clip: false, maxLen: 1500 });
+      } else {
+        // through the floor: a mark under the staff, then waves both ways
+        const m = K.columnMark(b.x + b.face * 26, 70);
+        let e = 0;
+        while (e < late) { e += yield; m.k = e / late; m.locked = e > late * 0.6; }
+        m.dead = true;
+        G.audio.play('zap'); G.fx.shake(7);
+        G.fx.thud(b.x + b.face * 26, FLOOR, 0.9, { col: BOLT.boss });
+        H.shockwave(b.x + b.face * 40, b.face, 640, 46, BOLT);
+        H.shockwave(b.x - b.face * 10, -b.face, 640, 46, BOLT);
+      }
+      if (g !== 'plant') yield* wait(late);
+      yield* wait(0.3);
+      b.gest = null;
+      yield* wait(0.3);
+    }
+    yield* wait(0.5);
+  }
+
   B.ATTACKS = {
+    invoke: atkInvoke,
     comet: atkComet,
     shards: coda(atkShards, ICE), rime: coda(atkRime, ICE), fireball: coda(atkFireball, FIRE), bolts: coda(atkBolts, BOLT),
     spheres: coda(atkSpheres, BOLT), firewall: coda(atkFirewall, FIRE), crystals: coda(atkCrystals, ICE), storm: coda(atkStorm, BOLT),
@@ -646,6 +707,9 @@
   B.tick = function (dt) {
     const b = B.body, P = G.player;
     b.cast = G.damp(b.cast, b.want, 12, dt);
+    if (b.gest) b.gestWas = b.gest;
+    b.gk = G.damp(b.gk || 0, b.gest ? 1 : 0, b.gest ? 14 : 9, dt);
+    b.mk = G.damp(b.mk || 0, b.merge ? 1 : 0, 6, dt);
     D.chainStep(B.cape, b.x - b.face * 12, b.y - 92, dt, { seg: 13, grav: 50, drift: 24, face: b.face, wave: 10, rate: 5 });
     for (const s of B.shards) s.life -= dt;
     B.shards = B.shards.filter((s) => s.life > 0);
@@ -754,11 +818,12 @@
 
     // the three motes circle the Magus; the one in use burns in the staff
     const motes = ELEMS.map((e, i) => {
-      const a = B.t * 1.5 * B.spin + i * G.TAU / 3;
-      return { e, x: Math.cos(a) * 56, y: -62 + Math.sin(a) * 15, back: Math.sin(a) < 0 };
+      const a = B.t * 1.5 * B.spin + i * G.TAU / 3, mk = b.mk || 0, S0 = staff(c);
+      const tx = S0.hx + Math.sin(S0.tilt) * 96, ty = S0.hy - Math.cos(S0.tilt) * 96; // the staff's head
+      return { e, x: G.lerp(Math.cos(a) * 56, tx, mk), y: G.lerp(-62 + Math.sin(a) * 15, ty, mk), back: Math.sin(a) < 0 && mk < 0.5 };
     });
     const dim = down ? 0.35 : 1;
-    for (const m of motes) if (m.back && m.e !== el) mote(ctx, m.e, m.x, m.y, 0.8, 0.7 * dim);
+    for (const m of motes) if (m.back && (m.e !== el || b.mk > 0.05)) mote(ctx, m.e, m.x, m.y, 0.8, 0.7 * dim);
 
     // robe: narrow at the waist, wide at the hem and torn into wisps
     const g = ctx.createLinearGradient(0, -96, 0, 6);
@@ -839,6 +904,18 @@
     ctx.lineWidth = 2; D.line(ctx, -4, -80, 4, -80); D.line(ctx, -3, -75, 3, -75);
     if (el) mote(ctx, el, 0, -96, 1.3 + 0.8 * b.charge, 1);
     else { D.glow(ctx, col, 0, -96, 18, 0.8); ctx.fillStyle = G.rgba(hot, 1); D.poly(ctx, [0, -103, 4.2, -96, 0, -89, -4.2, -96]); ctx.fill(); }
+    // the gesture's accent: a thread of light going up from a raised staff, a ring where a planted one meets the floor
+    const gk = b.gk || 0, gs = b.gest || b.gestWas;
+    if (gk > 0.05 && gs === 'high') {
+      const lg = ctx.createLinearGradient(0, -112, 0, -272);
+      lg.addColorStop(0, G.rgba(hot, 0.9 * gk)); lg.addColorStop(1, G.rgba(hot, 0));
+      ctx.strokeStyle = lg; ctx.lineWidth = 3; D.line(ctx, 0, -112, 0, -112 - 160 * gk);
+    }
+    if (gk > 0.05 && gs === 'plant') {
+      D.glow(ctx, col, 0, 72, 34 * gk, 0.9 * gk);
+      ctx.strokeStyle = G.rgba(hot, 0.85 * gk); ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.ellipse(0, 74, 38 * gk, 7 * gk, 0, 0, G.TAU); ctx.stroke();
+    }
     ctx.restore();
     const k = D.ik(13, -92, S.hx, S.hy, 18, 18, 1);
     ctx.fillStyle = '#28338c';
@@ -852,7 +929,8 @@
     ctx.fillStyle = '#03040a'; ctx.beginPath(); ctx.arc(k.ex, k.ey, 3.6, 0, G.TAU); ctx.fill();
     if (c > 0.3) D.glow(ctx, col, k.ex, k.ey, 14 + 10 * b.charge, c * 0.8);
 
-    for (const m of motes) if (!m.back && m.e !== el) mote(ctx, m.e, m.x, m.y, 1, dim);
+    for (const m of motes) if (!m.back && (m.e !== el || b.mk > 0.05)) mote(ctx, m.e, m.x, m.y, 1 + 0.5 * (b.mk || 0), dim);
+    if (b.mk > 0.3) { const S1 = staff(c); D.glow(ctx, '255,255,255', S1.hx + Math.sin(S1.tilt) * 96, S1.hy - Math.cos(S1.tilt) * 96, 70 * b.mk, 0.8 * b.mk); }
 
     if (b.flash > 0) D.glow(ctx, '255,255,255', 0, -70, 95, b.flash * 0.8);
     ctx.restore();

@@ -50,7 +50,8 @@
           if (h.vy > 60 || h.grav) {
             const g = h.grav || 0, dy = (FLOOR - 20) - h.y;
             let t = g ? (-h.vy + Math.sqrt(Math.max(0, h.vy * h.vy + 2 * g * dy))) / g : dy / h.vy;
-            if (t > 0 && t < 1.2) out.push([h.x + h.vx * t, h.r + 26, t]);
+            // a big one still steers a little as it comes down: give it more room
+            if (t > 0 && t < 1.2) out.push([h.x + h.vx * t, h.r + (h.r > 28 ? 70 : 26), t]);
           }
           const dx = P.x - h.x;
           if (Math.abs(h.y - py) < 46 && Math.abs(dx) < 150 && dx * h.vx > 0 && Math.abs(h.vx) > 120) out.push([P.x, 24, 0]);
@@ -121,8 +122,8 @@
       } else if (h.kind === 'echo') {
         st.echo = h;
       } else if (h.kind === 'orb' && !h.grav) {
-        const dx = P.x - h.x;
-        if (Math.abs(h.y - (P.y - 22)) < 44 && Math.abs(dx) < 170 && dx * h.vx > 0 && Math.abs(h.vx) > 300) jump = true;
+        const dx = P.x - h.x, big = Math.max(0, (h.r || 21) - 21); // a bigger orb is jumped sooner
+        if (Math.abs(h.y - (P.y - 22)) < 44 + big * 2 && Math.abs(dx) < 170 + big * 4 && dx * h.vx > 0 && Math.abs(h.vx) > 300) { jump = true; if (big > 8) high = true; } // the great fireball takes a double jump
       }
     }
     // cornered by the Knight's whirl: go over it with a double jump

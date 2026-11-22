@@ -9,6 +9,7 @@
   const I = G.input, P = G.player, B = G.setBoss('warden'), D = 1 / 120;
   G.debug.freeze = true;
   G.debug.boss = 'warden';
+  G.debug.variant = 'plain'; // the tests below were written for each attack's plain form; the tells are tested at the end
   if (!P._orig) {
     P._orig = P.tryHit;
     P.tryHit = function (dmg, sx, src) {
@@ -279,6 +280,22 @@
     }
   }));
 
+  // --- the tells
+  G.debug.variant = 'heavy';
+  out.push(run('heavy slam (trembling fist): dash out on the flash, jump both waves', 1, 'slam', 640, (t, st) => {
+    const m = mark();
+    if (m && m.locked && !st.d) { st.d = 1; I.pressed.dash = true; hold(1, 0); }
+    if (st.d && P.dashT <= 0) hold(0, 0);
+    jumpWaves();
+  }));
+  G.debug.variant = 'n2';
+  out.push(run('two blinks, two lances: dash across each as it locks', 1, 'lance', 400, (t, st) => {
+    const b = G.hazards.list.find((h) => h.kind === 'beam');
+    if (b && b.locked && !b.firing && b.tele - b.t < 0.16 && !b._d && P.dashCd <= 0 && P.dashT <= 0) { b._d = 1; st.dir = st.dir ? -st.dir : 1; hold(st.dir < 0, st.dir > 0); I.pressed.dash = true; }
+    if (P.dashT <= 0 && !(b && b.locked)) hold(0, 0);
+  }));
+  G.debug.variant = 'plain';
+
   for (const px of [640, 200, 1100]) {
     out.push(run('sunburst: get into the nearest shadow, from x=' + px, 1, 'sunburst', px, () => {
       const s = G.hazards.list.find((h) => h.kind === 'sunburst');
@@ -290,6 +307,7 @@
   }
 
   G.debug.forceAttack = '';
+  G.debug.variant = '';
   G.debug.boss = '';
   G.debug.freeze = false;
   for (const a in I.down) I.down[a] = false;

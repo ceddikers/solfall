@@ -18,6 +18,14 @@
   const K = G.kit = {};
   K.hard = () => G.fierce();
   K.gentle = () => G.settings.difficulty === 0;
+  // Tells: many attacks have two ways of going, and a small thing the boss does beforehand says which.
+  // This decides the way: by chance p, or as forced for a test. G.debug.variant = 'plain' turns every
+  // variant off; any other value turns on the variants it names ('fast', 'follow,blaze', ...).
+  K.chance = function (p, tag) {
+    const v = G.debug.variant;
+    if (v) return v !== 'plain' && String(v).split(',').includes(tag);
+    return G.rng() < p;
+  };
   K.T = () => G.diff().tele;
 
   // One-step damage check for an impact.
