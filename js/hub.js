@@ -1,7 +1,8 @@
 // Solfall - the Vigil: the camp between runs. It is nearly three screens wide and the view follows
 // the hero across it. Everything that used to be a menu is a place: the Hall of Echoes to change
 // hero, the Shrine, a training yard with a sparring post, the brazier that sets the difficulty,
-// the banners that name the first foe, and the gate that starts a run.
+// the banners that name the first foe, a ring to practise in, the reliquary where the run's relic
+// is chosen, and the gate that starts a run.
 // The backdrop is painted once into four layers that slide at different speeds (sky, far hills,
 // a ruined aqueduct, near columns and tents); the places themselves are drawn every frame.
 'use strict';
@@ -9,13 +10,13 @@
   const FLOOR = G.FLOOR, F = G.fx, rnd = G.rand, W = G.W, TAU = G.TAU;
   const GOLD = '255,214,140', RIM = '255,206,150', WARM = '255,170,90';
   const STONE = '#120f26', STONE2 = '#1c1736', DARK = '#0b0919';
-  const HW = 3600, WALL_L = 150, WALL_R = HW - 110, PAD = 48;
+  const HW = 4040, WALL_L = 150, WALL_R = HW - 110, PAD = 48;
   const FOES = ['random', 'warden', 'mage', 'assassin', 'knight'];
   const NOTES = ['7 health. Warnings last longer, attacks come slower', '5 health. The fight as intended', '4 health. Shorter warnings, less rest, extra attacks'];
   const FLAME = ['150,215,255', '255,170,90', '255,70,60'];
   // where things stand
-  const ECHO_X = [420, 590, 760], SHRINE_X = 1130, FIRE_X = 1560, POST_X = 1950, BRAZIER_X = 2390, BANNER_X = 2770, GATE_X = 3270;
-  const BANNERS = [2665, 2735, 2805, 2875], RING_X = 2996;
+  const ECHO_X = [420, 590, 760], SHRINE_X = 1130, FIRE_X = 1560, POST_X = 1950, BRAZIER_X = 2390, BANNER_X = 2770, RELIQ_X = 3266, GATE_X = 3720;
+  const BANNERS = [2665, 2735, 2805, 2875], RING_X = 2975;
 
   const HUB = G.hub = { near: null, t: 0, lastX: FIRE_X - 70, msg: '', msgT: 0, W: HW, layers: null, flies: [], blades: [] };
   HUB.maxCam = HW - W;
@@ -107,10 +108,30 @@
     { id: 'brazier', x: BRAZIER_X, reach: 70, top: 222 },
     { id: 'banner', x: BANNER_X, reach: 150, top: 292 },
     { id: 'ring', x: RING_X, reach: 44, top: 150 },
-    { id: 'gate', x: GATE_X, reach: 110, top: 474 },
+    { id: 'gate', x: GATE_X, reach: 160, top: 474 },
   ];
   const foeName = (v) => (G.bosses[v] ? G.bosses[v].short : 'Whoever comes');
   const usable = (s) => s.reach > 0 && !(s.id === 'echo' && G.HEROES[s.hero].id === G.run.hero);
+
+  // The reliquary: one plinth for each relic on offer this visit (three, or four with the Shrine's
+  // Fourth Relic). The plinths are places too, rebuilt only when the offer changes.
+  const RELIC_COL = {
+    chalice: '255,150,120', shard: '150,225,255', moons: '214,170,255', crown: '255,96,56', ward: '255,226,170', cloak: '140,245,185',
+    storm: '255,250,160', phoenix: '255,170,90', sunstone: '255,214,140', eye: '255,186,92', prism: '150,170,255', shroud: '190,135,255', oath: '130,195,255',
+  };
+  const relicCol = (r) => RELIC_COL[r.id] || GOLD;
+  let relicKey = '', relicSt = [];
+  function relicStations() {
+    const offer = G.run.relicOffer || [], key = offer.map((r) => r.id).join(',');
+    if (key !== relicKey) {
+      relicKey = key;
+      relicSt = offer.map((r, i) => ({ id: 'relic', i, x: RELIQ_X + (i - (offer.length - 1) / 2) * 112, reach: 50, top: i % 2 ? 154 : 132 }));
+    }
+    return relicSt;
+  }
+  const places = () => STATIONS.concat(relicStations());
+  // Roll the relics on offer (on arriving, and when the hero or the difficulty changes, since both decide what may be offered).
+  HUB.offer = function () { G.run.relic = null; G.run.rollRelics(); };
   const foeCol = (v) => (G.THEMES[v] ? G.THEMES[v][1].boss : '200,200,215');
 
   function label(s) {
@@ -128,14 +149,20 @@
       return ['First foe: ' + foeName(f), rec, 'choose another'];
     }
     if (s.id === 'ring') return ['The Proving Ring', 'Practise against ' + (G.bosses[G.settings.firstFoe] ? G.bosses[G.settings.firstFoe].short : 'a foe at random') + ', from any phase', 'step in'];
+    if (s.id === 'relic') {
+      const r = G.run.relicOffer[s.i];
+      return [r.name, r.desc, G.run.relic === r.id ? 'this is your relic for the run' : 'take it for the run'];
+    }
     if (s.id === 'gate') {
-      const deep = G.store.load('depth', {})[G.settings.difficulty];
-      return ['The Gate', deep ? 'Deepest trial on ' + G.diff().name + ': ' + G.roman(deep) : 'No trial won yet on ' + G.diff().name, 'begin a run'];
+      const deep = G.store.load('depth', {})[G.settings.difficulty], r = G.relicDef(G.run.relic);
+      return ['The Gate', (r ? 'Relic: ' + r.name : 'No relic chosen: the reliquary is just behind you')
+        + (deep ? ' \u00b7 deepest trial ' + G.roman(deep) : ''), r ? 'begin the run' : 'choose a relic and begin'];
     }
     return ['', '', ''];
   }
   function shortName(s) {
     if (s.id === 'echo') return G.HEROES[s.hero].id === G.run.hero ? '' : G.HEROES[s.hero].name;
+    if (s.id === 'relic') return G.run.relicOffer[s.i].name;
     return { shrine: 'The Shrine', post: 'Sparring post', brazier: G.diff().name, banner: 'First foe', ring: 'Practice', gate: 'The Gate' }[s.id];
   }
 
@@ -148,7 +175,7 @@
       // trade places with the echo: the hero you were goes back to their own alcove
       const h = G.HEROES[s.hero], x = P.x, f = P.facing;
       G.settings.hero = h.id; G.saveSettings();
-      G.run.reset();
+      G.run.reset(); HUB.offer();
       P.reset(); G.flow.reset(); G.moments.reset();
       P.x = x; P.facing = f; P.ember = G.PLAYER.SEG * P.segs;
       G.ui.buildRun();
@@ -167,6 +194,7 @@
       F.burst(s.x, FLOOR - 120, { n: 30, color: c, speed: [80, 420], angle: -Math.PI / 2, spread: 1.6, life: [0.3, 0.9], size: [2, 5], grav: -200 });
       F.light(s.x, FLOOR - 120, 340, c, 0.45, 0.8);
       say(G.diff().name);
+      HUB.offer(); retake(); // health changes with the difficulty, and with it which relics may be offered
     } else if (s.id === 'banner') {
       G.settings.firstFoe = FOES[(FOES.indexOf(G.settings.firstFoe) + 1) % FOES.length]; G.saveSettings();
       G.audio.play('uiSelect');
@@ -175,9 +203,30 @@
       say(foeName(G.settings.firstFoe));
     } else if (s.id === 'ring') {
       G.audio.play('uiSelect'); G.ui.showPractice();
+    } else if (s.id === 'relic') {
+      // take the relic from its plinth: it is yours for the run, and it works at once so it can be tried on the post
+      const r = G.run.relicOffer[s.i], c = relicCol(r);
+      if (G.run.relic === r.id) { G.audio.play('uiMove'); return; }
+      G.run.relic = r.id; retake();
+      G.audio.play('segment'); G.audio.play('heal');
+      F.flash(c, 0.18, 0.3); F.shake(4);
+      F.shatter(s.x, FLOOR - 96, c, 14, { r: 240, r0: 24 });
+      F.ring(s.x, FLOOR - 96, { r0: 10, r1: 150, life: 0.45, color: c, width: 6 });
+      F.burst(P.x, P.y - 10, { n: 16, color: c, speed: [20, 130], life: [0.6, 1.2], size: [2, 4], grav: -220, wob: 130, jitter: 22 });
+      say(r.name);
     } else if (s.id === 'gate') {
-      G.audio.play('uiSelect'); G.openGate();
+      // with a relic in hand the gate opens at once; without one it asks which
+      G.audio.play('uiSelect');
+      if (G.run.relic) G.startFight(); else G.openGate();
     }
+  }
+
+  // Make the hero over again where they stand, so a relic (or a change of difficulty) takes effect in the camp.
+  function retake() {
+    const P = G.player, x = P.x, y = P.y, f = P.facing, vy = P.vy, ground = P.onGround, ult = P.ult;
+    P.reset(); G.flow.reset();
+    P.x = x; P.y = y; P.facing = f; P.vy = vy; P.onGround = ground; P.ult = ult; P.ember = G.PLAYER.SEG * P.segs;
+    G.ui.buildHp(P.maxHp); G.ui.buildRun();
   }
 
   // ------------------------------------------------------------------ update
@@ -187,7 +236,7 @@
     if (HUB.msgT > 0) HUB.msgT -= dt;
     HUB.lastX = P.x;
     let best = null, bd = 1e9;
-    for (const s of STATIONS) {
+    for (const s of places()) {
       const d = Math.abs(P.x - s.x);
       if (usable(s) && d < s.reach && d < bd && P.y > FLOOR - 150) { best = s; bd = d; }
     }
@@ -496,6 +545,7 @@
     drawBrazier(ctx, t);
     drawBanners(ctx, t);
     drawRing(ctx, t);
+    drawReliquary(ctx, t);
     drawGate(ctx, t);
   };
 
@@ -721,6 +771,41 @@
     pool(ctx, c, x, 90, on ? 0.5 : 0.3);
   }
 
+  // The reliquary: a low wall of niches behind a row of plinths, a relic turning over each. The one
+  // you have taken burns brightly; the rest dim once a choice is made.
+  function drawReliquary(ctx, t) {
+    const st = relicStations();
+    if (!st.length || !seen(RELIQ_X, 460)) return;
+    const x0 = st[0].x - 56, x1 = st[st.length - 1].x + 56, taken = G.run.relic;
+    // the wall, broken at one end, with a lit niche behind each plinth
+    poly(ctx, [x0, FLOOR, x0, FLOOR - 150, x0 + 40, FLOOR - 176, x1 - 60, FLOOR - 176, x1 - 30, FLOOR - 150, x1 - 14, FLOOR - 118, x1, FLOOR - 124, x1, FLOOR], STONE);
+    ctx.fillStyle = G.rgba(RIM, 0.5); ctx.fillRect(x0 + 40, FLOOR - 176, x1 - x0 - 100, 2);
+    block(ctx, (x0 + x1) / 2, x1 - x0 + 40, 8, 0, STONE2);
+    for (const s of st) {
+      const r = G.run.relicOffer[s.i], c = relicCol(r), mine = taken === r.id, on = HUB.near === s;
+      const lit = mine ? 1 : taken ? 0.34 : 0.75, bob = Math.sin(t * 1.8 + s.i * 1.7) * 4, cy = FLOOR - 98 + bob;
+      // niche
+      ctx.fillStyle = DARK;
+      ctx.beginPath(); ctx.moveTo(s.x - 30, FLOOR - 8); ctx.lineTo(s.x - 30, FLOOR - 120); ctx.arc(s.x, FLOOR - 120, 30, Math.PI, 0); ctx.lineTo(s.x + 30, FLOOR - 8); ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = G.rgba(c, 0.35 + 0.4 * lit); ctx.lineWidth = 1.5; ctx.stroke();
+      glow(ctx, c, s.x, cy, (mine ? 92 : 62) + (on ? 16 : 0), (0.2 + 0.5 * lit) + (on ? 0.12 : 0));
+      // plinth
+      block(ctx, s.x, 44, 44, 8, STONE2);
+      ctx.fillStyle = G.rgba(c, 0.5 * lit + 0.2); ctx.fillRect(s.x - 22, FLOOR - 52, 44, 2);
+      // the relic: a cut stone turning in its own light
+      const w = (mine ? 13 : 10) * (0.35 + 0.65 * Math.abs(Math.cos(t * 1.2 + s.i))), h = mine ? 22 : 17;
+      ctx.globalCompositeOperation = 'lighter';
+      diamond(ctx, s.x, cy, w + 2, h, G.rgba(c, 0.95 * lit));
+      diamond(ctx, s.x, cy, w * 0.45 + 1, h * 0.6, 'rgba(255,255,255,' + 0.9 * lit + ')');
+      if (mine) {
+        ctx.strokeStyle = G.rgba(c, 0.8); ctx.lineWidth = 2; ctx.setLineDash([6, 5]); ctx.lineDashOffset = -t * 14;
+        ctx.beginPath(); ctx.ellipse(s.x, cy, 30, 34, 0, 0, TAU); ctx.stroke(); ctx.setLineDash([]);
+      }
+      ctx.globalCompositeOperation = 'source-over';
+      pool(ctx, c, s.x, 70, 0.3 * lit);
+    }
+  }
+
   // The gate: steps, two fire-bowls on tall plinths, and the light of the trials turning in the arch.
   function drawGate(ctx, t) {
     if (!seen(GATE_X, 560)) return;
@@ -824,11 +909,15 @@
   HUB.drawOver = function (ctx) {
     const P = G.player, near = HUB.near, pad = G.input.device === 'gamepad', cam = G.cam.x;
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    for (const s of STATIONS) {
+    for (const s of places()) {
       if (s === near || !seen(s.x, 200)) continue;
       const name = shortName(s);
-      if (name) text(ctx, name.toUpperCase(), s.x, FLOOR - s.top, 12, '236,233,244', 0.55);
+      if (!name) continue;
+      // the relic you have taken is named in gold; the others fade once you have chosen
+      const mine = s.id === 'relic' && G.run.relic === G.run.relicOffer[s.i].id, dim = s.id === 'relic' && G.run.relic && !mine;
+      text(ctx, name.toUpperCase(), s.x, FLOOR - s.top, s.id === 'relic' ? 11 : 12, mine ? GOLD : '236,233,244', mine ? 0.95 : dim ? 0.3 : 0.55);
     }
+    if (seen(RELIQ_X, 200) && relicStations().length && !(near && near.id === 'relic')) text(ctx, G.run.relic ? 'THE RELIQUARY' : 'THE RELIQUARY  \u00b7  CHOOSE ONE', RELIQ_X, FLOOR - 204, 12, G.run.relic ? '236,233,244' : GOLD, G.run.relic ? 0.55 : 0.6 + 0.25 * Math.sin(HUB.t * 3));
     // the post reports what the last flurry came to, and how Dawnbreak stands
     if (D.sum > 0) text(ctx, D.sum + ' damage', POST_X, FLOOR - 164, 16, GOLD, Math.min(1, D.sumT * 2));
     if (P.ult > 0 && Math.abs(P.x - POST_X) < 240) {
@@ -836,7 +925,8 @@
       text(ctx, full ? 'Dawnbreak ready: press ' + (pad ? 'RT' : G.input.label('ult')) : 'Dawnbreak ' + Math.round(P.ult) + '%', POST_X, FLOOR - 186, 13, GOLD, full ? 0.7 + 0.3 * Math.sin(HUB.t * 8) : 0.7);
     }
     if (near && !G.ui.current) {
-      const Lb = label(near), x = G.clamp(near.x, cam + 200, cam + W - 200), y = FLOOR - near.top - 40;
+      // a relic's lines sit above the reliquary wall, clear of its neighbours' names
+      const Lb = label(near), x = G.clamp(near.x, cam + 200, cam + W - 200), y = FLOOR - (near.id === 'relic' ? 226 : near.top) - 40;
       text(ctx, Lb[0].toUpperCase(), x, y, 18, '255,255,255', 1);
       text(ctx, Lb[1], x, y + 22, 13, '236,233,244', 0.85, '500');
       text(ctx, (pad ? 'LB' : G.input.label('heal')) + '  ' + Lb[2], x, y + 44, 14, GOLD, 0.85 + 0.15 * Math.sin(HUB.t * 6));

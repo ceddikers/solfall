@@ -58,7 +58,13 @@
     G.startFight();
   };
   // The gate in the camp: choose a relic, then the first trial.
-  G.openGate = function () { G.practice = null; G.run.reset(); G.ui.showRelics(G.run.rollRelics()); };
+  // The relics on offer are the ones standing on the reliquary's plinths; this is the same choice as a menu,
+  // for the quick retry after a fall and for anyone who walks up to the gate without one.
+  G.openGate = function () {
+    G.practice = null;
+    if (!G.run.relicOffer.length) G.run.rollRelics();
+    G.ui.showRelics(G.run.relicOffer);
+  };
 
   // The Vigil: the camp between runs, where the hero walks about (see hub.js).
   // where: 'fire' (coming from the title) or 'gate' (coming back from a run).
@@ -67,6 +73,7 @@
     G.run.reset();
     G.setBoss('dummy');
     G.arena.reset(); G.hazards.clear(); F.reset();
+    G.hub.offer(); // the relics on the reliquary's plinths for this visit
     G.player.reset(); G.flow.reset(); G.boss.reset(); G.moments.reset();
     G.player.x = G.hub.spawn(where); G.player.facing = where === 'gate' ? -1 : 1;
     G.cam.x = G.hub.camTarget(); G.cam.y = 0; // the view starts on the hero, it does not slide there

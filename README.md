@@ -2,7 +2,7 @@
 
 A side-on boss rush for the browser: three heroes, four three-phase bosses, played as a run of
 ever-harder trials. You pick a hero and a relic before the run and win a boon after each victory.
-Version 1.0a.
+Version 1.0b.
 
 This is an early slice of a planned boss-rush roguelite (short runs, a boon after each boss,
 bosses drawn from a pool). A run meets the four bosses in a shuffled order, then meets them again, harder.
@@ -46,7 +46,7 @@ and gamepad are fixed.
 ## The Vigil (new in v0.9a)
 
 The title screen now leads to a camp, the Vigil, where you move your hero about freely. Since v0.9b it
-is nearly three screens wide (3,600 pixels) and the view follows the hero across it. What used to be
+is a little over three screens wide (4,040 pixels) and the view follows the hero across it. What used to be
 menu options are places in it, left to right:
 
 | Place | Walk up and press E to |
@@ -58,7 +58,8 @@ menu options are places in it, left to right:
 | The brazier | step the difficulty: Gentle, Standard, Merciless. The flame grows and changes colour with it. |
 | The banners | choose the first foe. One banner for each boss hangs on the rail; the lit one comes first, and all four lit means whoever comes. |
 | The proving ring | practise against the foe the banners show (or one at random), starting from phase I, II or III. No relic, no omen, no reward, nothing lost; R tries again. |
-| The gate | begin a run: choose a relic, then the first trial. You come back out of it when a run ends. |
+| The reliquary | take the relic for your run. Each relic on offer (three, or four with the Shrine's Fourth Relic) turns over its own plinth; walk up to one to read it and press E to take it. You can change your mind until you go through the gate. The relic works at once, so it can be tried on the sparring post. |
+| The gate | begin the run with the relic you took. If you have not taken one, it asks you to choose from the same relics as a menu. You come back out of it when a run ends. |
 
 The backdrop is painted once into four layers that slide at different speeds as you walk: the sky (with
 a thin moon and the dimmed sun low over the gate), far hills, a ruined aqueduct, and near columns,
@@ -66,7 +67,9 @@ tents and trees. The places, the fires, the grass (which bends away from you) an
 drawn each frame. A marker at the top right points to the gate until it is in view.
 
 Nothing can hurt you in the camp. Esc opens the menu (settings, how to play, quit to title). After a run,
-**New run** goes straight back to the gate's relic choice, and **Back to camp** returns you to the Vigil.
+**New run** (or R) goes straight to the relic choice as a menu, so a retry is as quick as before, and
+**Back to camp** returns you to the Vigil beside the gate. The relics on offer are drawn afresh each time
+you arrive, and again if you change hero or difficulty, since both decide what may be offered.
 The camp is `js/hub.js`; the sparring post is a stand-in boss (`G.bosses.dummy`), which is why every
 weapon, special and Dawnbreak works on it unchanged.
 
@@ -133,7 +136,8 @@ Heroes are defined in `G.HEROES` in `js/run.js` (numbers, colours, text); the we
 
 ## The run
 
-- A run starts by choosing a **hero**, then **one of three relics** drawn from nine (up to thirteen once trophies are won). The relic lasts the whole run.
+- A run starts in the camp: choose a **hero** at the Hall of Echoes, take **one of three relics** at the reliquary
+  (drawn from nine, up to thirteen once trophies are won), and step through the gate. The relic lasts the whole run.
 - Each trial is one boss. The four come in a shuffled order, and when all are beaten the order is
   shuffled again. The **banner** in the camp fixes who comes first (handy for practising one boss).
 - Beating a boss offers **three boons; you keep one** and go straight into the next trial. The victory

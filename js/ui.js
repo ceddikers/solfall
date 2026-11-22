@@ -372,7 +372,7 @@
   U.campHint = function () {
     if (!G.settings.hints || U.campSeen) return;
     U.campSeen = true;
-    el.hint.innerHTML = 'Welcome to the Vigil. Try your moves on the <b>sparring post</b>, then walk right to <b>the gate</b> to begin a run.';
+    el.hint.innerHTML = 'Welcome to the Vigil. Try your moves on the <b>sparring post</b>, then walk right: take a relic at <b>the reliquary</b> and step through <b>the gate</b>.';
     el.hint.classList.add('show', 'calm');
     H.hintT = 9;
   };
