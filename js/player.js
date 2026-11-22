@@ -8,6 +8,7 @@
     RUN: 335, ACC_G: 4400, ACC_A: 3000, GRAV: 2500, JUMP: 830, JUMP2: 740, MAXFALL: 1500,
     DASH_SPEED: 940, DASH_T: 0.16, DASH_CD: 0.34, IFRAME: 0.24,
     COYOTE: 0.09, BUFFER: 0.13, HURT_INV: 1.15, HEAL_T: 0.85,
+    FLOURISH_T: 0.7, FLOURISH_CD: 5,
     SEG: 100, SEGS: 3,
     GAIN_HIT: 8, GAIN_HEAVY: 16, GAIN_PERFECT: 34, GAIN_ORB: 6,
     LANCE_DMG: 42, LANCE_SPEED: 1700,
@@ -53,6 +54,7 @@
       dead: false, deadT: 0, hidden: false,
       squash: 0, runT: 0, stepN: 0, skidT: 0, hurtFlash: 0, emberFlash: 0,
       ult: 0, ulting: false, vanish: false, shroudT: 0,
+      flT: 0, flCd: 0, flBrazen: false,
       scarf: [], ghosts: [], slashes: [], bolts: [],
       stats: { dmg: 0, hits: 0, perfect: 0, heals: 0, lances: 0 },
     });
@@ -71,6 +73,22 @@
     if (Math.floor(P.ember / C.SEG) > before) { G.audio.play('segment'); P.emberFlash = 1; }
     G.flow.hit(n); // whatever earns Starlight also builds Flow
   };
+
+  // A flourish held to its end without being struck.
+  function flourished() {
+    const brazen = P.flBrazen;
+    P.flT = 0; P.flCd = C.FLOURISH_CD; P.flBrazen = false;
+    G.audio.play('flourish', { brazen });
+    const y = P.y - 96;
+    G.fx.ring(P.x, y, { r0: 8, r1: brazen ? 150 : 90, life: 0.4, color: brazen ? GOLD : STAR, width: brazen ? 6 : 4 });
+    G.fx.burst(P.x, y, { n: brazen ? 26 : 12, color: brazen ? GOLD : HOT, speed: [80, 380], life: [0.3, 0.8], size: [2, 4.5], kind: 'spark' });
+    G.fx.light(P.x, y, brazen ? 260 : 150, brazen ? GOLD : STAR, 0.4, 0.5);
+    if (G.state !== 'fight') return; // in the camp it is only for show
+    G.fx.text(P.x, P.y - 118, brazen ? 'BRAZEN' : 'FLOURISH', { color: brazen ? GOLD : HOT, size: brazen ? 24 : 16, life: 0.9 });
+    G.flow.add(brazen ? 30 : 10);
+    P.ult = Math.min(100, P.ult + (brazen ? 10 : 3));
+    if (brazen) { G.feats.bump('brazen'); G.fx.shake(5); }
+  }
 
   // The Warden entered a new phase: the Wardstone recharges.
   P.onPhase = function () {
@@ -129,9 +147,30 @@
       if (I.down.attack && P.atkCd <= 0) P.atkBuf = Math.max(P.atkBuf, 0.03);
     }
 
+    // --- flourish: a salute that leaves you open for its whole length. Finish one and Flow and
+    // Dawnbreak rise; finish one while the boss is in the middle of an attack and they rise far more.
+    P.flCd = Math.max(0, P.flCd - dt);
+    if (P.flT > 0) {
+      P.flT += dt; mx = 0;
+      P.jumpBuf = P.atkBuf = P.dashBuf = P.flareBuf = 0;
+      if (G.state === 'fight' && G.boss.attackName && !G.boss.staggered) P.flBrazen = true;
+      if (Math.random() < dt * 50) {
+        G.fx.spawn({ x: P.x + P.facing * 8 + G.rand(-10, 10), y: P.y - 96 + G.rand(-10, 10), vx: G.rand(-40, 40), vy: -G.rand(20, 120), life: G.rand(0.3, 0.7), size: G.rand(1.6, 3.2), color: Math.random() < 0.5 ? HOT : STAR, wob: 60, rot: G.rand(0, 6) });
+      }
+      if (!P.onGround || P.stun > 0) P.flT = 0;
+      else if (P.flT >= C.FLOURISH_T) flourished();
+    } else if (ctl && I.pressed.taunt && free && P.onGround && P.dashT <= 0 && !P.atk && P.stun <= 0 && P.healT === 0) {
+      if (P.flCd > 0) { G.audio.play('empty'); }
+      else {
+        P.flT = 0.0001; P.flBrazen = false; mx = 0;
+        G.audio.play('whoosh');
+        G.fx.ring(P.x, P.y - 30, { r0: 60, r1: 14, life: 0.3, color: STAR, width: 3 });
+      }
+    }
+
     // --- mend: hold to spend one segment of Starlight for health
     if (!I.down.heal) P.healLock = false;
-    const wantHeal = ctl && I.down.heal && !P.healLock;
+    const wantHeal = ctl && I.down.heal && !P.healLock && P.flT === 0;
     if (wantHeal && free && P.onGround && P.dashT <= 0 && !P.atk && P.stun <= 0 && P.hp < P.maxHp && P.ember >= C.SEG) {
       if (P.healT === 0) G.audio.play('healStart');
       P.healT += dt;
@@ -734,6 +773,8 @@
     const braced = !!(P.atk && P.atk.canCharge && !P.atk.swung && P.atk.hold > 0.12) && P.hp > 0;
     const dir = G.sign(P.x - srcX) || -P.facing;
     P.inv = C.HURT_INV; P.dashT = 0; P.healT = 0; P.hurtFlash = 1; P.plunge = false;
+    if (P.flT > 0) { P.flT = 0; P.flCd = 2; } // caught showing off
+    G.feats.bump('hurt');
     if (braced) {
       // Aster, mid-charge: it hurts, but she is not moved and the blow she is holding is not lost
       G.fx.text(P.x, P.y - 84, 'UNMOVED', { color: HOT, size: 15, life: 0.8 });
@@ -1064,6 +1105,14 @@
     const a = s.atk, air = !s.onGround, run = !air && Math.abs(s.vx) > 40;
     const sw = Math.sin(s.runT + Math.PI);
     const SH = -35; // shoulder height
+    if (s.flT > 0) {
+      // flourish: the weapon goes round once and is held high
+      const k = G.clamp(s.flT / 0.3, 0, 1), spin = (1 - k) * (1 - k) * G.TAU, ang = -1.42 - spin;
+      const fx = 3 + Math.cos(ang) * 6, fy = SH - 6 + Math.sin(ang) * 6;
+      if (h.weapon === 'sword') return { fx, fy, bx: -5, by: -24, ang, len: 38 };
+      if (h.weapon === 'maul') return { fx, fy, bx: fx - Math.cos(ang) * 7.5, by: fy - Math.sin(ang) * 7.5, ang, len: 34 };
+      return { fx: 5, fy: SH - 14 * k, bx: -5, by: -22, ang: -1.25 * k, pull: 0, len: 0 };
+    }
     if (h.weapon === 'sword') {
       if (a && a.kind !== 'shot') {
         const ang = swingAngle(a), c = Math.cos(ang), sn = Math.sin(ang), r = a.thrust ? 12.5 : 11;

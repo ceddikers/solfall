@@ -593,6 +593,7 @@
             G.fx.stop(0.14); G.fx.shake(16); G.fx.flash(STAR.hot, 0.3, 0.3); G.fx.punch(0.04);
             G.fx.shatter(q.x, q.y, STAR.boss, 26, { hot: STAR.hot, r: 420, r0: 40 });
             G.fx.boom(q.x, q.y, 130, { col: STAR.boss, hot: STAR.hot });
+            if (t) G.feats.bump('comet');
             if (t) B.damage(Math.round(70 * G.dmgMult()), t, { x: q.x, y: q.y, heavy: true, finisher: true, lance: true, poise: 2.4, dir: G.sign(q.vx) || 1 });
           }
         }

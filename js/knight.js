@@ -63,6 +63,7 @@
     b.x = 900; b.y = FLOOR + 150; b.pose = 'kneel'; b.p = POSES.kneel.slice(); b.walkT = 0; b.hurt = false; b.spin = 0; b.spinning = false; b.fast = false;
     B.cape = D.chain(9, b.x, b.y - 100);
   };
+  B.onHit = function () { if (B.body.unarmed) G.feats.bump('unarmed'); }; // for the feat
   B.onRelease = function () { const b = B.body; b.hurt = false; b.pose = 'idle'; b.spinning = false; b.fast = false; b.unarmed = false; b.blaze = 0; };
   B.onStagger = function () { B.body.pose = 'kneel'; };
   B.reckonName = 'DIRGE';

@@ -41,7 +41,7 @@
       'hint', 'lowhp', 'lbTop', 'lbBot', 'diffNote', 'bestLine', 'ver', 'deadLead', 'deadFill', 'deadStats',
       'pauseBoons', 'boons', 'trial', 'winOver', 'winPick', 'winCards', 'heroName', 'heroCards', 'relicCards', 'relicOver',
       'deadTip', 'winStats', 'winBest', 'gradeLetter', 'gradeTitle', 'gradeSub', 'stage',
-      'practiceOver', 'keyList', 'resetItem', 'movesOver', 'movesTitle', 'movesBody', 'movesFoot', 'ult', 'ultFill', 'ultKey', 'flow', 'flowRank', 'flowFill', 'omen', 'shardCount', 'shrineLead', 'shrineList', 'shrineTrophies', 'rerollItem']) el[id] = $(id);
+      'practiceOver', 'keyList', 'resetItem', 'movesOver', 'movesTitle', 'movesBody', 'movesFoot', 'ult', 'ultFill', 'ultKey', 'flow', 'flowRank', 'flowFill', 'omen', 'shardCount', 'shrineLead', 'shrineList', 'shrineTrophies', 'rerollItem', 'featsLead', 'featsBody']) el[id] = $(id);
     el.segs = Array.from(document.querySelectorAll('#ember .seg'));
     el.bbar = document.querySelector('.bbar');
     el.bname = document.getElementById('bname');
@@ -224,6 +224,15 @@
       + (got.length ? ': ' + got.map((t) => t.name).join(', ') + '.' : '. The first victory over each boss adds its relic to those you can be offered.');
   };
   U.showShrine = function () { U.fillShrine(); U.show('shrine', true); };
+  // ---- the Tally: every feat, done or not, and what it pays
+  U.showFeats = function () {
+    const FE = G.feats;
+    const row = (f) => '<div class="feat' + (FE.done(f.id) ? ' done' : '') + '"><b>' + f.name + '</b><span>' + f.desc + '</span><i>' + (FE.done(f.id) ? 'done' : '\u25c6 ' + f.pay) + '</i></div>';
+    el.featsLead.innerHTML = '<b style="color:var(--gold)">' + FE.count() + '</b> of ' + FE.total + ' done. Each pays its Sunshards once, the first time you do it.';
+    el.featsBody.innerHTML = FE.BOSSES.map((b) => '<div class="featcol"><h3>' + G.bosses[b].short + '</h3>' + FE.of(b).map(row).join('') + '</div>').join('')
+      + '<div class="featcol wide"><h3>The Vigil</h3>' + FE.CAMP.map(row).join('') + '</div>';
+    U.show('feats', true);
+  };
   // ---- the Moves page: every button, and what it does for the hero in play
   U.showMoves = function (fromMenu) {
     const h = G.hero(), I = G.input, k = (a) => I.keys(a).map((n) => '<kbd>' + n + '</kbd>').join(' ');
@@ -237,6 +246,7 @@
       ['Special', k('flare') + ' or right click', h.how.special + ' Costs one segment of Starlight.'],
       ['Mend', 'hold ' + k('heal'), 'Stand still and hold to turn one segment of Starlight into one health. Jumping or dashing cancels it.'],
       ['Dawnbreak', k('ult') + ' or middle click', h.how.ult + ' The bar fills as you deal damage; nothing can hurt you while it plays.'],
+      ['Flourish', k('taunt'), 'A salute, for most of a second, in which you can do nothing else. Finish it and Flow and Dawnbreak rise a little; finish it while the boss is in the middle of an attack and it is BRAZEN, worth three times as much. Being struck ends it.'],
     ];
     el.movesOver.textContent = h.title; el.movesOver.style.color = h.css;
     el.movesTitle.textContent = h.name + '\u2019s moves';
@@ -252,7 +262,7 @@
     U.show('practice', true);
   };
   // ---- Settings, Controls: choose a row, then press the key it should use
-  const ACTIONS = { left: 'Move left', right: 'Move right', up: 'Aim up', down: 'Aim down, drop', jump: 'Jump', attack: 'Attack', dash: 'Dash', flare: 'Special', heal: 'Mend, use', ult: 'Dawnbreak' };
+  const ACTIONS = { left: 'Move left', right: 'Move right', up: 'Aim up', down: 'Aim down, drop', jump: 'Jump', attack: 'Attack', dash: 'Dash', flare: 'Special', heal: 'Mend, use', ult: 'Dawnbreak', taunt: 'Flourish' };
   U.fillKeys = function () {
     Array.from(el.keyList.children).forEach((row) => {
       const a = (row.dataset.act || '').slice(4);
@@ -573,8 +583,10 @@
     ]);
     el.winStats.lastElementChild.firstElementChild.classList.add('gold');
     el.winOver.textContent = 'Victory \u00b7 trial ' + G.roman(res.trial);
-    el.winBest.textContent = res.meta.relic ? 'Trophy won: ' + res.meta.relic.name + ' joins the relics you can be offered.'
-      : res.meta.record ? 'Your fastest win against ' + G.boss.short + ' on ' + G.diff().name + ': ' + U.fmtTime(res.meta.record) + '.'
+    // feats done in this fight are always named, whatever else there is to say
+    const feats = res.meta.lines.filter((l) => l.indexOf('Feat: ') === 0).join(' · ');
+    el.winBest.textContent = res.meta.relic ? 'Trophy won: ' + res.meta.relic.name + ' joins the relics you can be offered.' + (feats ? ' ' + feats : '')
+      : res.meta.record ? 'Your fastest win against ' + G.boss.short + ' on ' + G.diff().name + ': ' + U.fmtTime(res.meta.record) + '.' + (feats ? ' ' + feats : '')
       : res.meta.lines.length ? res.meta.lines.join(' \u00b7 ')
       : res.newBest ? 'New fastest first trial on ' + G.diff().name + '.'
       : res.newDepth ? 'Your deepest trial yet on ' + G.diff().name + '.' : '';

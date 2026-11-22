@@ -40,12 +40,20 @@
       D.body = { x: POST_X, y: FLOOR, flash: 0, kx: 0, kv: 0, hidden: false };
       D.core = { x: POST_X, y: FLOOR - 52, r: 22 };
       G.bounds = { l: WALL_L, r: WALL_R }; G.wind = 0; // the camp is wider than an arena
+      toysReset();
     },
     attract() { D.reset(); },
     intro() { },
     release() { }, interrupt() { }, pushPlayer() { },
-    targets() { return [{ id: 'body', kind: 'body', ref: D.body, cx: POST_X, cy: FLOOR - 48, hw: 22, hh: 48 }]; },
+    targets() {
+      const at = bellAt();
+      return [{ id: 'body', kind: 'body', ref: D.body, cx: POST_X, cy: FLOOR - 48, hw: 22, hh: 48 },
+        { id: 'bell', kind: 'toy', cx: at.x, cy: at.y, hw: 30, hh: 42 },
+        { id: 'lamp', kind: 'toy', cx: lamp.x, cy: lamp.y, hw: LAMP_R + 5, hh: LAMP_R + 5 }];
+    },
     damage(amount, t, info) {
+      if (t && t.id === 'bell') return ringBell(info);
+      if (t && t.id === 'lamp') return knockLamp(info);
       const b = D.body, dmg = Math.round(amount);
       b.flash = 1;
       b.kv += (info.dir || G.sign(POST_X - G.player.x) || 1) * (info.lance ? 9 : info.heavy ? 6 : 3);
@@ -97,6 +105,160 @@
     },
   };
 
+
+  // ------------------------------------------------------------------ toys
+  // Two things in the camp that are only there to be hit: an old bell at the far end, which climbs
+  // a scale while you keep it ringing, and a paper lantern in the yard, which counts the blows you
+  // land before it touches the ground. Both are targets of the sparring post's "boss".
+  const BELL_X = 224, TALLY_X = 935, LAMP_X = 2190, LAMP_R = 20;
+  const PENT = [0, 2, 4, 7, 9, 12, 14, 16, 19, 21, 24];
+  const bell = { a: 0, av: 0, n: 0, quiet: 9, flash: 0 };
+  const lamp = { x: LAMP_X, y: FLOOR - LAMP_R, vx: 0, vy: 0, n: 0, rot: 0, idle: 0, flash: 0 };
+  HUB.bell = bell; HUB.lamp = lamp;
+  function toysReset() {
+    Object.assign(bell, { a: 0, av: 0, n: 0, quiet: 9, flash: 0 });
+    Object.assign(lamp, { x: LAMP_X, y: FLOOR - LAMP_R, vx: 0, vy: 0, n: 0, rot: 0, idle: 0, flash: 0 });
+  }
+  const bellAt = () => ({ x: BELL_X + Math.sin(bell.a) * 62, y: FLOOR - 150 + Math.cos(bell.a) * 62 });
+  function featSay(f) {
+    HUB.msg = 'Feat: ' + f.name + '  ◆ +' + f.pay; HUB.msgT = 4;
+    G.audio.play('segment'); G.audio.play('heal');
+    F.flash(GOLD, 0.16, 0.3);
+  }
+  function ringBell(info) {
+    const P = G.player, at = bellAt();
+    if (Math.abs(P.x - BELL_X) > 700) return false;
+    const dir = info.dir || G.sign(BELL_X - P.x) || 1, hard = !!info.heavy;
+    bell.av += dir * (hard ? 5.5 : 3.2);
+    bell.n = bell.quiet < 1.6 ? bell.n + 1 : 1; bell.quiet = 0; bell.flash = 1;
+    G.audio.play('chime', { n: PENT[Math.min(bell.n - 1, PENT.length - 1)], vol: hard ? 1.25 : 1 });
+    F.ring(at.x, at.y, { r0: 20, r1: 110 + 12 * Math.min(bell.n, 10), life: 0.5, color: GOLD, width: 3 });
+    F.burst(info.x, info.y, { n: hard ? 10 : 5, color: GOLD, speed: [60, 300], life: [0.3, 0.8], size: [1.5, 3.2], kind: 'spark' });
+    F.light(at.x, at.y, 220, GOLD, 0.3, 0.6);
+    if (bell.n >= 2) F.text(BELL_X, FLOOR - 236, String(bell.n), { color: GOLD, size: 16 + Math.min(10, bell.n), life: 0.7, pop: true });
+    if (bell.n === 5) {
+      // a full peal: light pours out of it
+      F.burst(at.x, at.y, { n: 40, color: '214,255,170', speed: [60, 420], life: [0.8, 1.8], size: [2, 4], grav: -120, wob: 120 });
+      F.shake(4);
+      const f = G.feats.camp('camp.bell');
+      if (f) featSay(f); else say('A full peal');
+    }
+    return true;
+  }
+  function knockLamp(info) {
+    const P = G.player;
+    if (Math.abs(P.x - lamp.x) > 700) return false;
+    const air = lamp.y < FLOOR - LAMP_R - 6, hard = !!info.heavy;
+    const above = !P.onGround && P.y - 22 < lamp.y - 34; // struck from above, it is driven down
+    lamp.vx = G.clamp((lamp.x - P.x) * 2 + (info.dir || 0) * 80, -420, 420);
+    lamp.vy = above ? 520 : -(600 + (hard ? 140 : 0));
+    lamp.n = air ? lamp.n + 1 : 1; lamp.idle = 0; lamp.flash = 1;
+    G.audio.play('paper', { n: lamp.n - 1 });
+    F.burst(lamp.x, lamp.y, { n: hard ? 9 : 5, color: WARM, speed: [60, 280], life: [0.3, 0.7], size: [1.5, 3], kind: 'spark' });
+    F.ring(lamp.x, lamp.y, { r0: 10, r1: 60, life: 0.25, color: WARM, width: 3 });
+    if (lamp.n >= 2) F.text(lamp.x, lamp.y - 44, String(lamp.n), { color: lamp.n >= 10 ? GOLD : '255,236,200', size: 15 + Math.min(12, lamp.n), life: 0.6, pop: true });
+    if (lamp.n === 10) { const f = G.feats.camp('camp.keep'); if (f) featSay(f); }
+    return true;
+  }
+  // The lantern came down: say what the rally came to, and keep the best.
+  function lampLanded() {
+    const n = lamp.n; lamp.n = 0;
+    if (n < 2) return;
+    if (n > (G.meta.toys.keep || 0)) {
+      G.meta.toys.keep = n; if (G.meta.earning()) G.meta.save();
+      say('Lantern: ' + n + ' blows, your best'); G.audio.play('segment');
+    } else say('Lantern: ' + n + ' blows');
+  }
+  function toysUpdate(dt) {
+    bell.quiet += dt; bell.flash = Math.max(0, bell.flash - dt * 3);
+    bell.av += (-bell.a * 30 - bell.av * 1.2) * dt; bell.a = G.clamp(bell.a + bell.av * dt, -1.3, 1.3);
+    const L = lamp;
+    L.flash = Math.max(0, L.flash - dt * 4);
+    if (L.y < FLOOR - LAMP_R || L.vy < 0) {
+      // in the air it is light: it falls slowly and the air takes its sideways speed
+      L.vy += 900 * dt; L.vx *= Math.exp(-0.5 * dt);
+      L.x += L.vx * dt; L.y += L.vy * dt; L.rot += L.vx * 0.012 * dt;
+      if (L.x < WALL_L + LAMP_R) { L.x = WALL_L + LAMP_R; L.vx = Math.abs(L.vx) * 0.7; }
+      if (L.x > WALL_R - LAMP_R) { L.x = WALL_R - LAMP_R; L.vx = -Math.abs(L.vx) * 0.7; }
+      if (L.y >= FLOOR - LAMP_R) {
+        L.y = FLOOR - LAMP_R;
+        if (L.n > 0) lampLanded();
+        if (L.vy > 170) { L.vy = -L.vy * 0.38; F.dust(L.x, FLOOR, 2); } else L.vy = 0;
+        L.vx *= 0.6;
+      }
+    } else {
+      L.x = G.clamp(L.x + L.vx * dt, WALL_L + LAMP_R, WALL_R - LAMP_R); L.rot += L.vx * 0.012 * dt; L.vx *= Math.exp(-3 * dt);
+      L.idle += dt;
+      // left lying far from its place, it finds its own way back
+      if (L.idle > 6 && Math.abs(L.x - LAMP_X) > 80 && Math.abs(G.player.x - L.x) > 160) {
+        F.burst(L.x, L.y, { n: 12, color: WARM, speed: [30, 160], life: [0.3, 0.8], size: [2, 4], grav: -160 });
+        L.x = LAMP_X; L.vx = 0; L.idle = 0; L.rot = 0;
+        F.burst(L.x, L.y, { n: 12, color: WARM, speed: [30, 160], life: [0.3, 0.8], size: [2, 4], grav: -160 });
+      }
+    }
+  }
+  function drawBell(ctx, t) {
+    if (!seen(BELL_X, 300)) return;
+    const x = BELL_X, k = bell.flash;
+    glow(ctx, GOLD, x, FLOOR - 100, 120, 0.16 + 0.3 * k);
+    for (const side of [-1, 1]) poly(ctx, [x + side * 52 - 7, FLOOR, x + side * 50 - 5, FLOOR - 156, x + side * 50 + 5, FLOOR - 156, x + side * 52 + 7, FLOOR], STONE);
+    poly(ctx, [x - 66, FLOOR - 150, x + 66, FLOOR - 150, x + 58, FLOOR - 164, x - 58, FLOOR - 164], STONE2);
+    poly(ctx, [x - 74, FLOOR - 164, x, FLOOR - 188, x + 74, FLOOR - 164], STONE);
+    ctx.save();
+    ctx.translate(x, FLOOR - 150); ctx.rotate(-bell.a);
+    ctx.strokeStyle = 'rgba(160,150,190,0.7)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(0, 22); ctx.stroke();
+    poly(ctx, [-8, 22, 8, 22, 15, 38, 20, 64, 30, 80, -30, 80, -20, 64, -15, 38], '#4a3a22', G.rgba(GOLD, 0.6 + 0.4 * k));
+    ctx.fillStyle = G.rgba(GOLD, 0.5 + 0.5 * k); ctx.fillRect(-29, 76, 58, 3);
+    ctx.strokeStyle = G.rgba(GOLD, 0.35); ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(-17, 48); ctx.lineTo(17, 48); ctx.moveTo(-21, 62); ctx.lineTo(21, 62); ctx.stroke();
+    // the clapper and its cord lag a little behind the bell
+    const lag = G.clamp(bell.av * 0.05, -0.4, 0.4);
+    ctx.rotate(lag);
+    ctx.strokeStyle = 'rgba(160,150,190,0.8)'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(0, 60); ctx.lineTo(0, 100); ctx.stroke();
+    ctx.fillStyle = '#8a7a52'; ctx.beginPath(); ctx.arc(0, 86, 5, 0, TAU); ctx.fill();
+    poly(ctx, [-4, 98, 4, 98, 0, 112], G.rgba(RIM, 0.9), false);
+    ctx.restore();
+    pool(ctx, GOLD, x, 110, 0.18 + 0.4 * k);
+  }
+  function drawTally(ctx, t) {
+    if (!seen(TALLY_X, 300)) return;
+    const x = TALLY_X, on = HUB.near && HUB.near.id === 'tally', FE = G.feats;
+    glow(ctx, GOLD, x, FLOOR - 96, 110, on ? 0.34 : 0.2);
+    block(ctx, x, 96, 10, 0, STONE2);
+    poly(ctx, [x - 36, FLOOR - 10, x - 32, FLOOR - 150, x - 12, FLOOR - 170, x + 24, FLOOR - 160, x + 36, FLOOR - 10], STONE);
+    // one mark for each feat, cut in rows: lit when it is done
+    const ids = [];
+    for (const b of FE.BOSSES) for (const f of FE.of(b)) ids.push(f.id);
+    for (const f of FE.CAMP) ids.push(f.id);
+    ctx.globalCompositeOperation = 'lighter';
+    ids.forEach((id, i) => {
+      const cx = x - 18 + (i % 4) * 12, cy = FLOOR - 138 + Math.floor(i / 4) * 24, done = FE.done(id);
+      if (done) diamond(ctx, cx, cy, 4, 7, G.rgba(GOLD, 0.8 + 0.2 * Math.sin(t * 2 + i)));
+      else { ctx.strokeStyle = G.rgba(RIM, 0.28); ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(cx, cy - 6); ctx.lineTo(cx, cy + 6); ctx.stroke(); }
+    });
+    ctx.globalCompositeOperation = 'source-over';
+    pool(ctx, GOLD, x, 100, on ? 0.34 : 0.2);
+  }
+  function drawLamp(ctx, t) {
+    // where it lives: a ring painted on the paving
+    if (seen(LAMP_X, 200)) { ctx.strokeStyle = G.rgba(WARM, 0.3); ctx.lineWidth = 1.5; ctx.beginPath(); ctx.ellipse(LAMP_X, FLOOR + 4, 30, 4, 0, 0, TAU); ctx.stroke(); }
+    const L = lamp;
+    if (!seen(L.x, 200)) return;
+    const k = L.flash;
+    glow(ctx, WARM, L.x, L.y, 70 + 30 * k, 0.5 + 0.3 * k);
+    if (L.y > FLOOR - 260) pool(ctx, WARM, L.x, 90, 0.4 * (1 - (FLOOR - LAMP_R - L.y) / 260));
+    ctx.save();
+    ctx.translate(L.x, L.y); ctx.rotate(L.rot);
+    const g = ctx.createRadialGradient(0, 2, 2, 0, 0, 22);
+    g.addColorStop(0, '#fff4d6'); g.addColorStop(0.55, '#ffb060'); g.addColorStop(1, '#b0502a');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.ellipse(0, 0, 17, 20, 0, 0, TAU); ctx.fill();
+    ctx.strokeStyle = 'rgba(90,30,10,0.55)'; ctx.lineWidth = 1;
+    for (const rx of [6, 12]) { ctx.beginPath(); ctx.ellipse(0, 0, rx, 20, 0, 0, TAU); ctx.stroke(); }
+    ctx.beginPath(); ctx.moveTo(0, -20); ctx.lineTo(0, 20); ctx.stroke();
+    ctx.fillStyle = '#241408'; ctx.fillRect(-8, -23, 16, 4); ctx.fillRect(-7, 19, 14, 4);
+    poly(ctx, [-2, 23, 2, 23, 0, 33], G.rgba(GOLD, 0.9), false);
+    ctx.restore();
+  }
+
   // ------------------------------------------------------------------ the places
   // x: where it stands. reach: how close the hero must be. top: how high its name floats.
   const STATIONS = [
@@ -104,6 +266,7 @@
     { id: 'echo', hero: 1, x: ECHO_X[1], reach: 56, top: 262 },
     { id: 'echo', hero: 2, x: ECHO_X[2], reach: 56, top: 262 },
     { id: 'shrine', x: SHRINE_X, reach: 78, top: 300 },
+    { id: 'tally', x: TALLY_X, reach: 62, top: 204 },
     { id: 'post', x: POST_X, reach: 0, top: 140 },
     { id: 'brazier', x: BRAZIER_X, reach: 70, top: 222 },
     { id: 'banner', x: BANNER_X, reach: 150, top: 292 },
@@ -139,6 +302,7 @@
       const h = G.HEROES[s.hero];
       return [h.name + ', ' + h.title, h.blurb, 'take up ' + h.name + '’s ' + h.weapon];
     }
+    if (s.id === 'tally') return ['The Tally', G.feats.count() + ' of ' + G.feats.total + ' feats done', 'read it'];
     if (s.id === 'shrine') return ['The Shrine', '◆ ' + G.meta.shards + ' Sunshards', 'spend them'];
     if (s.id === 'brazier') return ['The Brazier: ' + G.diff().name, NOTES[G.settings.difficulty], 'change the difficulty'];
     if (s.id === 'banner') {
@@ -163,7 +327,7 @@
   function shortName(s) {
     if (s.id === 'echo') return G.HEROES[s.hero].id === G.run.hero ? '' : G.HEROES[s.hero].name;
     if (s.id === 'relic') return G.run.relicOffer[s.i].name;
-    return { shrine: 'The Shrine', post: 'Sparring post', brazier: G.diff().name, banner: 'First foe', ring: 'Practice', gate: 'The Gate' }[s.id];
+    return { shrine: 'The Shrine', tally: 'The Tally', post: 'Sparring post', brazier: G.diff().name, banner: 'First foe', ring: 'Practice', gate: 'The Gate' }[s.id];
   }
 
   function say(text) { HUB.msg = text; HUB.msgT = 3; }
@@ -187,6 +351,8 @@
       say(h.name + ' takes up the vigil');
     } else if (s.id === 'shrine') {
       G.audio.play('uiSelect'); G.ui.showShrine();
+    } else if (s.id === 'tally') {
+      G.audio.play('uiSelect'); G.ui.showFeats();
     } else if (s.id === 'brazier') {
       G.settings.difficulty = (G.settings.difficulty + 1) % 3; G.saveSettings();
       const c = FLAME[G.settings.difficulty];
@@ -242,6 +408,8 @@
     }
     HUB.near = best;
     if (best && G.playerControl() && !P.ulting && (I.pressed.heal || I.pressed.confirm)) use(best);
+
+    toysUpdate(dt);
 
     // fires throw sparks, the gate drinks light, the shard sheds it
     const d = G.settings.difficulty, c = FLAME[d];
@@ -538,10 +706,13 @@
     }
     if (seen(HW, 500)) poly(ctx, [HW - 96, FLOOR, HW - 112, FLOOR - 300, HW - 60, FLOOR - 430, HW + 300, FLOOR - 520, HW + 300, FLOOR], STONE);
 
+    drawBell(ctx, t);
     drawHall(ctx, t);
     drawShrine(ctx, t);
+    drawTally(ctx, t);
     drawFire(ctx, t);
     drawYard(ctx, t);
+    drawLamp(ctx, t);
     drawBrazier(ctx, t);
     drawBanners(ctx, t);
     drawRing(ctx, t);
@@ -918,6 +1089,8 @@
       text(ctx, name.toUpperCase(), s.x, FLOOR - s.top, s.id === 'relic' ? 11 : 12, mine ? GOLD : '236,233,244', mine ? 0.95 : dim ? 0.3 : 0.55);
     }
     if (seen(RELIQ_X, 200) && relicStations().length && !(near && near.id === 'relic')) text(ctx, G.run.relic ? 'THE RELIQUARY' : 'THE RELIQUARY  \u00b7  CHOOSE ONE', RELIQ_X, FLOOR - 204, 12, G.run.relic ? '236,233,244' : GOLD, G.run.relic ? 0.55 : 0.6 + 0.25 * Math.sin(HUB.t * 3));
+    if (seen(BELL_X, 200)) text(ctx, 'THE OLD BELL', BELL_X, FLOOR - 212, 12, '236,233,244', 0.55);
+    if (seen(lamp.x, 200) && lamp.n < 2) text(ctx, 'LANTERN' + (G.meta.toys.keep ? '  \u00b7  BEST ' + G.meta.toys.keep : ''), lamp.x, lamp.y - 46, 12, '236,233,244', 0.55);
     // the post reports what the last flurry came to, and how Dawnbreak stands
     if (D.sum > 0) text(ctx, D.sum + ' damage', POST_X, FLOOR - 164, 16, GOLD, Math.min(1, D.sumT * 2));
     if (P.ult > 0 && Math.abs(P.x - POST_X) < 240) {
@@ -934,9 +1107,9 @@
     if (HUB.msgT > 0) text(ctx, HUB.msg.toUpperCase(), P.x, P.y - 104, 15, GOLD, Math.min(1, HUB.msgT * 2));
     if (!G.ui.current) {
       text(ctx, 'THE VIGIL', cam + W / 2, 40, 20, '236,233,244', 0.75, '400');
-      text(ctx, pad ? 'Stick move  ·  A jump  ·  X attack  ·  B dash  ·  LB use  ·  Start menu'
+      text(ctx, pad ? 'Stick move  ·  A jump  ·  X attack  ·  B dash  ·  LB use  ·  Back flourish  ·  Start menu'
         : [G.input.label('left') + ' / ' + G.input.label('right') + ' move', G.input.label('jump') + ' jump', G.input.label('attack') + ' or click attack', G.input.label('dash') + ' dash',
-          G.input.label('flare') + ' special', G.input.label('heal') + ' use', 'hold Tab moves', 'Esc menu'].join('  \u00b7  '),
+          G.input.label('flare') + ' special', G.input.label('heal') + ' use', G.input.label('taunt') + ' flourish', 'hold Tab moves', 'Esc menu'].join('  \u00b7  '),
         cam + W / 2, 66, 12, '236,233,244', 0.45, '500');
       text(ctx, '\u25c6 ' + G.meta.shards + ' Sunshards', cam + W - 112, 66, 12, GOLD, 0.8);
       // which way the gate lies, until it is in view

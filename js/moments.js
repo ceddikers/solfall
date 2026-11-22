@@ -125,7 +125,7 @@
       F.thud(x, FLOOR, 1.5, { col: H0.col });
       F.ring(x, y, { r0: 20, r1: 380, life: 0.5, color: GOLD, width: 10 });
     } else if (em.kind === 'riposte') {
-      P.riposteT = 0;
+      P.riposteT = 0; G.feats.bump('riposte');
       G.audio.play('riposte');
       F.text(x, y - 52, 'RIPOSTE', { color: GOLD, size: 24, life: 0.9 });
       F.stop(0.11); F.slow(0.4, 0.22); F.shake(9); F.punch(0.03); F.flash(H0.hot, 0.16, 0.2);

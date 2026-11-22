@@ -2,11 +2,11 @@
 // relics that the first victory over each boss adds to the relic pool. Kept in the browser's storage.
 'use strict';
 (function () {
-  const M = G.meta = Object.assign({ shards: 0, earned: 0, up: {}, kills: {}, runs: 0, best: {} }, G.store.load('meta', {}));
-  const save = () => G.store.save('meta', { shards: M.shards, earned: M.earned, up: M.up, kills: M.kills, runs: M.runs, best: M.best });
+  const M = G.meta = Object.assign({ shards: 0, earned: 0, up: {}, kills: {}, runs: 0, best: {}, feats: {}, toys: {} }, G.store.load('meta', {}));
+  const save = () => G.store.save('meta', { shards: M.shards, earned: M.earned, up: M.up, kills: M.kills, runs: M.runs, best: M.best, feats: M.feats, toys: M.toys });
   // Erase everything that lasts between runs (Settings, Reset progress).
   M.reset = function () {
-    M.shards = 0; M.earned = 0; M.up = {}; M.kills = {}; M.runs = 0; M.best = {};
+    M.shards = 0; M.earned = 0; M.up = {}; M.kills = {}; M.runs = 0; M.best = {}; M.feats = {}; M.toys = {};
     save(); G.store.save('best', {}); G.store.save('depth', {});
   };
   // Fastest first-trial win against a boss on the current difficulty, in seconds (or undefined).
@@ -53,6 +53,7 @@
   // ------------------------------------------------------------------ Sunshards
   // Tests and god mode earn nothing (G.debug.meta = true forces it, for checking this file).
   const earning = () => !G.practice && (G.debug.meta || !(G.debug.freeze || G.debug.god));
+  M.earning = earning;
   const GRADE = { S: 1.5, A: 1.25, B: 1.1, C: 1 }, DIFF = [0.75, 1, 1.4];
   const base = () => 12 + 5 * (G.run.trial - 1);
   const scale = () => (DIFF[G.settings.difficulty] || 1) * (1 + 0.1 * G.up('fortune')) * (1 + 0.25 * G.run.omens.length);
@@ -77,6 +78,8 @@
       out.lines.push('First victory over ' + G.bosses[bossId].short + ' +25');
     }
     if (G.run.omens.length) out.lines.push('Omen +' + 25 * G.run.omens.length + '%');
+    // feats done for the first time in this fight (see feats.js); their pay is not scaled
+    for (const f of G.feats.win(bossId)) { n += f.pay; out.lines.push('Feat: ' + f.name + ' +' + f.pay); }
     M.kills[bossId] = (M.kills[bossId] || 0) + 1;
     out.shards = Math.round(n);
     M.shards += out.shards; M.earned += out.shards;

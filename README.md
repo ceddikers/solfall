@@ -2,7 +2,7 @@
 
 A side-on boss rush for the browser: three heroes, four three-phase bosses, played as a run of
 ever-harder trials. You pick a hero and a relic before the run and win a boon after each victory.
-Version 1.2a.
+Version 1.3a.
 
 This is an early slice of a planned boss-rush roguelite (short runs, a boon after each boss,
 bosses drawn from a pool). A run meets the four bosses in a shuffled order, then meets them again, harder.
@@ -31,6 +31,7 @@ then open http://localhost:8321. There is no build step and no dependency.
 | Special (costs one Starlight segment) | L or V, or right click (at the cursor) | Y |
 | Mend one health (costs one segment) | hold E or F while standing | LB or LT |
 | Dawnbreak (when its bar is full) | Q or I, or middle click | RT |
+| Flourish (a salute that leaves you open) | T or G | Back, or press the right stick |
 | Drop through a platform | S + Space | down + A |
 | Your hero's moves (the fight waits while it is up) | hold Tab, or Moves in the pause menu | |
 | Pause | Esc or P | Start |
@@ -111,6 +112,45 @@ hero (`tools/feel-check.js`).
 - Settings, Reset progress erases Sunshards, upgrades, trophies and records (it has to be chosen twice).
 
 Not done: touch controls, a colour-blind alternative to red-orange warnings, gamepad rebinding.
+
+## Fun things (new in v1.3a)
+
+Three additions that are there to be played with.
+
+**The flourish.** Press T (or G) on the ground and your hero twirls the weapon and holds it high for
+0.7 seconds. You can do nothing else until it ends, and a blow that lands ends it. Finish one and
+Flow rises by 10 and Dawnbreak by 3%. Finish one while the boss is in the middle of an attack and it
+is **BRAZEN**: Flow +30, Dawnbreak +10%. It can be used again after 5 seconds (2 if you were caught).
+In the camp it is only for show.
+
+**Toys in the Vigil.**
+
+- **The old bell**, at the far left end past the Hall of Echoes. Strike it and it rings. Keep it
+  ringing (another blow within 1.6 seconds) and each note climbs a scale. Five in a row is a full peal.
+- **The lantern**, in the yard beside the sparring post. Knock it into the air and keep it there: it
+  counts the blows you land before it touches the ground and remembers your best. It is light and
+  drifts away from you, so you have to chase it. Struck from above it is driven down. Left lying far
+  from its place, it finds its own way back. Arrows, specials and Dawnbreaks all move it.
+
+**Feats and the Tally.** Eighteen things worth doing once. Each pays Sunshards the first time, and a
+standing stone between the Hall and the Shrine keeps count: one mark for each, lit when it is done.
+Use it to read the list. Feats done in a fight are named on the victory screen. Practice and test
+modes do not count.
+
+| Feat | For | Pays |
+|---|---|---|
+| Untouched | each boss: win without losing any health | 30 |
+| Swift | each boss: win in under 2:30 | 20 |
+| Brazen | each boss: win after three brazen flourishes | 20 |
+| An eye for an eye | the Warden: land three Ripostes | 20 |
+| Return to sender | the Magus: send two Comets back into it | 20 |
+| Faster than silence | the Veil: reach Flow rank S | 20 |
+| Disarmed | the Knight: strike it eight times while its sword is away | 20 |
+| Bellringer | the camp: ring the old bell five times without letting it fall quiet | 10 |
+| Lamplighter | the camp: keep the lantern off the ground for ten blows | 10 |
+
+That is 380 Sunshards in all, a little over a quarter of what the whole Shrine costs. The feats are
+in `js/feats.js`; the toys are in `js/hub.js`, as extra targets of the sparring post.
 
 ## Tells (new in v1.2a)
 
@@ -461,10 +501,11 @@ To use these in a new attack, call the ready-made mixes in `js/fx.js`: `G.fx.hit
 | `js/util.js` | constants, maths, seedable randomness, saved settings, difficulty table (`G.DIFFS`) |
 | `js/run.js` | the run: heroes, relics, boons, offers, how each trial scales the boss |
 | `js/meta.js` | what lasts between runs: Sunshards, the Shrine (`G.SHRINE`), trophy relics |
+| `js/feats.js` | the feats: what each asks, the counters a fight keeps for them, and what they pay |
 | `js/flow.js` | the Flow rank and each hero's Dawnbreak |
 | `js/omens.js` | the omens (`G.OMENS`) and what each one does during a fight |
 | `js/moments.js` | Reckoning, Riposte, Sunder, Clash, Last Light and the last push |
-| `js/hub.js` | the Vigil: the camp between runs, its places, and the sparring post |
+| `js/hub.js` | the Vigil: the camp between runs, its places, the sparring post, the bell and the lantern |
 | `tools/feel-check.js` | whole fights played by a scripted hero, to measure Dawnbreak, Flow and Reckonings |
 | `js/input.js` | keyboard, mouse and gamepad mapped to actions |
 | `js/audio.js` | every sound and the music, synthesised in code (no audio files) |
@@ -533,6 +574,14 @@ Open the browser console on the running game.
   were run and looked at in captures, and the numbers above were checked in the running game. Whether
   Flow climbs at a satisfying rate, how often Dawnbreak fills in a real fight (the aim was two to four
   times), and whether Sunshard prices are fair are first guesses.
+- **v1.3a has not been played.** The flourish was run in a fight (plain, brazen, and caught in the
+  middle), the bell was rung to a full peal, a scripted hero kept the lantern up for 19 blows by
+  striking upward on the exact frame, and a scripted win paid three feats and named them on the
+  victory screen. The counters behind Return to sender and Disarmed were checked in the running
+  game. Every older test gives the same result as in v1.2a. What nobody knows: whether ten blows on
+  the lantern is a fair target for a person, whether a brazen flourish is too safe against slow
+  attacks, whether the feat rewards are the right size, and how the bell, the lantern and the
+  flourish sound. The gamepad button for the flourish is untested.
 - **v1.2a has not been played.** Each tell was looked at in still frames of the running game and both
   forms of each attack were run against the scripted players, with each form forced in turn: Vesper
   loses no health to any of them on two seeds, and the Warden's 37 tests lose none. Aster loses 4 in

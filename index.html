@@ -127,10 +127,10 @@
               <tr><td>Dawnbreak</td><td><kbd>Q</kbd> or <kbd>I</kbd>, or middle click, when its bar is full</td></tr>
               <tr><td>Drop through a platform</td><td><kbd>S</kbd> + <kbd>Space</kbd></td></tr>
               <tr><td>Use something in the camp</td><td><kbd>E</kbd> or <kbd>Enter</kbd></td></tr>
-              <tr><td>Your hero's moves</td><td>hold <kbd>Tab</kbd></td></tr>
-              <tr><td>Pause</td><td><kbd>Esc</kbd> or <kbd>P</kbd></td></tr>
+              <tr><td>Flourish (a risky salute)</td><td><kbd>T</kbd> or <kbd>G</kbd></td></tr>
+              <tr><td>Your hero's moves, pause</td><td>hold <kbd>Tab</kbd>; <kbd>Esc</kbd> or <kbd>P</kbd></td></tr>
             </table>
-            <p class="small">Gamepad: stick to move, A jump, X attack, B or RB dash, Y special, LB mend, RT Dawnbreak.</p>
+            <p class="small">Gamepad: stick to move, A jump, X attack, B or RB dash, Y special, LB mend, RT Dawnbreak, Back flourish.</p>
           </div>
           <div>
             <h3>Reading the fight</h3>
@@ -184,9 +184,20 @@
           <div class="item kv" data-act="key-flare"><span class="k"></span><span class="v"></span></div>
           <div class="item kv" data-act="key-heal"><span class="k"></span><span class="v"></span></div>
           <div class="item kv" data-act="key-ult"><span class="k"></span><span class="v"></span></div>
+          <div class="item kv" data-act="key-taunt"><span class="k"></span><span class="v"></span></div>
           <div class="item" data-act="keyreset">Restore defaults</div>
           <div class="item" data-act="back">Back</div>
         </nav>
+      </div>
+    </section>
+
+    <section id="s-feats" class="screen panelscreen">
+      <div class="panel feats">
+        <p class="over">Feats</p>
+        <h2>The Tally</h2>
+        <p class="lead" id="featsLead"></p>
+        <div id="featsBody" class="featgrid"></div>
+        <nav class="row"><div class="item" data-act="back">Back</div></nav>
       </div>
     </section>
 
@@ -274,6 +285,7 @@
 <script src="js/util.js"></script>
 <script src="js/run.js"></script>
 <script src="js/meta.js"></script>
+<script src="js/feats.js"></script>
 <script src="js/input.js"></script>
 <script src="js/audio.js"></script>
 <script src="js/fx.js"></script>

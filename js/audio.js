@@ -277,6 +277,25 @@
       tone({ type: 'triangle', f0: f, dur: 0.12, vol: 0.1 });
       tone({ type: 'triangle', f0: f * 1.5, dur: 0.18, vol: 0.09, delay: 0.07 });
     },
+    // the flourish: a bright rising figure; brazen adds a fifth on top
+    flourish(o) {
+      [784, 1175, 1568].forEach((f, i) => tone({ type: 'triangle', f0: f, dur: 0.16, vol: 0.09, delay: i * 0.05 }));
+      if (o && o.brazen) tone({ type: 'triangle', f0: 2349, dur: 0.4, vol: 0.1, delay: 0.16 });
+    },
+    // the camp's bell: n semitones up from its ground note, louder for a harder blow
+    chime(o) {
+      const f = 330 * Math.pow(2, ((o && o.n) || 0) / 12), v = (o && o.vol) || 1;
+      tone({ type: 'sine', f0: f, f1: f * 0.995, dur: 1.5, vol: 0.2 * v });
+      tone({ type: 'sine', f0: f * 2.01, f1: f * 2, dur: 1.0, vol: 0.09 * v });
+      tone({ type: 'sine', f0: f * 2.76, dur: 0.5, vol: 0.05 * v });
+      noise({ dur: 0.04, vol: 0.1 * v, f0: 3000, f1: 1500, q: 1 });
+    },
+    // the lantern: a soft paper thump with a little ring in it
+    paper(o) {
+      const f = 520 * Math.pow(2, Math.min(12, (o && o.n) || 0) / 12);
+      noise({ dur: 0.07, vol: 0.14, type: 'lowpass', f0: 900, f1: 300 });
+      tone({ type: 'sine', f0: f, f1: f * 1.02, dur: 0.22, vol: 0.08 });
+    },
     ultReady() { [880, 1320, 1760].forEach((f, i) => tone({ f0: f, dur: 0.4, vol: 0.11, delay: i * 0.07 })); },
     ult() {
       tone({ type: 'sawtooth', f0: 110, f1: 880, dur: 0.35, vol: 0.2 });
