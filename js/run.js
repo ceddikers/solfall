@@ -7,6 +7,9 @@
 
   // ------------------------------------------------------------------ heroes
   // combo: three steps of { dmg, cd (time to the next swing), dur, wind (wind-up), act (active time) }.
+  // chain: how many swings make a chain (the last is the finisher, combo[2]); 3 unless given.
+  // heavy: the maul's own rules (a sweep on both sides, a smash that can be charged, more weight in every step).
+  // how: what each button does for this hero, for the Moves page.
   // hp is added to the difficulty's health; reach, thick and poise scale melee reach, arc width and stagger.
   G.HEROES = [
     {
@@ -21,19 +24,33 @@
       down: 11, special: 'lance', specialName: 'Star Lance', verb: 'lance',
       blurb: 'Balanced and quick. The one to learn the fight with.',
       lines: ['Sword: a fast three-hit combo', 'Star Lance: a piercing shot at any range', 'A slash out of a dash becomes a thrust'],
+      how: {
+        attack: 'Sword. Two quick cuts (9, 11), then a finisher (24). Hold the button to keep cutting.',
+        aim: 'Hold up to cut overhead. In the air, hold down to strike below and bounce off what you hit, getting your jump and dash back.',
+        dash: 'A cut thrown straight out of a dash becomes a thrust: 40% more damage and a longer reach.',
+        special: 'Star Lance: a piercing shot of 42 that crosses the arena. Aim with the mouse, or hold a direction.',
+        ult: 'Thousand Stars: you vanish and cut from every side, eight times for 20 and once for 80.',
+      },
     },
     {
       id: 'aster', name: 'Aster', title: 'The Starmaul', col: '140,245,185', hot: '232,255,240', css: '#8cf5b9',
       cloak: ['#1f4a3a', '#08160f'], build: 1.24, scarf: 6, scarfW: 1.7,
-      hp: 1, run: 300, air: 1, weapon: 'maul', reach: 1.28, thick: 1.55, poise: 1.35,
+      hp: 1, run: 300, air: 1, weapon: 'maul', reach: 1.28, thick: 1.55, poise: 1.35, chain: 2, heavy: true, accel: 0.74,
       combo: [
-        { dmg: 14, cd: 0.34, dur: 0.3, wind: 0.05, act: 0.13 },
-        { dmg: 17, cd: 0.36, dur: 0.3, wind: 0.05, act: 0.13 },
-        { dmg: 36, cd: 0.62, dur: 0.48, wind: 0.15, act: 0.16 },
+        { dmg: 20, cd: 0.44, dur: 0.36, wind: 0.08, act: 0.14 }, // the sweep
+        { dmg: 20, cd: 0.44, dur: 0.36, wind: 0.08, act: 0.14 },
+        { dmg: 40, cd: 0.66, dur: 0.5, wind: 0.16, act: 0.16 },  // the smash
       ],
       down: 15, special: 'starfall', specialName: 'Starfall', verb: 'starfall',
       blurb: 'Slow, heavy and hard to kill. Every swing counts.',
-      lines: ['Maul: wide, slow swings; the finisher shakes the ground', 'Starfall: slam down for a blast around you, passing through attacks as you fall', 'One more health, and the stagger bar fills 35% faster'],
+      lines: ['Maul: a sweep that hits on both sides, then a smash you can hold to charge', 'Starfall: slam down for a blast around you, passing through attacks as you fall', 'One more health; she cannot be knocked back while charging'],
+      how: {
+        attack: 'Maul. A sweep that hits on both sides of you (20), then a smash that shakes the ground (40). Keep the button held on the smash to charge it, up to double; fully charged it also throws a wave along the floor. While you charge you move slowly, but a blow cannot knock you back or stop you.',
+        aim: 'Hold up to heave the maul overhead. In the air, hold down to strike below and bounce off what you hit.',
+        dash: 'She is slower to start and stop than the others. A sweep thrown straight out of a dash hits 40% harder.',
+        special: 'Starfall: a blast of 46 around your feet. In the air you plunge first, passing through attacks until you land.',
+        ult: 'Worldbreaker: you rise and come down for 250, and the whole floor splits.',
+      },
     },
     {
       id: 'lune', name: 'Lune', title: 'The Moonbow', col: '214,170,255', hot: '246,236,255', css: '#d6aaff',
@@ -47,6 +64,13 @@
       down: 4, special: 'volley', specialName: 'Moon Volley', verb: 'volley',
       blurb: 'Fragile and nimble. Fights from range, hits hardest up close.',
       lines: ['Moonbow: arrows in any direction, strongest up close and weaker at long range; she slows while firing', 'Moon Volley: a fan of five arrows and a leap backwards', 'Triple jump; firing downward in the air lifts you; one less health'],
+      how: {
+        attack: 'Moonbow. Arrows wherever you aim (4, 5), then a heavy arrow that pierces (10). Up to 60% stronger within 120 pixels, up to 30% weaker past 240. You slow down while firing.',
+        aim: 'Aim with the mouse, or hold a direction; with no direction held she fires the way she faces. Firing downward in the air lifts you.',
+        dash: 'Three jumps instead of two. She has one less health than the others.',
+        special: 'Moon Volley: a fan of five arrows, and a leap back from where you aimed.',
+        ult: 'Moonfall: one arrow into the sky; twelve fall on the boss for 15 each, then a beam of 70.',
+      },
     },
   ];
   const heroById = {};

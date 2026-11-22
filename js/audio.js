@@ -10,7 +10,7 @@
   let vary = 1;
   const VARY = {
     hit: 1.3, hitHeavy: 1, slash: 1.6, slash3: 1.2, arrow: 1.2, arrowHeavy: 0.8, tink: 1.5, orbPop: 2,
-    step: 3, stomp: 2, land: 2, landHard: 1.5, jump: 0.7, dash: 1, boom: 1.2, slam: 0.8, blade: 1.2, zap: 1.2,
+    step: 3, stepHeavy: 2.5, stomp: 2, land: 2, landHard: 1.5, jump: 0.7, dash: 1, boom: 1.2, slam: 0.8, blade: 1.2, zap: 1.2,
   };
 
   // Browsers only allow audio after a user gesture, so this is called from the first key or click.
@@ -125,6 +125,10 @@
       tone({ type: 'sine', f0: 96, f1: 40, dur: 0.17, vol: 0.32 });
     },
     step() { noise({ dur: 0.05, vol: 0.05, type: 'lowpass', f0: 420, f1: 140 }); },
+    stepHeavy() {
+      noise({ dur: 0.07, vol: 0.09, type: 'lowpass', f0: 300, f1: 90 });
+      tone({ type: 'sine', f0: 70, f1: 38, dur: 0.1, vol: 0.12 });
+    },
     // a heavy boss's footfall
     stomp() {
       tone({ type: 'sine', f0: 72, f1: 30, dur: 0.22, vol: 0.34 });

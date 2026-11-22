@@ -279,6 +279,16 @@
     }
   }));
 
+  for (const px of [640, 200, 1100]) {
+    out.push(run('sunburst: get into the nearest shadow, from x=' + px, 1, 'sunburst', px, () => {
+      const s = G.hazards.list.find((h) => h.kind === 'sunburst');
+      if (!s) { hold(0, 0); return; }
+      let best = 0, bd = 1e9;
+      for (const z of s.shades) { const c = (z.x0 + z.x1) / 2, d = Math.abs(c - P.x); if (d < bd) { bd = d; best = c; } }
+      hold(P.x > best + 20, P.x < best - 20);
+    }));
+  }
+
   G.debug.forceAttack = '';
   G.debug.boss = '';
   G.debug.freeze = false;

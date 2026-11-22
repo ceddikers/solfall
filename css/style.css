@@ -419,3 +419,14 @@ ul.tips b { color: var(--ink); font-weight: 600; }
 .panel.wide table.keys td { padding: 5px 0; }
 .panel.wide nav.row { margin-top: 12px; }
 #s-settings .panel nav .item { padding-top: 6px; padding-bottom: 6px; }
+
+/* ---------------------------------------------------------------- the Moves page */
+.panel.moves { width: 980px; padding: 26px 40px 18px; }
+.panel.moves .over { text-align: center; }
+.panel.moves h2 { margin-bottom: 14px; }
+.movetable { width: 100%; border-collapse: collapse; font-size: 13.5px; line-height: 1.4; color: var(--dim); }
+.movetable td { padding: 6px 10px 6px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.07); vertical-align: top; }
+.movetable .mname { width: 96px; color: var(--gold); font-size: 12px; font-weight: 600; letter-spacing: 0.22em; text-transform: uppercase; padding-top: 9px; }
+.movetable .mkeys { width: 196px; color: var(--ink); white-space: nowrap; }
+.panel.moves .small { text-align: center; min-height: 16px; margin-top: 10px; }
+.panel.moves nav.row { margin-top: 6px; }

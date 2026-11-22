@@ -381,13 +381,13 @@
 
   // ------------------------------------------------------------------ attack selection
   const BAGS = {
-    1: ['slam', 'sweep', 'clap', 'lance', 'rain', 'flick', 'crossfire'],
-    2: ['slam2', 'sweep2', 'clap', 'lance3', 'rain', 'pulse', 'comb', 'rocket', 'tide', 'fan', 'cage', 'duet', 'crossfire', 'flick'],
+    1: ['slam', 'sweep', 'clap', 'lance', 'rain', 'flick', 'crossfire', 'sunburst'],
+    2: ['slam2', 'sweep2', 'clap', 'lance3', 'rain', 'pulse', 'comb', 'rocket', 'tide', 'fan', 'cage', 'duet', 'crossfire', 'flick', 'sunburst'],
     3: ['dive', 'storm', 'wheel', 'singularity', 'rain', 'pulse', 'fan', 'halo', 'dive'],
   };
   // How many whole hands an attack needs. Attacks that need more than are left are skipped.
   const NEEDS = {
-    slam: 1, sweep: 1, clap: 2, slam2: 1, sweep2: 1, comb: 2, rocket: 1,
+    sunburst: 1, slam: 1, sweep: 1, clap: 2, slam2: 1, sweep2: 1, comb: 2, rocket: 1,
     flick: 1, crossfire: 2, cage: 2, swat: 1, duet: 1, duetSlam: 1, duetSweep: 1,
   };
   const canUse = (name) => (NEEDS[name] || 0) <= usableHands().length;
@@ -1192,6 +1192,91 @@
     yield* tween(c, { y: HOME_Y[3] }, 0.6, E.outCubic);
   }
 
+  // Sunburst: the one attack you answer by going to a place, not leaving one. The core climbs and
+  // burns the whole arena; each hand it has left plants itself as a wall, and only the ground
+  // behind a hand, between it and the arena wall, stays in shadow.
+  function* atkSunburst() {
+    const c = B.core, T = G.diff().tele, P = G.player;
+    const hands = usableHands();
+    if (!hands.length) return;
+    c.ctrl = true;
+    G.ui.hint('shadow', 'It will burn everything. Get behind a hand, in its shadow');
+    // with one hand left, it stands on the hero's side so the shadow can be reached
+    const spots = hands.length > 1 ? null : [P.x < 640 ? 420 : 860];
+    const moves = [tween(c, { x: 640, y: 150, open: 1 }, 0.6)];
+    hands.forEach((h) => {
+      h.ctrl = true; h.stuck = false;
+      moves.push(tween(h, { x: spots ? spots[0] : (h.side < 0 ? 420 : 860), y: FLOOR - 74, rot: 0, curl: 0 }, 0.6, E.inOutCubic));
+    });
+    yield* par(...moves);
+    for (const h of hands) { G.fx.thud(h.x, FLOOR, 1.1); h.stuck = true; }
+    G.fx.shake(9); G.audio.play('slam');
+    const shades = hands.map((h) => (h.x < 640 ? { x0: WL, x1: h.x - 62 } : { x0: h.x + 62, x1: WR }));
+    const tele = 1.7 * T, active = 0.55;
+    G.audio.play('charge', { dur: tele });
+    const hz = H.add({
+      kind: 'sunburst', layer: 'under', tele, active, shades, dmg: hard() ? 2 : 1, fired: false, srcX: 640,
+      get firing() { return this.t >= this.tele && this.t < this.tele + this.active; },
+      safe(x, y) { return y > FLOOR - 140 && this.shades.some((s) => x > s.x0 + 6 && x < s.x1 - 6); },
+      update() {
+        c.charge = Math.min(1, this.t / this.tele);
+        if (this.t >= this.tele && !this.fired) {
+          this.fired = true; c.charge = 0;
+          G.audio.play('boom'); G.audio.play('beam');
+          G.fx.shake(16); G.fx.flash(G.pal().hot, 0.3, 0.4);
+          G.fx.ring(c.x, c.y, { r0: c.r, r1: 900, life: 0.7, color: G.pal().hot, width: 14 });
+          for (let x = WL + 60; x < WR; x += 90) if (!this.safe(x, FLOOR)) { G.fx.scorch(x, 40, G.pal().boss); G.fx.dust(x, FLOOR, 1, { speed: [10, 60], size: [8, 13], life: [0.6, 1.1], up: 90, a: 0.34, color: '84,78,100' }); }
+        }
+        if (this.t >= this.tele + this.active + 0.3) this.dead = true;
+      },
+      hits(Pl) { return this.firing && !this.safe(Pl.x, Pl.y); },
+      draw(ctx) {
+        const pal = G.pal(), k = Math.min(1, this.t / this.tele), late = k > 0.8 && k < 1 ? 0.5 + 0.5 * Math.sin(this.t * 55) : 0;
+        const top = -60, f = this.firing ? 1 : this.t > this.tele ? Math.max(0, 1 - (this.t - this.tele - this.active) / 0.3) : 0;
+        ctx.save();
+        ctx.beginPath(); ctx.rect(WL, top, WR - WL, FLOOR - top);
+        // everything but the shadows
+        for (const s of this.shades) ctx.rect(s.x1, FLOOR - 184, s.x0 - s.x1, 184);
+        ctx.clip('evenodd');
+        if (this.t < this.tele) {
+          ctx.fillStyle = G.rgba(DANGER, 0.05 + 0.1 * k + 0.08 * late);
+          ctx.fillRect(WL, top, WR - WL, FLOOR - top);
+          // the light gathering: rays reaching further down as it fills
+          ctx.strokeStyle = G.rgba(DANGER, 0.16 + 0.2 * k); ctx.lineWidth = 2;
+          ctx.beginPath();
+          for (let i = 0; i <= 14; i++) { const x = WL + (WR - WL) * i / 14; ctx.moveTo(c.x, c.y); ctx.lineTo(G.lerp(c.x, x, k), G.lerp(c.y, FLOOR, k)); }
+          ctx.stroke();
+          ctx.fillStyle = G.rgba(DANGER, 0.3);
+          ctx.fillRect(WL, FLOOR - 6, (WR - WL) * k, 6);
+        } else if (f > 0) {
+          ctx.globalCompositeOperation = 'lighter';
+          ctx.fillStyle = G.rgba(pal.boss, 0.5 * f); ctx.fillRect(WL, top, WR - WL, FLOOR - top);
+          const g = ctx.createRadialGradient(c.x, c.y, 20, c.x, c.y, 760);
+          g.addColorStop(0, G.rgba(pal.hot, 0.95 * f)); g.addColorStop(1, G.rgba(pal.hot, 0.35 * f));
+          ctx.fillStyle = g; ctx.fillRect(WL, top, WR - WL, FLOOR - top);
+        }
+        ctx.restore();
+        // the shadows themselves: dark, edged in the hero's own pale light, so they read as shelter
+        for (const s of this.shades) {
+          ctx.fillStyle = 'rgba(4,4,14,' + (0.3 + 0.25 * k) + ')';
+          ctx.fillRect(s.x0, FLOOR - 184, s.x1 - s.x0, 184);
+          ctx.strokeStyle = G.rgba(G.COL.star, 0.55 + 0.35 * Math.sin(this.t * 6)); ctx.lineWidth = 2.5;
+          ctx.setLineDash([12, 8]); ctx.lineDashOffset = -this.t * 30;
+          ctx.strokeRect(s.x0 + 2, FLOOR - 184, s.x1 - s.x0 - 4, 184);
+          ctx.setLineDash([]);
+          ctx.fillStyle = G.rgba(G.COL.star, 0.8);
+          ctx.font = '600 12px Bahnschrift, "Segoe UI", sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+          ctx.fillText('SHADOW', (s.x0 + s.x1) / 2, FLOOR - 166);
+        }
+      },
+    });
+    yield* wait(tele + active + 0.3);
+    c.charge = 0;
+    // the hands stay planted a moment longer: time to hit one
+    yield* wait(hard() ? 0.8 : 1.2);
+    for (const h of hands) h.stuck = false;
+  }
+
   // Reckoning: the core comes down within reach, wards itself and gathers a blast (moments.js).
   function* reckoning() {
     const c = B.core;
@@ -1209,7 +1294,7 @@
   }
 
   const ATTACKS = B.ATTACKS = {
-    reckoning,
+    reckoning, sunburst: atkSunburst,
     slam: atkSlam, sweep: atkSweep, clap: atkClap, lance: atkLance, rain: atkRain,
     flick: atkFlick, crossfire: atkCrossfire,
     slam2: atkSlam2, sweep2: atkSweep2, lance3: atkLance3, pulse: atkPulse, comb: atkComb,

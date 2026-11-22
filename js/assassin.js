@@ -21,9 +21,9 @@
     BASE_HP: 3000, poise0: 340, w: 36, h: 84, platformsFrom: 2,
     gaps: [0, 0.8, 0.62, 0.5],
     bags: {
-      1: ['lunge', 'flurry', 'knives', 'ambush', 'backstab'],
-      2: ['pincer', 'flurry', 'knives', 'ambush', 'backstab', 'mirror', 'rain', 'cross'],
-      3: ['pincer', 'flurry', 'ambush', 'backstab', 'mirror', 'rain', 'cross', 'cuts', 'mark'],
+      1: ['lunge', 'flurry', 'knives', 'ambush', 'backstab', 'echo'],
+      2: ['pincer', 'flurry', 'knives', 'ambush', 'backstab', 'mirror', 'rain', 'cross', 'echo'],
+      3: ['pincer', 'flurry', 'ambush', 'backstab', 'mirror', 'rain', 'cross', 'cuts', 'mark', 'echo'],
     },
     cards: { 2: ['SHADOWS', 'It no longer hunts alone'], 3: ['EXECUTION', 'No more warnings than these'] },
     first: { 1: 'lunge', 2: 'mirror', 3: 'cuts' },
@@ -429,7 +429,69 @@
     yield* wait(0.9);
   }
 
+  // Echo: the Veil kneels at the far side and sets the hero's own shadow on them. The shadow runs
+  // the exact path the hero took, a second or so behind, and cuts what it touches. Standing still
+  // lets it arrive; so does turning back into it, unless you jump it or dash through.
+  function* atkEcho() {
+    const b = B.body, P = G.player, T = K.T();
+    yield* vanish();
+    yield* wait(0.25);
+    appear(P.x < 640 ? WR - 150 : WL + 150, FLOOR, 'crouch');
+    G.ui.hint('echo', 'Your own shadow follows the path you took. Keep moving; jump it or dash through it when you turn back');
+    G.audio.play('pull');
+    const delay = Math.max(0.95, 1.2 * T), dur = B.phase === 1 ? 4 : B.phase === 2 ? 5 : 6;
+    const shade = { x: P.x, y: P.y, face: P.facing, pose: 'dash', p: POSES.dash.slice(), clone: true, hurt: true };
+    H.add({
+      kind: 'echo', delay, dur, trail: [], live: false, x: P.x, y: P.y, shade,
+      update(dt) {
+        const tr = this.trail;
+        tr.push({ x: P.x, y: P.y, t: this.t });
+        while (tr.length > 1 && tr[1].t <= this.t - this.delay) tr.shift();
+        if (this.t >= this.delay) {
+          this.live = true;
+          const s = tr[0];
+          if (Math.abs(s.x - this.x) > 0.5) shade.face = s.x > this.x ? 1 : -1;
+          this.x = s.x; this.y = s.y;
+        }
+        shade.x = this.x; shade.y = this.y; this.srcX = this.x - shade.face * 20;
+        if (this.live && Math.random() < dt * 34) G.fx.spawn({ x: this.x + G.rand(-10, 10), y: this.y - G.rand(4, 60), vx: G.rand(-20, 20), vy: -G.rand(10, 60), life: G.rand(0.3, 0.6), size: G.rand(2, 5), color: G.pal().boss });
+        if (this.t >= this.delay + this.dur) { this.dead = true; smoke(this.x, this.y - 40); G.audio.play('orbPop'); }
+      },
+      hits(Pl) { return this.live && this.t > this.delay + 0.3 && Math.abs(Pl.x - this.x) < 22 && Math.abs(Pl.y - this.y) < 44; },
+      draw(ctx) {
+        const tr = this.trail, k = Math.min(1, this.t / this.delay);
+        // the path it is about to run, in the warning colour
+        if (tr.length > 1) {
+          ctx.strokeStyle = G.rgba(DANGER, 0.55); ctx.lineWidth = 3; ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+          ctx.setLineDash([10, 8]); ctx.lineDashOffset = -this.t * 90;
+          ctx.beginPath();
+          for (let i = 0; i < tr.length; i += 3) { if (i) ctx.lineTo(tr[i].x, tr[i].y - 22); else ctx.moveTo(tr[i].x, tr[i].y - 22); }
+          ctx.stroke(); ctx.setLineDash([]);
+        }
+        if (!this.live) {
+          // it is still tearing loose from where the hero stood
+          ctx.strokeStyle = G.rgba(DANGER, 0.5 + 0.4 * k); ctx.lineWidth = 2.5;
+          ctx.beginPath(); ctx.arc(this.x, this.y - 30, G.lerp(64, 18, k), 0, G.TAU); ctx.stroke();
+          ctx.fillStyle = G.rgba(DANGER, 0.1 + 0.2 * k);
+          ctx.beginPath(); ctx.arc(this.x, this.y - 30, 18, 0, G.TAU); ctx.fill();
+        } else {
+          D.glow(ctx, DANGER, this.x, this.y - 40, 46, 0.5);
+          figure(ctx, shade, 0.9);
+          ctx.fillStyle = G.rgba(DANGER, 0.95);
+          ctx.beginPath(); ctx.arc(this.x + shade.face * 5, this.y - 67, 2.6, 0, G.TAU); ctx.fill();
+        }
+      },
+    });
+    b.pose = 'crouch';
+    yield* wait(delay + dur + 0.2);
+    // the working spent: the Veil is slow to rise
+    b.pose = 'kneel'; b.exposed = true;
+    yield* wait(1.0);
+    b.exposed = false;
+  }
+
   B.ATTACKS = {
+    echo: atkEcho,
     lunge: atkLunge, pincer: atkPincer, flurry: atkFlurry, knives: atkKnives, ambush: atkAmbush, backstab: atkBackstab,
     mirror: atkMirror, rain: atkRain, cross: atkCross, cuts: atkCuts, mark: atkMark,
   };

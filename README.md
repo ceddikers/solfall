@@ -2,7 +2,7 @@
 
 A side-on boss rush for the browser: three heroes, four three-phase bosses, played as a run of
 ever-harder trials. You pick a hero and a relic before the run and win a boon after each victory.
-Version 1.0b.
+Version 1.1a.
 
 This is an early slice of a planned boss-rush roguelite (short runs, a boon after each boss,
 bosses drawn from a pool). A run meets the four bosses in a shuffled order, then meets them again, harder.
@@ -32,6 +32,7 @@ then open http://localhost:8321. There is no build step and no dependency.
 | Mend one health (costs one segment) | hold E or F while standing | LB or LT |
 | Dawnbreak (when its bar is full) | Q or I, or middle click | RT |
 | Drop through a platform | S + Space | down + A |
+| Your hero's moves (the fight waits while it is up) | hold Tab, or Moves in the pause menu | |
 | Pause | Esc or P | Start |
 | Use something in the camp | E or F, or Enter | LB |
 
@@ -111,6 +112,28 @@ hero (`tools/feel-check.js`).
 
 Not done: touch controls, a colour-blind alternative to red-orange warnings, gamepad rebinding.
 
+## What changed in v1.1a
+
+- **Aster is her own character now.** The maul no longer shares the sword's three-hit chain. Her
+  chain is two blows: a sweep that goes right round and hits whatever is on either side of her, then
+  a smash. Keep the button held on the smash and she holds it back and charges it over 0.9 seconds,
+  up to double damage and a wider quake; fully charged it also sends a wave along the floor. While
+  she charges she moves at a third of her speed, but a blow that lands on her does not knock her
+  back or lose the charge (it still costs health). She is slower to start and stop than the others,
+  always lands hard, and her footsteps raise dust.
+- **A Moves page for each hero.** Hold Tab in a fight or in the camp (the fight waits), or choose
+  Moves in the pause menu. It lists every button with what it does for the hero you are playing,
+  using your own key bindings.
+- **Each boss has one attack of a new kind**, so the answers are no longer all "leave the marked
+  ground, jump the wave":
+
+| Boss | Attack | What is new about it | The simple answer |
+|---|---|---|---|
+| The Warden (phases I and II) | Sunburst | you go to a place instead of leaving one: it burns the whole arena, and only the ground behind its planted hands is in shadow | get behind a hand before the light fills; then hit the hand while it is stuck |
+| The Magus (all phases) | Comet | you send it back: a slow star follows you until you strike it, and then it flies home for 70 damage and most of a stagger | strike it. In phase III the Magus bats it back once, faster: strike it again |
+| The Veil (all phases) | Echo | your own path is the danger: a shadow runs exactly where you ran, about a second behind, for 4 to 6 seconds | keep moving; when you have to turn back, jump the shadow or dash through it |
+| The Knight (all phases) | Hurl | the weapon leaves the boss: its sword crosses the arena and sticks in the far wall. Until it calls the sword home it cannot swing and takes 30% more; the sword then flies back, at your back if you are between them | jump the sword both ways; hit the Knight while it is unarmed |
+
 ## The heroes
 
 All three share movement, the dash, Starlight and mending. Weapon and special differ.
@@ -118,7 +141,7 @@ All three share movement, the dash, Starlight and mending. Weapon and special di
 | | Vesper, the Starblade | Aster, the Starmaul | Lune, the Moonbow |
 |---|---|---|---|
 | Health (Standard) | 5 | 6 | 4 |
-| Weapon | sword: 9, 11, then a 24 finisher | maul: 14, 17, then a 36 finisher that shakes the ground; slow and wide | bow: arrows of 4, 5, then a piercing 10, in any direction; up to 60% stronger within 120px, up to 30% weaker past 240px |
+| Weapon | sword: 9, 11, then a 24 finisher | maul: a sweep that hits on both sides (20), then a smash that shakes the ground (40). Hold the smash to charge it, up to 80; fully charged it also throws a wave along the floor (24) | bow: arrows of 4, 5, then a piercing 10, in any direction; up to 60% stronger within 120px, up to 30% weaker past 240px |
 | Special | Star Lance: a piercing shot at any range | Starfall: a blast around her; from the air she plunges first and passes through attacks | Moon Volley: a fan of five arrows and a leap backwards |
 | Extra | a slash out of a dash is a thrust | fills the stagger bar 35% faster; a little slower on foot | triple jump; firing downward in the air lifts her; moves at 60% speed while firing; arrows give less Starlight than melee hits |
 
@@ -443,10 +466,10 @@ Open the browser console on the running game.
 
 - **Dodge tests:** `fetch('/tools/dodge-tests.js').then(r => r.text()).then(t => console.log((0, eval)(t)))`
   runs each of the Warden's attacks against a simple scripted player and reports health lost. There are
-  32 tests and all lose 0 as of v0.6a. Set `window.TEST_HERO = 'aster'` (or `'lune'`) to test another hero
+  35 tests and all lose 0 as of v1.1a. Set `window.TEST_HERO = 'aster'` (or `'lune'`) to test another hero
   and `window.TEST_SEED = 2` for a different, repeatable set of boss choices.
 - **Tests for the other three bosses:** `fetch('/tools/boss-tests.js').then(r => r.text()).then(t => console.log((0, eval)(t)))`
-  runs every attack of the Magus, the Veil and the Knight in every phase that uses it (134 runs) against one
+  runs every attack of the Magus, the Veil and the Knight in every phase that uses it (152 runs since v1.1a) against one
   scripted player that follows plain rules: step off marked ground, jump low things, leave a swing's reach,
   dash when there is no time to walk. As of v0.6a it loses 0 health as Vesper on seed 1. Across three
   heroes and three seeds it lost between 0 and 6 in 134 runs when last measured (v0.5a), in the Veil's Cuts, the Knight's Whirl and,
@@ -488,6 +511,11 @@ Open the browser console on the running game.
   were run and looked at in captures, and the numbers above were checked in the running game. Whether
   Flow climbs at a satisfying rate, how often Dawnbreak fills in a real fight (the aim was two to four
   times), and whether Sunshard prices are fair are first guesses.
+- **v1.1a has not been played.** Aster's sweep, tap smash and fully charged smash were measured on the
+  sparring post (20, 40, and 80 plus a 24 wave), and her whole fights by script take about as long as
+  before (59 to 64 seconds for a hero that never stops attacking). Whether she now feels heavy in the
+  hand is for a person to say. The four new attacks were each run and looked at; the scripted players
+  lose no health to them as Vesper (as Aster, 1 in 152 runs, to the Comet's second rally).
 - **v1.0a was checked on screen and by script, still not by hand.** Every menu and the fight display
   were looked at in screenshots of the real page; rebinding was tested with simulated key presses, not a
   keyboard; practice fights were started, lost, retried and won by script. Flow's new pace is tuned

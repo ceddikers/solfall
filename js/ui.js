@@ -41,7 +41,7 @@
       'hint', 'lowhp', 'lbTop', 'lbBot', 'diffNote', 'bestLine', 'ver', 'deadLead', 'deadFill', 'deadStats',
       'pauseBoons', 'boons', 'trial', 'winOver', 'winPick', 'winCards', 'heroName', 'heroCards', 'relicCards', 'relicOver',
       'deadTip', 'winStats', 'winBest', 'gradeLetter', 'gradeTitle', 'gradeSub', 'stage',
-      'practiceOver', 'keyList', 'resetItem', 'ult', 'ultFill', 'ultKey', 'flow', 'flowRank', 'flowFill', 'omen', 'shardCount', 'shrineLead', 'shrineList', 'shrineTrophies', 'rerollItem']) el[id] = $(id);
+      'practiceOver', 'keyList', 'resetItem', 'movesOver', 'movesTitle', 'movesBody', 'movesFoot', 'ult', 'ultFill', 'ultKey', 'flow', 'flowRank', 'flowFill', 'omen', 'shardCount', 'shrineLead', 'shrineList', 'shrineTrophies', 'rerollItem']) el[id] = $(id);
     el.segs = Array.from(document.querySelectorAll('#ember .seg'));
     el.bbar = document.querySelector('.bbar');
     el.bname = document.getElementById('bname');
@@ -135,11 +135,13 @@
     else if (/^shrine\d$/.test(name)) buy(Number(name.slice(6)));
     else if (name === 'how') U.show('how', true);
     else if (name === 'settings') U.show('settings', true);
+    else if (name === 'back' && U.current === 'moves' && !U.stack.length) G.resume(); // opened with Tab: back to the fight
     else if (name === 'back') U.back();
     else if (name === 'resume') G.resume();
     else if (name === 'quit') G.toTitle();
     else if (/^practice\d$/.test(name)) G.startPractice(Number(name.slice(8)));
     else if (name === 'controls') U.showKeys();
+    else if (name === 'moves') U.showMoves(true);
     else if (/^key-/.test(name)) capture(name.slice(4));
     else if (name === 'keyreset') { G.input.resetKeys(); U.fillKeys(); }
     else if (name === 'reset') resetProgress();
@@ -167,7 +169,7 @@
     }
     else if (a === 'pause') {
       if (U.stack.length) U.back();
-      else if (U.current === 'pause') { G.audio.play('uiBack'); G.resume(); }
+      else if (U.current === 'pause' || U.current === 'moves') { G.audio.play('uiBack'); G.movesHeld = false; G.resume(); }
       else if (G.state === 'hub') U.back();
     }
     else if (a === 'retry') {
@@ -222,6 +224,27 @@
       + (got.length ? ': ' + got.map((t) => t.name).join(', ') + '.' : '. The first victory over each boss adds its relic to those you can be offered.');
   };
   U.showShrine = function () { U.fillShrine(); U.show('shrine', true); };
+  // ---- the Moves page: every button, and what it does for the hero in play
+  U.showMoves = function (fromMenu) {
+    const h = G.hero(), I = G.input, k = (a) => I.keys(a).map((n) => '<kbd>' + n + '</kbd>').join(' ');
+    const jumps = 1 + h.air + G.boon('wind') + (G.relic('cloak') ? 1 : 0);
+    const rows = [
+      ['Move', k('left') + ' ' + k('right'), 'Run. ' + (h.heavy ? 'She is heavy: slower to start, slower to stop.' : h.id === 'lune' ? 'The fastest of the three.' : 'Quick on her feet.')],
+      ['Jump', k('jump'), 'Jump; press again in the air (' + jumps + ' jumps in all). Hold for height. Down and jump drops through a platform.'],
+      ['Attack', k('attack') + ' or left click', h.how.attack],
+      ['Aim', k('up') + ' ' + k('down'), h.how.aim],
+      ['Dash', k('dash'), 'A burst of speed that passes straight through any attack. Dash through one at the last moment for a perfect dodge: time slows, Starlight fills, and your next hit is a Riposte for double. ' + h.how.dash],
+      ['Special', k('flare') + ' or right click', h.how.special + ' Costs one segment of Starlight.'],
+      ['Mend', 'hold ' + k('heal'), 'Stand still and hold to turn one segment of Starlight into one health. Jumping or dashing cancels it.'],
+      ['Dawnbreak', k('ult') + ' or middle click', h.how.ult + ' The bar fills as you deal damage; nothing can hurt you while it plays.'],
+    ];
+    el.movesOver.textContent = h.title; el.movesOver.style.color = h.css;
+    el.movesTitle.textContent = h.name + '\u2019s moves';
+    el.movesBody.innerHTML = rows.map((r) => '<tr><td class="mname">' + r[0] + '</td><td class="mkeys">' + r[1] + '</td><td>' + r[2] + '</td></tr>').join('');
+    el.movesFoot.textContent = fromMenu ? '' : 'Let go of Tab to carry on';
+    U.show('moves', !!fromMenu);
+  };
+
   // ---- the proving ring: practise against one boss, from any phase
   U.showPractice = function () {
     const f = G.settings.firstFoe;

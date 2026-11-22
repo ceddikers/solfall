@@ -936,7 +936,7 @@
       text(ctx, 'THE VIGIL', cam + W / 2, 40, 20, '236,233,244', 0.75, '400');
       text(ctx, pad ? 'Stick move  ·  A jump  ·  X attack  ·  B dash  ·  LB use  ·  Start menu'
         : [G.input.label('left') + ' / ' + G.input.label('right') + ' move', G.input.label('jump') + ' jump', G.input.label('attack') + ' or click attack', G.input.label('dash') + ' dash',
-          G.input.label('flare') + ' special', G.input.label('heal') + ' use', 'Esc menu'].join('  \u00b7  '),
+          G.input.label('flare') + ' special', G.input.label('heal') + ' use', 'hold Tab moves', 'Esc menu'].join('  \u00b7  '),
         cam + W / 2, 66, 12, '236,233,244', 0.45, '500');
       text(ctx, '\u25c6 ' + G.meta.shards + ' Sunshards', cam + W - 112, 66, 12, GOLD, 0.8);
       // which way the gate lies, until it is in view

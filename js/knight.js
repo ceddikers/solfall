@@ -21,9 +21,9 @@
     BASE_HP: 4300, poise0: 460, w: 62, h: 122, platformsFrom: 2,
     gaps: [0, 1.0, 0.8, 0.6],
     bags: {
-      1: ['cleave', 'overhead', 'charge', 'grip', 'graves'],
-      2: ['cleave2', 'overhead', 'charge', 'grip', 'graves', 'wraiths', 'desecrate', 'whirl', 'rend'],
-      3: ['reap', 'overhead', 'charge', 'grip', 'wraiths', 'desecrate', 'whirl', 'rend', 'leap'],
+      1: ['cleave', 'overhead', 'charge', 'grip', 'graves', 'hurl'],
+      2: ['cleave2', 'overhead', 'charge', 'grip', 'graves', 'wraiths', 'desecrate', 'whirl', 'rend', 'hurl'],
+      3: ['reap', 'overhead', 'charge', 'grip', 'wraiths', 'desecrate', 'whirl', 'rend', 'leap', 'hurl'],
     },
     cards: { 2: ['THE HOST', 'The dead answer the call'], 3: ['BLOOD OATH', 'It will not fall alone'] },
     first: { 1: 'cleave', 2: 'wraiths', 3: 'leap' },
@@ -61,7 +61,7 @@
     b.x = 900; b.y = FLOOR + 150; b.pose = 'kneel'; b.p = POSES.kneel.slice(); b.walkT = 0; b.hurt = false; b.spin = 0; b.spinning = false; b.fast = false;
     B.cape = D.chain(9, b.x, b.y - 100);
   };
-  B.onRelease = function () { const b = B.body; b.hurt = false; b.pose = 'idle'; b.spinning = false; b.fast = false; };
+  B.onRelease = function () { const b = B.body; b.hurt = false; b.pose = 'idle'; b.spinning = false; b.fast = false; b.unarmed = false; };
   B.onStagger = function () { B.body.pose = 'kneel'; };
   B.reckonName = 'DIRGE';
   B.onReckon = function (on) { B.body.pose = on ? 'overRaise' : 'idle'; };
@@ -438,7 +438,73 @@
     yield* overhead(0.42 * T, 0.28 * T, 1.05);
   }
 
+  // Hurl: the Knight throws its sword the length of the arena. It sticks in the far wall, and until
+  // the Knight calls it back it has no weapon and stands open. The sword then tears free and flies
+  // home: if the hero is between the wall and the Knight, it comes at their back.
+  function* atkHurl() {
+    const b = B.body, T = K.T(), P = G.player;
+    facePlayer();
+    const dir = b.face, tele = 0.8 * T, speed = K.gentle() ? 860 : 980;
+    b.fast = false; b.pose = 'raise';
+    H.lane({ x: WL, y: FLOOR - 66, w: WR - WL, h: 66, dir, dur: tele });
+    G.audio.play('charge', { dur: tele });
+    yield* wait(tele);
+    b.fast = true; b.pose = 'cleave'; b.unarmed = true;
+    G.audio.play('cleave'); G.audio.play('streak'); G.fx.shake(6);
+    const tint = tintNow(), wall = dir > 0 ? WR - 34 : WL + 34;
+    const blade = H.add({
+      kind: 'blade', x: b.x + dir * 60, y: FLOOR - 40, dir, speed, state: 'out', spin: 0, tint, quiver: 0,
+      update(dt) {
+        if (this.state === 'out') {
+          this.x += this.dir * this.speed * dt; this.spin += this.dir * 26 * dt;
+          if ((this.x - wall) * this.dir >= 0) {
+            this.x = wall; this.state = 'stuck'; this.quiver = 1;
+            G.audio.play('tink'); G.audio.play('boom'); G.fx.shake(9);
+            G.fx.burst(this.x, this.y, { n: 14, color: tint.hot, speed: [120, 520], angle: this.dir > 0 ? Math.PI : 0, spread: 2.2, life: [0.15, 0.4], kind: 'spark', size: [2, 4] });
+            G.fx.dust(this.x, this.y, 5, { dir: -this.dir, speed: [40, 220], size: [7, 12], up: 60 });
+          }
+        } else if (this.state === 'stuck') {
+          this.quiver = Math.max(0, this.quiver - dt * 2);
+        } else {
+          // called home: it comes back faster than it left
+          this.x -= this.dir * this.speed * 1.12 * dt; this.spin -= this.dir * 30 * dt;
+          if ((this.x - b.x) * this.dir <= 44) this.dead = true;
+        }
+        this.srcX = this.x - (this.state === 'back' ? -this.dir : this.dir) * 30;
+        if (this.state !== 'stuck' && Math.random() < dt * 50) G.fx.spawn({ x: this.x + G.rand(-20, 20), y: this.y + G.rand(-16, 16), vx: G.rand(-30, 30), vy: G.rand(-30, 30), life: G.rand(0.15, 0.35), size: G.rand(2, 5), color: tint.boss });
+      },
+      hits(Pl) { return this.state !== 'stuck' && G.rectsOverlap(Pl.box(), { cx: this.x, cy: this.y, hw: 36, hh: 24 }); },
+      draw(ctx) {
+        // stuck in the wall it points along its flight and shivers; in flight it spins
+        const ang = this.state === 'stuck' ? (this.dir > 0 ? 0 : Math.PI) + Math.sin(this.t * 60) * 0.06 * this.quiver : this.spin;
+        ctx.globalCompositeOperation = 'lighter';
+        if (this.state !== 'stuck') D.glow(ctx, DANGER, this.x, this.y, 70, 0.5);
+        ctx.globalCompositeOperation = 'source-over';
+        sword(ctx, this.x - Math.cos(ang) * (this.state === 'stuck' ? 96 : 45), this.y - Math.sin(ang) * 45, ang, tint.boss, tint.hot);
+      },
+    });
+    // unarmed: nothing to swing, and every blow counts for more
+    while (blade.state === 'out') yield;
+    b.pose = 'idle'; b.exposed = true;
+    yield* wait(B.phase === 3 ? 1.0 : 1.4);
+    // the call: a lane the other way, then the sword tears free
+    b.pose = 'grip'; facePlayer();
+    H.lane({ x: WL, y: FLOOR - 66, w: WR - WL, h: 66, dir: -dir, dur: 0.6 * T });
+    G.audio.play('pull');
+    yield* wait(0.6 * T);
+    blade.state = 'back';
+    G.audio.play('streak');
+    while (!blade.dead) yield;
+    b.unarmed = false; b.exposed = false; b.fast = true; b.pose = 'raise';
+    G.audio.play('blade'); G.fx.shake(5);
+    G.fx.ring(b.x, b.y - 80, { r0: 60, r1: 12, life: 0.25, color: tint.hot, width: 4 });
+    yield* wait(0.35);
+    // from the second phase it does not waste the catch
+    if (B.phase >= 2) { facePlayer(); yield* cut(true, 0.5 * T); }
+  }
+
   B.ATTACKS = {
+    hurl: atkHurl,
     cleave: atkCleave, cleave2: atkCleave2, overhead: atkOverhead, charge: atkCharge, grip: atkGrip, graves: atkGraves,
     wraiths: atkWraiths, desecrate: atkDesecrate, whirl: atkWhirl, rend: atkRend, leap: atkLeap, reap: atkReap,
   };
@@ -654,7 +720,7 @@
     for (const vx of [3, 6.5, 10]) D.line(ctx, vx, 3, vx, 10);
     ctx.restore();
 
-    sword(ctx, hx, hy, ang, col, hot);
+    if (!b.unarmed) sword(ctx, hx, hy, ang, col, hot); // thrown: see atkHurl
     arm(true);
     pauldron(shx + 14, shy, 1, plate);
 

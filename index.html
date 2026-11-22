@@ -127,6 +127,7 @@
               <tr><td>Dawnbreak</td><td><kbd>Q</kbd> or <kbd>I</kbd>, or middle click, when its bar is full</td></tr>
               <tr><td>Drop through a platform</td><td><kbd>S</kbd> + <kbd>Space</kbd></td></tr>
               <tr><td>Use something in the camp</td><td><kbd>E</kbd> or <kbd>Enter</kbd></td></tr>
+              <tr><td>Your hero's moves</td><td>hold <kbd>Tab</kbd></td></tr>
               <tr><td>Pause</td><td><kbd>Esc</kbd> or <kbd>P</kbd></td></tr>
             </table>
             <p class="small">Gamepad: stick to move, A jump, X attack, B or RB dash, Y special, LB mend, RT Dawnbreak.</p>
@@ -189,6 +190,16 @@
       </div>
     </section>
 
+    <section id="s-moves" class="screen panelscreen">
+      <div class="panel moves">
+        <p class="over" id="movesOver"></p>
+        <h2 id="movesTitle"></h2>
+        <table class="movetable"><tbody id="movesBody"></tbody></table>
+        <p class="small" id="movesFoot"></p>
+        <nav class="row"><div class="item" data-act="back">Back</div></nav>
+      </div>
+    </section>
+
     <section id="s-practice" class="screen panelscreen">
       <div class="panel narrow">
         <p class="over" id="practiceOver"></p>
@@ -208,6 +219,7 @@
         <h2>Paused</h2>
         <nav>
           <div class="item" data-act="resume">Resume</div>
+          <div class="item" data-act="moves">Moves</div>
           <div class="item" data-act="restart">Restart run</div>
           <div class="item" data-act="camp">Return to camp</div>
           <div class="item" data-act="how">How to play</div>

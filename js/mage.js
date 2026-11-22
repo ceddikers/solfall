@@ -26,9 +26,9 @@
     BASE_HP: 3900, poise0: 380, w: 52, h: 112, platformsFrom: 1,
     gaps: [0, 0.95, 0.75, 0.6],
     bags: {
-      1: ['shards', 'rime', 'fireball', 'bolts', 'spheres'],
-      2: ['shards', 'rime', 'fireball', 'bolts', 'spheres', 'firewall', 'crystals', 'storm'],
-      3: ['shards', 'fireball', 'bolts', 'firewall', 'crystals', 'storm', 'blizzard', 'rime'],
+      1: ['shards', 'rime', 'fireball', 'bolts', 'spheres', 'comet'],
+      2: ['shards', 'rime', 'fireball', 'bolts', 'spheres', 'firewall', 'crystals', 'storm', 'comet'],
+      3: ['shards', 'fireball', 'bolts', 'firewall', 'crystals', 'storm', 'blizzard', 'rime', 'comet'],
     },
     cards: { 2: ['CONFLUENCE', 'The spells begin to overlap'], 3: ['TRINITY', 'Every element answers'] },
     first: { 1: 'shards', 2: 'crystals', 3: 'blizzard' },
@@ -534,7 +534,78 @@
     echo(el);
     yield* wait(0.85 * K.T() + 0.3);
   };
+  // Comet: a slow star that follows the hero. It cannot be outrun for ever; the answer is to strike
+  // it, which sends it back at the Magus. In the last phase (and on Merciless patterns) the Magus
+  // bats it back again, faster, and it must be struck a second time.
+  const STAR = { boss: '255,214,140', hot: '255,250,230' };
+  function* atkComet() {
+    yield* reposition(true);
+    const T = K.T(), b = B.body, P = G.player;
+    G.ui.hint('comet', 'Strike the star to send it back at the Magus');
+    face();
+    yield* cast(STAR, 0.9 * T);
+    const o = tip(), sp = K.gentle() ? 210 : K.hard() ? 280 : 245;
+    const a0 = Math.atan2(P.y - 30 - o.y, P.x - o.x);
+    G.audio.play('whoosh');
+    const ob = H.orb(o.x, o.y, Math.cos(a0) * sp, Math.sin(a0) * sp, {
+      r: 24, life: 11, tint: STAR, once: true,
+      steer(q, dt) {
+        const tx = q.back ? b.x : P.x, ty = q.back ? b.y - B.h / 2 : Math.min(P.y - 30, FLOOR - 40);
+        const cur = Math.atan2(q.vy, q.vx), want = Math.atan2(ty - q.y, tx - q.x), rate = q.back ? 9 : 2.3;
+        const na = cur + G.clamp(G.angDiff(cur, want), -rate * dt, rate * dt);
+        q.vx = Math.cos(na) * q.speed; q.vy = Math.sin(na) * q.speed;
+        if (q.y > FLOOR - 30) { q.y = FLOOR - 30; q.vy = Math.min(q.vy, 0); }
+        if (Math.random() < dt * 40) G.fx.spawn({ x: q.x, y: q.y, vx: G.rand(-40, 40), vy: G.rand(-40, 40), life: 0.4, size: G.rand(3, 7), color: (q.tint || STAR).boss });
+        if (q.back && G.dist(q.x, q.y, tx, ty) < 50) {
+          if (q.rallies > 0) {
+            // the Magus knocks it back with the staff
+            q.rallies--; q.back = false; q.speed *= 1.22; q.tint = STAR; q.life = Math.max(q.life, 7);
+            const a = Math.atan2(P.y - 30 - q.y, P.x - q.x);
+            q.vx = Math.cos(a) * q.speed; q.vy = Math.sin(a) * q.speed;
+            b.charge = 1;
+            G.audio.play('clash'); G.fx.shake(8); G.fx.stop(0.06);
+            G.fx.lines(q.x, q.y, 12, STAR.hot, { r0: 20 }); G.fx.ring(q.x, q.y, { r0: 10, r1: 150, life: 0.3, color: STAR.hot, width: 6 });
+          } else {
+            q.dead = true; q.struck = true;
+            const t = B.targets().find((z) => z.kind === 'body');
+            G.audio.play('flareHit'); G.audio.play('shatter');
+            G.fx.stop(0.14); G.fx.shake(16); G.fx.flash(STAR.hot, 0.3, 0.3); G.fx.punch(0.04);
+            G.fx.shatter(q.x, q.y, STAR.boss, 26, { hot: STAR.hot, r: 420, r0: 40 });
+            G.fx.boom(q.x, q.y, 130, { col: STAR.boss, hot: STAR.hot });
+            if (t) B.damage(Math.round(70 * G.dmgMult()), t, { x: q.x, y: q.y, heavy: true, finisher: true, lance: true, poise: 2.4, dir: G.sign(q.vx) || 1 });
+          }
+        }
+      },
+    });
+    ob.speed = sp; ob.back = false; ob.struck = false;
+    ob.rallies = (B.phase >= 3 ? 1 : 0) + (K.hard() ? 1 : 0);
+    // struck by the hero: it turns round, faster, in the hero's own colour
+    ob.slash = function () {
+      if (ob.back) return;
+      ob.back = true; ob.speed *= 1.4; ob.life = Math.max(ob.life, 5);
+      ob.tint = { boss: P.hero.col, hot: P.hero.hot };
+      const a = Math.atan2(b.y - B.h / 2 - ob.y, b.x - ob.x);
+      ob.vx = Math.cos(a) * ob.speed; ob.vy = Math.sin(a) * ob.speed;
+      G.audio.play('clash'); G.fx.stop(0.08); G.fx.shake(9); G.fx.punch(0.02);
+      G.fx.lines(ob.x, ob.y, 14, P.hero.hot, { r0: 22 });
+      G.fx.ring(ob.x, ob.y, { r0: 10, r1: 170, life: 0.3, color: P.hero.hot, width: 7 });
+      G.fx.light(ob.x, ob.y, 260, P.hero.col, 0.25, 0.7);
+    };
+    const hits0 = ob.hits;
+    ob.hits = (Pl) => !ob.back && hits0.call(ob, Pl);
+    b.want = 0.5;
+    while (!ob.dead) { const dt = yield; b.charge = Math.max(0, b.charge - dt * 3); face(); }
+    b.charge = 0; b.want = 0;
+    if (ob.struck) {
+      // its own star in its face: it reels, open
+      b.exposed = true;
+      yield* wait(1.7);
+      b.exposed = false;
+    } else yield* wait(0.5);
+  }
+
   B.ATTACKS = {
+    comet: atkComet,
     shards: coda(atkShards, ICE), rime: coda(atkRime, ICE), fireball: coda(atkFireball, FIRE), bolts: coda(atkBolts, BOLT),
     spheres: coda(atkSpheres, BOLT), firewall: coda(atkFirewall, FIRE), crystals: coda(atkCrystals, ICE), storm: coda(atkStorm, BOLT),
     blizzard: atkBlizzard, cataclysm: atkCataclysm,

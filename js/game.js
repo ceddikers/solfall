@@ -169,10 +169,20 @@
     return { grade, title, newBest, best: best[d], trial, newDepth, offer: G.run.rollOffer(), meta: G.meta.onVictory(grade, G.boss.id) };
   }
 
+  // The Moves page: what each button does for the hero in play. Held open with Tab (the fight
+  // waits while it is up), or opened from the pause menu.
+  G.showMoves = function () {
+    if ((G.state !== 'fight' && G.state !== 'hub') || G.paused || G.ui.current || G.player.dead || G.debug.freeze) return;
+    G.paused = true; G.movesHeld = true;
+    G.ui.showMoves(false);
+    G.audio.duck(0.5);
+  };
+
   function onAction(a) {
     G.audio.init(); G.audio.startMusic();
     if (G.ui.current) { G.ui.onAction(a); return; }
     if (a === 'pause') G.pause();
+    if (a === 'moves') G.showMoves();
     // no need to wait for the defeat screen: R restarts at once
     if (a === 'retry' && G.state === 'dead') G.newRun();
   }
@@ -285,6 +295,8 @@
     const dt = G.clamp((now - last) / 1000, 0, 0.1);
     last = now;
     G.input.poll();
+    // Tab let go: the Moves page closes and the fight goes on
+    if (G.movesHeld && !G.input.down.moves) { G.movesHeld = false; if (G.ui.current === 'moves') G.resume(); }
     if (!G.paused && !G.debug.freeze) {
       // Split the frame into equal sub-steps no longer than 1/120 s. The simulation then lands
       // exactly on each frame's time, so motion stays even on 60, 120 or 144 Hz screens

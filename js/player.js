@@ -15,6 +15,7 @@
     ARROW_GAIN: 6, ARROW_GAIN_HEAVY: 12, // Starlight per arrow hit: less than a melee hit
     BOW_SLOW: 0.6,                       // Lune's speed while she is drawing and loosing
     STARFALL_DMG: 46, STARFALL_R: 165,
+    CHARGE_T: 0.9, // how long Aster's smash takes to charge fully
   };
   const GOLD = '255,214,140'; // the finisher's colour
   // The active hero and its two light colours; set in P.reset.
@@ -194,8 +195,8 @@
       P.vx *= Math.exp(-2.5 * dt);
     } else {
       // firing the bow slows her, so shooting and dodging cannot both be done at full speed
-      const target = mx * P.run * (P.atk && P.atk.kind === 'shot' ? C.BOW_SLOW : 1);
-      const acc = (P.onGround ? C.ACC_G : C.ACC_A) * dt;
+      const target = mx * P.run * (P.atk && P.atk.kind === 'shot' ? C.BOW_SLOW : P.atk && P.atk.hold > 0 && !P.atk.swung ? 0.3 : 1);
+      const acc = (P.onGround ? C.ACC_G : C.ACC_A) * (H.accel || 1) * dt; // the heavy hero takes longer to start and stop
       if (P.onGround && mx && P.vx * mx < -140) {
         P.skidT -= dt;
         if (P.skidT <= 0) { P.skidT = 0.045; G.fx.dust(P.x + G.sign(P.vx) * 9, P.y, 1, { dir: G.sign(P.vx), speed: [40, 130], size: [4, 8], up: 20, a: 0.34 }); }
@@ -271,7 +272,7 @@
       starfallBlast(1.2, 1);
     } else if (landed && fallSpeed > 260) {
       // the longer the fall, the deeper the crouch, the more dust, and past a point the ground answers
-      const k = G.clamp((fallSpeed - 260) / 1000, 0, 1);
+      const k = G.clamp((fallSpeed - 260) / 1000 + (H.heavy ? 0.4 : 0), 0, 1); // the heavy hero always lands hard
       P.squash = -0.2 - 0.14 * k;
       G.audio.play(k > 0.55 ? 'landHard' : 'land');
       G.fx.land(P.x, P.y, k);
@@ -282,18 +283,27 @@
     const stepN = Math.floor(P.runT / Math.PI);
     if (stepN !== P.stepN) {
       P.stepN = stepN;
-      if (P.onGround && P.dashT <= 0 && Math.abs(P.vx) > 150) { G.fx.step(P.x - P.facing * 5, P.y, -G.sign(P.vx)); G.audio.play('step'); }
+      if (P.onGround && P.dashT <= 0 && Math.abs(P.vx) > 150) {
+        G.fx.step(P.x - P.facing * 5, P.y, -G.sign(P.vx));
+        if (H.heavy) { G.fx.dust(P.x, P.y, 2, { speed: [20, 70], size: [5, 9], up: 20, a: 0.34 }); G.fx.kick(0, 0.7); G.audio.play('stepHeavy'); }
+        else G.audio.play('step');
+      }
     }
 
     // --- weapon
-    if (P.atkBuf > 0 && free && P.atkCd <= 0 && P.dashT <= 0 && P.stun <= 0 && P.healT === 0) {
+    const charging = P.atk && P.atk.canCharge && !P.atk.swung;
+    if (P.atkBuf > 0 && free && P.atkCd <= 0 && P.dashT <= 0 && P.stun <= 0 && P.healT === 0 && !charging) {
       P.atkBuf = 0;
       if (H.weapon === 'bow') startShot(mx, up, down);
       else startSwing(mx, up, down);
     }
     if (P.atk) {
       const a = P.atk;
-      a.t += dt;
+      // Aster's smash: with the button still down when the wind-up ends, the blow is held back and charges
+      if (a.canCharge && !a.swung && a.t + dt >= a.a0 && ctl && I.down.attack && a.hold < C.CHARGE_T) {
+        a.t = a.a0 - 0.0001;
+        charge(a, dt);
+      } else a.t += dt;
       if (!a.swung && a.t >= a.a0) { a.swung = true; if (a.kind === 'shot') loose(a); else swing(a); }
       if (a.kind !== 'shot' && a.t >= a.a0 && a.t <= a.a1) checkHits(a);
       if (a.t >= a.dur) P.atk = null;
@@ -334,8 +344,9 @@
   // Combo step for this attack: 0 and 1 are the quick hits, 2 is the finisher.
   function nextStep(counts) {
     if (!counts) { if (P.comboT > 0) P.comboT = 0.62; return -1; } // a bounce keeps the chain alive
-    const idx = (P.comboT > 0 && P.combo >= 0) ? (P.combo + 1) % 3 : 0;
-    P.combo = idx; P.comboT = idx === 2 ? 0 : 0.62;
+    const n = H.chain || 3;
+    const idx = (P.comboT > 0 && P.combo >= 0) ? (P.combo + 1) % n : 0;
+    P.combo = idx; P.comboT = idx === n - 1 ? 0 : 0.62 + (H.heavy ? 0.3 : 0);
     return idx;
   }
   const weaponMult = (heavy) => (1 + 0.25 * G.boon('keen')) * G.dmgMult() * (heavy && G.relic('shard') ? 1.5 : 1);
@@ -358,22 +369,51 @@
     // Side and upward slashes share the count. The downward bounce sits outside it and
     // does not break the chain, and neither does a dash.
     const idx = nextStep(kind !== 'down');
-    const heavy = idx === 2;
+    const heavy = idx === (H.chain || 3) - 1;
     const st = H.combo[heavy ? 2 : idx === 1 ? 1 : 0];
+    // the maul: its first swing goes right round and hits on both sides; its smash can be held and charged
+    const sweep = !!H.heavy && !heavy && kind === 'side', canCharge = !!H.heavy && heavy && kind !== 'down';
     // a slash thrown straight out of a dash becomes a thrust: more damage, more reach
     const thrust = kind === 'side' && P.sinceDash < 0.2;
     const base = kind === 'down' ? H.down : st.dmg;
     P.atk = {
       kind, idx, heavy, thrust, t: 0, dur: st.dur, a0: st.wind, a1: st.wind + st.act,
-      hit: new Set(), dir: P.facing, swung: false, quake: false,
+      hit: new Set(), dir: P.facing, swung: false, quake: false, sweep, canCharge, hold: 0, charge: 0,
       dmg: Math.round(base * (thrust ? 1.4 : 1) * weaponMult(heavy)),
     };
     P.atkCd = st.cd * haste();
-    P.slashes.push({
-      kind, dir: P.facing, heavy, thrust, idx, t: -st.wind, dur: heavy ? 0.3 : 0.19,
-      reach: (1 + 0.25 * G.boon('reach')) * H.reach, thick: H.thick,
-    });
+    // the arc of light for the swing; a smash that may be held shows its arc when it is let go (see swing)
+    if (!canCharge) slashArc(P.atk, -st.wind);
+    if (sweep) { P.slashes.push({ kind, dir: -P.facing, heavy: false, thrust: false, idx, t: -st.wind - 0.05, dur: 0.22, reach: (1 + 0.25 * G.boon('reach')) * H.reach, thick: H.thick }); }
     if (heavy) G.fx.burst(P.x - P.facing * 8, P.y - 34, { n: 5, color: GOLD, speed: [30, 140], life: [0.15, 0.35], kind: 'spark', size: [2, 3] });
+  }
+
+  function slashArc(a, t0) {
+    P.slashes.push({
+      kind: a.kind, dir: a.dir, heavy: a.heavy, thrust: a.thrust, idx: a.idx, t: t0, dur: a.heavy ? 0.3 + 0.1 * a.charge : 0.19,
+      reach: (1 + 0.25 * G.boon('reach')) * H.reach * (1 + 0.25 * a.charge), thick: H.thick * (1 + 0.5 * a.charge),
+    });
+  }
+
+  // Aster holds her smash back: light gathers on the maul, she sinks into her stance, and at full it rings.
+  function charge(a, dt) {
+    const was = a.charge;
+    a.hold += dt;
+    a.charge = G.clamp((a.hold - 0.08) / (C.CHARGE_T - 0.08), 0, 1);
+    if (a.hold - dt <= 0) G.audio.play('charge', { dur: C.CHARGE_T });
+    P.squash = Math.min(P.squash, -0.08 - 0.12 * a.charge);
+    P.atkCd = Math.max(P.atkCd, 0.4);
+    const hx = P.x - a.dir * 14, hy = P.y - 78;
+    if (Math.random() < dt * (18 + 40 * a.charge)) {
+      const ang = G.rand(0, G.TAU), r = G.rand(46, 90);
+      G.fx.spawn({ x: hx + Math.cos(ang) * r, y: hy + Math.sin(ang) * r, vx: -Math.cos(ang) * r * 3, vy: -Math.sin(ang) * r * 3, life: 0.3, size: G.rand(2, 4), color: a.charge >= 1 ? GOLD : STAR });
+    }
+    if (P.onGround && Math.random() < dt * 10 * a.charge) G.fx.dust(P.x + G.rand(-20, 20), P.y, 1, { speed: [10, 50], size: [4, 8], up: 40, a: 0.3 });
+    if (a.charge >= 1 && was < 1) {
+      G.audio.play('segment'); G.fx.shake(3);
+      G.fx.ring(hx, hy, { r0: 70, r1: 12, life: 0.25, color: GOLD, width: 5 });
+      G.fx.light(hx, hy, 200, GOLD, 0.25, 0.7);
+    }
   }
 
   // The moment the swing comes out: its sound, a step into the blow, and what finishers add.
@@ -381,6 +421,12 @@
   const swingAng = (a) => (a.kind === 'up' ? -Math.PI / 2 : a.kind === 'down' ? Math.PI / 2 : a.dir > 0 ? 0 : Math.PI);
 
   function swing(a) {
+    if (a.canCharge) {
+      // a charged smash hits up to twice as hard and reaches further
+      if (a.charge > 0) a.dmg = Math.round(a.dmg * (1 + a.charge));
+      slashArc(a, 0);
+      P.atkCd = Math.max(P.atkCd, (H.combo[2].cd - H.combo[2].wind) * haste());
+    }
     G.audio.play(a.heavy || H.weapon === 'maul' ? 'slash3' : 'slash');
     // flecks of light thrown off the blade, and a lean into the blow
     const ang = swingAng(a), reach = H.reach * (a.heavy ? 1.2 : 1);
@@ -399,9 +445,15 @@
     if (a.heavy && H.weapon === 'maul' && P.onGround && a.kind === 'side') {
       // the maul's finisher shakes the ground in front of it
       a.quake = true;
-      G.fx.shake(7); G.audio.play('boom');
-      G.fx.ring(P.x + a.dir * 90, FLOOR - 4, { r0: 20, r1: 150, life: 0.35, color: STAR, width: 6 });
-      G.fx.thud(P.x + a.dir * 90, FLOOR, 1.15, { col: STAR });
+      const ck = a.charge || 0;
+      G.fx.shake(7 + 9 * ck); G.audio.play('boom'); if (ck > 0.5) { G.audio.play('slam'); G.fx.punch(0.02 * ck); }
+      G.fx.ring(P.x + a.dir * 90, FLOOR - 4, { r0: 20, r1: 150 + 110 * ck, life: 0.35, color: ck >= 1 ? GOLD : STAR, width: 6 + 4 * ck });
+      G.fx.thud(P.x + a.dir * 90, FLOOR, 1.15 + 0.8 * ck, { col: STAR });
+      // fully charged: the blow runs on along the floor as a wave of light
+      if (ck >= 1) {
+        G.shots.push({ wave: true, x: P.x + a.dir * 120, y: FLOOR - 30, vx: a.dir * 980, vy: 0, t: 0, life: 0.5, hit: new Set(), dmg: Math.round(24 * G.dmgMult()) });
+        G.fx.thud(P.x + a.dir * 200, FLOOR, 1.2, { col: GOLD });
+      }
       G.fx.burst(P.x + a.dir * 90, FLOOR - 4, { n: 8, color: STAR, speed: [150, 520], angle: -Math.PI / 2, spread: 2.2, life: [0.2, 0.5], kind: 'spark', size: [2, 3.5], grav: 900 });
       G.fx.burst(P.x + a.dir * 90, FLOOR - 4, { n: 6, color: '22,18,32', speed: [150, 460], angle: -Math.PI / 2, spread: 2, life: [0.5, 1], size: [5, 9], kind: 'chunk', grav: 1500 });
     }
@@ -423,6 +475,7 @@
       return { cx: P.x + a.dir * 6, cy: P.y - 34 - hh, hw: (a.heavy ? 54 : 42) * (0.6 + 0.4 * H.reach), hh };
     }
     if (a.kind === 'down') return { cx: P.x, cy: P.y - 28 + 42 * r, hw: 36, hh: 42 * r };
+    if (a.sweep) return { cx: P.x, cy: P.y - 28, hw: (a.thrust ? 104 : 84) * r, hh: 38 };
     // side: the finisher is bigger, a thrust is longer and narrower
     const hw = ((a.heavy ? 66 : 48) + (a.thrust ? 22 : 0)) * r;
     return { cx: P.x + a.dir * (hw - (a.heavy ? 4 : 0)), cy: P.y - 26, hw, hh: a.thrust ? 32 : a.heavy ? 48 : 36 };
@@ -457,7 +510,7 @@
 
   function checkHits(a) {
     const boxes = [atkBox(a)];
-    if (a.quake) boxes.push({ cx: P.x + a.dir * 100, cy: FLOOR - 26, hw: 130, hh: 30 });
+    if (a.quake) boxes.push({ cx: P.x + a.dir * (100 + 40 * (a.charge || 0)), cy: FLOOR - 26, hw: 130 + 80 * (a.charge || 0), hh: 30 });
     let bounced = false;
     for (const hb of boxes) {
       for (const t of G.boss.targets()) {
@@ -466,12 +519,12 @@
         const c = contact(hb, t);
         // a riposte or a sunder makes this blow worth more (see moments.js)
         const em = G.moments.strike(a.heavy);
-        const res = G.boss.damage(Math.round(a.dmg * em.mult), t, { x: c.x, y: c.y, heavy: a.heavy || a.thrust, finisher: a.heavy || em.mult > 1, dir: a.dir, poise: H.poise });
+        const res = G.boss.damage(Math.round(a.dmg * em.mult), t, { x: c.x, y: c.y, heavy: a.heavy || a.thrust, finisher: a.heavy || em.mult > 1, dir: a.sweep ? (G.sign(t.cx - P.x) || a.dir) : a.dir, poise: H.poise });
         if (res) {
           P.gain(a.heavy ? C.GAIN_HEAVY : C.GAIN_HIT);
           // the freeze, the shake and the kick all scale with the blow; the maul's are heavier
-          G.fx.stop(a.heavy ? 0.11 : a.thrust ? 0.06 : 0.032 * H.thick);
-          G.fx.shake(a.heavy ? 9 : a.thrust ? 4.5 : 1.8 * H.thick);
+          G.fx.stop((a.heavy ? 0.11 : a.thrust ? 0.06 : 0.032 * H.thick) + 0.07 * (a.charge || 0) + (a.sweep ? 0.02 : 0));
+          G.fx.shake((a.heavy ? 9 : a.thrust ? 4.5 : 1.8 * H.thick) + 7 * (a.charge || 0) + (a.sweep ? 2 : 0));
           G.fx.hit(c.x, c.y, swingAng(a), { heavy: a.heavy, thrust: a.thrust, power: 0.8 + 0.2 * H.thick, col: a.heavy ? GOLD : STAR, hot: HOT });
           if (a.heavy) {
             // the finisher lands with a gold burst so it reads as the big hit
@@ -678,9 +731,16 @@
     }
     P.hp -= dmg; P.stats.hits++;
     P.lastHit = { kind: src && src.kind, attack: G.boss.attackName || '' }; // for the defeat screen
-    P.inv = C.HURT_INV; P.stun = 0.2; P.dashT = 0; P.atk = null; P.healT = 0; P.hurtFlash = 1; P.plunge = false;
+    const braced = !!(P.atk && P.atk.canCharge && !P.atk.swung && P.atk.hold > 0.12) && P.hp > 0;
     const dir = G.sign(P.x - srcX) || -P.facing;
-    P.vx = dir * 430; P.vy = (src && typeof src.popVy === 'number') ? src.popVy : -430; P.onGround = false; P.plat = null; P.jumpHeld = false;
+    P.inv = C.HURT_INV; P.dashT = 0; P.healT = 0; P.hurtFlash = 1; P.plunge = false;
+    if (braced) {
+      // Aster, mid-charge: it hurts, but she is not moved and the blow she is holding is not lost
+      G.fx.text(P.x, P.y - 84, 'UNMOVED', { color: HOT, size: 15, life: 0.8 });
+    } else {
+      P.stun = 0.2; P.atk = null;
+      P.vx = dir * 430; P.vy = (src && typeof src.popVy === 'number') ? src.popVy : -430; P.onGround = false; P.plat = null; P.jumpHeld = false;
+    }
     G.fx.stop(0.14); G.fx.shake(13); G.fx.flash('255,50,50', 0.26, 0.35);
     G.fx.burst(P.x, P.y - 22, { n: 16, color: '255,120,120', speed: [100, 420], life: [0.2, 0.55], kind: 'spark', size: [2, 4] });
     G.fx.hurt(P.x, P.y - 22, dir, STAR);
@@ -1432,7 +1492,7 @@
 
     const blink = P.inv > 0 && P.iframes <= 0 && Math.floor(G.t * 28) % 2 === 0;
     if (blink) ctx.globalAlpha = 0.35;
-    P.primed = P.combo === 1 && P.comboT > 0 && !P.atk;
+    P.primed = P.combo === (H.chain || 3) - 2 && P.comboT > 0 && !P.atk;
     P.dash = P.dashT > 0;
     if (!P.vanish) { drawTail(ctx, H, P.scarf); drawBody(ctx, H, P); }
     ctx.globalAlpha = 1;

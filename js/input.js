@@ -13,6 +13,7 @@
     heal: ['KeyE', 'KeyF'],
     ult: ['KeyQ', 'KeyI'],
     pause: ['Escape', 'KeyP'],
+    moves: ['Tab'],
     retry: ['KeyR'],
     confirm: ['Enter', 'NumpadEnter'],
   };
