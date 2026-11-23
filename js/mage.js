@@ -261,8 +261,11 @@
       },
       draw(ctx) {
         if (!this.started) return;
+        // it surges up out of the wall over its first few frames rather than appearing whole
+        const up = G.clamp((this.t - tele) / 0.12, 0, 1), rise = 1 - (1 - up) * (1 - up);
         ctx.globalCompositeOperation = 'lighter';
-        for (const [col, ws, hs, a] of [[FIRE.boss, 1.5, 1.12, 0.35], [DANGER, 1, 1, 0.8], [FIRE.hot, 0.45, 0.8, 0.95]]) {
+        for (const [col, ws, hs0, a] of [[FIRE.boss, 1.5, 1.12, 0.35], [DANGER, 1, 1, 0.8], [FIRE.hot, 0.45, 0.8, 0.95]]) {
+          const hs = hs0 * (0.25 + 0.75 * rise);
           ctx.fillStyle = G.rgba(col, a);
           ctx.beginPath(); ctx.moveTo(this.x - this.hw * ws, FLOOR);
           for (let i = 0; i <= 8; i++) {
@@ -1348,7 +1351,7 @@
 
     ctx.translate(b.x + b.kx + jx, b.y + bob);
     K.recoil(ctx, b);
-    ctx.scale(b.face, 1);
+    ctx.scale(K.faceX(b), 1); // (a turn narrows the figure through it: see K.turn)
     if (down) ctx.rotate(0.28);
 
     D.glow(ctx, col, 0, -70, 130, 0.2 + 0.2 * c);

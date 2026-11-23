@@ -1273,9 +1273,7 @@
         }
       }
     }
-    // (corrupted) a turn the Knight makes in its own two attacks is a turn, not a flip: the figure
-    // narrows through the turn, as it does in the whirl
-    if (b.smooth > 0) { b.smooth -= dt; b.fd = G.damp(b.fd == null ? b.face : b.fd, b.face, 20, dt); } else b.fd = b.face;
+    if (b.smooth > 0) b.smooth -= dt; // (every turn is eased now, by K.turn: b.smooth is left for the attacks that set it)
     // the Requiem's black blade: it creeps up from the guard, and drains away when the attack ends
     if (!b.voidOn && b.voidK > 0) b.voidK = Math.max(0, b.voidK - dt * 2.5);
     if (b.voidK > 0.3 && !b.unarmed && Math.random() < dt * 30 * b.voidK) {
@@ -1431,10 +1429,10 @@
     const lean = p[0], hip = p[1];
     const dark = '#090c11', mid = '#18212b', plate = '#2b3846', trim = '#40536a';
     const jx = b.jit ? G.rand(-b.jit, b.jit) : 0;
-    // while it whirls the whole figure turns: squeeze it sideways and flip
-    // (and a turn made in its corrupted attacks narrows it through the turn: b.fd, see B.tick)
-    const turn = b.spinning ? Math.cos(b.spin) : real && b.fd != null ? b.fd * b.face : 1;
-    const sx = b.face * (Math.abs(turn) < 0.25 ? 0.25 * (turn < 0 ? -1 : 1) : turn);
+    // while it whirls the whole figure turns: squeeze it sideways and flip; any other turn narrows it
+    // through the turn too (K.turn), rather than flipping it in one frame
+    const turn = b.spinning ? Math.cos(b.spin) : 1;
+    const sx = b.spinning ? b.face * (Math.abs(turn) < 0.25 ? 0.25 * (turn < 0 ? -1 : 1) : turn) : real ? K.faceX(b, 0.25) : b.face;
 
     ctx.save();
     ctx.globalAlpha = alpha;

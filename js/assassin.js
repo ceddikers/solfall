@@ -72,8 +72,8 @@
     B.lights = true; B.dark = 0; B.wires = []; B.wireHit = 0;
     B.pinned = null; B.strings = 0;
   };
-  B.onRelease = function () { const b = B.body; b.hurt = false; b.pose = 'idle'; b.hidden = false; B.pinned = null; B.strings = 0; };
-  B.onInterrupt = function () { for (const c of B.clones) smoke(c.x, c.y - 40); B.clones.length = 0; B.pinned = null; B.strings = 0; };
+  B.onRelease = function () { const b = B.body; b.fading = false; b.hurt = false; b.pose = 'idle'; b.hidden = false; B.pinned = null; B.strings = 0; };
+  B.onInterrupt = function () { B.body.fading = false; for (const c of B.clones) smoke(c.x, c.y - 40); B.clones.length = 0; B.pinned = null; B.strings = 0; };
   B.onStagger = function () { B.body.pose = 'kneel'; };
   B.staggerWord = 'CAUGHT'; B.staggerMult = 1.9; B.staggerDur = 0.7;
   B.staggerIn = function* () {
@@ -114,14 +114,17 @@
     b.hurt = false;
     G.audio.play('blink');
     smoke(b.x, b.y - 40);
-    yield* wait(0.06);
-    b.hidden = true;
+    // she thins into the smoke rather than going out like a light
+    b.fading = true;
+    for (let t = 0; t < 0.06;) { t += yield; b.vis = Math.max(0, 1 - t / 0.06); } // (exactly the old wait(0.06))
+    b.hidden = true; b.fading = false;
   }
   function appear(x, y, pose) {
     const b = B.body;
     b.x = x; b.y = y; b.hidden = false; b.pose = pose || 'idle';
     if (POSES[b.pose]) b.p = POSES[b.pose].slice();
-    b.face = G.player.x >= x ? 1 : -1;
+    b.face = G.player.x >= x ? 1 : -1; b.tqf = b.face; b.tqP = 1; // she comes out of the smoke already facing the hero
+    b.vis = 0; // and gathers out of it, quickly (B.tick)
     for (const p of B.scarf) { p.x = x; p.y = y - 70; }
     smoke(x, y - 40);
   }
@@ -1206,6 +1209,8 @@
   B.tick = function (dt) {
     const b = B.body, P = G.player;
     stepPose(b, dt);
+    if (b.vis == null) b.vis = 1;
+    else if (b.vis < 1 && !b.fading && !b.hidden) b.vis = Math.min(1, b.vis + dt / 0.09);
     D.chainStep(B.scarf, b.x - b.face * 4, b.y + b.p[1] - 36, dt, { seg: 8, grav: 30, drift: 46, face: b.face, wave: 14, rate: 9 });
     for (const c of B.clones) stepPose(c, dt);
     B.clones = B.clones.filter((c) => !c.gone);
@@ -1259,7 +1264,7 @@
     ctx.save();
     ctx.translate(a.x + (a.kx || 0) + (a.jit ? G.rand(-a.jit, a.jit) : 0), a.y);
     K.recoil(ctx, a);
-    ctx.scale(a.face, 1);
+    ctx.scale(K.faceX(a), 1); // (a turn narrows the figure through it: see K.turn; a shade just faces)
     ctx.globalAlpha = alpha;
     ctx.lineJoin = 'round'; ctx.lineCap = 'round';
     if (p[2]) { ctx.translate(0, hip); ctx.rotate(p[2]); ctx.translate(0, -hip); }
@@ -1483,7 +1488,7 @@
     for (let pass = 0; pass < 2; pass++) {
       for (let i = 1; i < n - pass * 3; i++) {
         const k = 1 - i / n, o = pass * (2 + i * 1.3);
-        ctx.strokeStyle = G.rgba(col, (0.2 + 0.6 * k) * (pass ? 0.6 : 1)); ctx.lineWidth = (1.5 + 5 * k) * (pass ? 0.7 : 1);
+        ctx.strokeStyle = G.rgba(col, (0.2 + 0.6 * k) * (pass ? 0.6 : 1) * (b.vis == null ? 1 : b.vis)); ctx.lineWidth = (1.5 + 5 * k) * (pass ? 0.7 : 1);
         D.line(ctx, B.scarf[i - 1].x, B.scarf[i - 1].y + o - (pass ? 1.3 : 0), B.scarf[i].x, B.scarf[i].y + o);
       }
     }
@@ -1495,7 +1500,14 @@
         figure(ctx, Object.assign({}, b, { x: gx, y: gy, flash: 0, clone: true, hurt: false }), 0.3 - i * 0.07);
       }
     }
-    figure(ctx, b, 1);
+    // thinning into smoke or gathering out of it: narrow and tall, and see-through
+    const v = b.vis == null ? 1 : b.vis;
+    if (v < 1) {
+      const e = v * v * (3 - 2 * v), cy = b.y - 40;
+      ctx.save(); ctx.translate(b.x, cy); ctx.scale(0.3 + 0.7 * e, 1 + 0.22 * (1 - e)); ctx.translate(-b.x, -cy);
+      figure(ctx, b, Math.max(0, e));
+      ctx.restore();
+    } else figure(ctx, b, 1);
     drawStrings(ctx, 1);
   };
   // (corrupted) strings between her spread fingers, catching the light; in the dark they show

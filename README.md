@@ -2,7 +2,7 @@
 
 A side-on boss rush for the browser: four heroes, four three-phase bosses, played as a run of
 ever-harder trials. You pick a hero and a relic before the run and win a boon after each victory.
-Version 1.9b.
+Version 1.9c.
 
 This is an early slice of a planned boss-rush roguelite (short runs, a boon after each boss,
 bosses drawn from a pool). A run meets the four bosses in a shuffled order, then meets them again, harder.
@@ -112,6 +112,55 @@ hero (`tools/feel-check.js`).
 - Settings, Reset progress erases Sunshards, upgrades, trophies and records (it has to be chosen twice).
 
 Not done: touch controls, a colour-blind alternative to red-orange warnings, gamepad rebinding.
+
+## Motion that turns, rolls and fades (v1.9c)
+
+A pass over how everything moves, measured rather than guessed: `tools/motion-check.js` draws the hero,
+each boss and each hazard alone, frame by frame, and flags any frame that changes far more than the
+frames around it (a pop), a pose that shows for a single frame (a flicker), a fast movement that stops
+in one frame, and a hazard drawn whole on its first or last frame. It found and this build fixes:
+
+- **Bosses turned by flipping in one frame.** The Magus, the Veil and the Knight now turn: the figure
+  narrows through the turn and opens out the other way, eased in and out over about a sixth of a second
+  (`K.turn` / `K.faceX` in `js/bosskit.js`). The Wolf already turned this way, more slowly.
+- **The hero's turn was a flip too** (narrowed a little, but mirrored in one frame, so Aster's maul jumped
+  from back to front). Now the same kind of turn, over about five frames; a swing or a dash still shows at
+  once, the right way round.
+- **The Leviathan's head jumped to its other side** whenever it passed upright (its lure leaping across).
+  It now rolls over through a few frames. And in its third-phase swim round the arena it reversed in one
+  frame at each end: it now rears up and swings round as it turns.
+- **The Veil went out like a light**, and came back whole. She now thins into her smoke and gathers out
+  of it, scarf and all.
+- **A blast sat still and then was gone.** The burst now flashes outward and burns away over its moment.
+  The Magus's firewall surges up out of the wall instead of appearing whole.
+
+**The Cinder Wolf moved like a machine**, so it got a pass of its own (`js/wolf.js`):
+
+- *Its legs keep time with the ground.* The walk and the gallop advance by the distance the body covers,
+  so a paw in its stance stays put instead of skating (its stalking walk stepped far too slowly for its
+  speed). Closing in at more than a walking pace, it gallops.
+- *It builds up speed.* Moving in, it starts from whatever it was doing and accelerates; stalking, it eases
+  into the walk and out of it.
+- *Not every part arrives together.* Each part follows its pose on its own spring: the legs lead, the head
+  comes a beat behind, and the tail and ears trail and swing past.
+- *Its paws are planted.* On the ground a paw stays where it was set down while the body shifts over it,
+  and steps (with a little lift, never both of a pair at once) when it is stretched too far or a new stance
+  wants it elsewhere. In a lunge the hind paws push off and catch up.
+- *Standing, it is alive:* slow heavy breaths, its weight rocking between its legs, its head following
+  you up and down, an ear flicking now and then, its jaw trembling while it snarls.
+
+None of this moves a hit area: every bite, sweep and leap still hurts exactly where and when it did.
+(The stalking walk's ease is kept quick on purpose: a slower one left the Wolf standing somewhere else
+when its next attack began, and the scripted player in `tools/boss-tests.js` showed the difference.)
+
+**Heroes no longer borrow boss sounds.** Eos's fully drawn cut landed with the bosses' heavy `slam`, and
+Aster's smash gathered with the bosses' rising `charge` tell, so both could be mistaken for an attack
+coming at you. Eos now has `iai` (a thin steel ring over torn air, with a short firm weight under it) and
+Aster `heave` (a brighter, shimmering hum up the haft), in `js/audio.js`.
+
+Checked and left alone, because they are meant: a struck boss's shiver; the Magus's teleport fade; the
+jump's stretch on take-off; Eos's draw, which stops as fast as it starts; warnings that go out as their
+blow lands; waves and orbs that break with a burst.
 
 ## Corrupted for real: twelve new attacks, a pitch-black look, and corrupted boons (v1.9b)
 
@@ -1113,6 +1162,7 @@ To use these in a new attack, call the ready-made mixes in `js/fx.js`: `G.fx.hit
 | `js/moments.js` | Reckoning, Riposte, Sunder, Clash, Last Light and the last push |
 | `js/hub.js` | the Vigil: the camp between runs, its places, the sparring post, the bell and the lantern |
 | `tools/feel-check.js` | whole fights played by a scripted hero, to measure Dawnbreak, Flow and Reckonings |
+| `tools/motion-check.js` | every attack, whole fights and every hero, drawn frame by frame, to find motion that pops, flickers or stops dead (see v1.9c) |
 | `js/input.js` | keyboard, mouse and gamepad mapped to actions |
 | `js/audio.js` | every sound and the music, synthesised in code (no audio files) |
 | `js/fx.js` | particles, smoke, shards, cut marks, floor cracks and scorch marks, screen shake and kick, flashes, hit-freeze, slow motion |

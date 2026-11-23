@@ -103,6 +103,30 @@
     if (b.sq) ctx.scale(1 + b.sq * 0.7, 1 - b.sq);
   };
 
+  // A boss that turns to face the other way turns; it does not flip in one frame. K.turn (run every
+  // frame by the kit) notices the change of facing and K.faceX gives the drawn width: the figure
+  // narrows through the turn and opens out the other way, eased in and out over TURN_T, as the hero's
+  // does. Turning back mid-turn carries on from where it is. A boss that is out of sight just faces
+  // the new way. (The Wolf has its own, slower turn: w.tf in wolf.js.)
+  const TURN_T = 0.16;
+  K.turn = function (b, dt) {
+    if (b.tqf !== b.face) {
+      const unseen = b.tqf == null || b.hidden || b.alpha === 0;
+      b.tq0 = unseen ? 1 : -K.turnK(b); b.tqP = unseen ? 1 : 0; b.tqf = b.face;
+    }
+    if (b.tqP < 1) b.tqP = Math.min(1, b.tqP + dt / TURN_T);
+  };
+  // the turn as a signed width: -1 still showing the old way, 1 settled the new way
+  K.turnK = function (b) {
+    if (b.tqP == null || b.tqP >= 1) return 1;
+    const p = b.tqP, s = p * p * (3 - 2 * p);
+    return b.tq0 + (1 - b.tq0) * s;
+  };
+  K.faceX = function (b, min) {
+    const t = K.turnK(b), m = min || 0.22;
+    return b.face * (Math.abs(t) < m ? m * (t < 0 ? -1 : 1) : t);
+  };
+
   K.aura = function (x, y, col, w, h, n) {
     for (let i = 0; i < (n || 3); i++) {
       G.fx.spawn({ kind: 'spark', x: x + G.rand(-w, w), y: y - G.rand(0, h * 0.5), vx: G.rand(-30, 30), vy: -G.rand(500, 1100), life: G.rand(0.18, 0.4), size: G.rand(1.6, 3.4), color: col, len: 0.07 });
@@ -479,6 +503,7 @@
         B.kite = G.clamp(B.kite + (away ? dt : -dt * 0.7), 0, KITE_T + 1.5);
       }
       B.tick(dt);
+      K.turn(b, dt);
       B.core.x = b.x; B.core.y = b.y - B.h * 0.55;
     };
 

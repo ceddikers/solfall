@@ -262,6 +262,72 @@
     curl: [22, -64, -26, -60, 34, -26, 24, -22, -4, -24, -18, -28, 1.45, 30, 0.0, 1.5, 1],
   };
   const NP = 17;
+  // how quickly each part follows its pose (JW) and how much it swings past (JZ, below 1 swings more):
+  // spine, legs, neck angle and length, jaw, tail, ears
+  const JW = [1, 1, 1, 1, 1.12, 1.12, 1.12, 1.12, 1.12, 1.12, 1.12, 1.12, 0.74, 0.8, 1.3, 0.56, 0.6];
+  const JZ = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0.82, 0.9, 1, 0.68, 0.62];
+
+  // Planted paws. On the ground, a paw stays where it was set down while the body moves over it
+  // (the legs bend and stretch), and steps, with a little lift, when it is stretched too far or the
+  // stance wants it somewhere new. A pair never steps both at once. When the body drives forward fast
+  // (a lunge) the forepaws reach freely and the hind paws push off, then catch up; backwards, the
+  // other way round. In the air, on a wall, on its back, or walking (the gait plants its own paws),
+  // the pose is shown as it is. The result is b.pd, which is what is drawn.
+  const STEP_T = 0.13, LIFT = 13;
+  function plantFeet(b, dt) {
+    const S = B.size, pd = b.pd || (b.pd = b.p.slice());
+    // where each paw was last drawn, so a paw let go (into a walk, a leap, a turn) glides to where
+    // the pose puts it instead of jumping there in one frame
+    const last = b.pdLast || (b.pdLast = b.p.slice());
+    const off = b.footOff || (b.footOff = [0, 0, 0, 0, 0, 0, 0, 0]);
+    for (let i = 0; i < NP; i++) pd[i] = b.p[i];
+    const decay = Math.exp(-22 * dt);
+    const finish = () => {
+      for (let k = 0; k < 8; k++) { off[k] *= decay; if (Math.abs(off[k]) < 0.05) off[k] = 0; pd[4 + k] += off[k]; last[4 + k] = pd[4 + k]; }
+    };
+    const release = (k) => { off[k * 2] = last[4 + k * 2] - b.p[4 + k * 2]; off[k * 2 + 1] = last[5 + k * 2] - b.p[5 + k * 2]; };
+    const loco = b.pose === 'walk' || b.pose === 'run';
+    const grounded = !loco && !b.air && !b.wall && !b.hidden && b.y >= FLOOR - 1 && Math.abs(b.rot) < 0.06 && b.roll < 0.3 && !b.comet && b.back < 0.05 && !(b.spin > 0.01);
+    if (!b.feet || b.feetFace !== b.face || !grounded) {
+      if (b.feet && b.feetFace === b.face && !b.hidden) for (let k = 0; k < 4; k++) if (b.feet[k]) release(k);
+      b.feet = [null, null, null, null]; b.feetFace = b.face; b.feetPose = b.pose;
+      finish(); return;
+    }
+    if (b.feetPose !== b.pose) { b.feetPose = b.pose; b.settle = 0.1; } // a new stance: shuffle into it
+    if (b.settle > -1) b.settle -= dt;
+    const fwd = b.vx * b.face;
+    for (let k = 0; k < 4; k++) {
+      const ix = 4 + k * 2, iy = ix + 1, front = k < 2, want = b.p[ix], wy = b.p[iy];
+      const free = wy < -3 || (front && fwd > 380) || (!front && fwd < -380);
+      if (free) { if (b.feet[k]) release(k); b.feet[k] = null; continue; }
+      const f = b.feet[k];
+      if (!f) {
+        // set it down where it is drawn now, once it has glided home
+        if (Math.abs(off[k * 2]) > 3 || Math.abs(off[k * 2 + 1]) > 2) continue;
+        const at = want + off[k * 2];
+        b.feet[k] = { x: b.x + b.face * at * S, step: 0, from: at };
+        off[k * 2] = off[k * 2 + 1] = 0; pd[ix] = at; pd[iy] = Math.min(wy, 0);
+        continue;
+      }
+      off[k * 2] = off[k * 2 + 1] = 0;
+      const lx = (f.x - b.x) * b.face / S;
+      if (f.step > 0) {
+        f.step = Math.min(1, f.step + dt / STEP_T);
+        const e = f.step * f.step * (3 - 2 * f.step);
+        pd[ix] = G.lerp(f.from, want, e);
+        pd[iy] = Math.min(wy, -Math.sin(Math.PI * f.step) * LIFT * Math.min(1, Math.abs(want - f.from) / 20));
+        if (f.step >= 1) { f.step = 0; f.x = b.x + b.face * want * S; }
+        continue;
+      }
+      const mate = b.feet[k ^ 1], mateBusy = mate && mate.step > 0;
+      const reach = (front ? 30 : 26) * (k % 2 ? 0.8 : 1), gap = Math.abs(lx - want);
+      // stretched too far, or settling into a new stance (the far paw a beat after the near one)
+      const settling = b.settle != null && b.settle <= (k % 2 ? -0.09 : 0) && b.settle > -0.7 && gap > 5;
+      if ((gap > reach || settling) && (!mateBusy || gap > reach * 2)) { f.step = 0.001; f.from = lx; }
+      pd[ix] = lx; pd[iy] = 0;
+    }
+    finish();
+  }
   function walkPose(t) {
     const s = Math.sin(t), c = Math.cos(t), p = POSES.idle.slice();
     p[4] = 62 + s * 22; p[5] = -Math.max(0, c) * 12;
@@ -389,14 +455,17 @@
 
   // ------------------------------------------------------------------ building blocks
   // Moving in on the hero: a trot, or a run when it is far off.
+  // (It builds up to its speed from whatever it was doing, rather than being at it in one frame;
+  // past a fast walk it breaks into a gallop.)
   function* approach(dist, speed, maxT) {
     const b = B.body, P = G.player;
-    let e = 0;
+    let e = 0, v = Math.max(0, b.vx * b.face);
     while (e < maxT && Math.abs(P.x - b.x) > dist) {
       const dt = yield;
       e += dt; facePlayer();
-      b.pose = speed > 420 ? 'run' : 'walk';
-      b.x = clampX(b.x + b.face * speed * dt, 80);
+      v = Math.min(speed, v + 4200 * dt);
+      b.pose = v > 240 ? 'run' : 'walk';
+      b.x = clampX(b.x + b.face * v * dt, 80);
     }
     facePlayer();
   }
@@ -1510,9 +1579,13 @@
     const b = B.body, P = G.player;
     if (b.y < FLOOR) b.y = Math.min(FLOOR, b.y + 900 * dt);
     facePlayer();
-    const d = Math.abs(P.x - b.x);
-    if (d > 300) { b.x = clampX(b.x + b.face * [0, 150, 175, 200][B.phase] * dt, 80); b.pose = 'walk'; }
-    else b.pose = d < 170 ? 'snarl' : 'idle';
+    // it stalks in when the hero is far off: easing into the walk and out of it, not starting and
+    // stopping in one frame
+    const d = Math.abs(P.x - b.x), want = d > 300 ? [0, 150, 175, 200][B.phase] : 0;
+    if (want) b.ivDir = b.face;
+    b.iv = G.damp(b.iv || 0, want, want ? 9 : 13, dt);
+    if (b.iv > 12) { b.x = clampX(b.x + (b.ivDir || b.face) * b.iv * dt, 80); b.pose = 'walk'; }
+    else { b.iv = want ? b.iv : 0; b.pose = d < 170 ? 'snarl' : 'idle'; }
   };
 
   B.tick = function (dt) {
@@ -1522,8 +1595,11 @@
     b.tf = G.damp(b.tf, 1, b.tfRate || 9, dt);
     b.vx = (b.x - b.lx) / Math.max(dt, 1e-4); b.vy = (b.y - b.ly) / Math.max(dt, 1e-4); b.lx = b.x; b.ly = b.y;
     // pose
-    if (b.pose === 'walk') b.walkT += dt * 7;
-    else if (b.pose === 'run') b.walkT += dt * 15;
+    // the legs keep time with the ground: a stance sweeps a paw back 44 (walk) or 92 (gallop) units,
+    // so the cycle runs at the speed the body actually covers and no paw skates
+    const gsp = Math.abs(b.vx);
+    if (b.pose === 'walk') b.walkT += Math.max(dt * 2, gsp * dt * Math.PI / (44 * B.size));
+    else if (b.pose === 'run') b.walkT += Math.max(dt * 5, gsp * dt * Math.PI / (92 * B.size));
     if ((b.pose === 'walk' || b.pose === 'run') && !b.wall) {
       const sn = Math.floor(b.walkT / Math.PI);
       if (sn !== b.stepN) {
@@ -1547,14 +1623,31 @@
         target[4] += k * 6; target[8] -= k * 6;
       }
     }
+    if ((b.pose === 'idle' || b.pose === 'snarl') && !b.hidden && !B.dying && b.roll < 0.3) {
+      // standing, it is alive: slow heavy breaths, its weight rocking a little between its legs (the
+      // paws stay put: see plantFeet), its head following the hero, an ear now and then
+      target = target.slice();
+      const br = Math.sin(B.t * 2.3), sway = Math.sin(B.t * 0.75);
+      target[1] += br * 2.4; target[3] += br * 1.2; target[0] += sway * 2.5; target[2] += sway * 2.5;
+      const hy = b.y + target[1] * B.size - 30, dy = (P.y - 34) - hy, dx = Math.max(60, Math.abs(P.x - b.x));
+      target[12] += G.clamp(Math.atan2(dy, dx) * 0.55, -0.4, 0.3) * (b.face * (P.x - b.x) > 0 ? 1 : 0.3);
+      target[15] += Math.sin(B.t * 1.4) * 0.12;
+      if (b.pose === 'snarl') target[14] += Math.abs(Math.sin(B.t * 19)) * 0.06;
+      b.earT = (b.earT == null ? 2 : b.earT) - dt;
+      if (b.earT < 0) { if (b.earT < -0.16) b.earT = G.rand(1.8, 4.5); else target[16] += 0.55; }
+    }
+    // Not every part arrives together: the legs lead, the head and neck follow a beat behind, and the
+    // tail and ears trail and swing past (lower stiffness, less damping). Hit areas never read the pose.
     const loco = b.pose === 'walk' || b.pose === 'run';
     const w0 = loco ? 40 : b.fast ? 40 : 13, z = b.fast ? 0.62 : 0.82;
     for (let i = 0; i < NP; i++) {
-      let w = w0;
+      let w = w0 * JW[i];
       if (i === 1 || i === 3) w *= target[i] > b.p[i] + 0.5 ? 1.3 : 0.86; // what drops, drops faster
-      b.pv[i] += ((target[i] - b.p[i]) * w * w - 2 * z * w * b.pv[i]) * dt;
+      const zi = z * JZ[i];
+      b.pv[i] += ((target[i] - b.p[i]) * w * w - 2 * zi * w * b.pv[i]) * dt;
       b.p[i] += b.pv[i] * dt;
     }
+    plantFeet(b, dt);
     b.fire = G.damp(b.fire, b.fireTo, b.fireTo > b.fire ? 3 : 5, dt);
     if (b.pose !== 'inhale') b.throat = Math.max(0, b.throat - dt * 3);
     B.gloom = G.damp(B.gloom, B.gloomTo, 3.5, dt);
@@ -1582,7 +1675,7 @@
     B.ghosts = B.ghosts.filter((g) => g.a > 0);
     if (b.trail && !b.hidden && !B.dead) {
       B.ghostT -= dt;
-      if (B.ghostT <= 0) { B.ghostT = 0.035; B.ghosts.push({ x: b.x, y: b.y, face: b.face, tf: b.tf, rot: b.rot, roll: 0, p: b.p.slice(), a: 1, fire: 0 }); }
+      if (B.ghostT <= 0) { B.ghostT = 0.035; B.ghosts.push({ x: b.x, y: b.y, face: b.face, tf: b.tf, rot: b.rot, roll: 0, p: (b.pd || b.p).slice(), a: 1, fire: 0 }); }
       const c = centre(b), sp = Math.hypot(b.vx, b.vy);
       if (sp > 300) {
         for (let i = 0; i < 3; i++) G.fx.spawn({ kind: 'spark', x: c.x + G.rand(-60, 60), y: c.y + G.rand(-40, 40), vx: -b.vx * 0.35, vy: -b.vy * 0.35, life: G.rand(0.12, 0.22), size: G.rand(1.4, 2.4), color: G.pal().boss, len: 0.06, drag: 2 });
@@ -1914,7 +2007,7 @@
   // The wolf (or, ghost, one of the afterimages it leaves when it moves fast).
   function drawWolf(ctx, w, alpha, ghost) {
     if (alpha <= 0.01) return;
-    const p = w.p, pal = G.pal(), S = B.size * (w.sc || 1);
+    const p = w.pd || w.p, pal = G.pal(), S = B.size * (w.sc || 1);
     const real = w === B.body, fire = ghost ? 0 : w.fire * Math.min(1, B.mane);
     // (corrupted) fire gone black: crimson where it was lit, and black flames (see tongue)
     const vk = ghost ? 0 : w.vk != null ? w.vk : real ? B.voidK : 0;
@@ -1973,7 +2066,8 @@
     let ta = Math.PI + tl, ttx = tx0, tty = ty0;
     tpts.push({ x: ttx, y: tty });
     // (a hanging brush droops towards its tip; a lifted one curls over)
-    const droop = tl > 0.3 ? 0.07 : -0.07;
+    // (blended over the lift, so the brush bends over as it rises rather than flipping in one frame)
+    const droop = G.clamp((tl - 0.3) / 0.22, -1, 1) * 0.07;
     for (let i = 1; i <= 8; i++) {
       ta += droop + Math.sin(G.t * 2.6 - i * 0.6 + (w.x || 0) * 0.01) * 0.06 * (i / 8);
       ttx += Math.cos(ta) * 12; tty += Math.sin(ta) * 12;

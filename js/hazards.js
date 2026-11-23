@@ -325,14 +325,16 @@
       draw(ctx) {
         if (this.fired) {
           // (v1.7a: the blast is the boss's colour with a hot rim and a small hot heart; it used to be a solid white disc)
-          const P = pal(this);
+          // it bursts outward and burns away over its moment, rather than sitting still and going out
+          const P = pal(this), f = G.clamp((this.t - this.tele) / Math.max(0.01, this.boom), 0, 1);
+          const R = this.r * (0.9 + 0.14 * Math.sqrt(f)), fade = 1 - 0.8 * f * f;
           ctx.globalCompositeOperation = 'lighter';
-          ctx.fillStyle = G.rgba(P.boss, 0.36);
-          ctx.beginPath(); ctx.arc(this.x, this.y, this.r, 0, G.TAU); ctx.fill();
-          ctx.fillStyle = G.rgba(P.hot, 0.34);
-          ctx.beginPath(); ctx.arc(this.x, this.y, this.r * 0.4, 0, G.TAU); ctx.fill();
-          ctx.strokeStyle = G.rgba(P.hot, 0.85); ctx.lineWidth = 5;
-          ctx.beginPath(); ctx.arc(this.x, this.y, this.r - 2.5, 0, G.TAU); ctx.stroke();
+          ctx.fillStyle = G.rgba(P.boss, 0.36 * fade);
+          ctx.beginPath(); ctx.arc(this.x, this.y, R, 0, G.TAU); ctx.fill();
+          ctx.fillStyle = G.rgba(P.hot, 0.34 * fade);
+          ctx.beginPath(); ctx.arc(this.x, this.y, R * (0.4 - 0.2 * f), 0, G.TAU); ctx.fill();
+          ctx.strokeStyle = G.rgba(P.hot, 0.85 * fade); ctx.lineWidth = 5 * (1 - 0.6 * f);
+          ctx.beginPath(); ctx.arc(this.x, this.y, R - 2.5, 0, G.TAU); ctx.stroke();
           ctx.globalCompositeOperation = 'source-over';
           return;
         }

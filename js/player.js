@@ -546,7 +546,7 @@
     const was = a.charge;
     a.hold += dt;
     a.charge = G.clamp((a.hold - 0.08) / (C.CHARGE_T - 0.08), 0, 1);
-    if (a.hold - dt <= 0) G.audio.play('charge', { dur: C.CHARGE_T });
+    if (a.hold - dt <= 0) G.audio.play('heave', { dur: C.CHARGE_T }); // (not the bosses' 'charge' tell)
     P.squash = Math.min(P.squash, -0.08 - 0.12 * a.charge);
     P.atkCd = Math.max(P.atkCd, 0.4);
     const hx = P.x - a.dir * 14, hy = P.y - 78;
@@ -1068,7 +1068,7 @@
         G.fx.lines(x, y, 14, HOT, { r0: 24 });
         G.fx.light(x, y, 220, HOT, 0.25, 0.45);
         G.fx.burst(x, y, { n: 12, color: GOLD, speed: [200, 760], life: [0.15, 0.5], kind: 'spark', size: [2.5, 4.5] });
-        G.audio.play('slam');
+        G.audio.play('iai'); // (her own, not the bosses' slam)
       }
       G.audio.play(lvl >= 2 ? 'hitHeavy' : 'hit', { pitch: hitPitch() });
       if (counter) counterLand(x, y, o);
@@ -2282,15 +2282,22 @@
     let rdt = 0;
     if (R) { rdt = R.t == null ? 0 : G.clamp(G.t - R.t, 0, 0.05); R.t = G.t; }
     const ease = (key, v, rate) => { if (!R) return v; R[key] = R[key] == null ? v : G.damp(R[key], v, rate, rdt); return R[key]; };
-    let turn = 0;
+    let turnW = 1;
     if (R) {
-      // turning round: the figure narrows for an instant, like a card flipping
-      if (R.face !== s.facing) { if (R.face != null) R.turn = 1; R.face = s.facing; }
-      R.turn = G.damp(R.turn || 0, 0, 24, rdt); turn = R.turn;
+      // turning round: the figure narrows through the turn and opens out the other way, over about
+      // five frames (from -1, still showing the old way, to 1), so the weapon swings round rather
+      // than jumping across. Turning back mid-turn carries on from where it is. A swing or a dash
+      // is shown at once, the right way round.
+      if (R.face !== s.facing) { R.tq0 = R.face == null ? 1 : -(R.tk == null ? 1 : R.tk); R.tp = R.face == null ? 1 : 0; R.face = s.facing; }
+      if (a || s.dash) R.tp = 1;
+      R.tp = Math.min(1, (R.tp == null ? 1 : R.tp) + rdt / 0.085);
+      const e = R.tp * R.tp * (3 - 2 * R.tp);
+      R.tk = R.tp >= 1 ? 1 : R.tq0 + (1 - R.tq0) * e;
+      turnW = Math.abs(R.tk) < 0.28 ? 0.28 * (R.tk < 0 ? -1 : 1) : R.tk;
     }
     ctx.save();
     ctx.translate(s.x, s.y);
-    ctx.scale(s.facing * SC * (1 - 0.34 * turn), SC);
+    ctx.scale(s.facing * SC * turnW, SC);
     const c = s.cast, lean0 = s.dash ? 0.42 : G.clamp(s.vx * s.facing / h.run, -1.6, 1.6) * 0.13;
     let leanT = lean0;
     if (c && !a) leanT = c.kind === 'lance' ? (c.thrown ? 0.3 : -0.16) : c.kind === 'slam' ? 0.34 : c.kind === 'arc' ? 0.24 : -0.12; // rock back to wind up, fall into the throw

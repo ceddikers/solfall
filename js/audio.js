@@ -133,6 +133,23 @@
       tone({ type: 'square', f0: 1700, f1: 900, dur: 0.035, vol: 0.07 * v });
       tone({ type: 'triangle', f0: 640, f1: 610, dur: 0.14, vol: 0.07 * v });
     },
+    // her fully drawn cut landing: a thin steel ring over torn air and a short, firm weight under it
+    // (her own; it used to borrow the bosses' slam)
+    iai() {
+      noise({ dur: 0.05, vol: 0.34, type: 'highpass', f0: 3200 });
+      noise({ dur: 0.2, vol: 0.26, f0: 7000, f1: 1600, q: 1.1 });
+      tone({ type: 'triangle', f0: 3300, f1: 2500, dur: 0.42, vol: 0.075 });
+      tone({ type: 'sine', f0: 1650, f1: 1600, dur: 0.5, vol: 0.05, delay: 0.02 });
+      tone({ type: 'sine', f0: 210, f1: 92, dur: 0.22, vol: 0.4 });
+    },
+    // Aster gathering her smash: light hums up the haft, bright and close (the bosses' tell is the
+    // low rising 'charge'; this one sits higher and shimmers, so the two are never confused)
+    heave(o) {
+      const dur = (o && o.dur) || 0.9;
+      tone({ type: 'triangle', f0: 330, f1: 660, dur, vol: 0.07, attack: dur * 0.7 });
+      tone({ type: 'sine', f0: 990, f1: 1320, dur, vol: 0.035, attack: dur * 0.8 });
+      noise({ dur, vol: 0.06, f0: 900, f1: 3200, q: 2, attack: dur * 0.7 });
+    },
     focus(o) {
       const n = (o && o.n) || 1, f = 880 * Math.pow(2, (n - 1) * 4 / 12);
       tone({ f0: f, f1: f * 1.01, dur: 0.16, vol: 0.085 });

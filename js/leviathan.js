@@ -1454,7 +1454,10 @@
         e += dt;
         const a = e * 3.2;
         b.x = 640 + Math.cos(a) * 420; b.z = 0.42 + 0.18 * Math.sin(a); b.y = B.sea.y - 30 + Math.sin(a * 2) * 10;
-        b.ta = b.ang = Math.sin(a) > 0 ? Math.PI : 0; // swimming round
+        // swimming round: the head points the way it swims and rears up as it rounds each end (the
+        // angle spring in B.tick carries it there), rather than reversing in one frame
+        const u = -Math.sin(a);
+        b.ta = -Math.PI / 2 + Math.sign(u) * Math.pow(Math.abs(u), 0.4) * Math.PI / 2;
         B.vortex.to = 0.3 * (e / 1.3);
       }
       yield* sinkAway(0.3);
@@ -1814,6 +1817,7 @@
 
   // The head: a long armoured skull with swept horns, a slit eye under a heavy brow, a lure on a
   // filament over the snout, gill slits that flare, and a jaw full of needles.
+  const ROLL_T = 0.18; // (seconds for the head to roll over: see drawHead)
   function drawHead(ctx, b) {
     const P = palNow(), pr = proj(b.x, b.y - HH, b.z), fog = G.clamp((b.z - 0.06) * 0.85, 0, 0.78), lit = 1 - fog;
     const C = (h) => shade(h, P, fog);
@@ -1828,7 +1832,14 @@
     K.recoil(ctx, b);
     ctx.scale(pr.s * HS, pr.s * HS);
     ctx.rotate(b.ang);
-    if (Math.cos(b.ang) < 0) ctx.scale(1, -1);
+    // as the head passes upright it rolls over onto its other side: over a few frames, narrowing
+    // through the roll, never in one frame (the lure swings round rather than jumping)
+    const side = Math.cos(b.ang) < 0 ? -1 : 1;
+    if (b.rollT == null || G.t < b.rollT) { b.rollT = G.t; b.roll = side; }
+    const step = G.clamp(G.t - b.rollT, 0, 0.05) * 2 / ROLL_T;
+    b.roll += G.clamp(side - b.roll, -step, step); b.rollT = G.t;
+    const rs = (b.roll + 1) / 2, re = rs * rs * (3 - 2 * rs) * 2 - 1;
+    ctx.scale(1, Math.abs(re) < 0.2 ? 0.2 * (re < 0 ? -1 : 1) : re);
     ctx.lineJoin = 'round'; ctx.lineCap = 'round';
     const poly = (a) => { ctx.beginPath(); for (let i = 0; i < a.length; i += 2) { if (i) ctx.lineTo(a[i], a[i + 1]); else ctx.moveTo(a[i], a[i + 1]); } ctx.closePath(); };
     const ja = b.jaw * 0.55;
