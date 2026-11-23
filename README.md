@@ -2,7 +2,7 @@
 
 A side-on boss rush for the browser: four heroes, four three-phase bosses, played as a run of
 ever-harder trials. You pick a hero and a relic before the run and win a boon after each victory.
-Version 1.9d.
+Version 2.0a.
 
 This is an early slice of a planned boss-rush roguelite (short runs, a boon after each boss,
 bosses drawn from a pool). A run meets the four bosses in a shuffled order, then meets them again, harder.
@@ -112,6 +112,35 @@ hero (`tools/feel-check.js`).
 - Settings, Reset progress erases Sunshards, upgrades, trophies and records (it has to be chosen twice).
 
 Not done: touch controls, a colour-blind alternative to red-orange warnings, gamepad rebinding.
+
+## Two new moves for every boss (v2.0a)
+
+Every boss has two new attacks in all three of its phases, so a phase I fight has more to read and the
+moves you learn early carry on to the end. Each has two forms told by the body, grows in phase II, and
+pushes harder in phase III; in phases I and II they are about as hard as the boss's other attacks.
+
+| Boss | Move | The tell | What later phases add |
+|---|---|---|---|
+| Cinder Wolf | Prowl: a feint dart | One forepaw scrape: a low dart through you (jump or dash). Two: it stops short, leaps over you and bites back from behind | II: the ground it starts from burns. III: it darts back across, faster |
+| | Shake: embers flung off its mane | Whole body shaking, tail whipping: embers land far out, stand close. Head and shoulders only: they land around it, get away | II: where they land burns. III: two shakes, the second the other form |
+| Drowned Leviathan | Breaker: a wave across the shore | The sea drawn far back: a tall breaker, dash through it. A short draw: a low swell, jump it | II: a second wave from the other wall. III: three, each with its own draw |
+| | Jet: a sweeping jet of brine | Head reared: down from the sky to the far wall, then in along the floor (get under its chin). Head low: a swell along the floor (jump), then a level jet over your head (stay down) | II: the jet pans back out. III: spouts where it strikes |
+| Silent Veil | Stance: blades sheathed, still | Strike it and it catches the blow, vanishes and cuts through you (step off the line). Wait: a low grip lunges low (jump), a high grip crosses at leaping height (stay down) | II: a shadow takes the stance on your other side. III: a second draw back the other way |
+| | Crescent: a blade that flies out and comes back | Overhand: out high, back low (jump on the return). Sidearm: out low, back high | II: a shadow throws a mirrored one. III: it catches and throws again at once |
+| Unburied Knight | Heel: a cut behind it | It glances over its shoulder. Blade low: a sweep along the floor (jump). Blade on the shoulder: a backhand at chest height (stay down). It comes on its own if you stay at its back | II: its ghost repeats it. III: straight into an overhead |
+| | Thrust: a lunging stab, point first | Drawn back at the hip: low (jump). At the shoulder: high (stay down, or dash through) | II: a ghostly lance flies on to the wall. III: two thrusts, read the re-draw |
+| Threefold Magus | Nova: the answer to a hero at its side | Staff low, frost creeping: a ring of frost runs both ways (jump). Staff raised, spinning: a tall lightning dome (get out sideways) | II: one of each. III: the second follows almost at once |
+| | Serpent: fire that slithers after you | One slow turn of the staff: one long serpent. Quick circles: two short fast ones. Jump them or cut them | II: burning ground behind. III: the long one splits, the brood is three |
+| Eclipsed Warden | Flare: a lash of fire from the core | The corona bulges low: the lash runs along the floor (jump). High: it hangs over you and cracks down (step out once it locks) | II: both sides. III: a second rake, or a wave and burning floor |
+| | Sunspot: dark orbs torn off the core | Spots scattered: several light orbs dive on marks (keep moving). Gathered into one: one heavy orb bursts for 2 (walk clear or dash through) | III: every orb bounces once |
+
+The Warden's two come from the core, since it crushes its own hands in phase III. Every new move moves
+like the boss it belongs to and has its own way back to rest; each has its own sounds.
+
+Measured: `tools/boss-tests.js` (seed 1, Vesper) loses 8 over 356 runs, the same 8 in the same old attacks
+as before, and 0 in the new moves; `tools/dodge-tests.js` passes all 89 (37 of them new, for Flare and
+Sunspot). `tools/motion-check.js` flags 8 frames in the new moves, all of kinds the old attacks show too
+(an orb bursting, a blink, a staff stopped dead in the floor, a dive under the water).
 
 ## The Wolf fights like an animal (v1.9d)
 

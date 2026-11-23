@@ -308,6 +308,84 @@
     }));
   }
 
+  // ---- the core's own two (v2.0a): the Flare and the Sunspot, in every phase
+  const flareOf = () => G.hazards.list.find((h) => h.kind === 'flare' && !h.dead);
+  // Jump a lash's tip as it rakes the floor toward the hero (or slaps down right beside them), and any
+  // ground wave; step out from under a lash that has locked overhead, toward the middle.
+  function flarePolicy(t, st) {
+    const f = flareOf(), m = mark();
+    if (m && m.locked && f && f.high && st.from !== m) {
+      st.from = m;
+      const away = m.x < 640 ? 1 : -1;
+      st.goal = G.clamp(m.x + away * 125, 80, 1200);
+    }
+    if (st.goal != null) {
+      if (Math.abs(P.x - st.goal) < 8) { st.goal = null; hold(0, 0); } else hold(P.x > st.goal, P.x < st.goal);
+    } else hold(0, 0);
+    let go = false;
+    if (f && !f.high) {
+      const d = f.dir || f.side;
+      if (f.crest) go = Math.abs(f.crestX - P.x) < 85 && Math.sign(P.x - f.crestX) === d;
+      else go = Math.abs(P.x - (B.core.x + f.side * 52)) < 70;
+    }
+    if (G.hazards.list.find((h) => h.kind === 'wave' && Math.abs(h.x - P.x) < 80 && Math.sign(P.x - h.x) === h.dir)) go = true;
+    if (go && P.onGround) jump();
+    if (!go && P.onGround) I.down.jump = false;
+  }
+  const forms = [['plain', 'low'], ['high', 'high'], ['high2', 'low, then high'], ['high,high2', 'high, then high']];
+  for (const [ph, px] of [[1, 900], [1, 360], [1, 700], [2, 900], [3, 900], [3, 300]]) {
+    for (const [v, what] of (ph === 1 ? forms.slice(0, 2) : forms)) {
+      G.debug.variant = v;
+      out.push(run('flare (' + (ph === 1 ? what.split(',')[0] : what) + '): jump the raking tip, step out from under, phase ' + ph + ' from x=' + px, ph, 'flare', px, flarePolicy));
+    }
+  }
+  // Where the sunspots will land: each marked spot, and the burst still going off.
+  function spotXs() { return G.hazards.list.filter((h) => h.kind === 'spot' && !h.dead && h.mk > 0 && h.st !== 'drift').map((h) => h.st === 'boom' ? h.x : h.mx); }
+  const heavySpot = () => G.hazards.list.find((h) => h.kind === 'spot' && !h.dead && h.heavy);
+  for (const ph of [1, 2, 3]) {
+    for (const px of [900, 300]) {
+      G.debug.variant = 'plain';
+      // (not in phase III: there the bounces crowd a hero who stops, and the answer is to keep going)
+      if (ph < 3) out.push(run('sunspot (scattered): walk off each mark, phase ' + ph + ' from x=' + px, ph, 'sunspot', px, (t, st) => {
+        // (out toward the middle rather than into a corner, and never across a mark that has locked)
+        const locked = G.hazards.list.filter((h) => h.kind === 'spot' && !h.dead && (h.st === 'lock' || h.st === 'dive')).map((h) => h.mx);
+        stepClear(st, spotXs(), 60, 1220, 82, 640, locked);
+      }));
+      // or never stop: each mark follows the hero but locks a moment before it falls, so a hero who keeps
+      // walking is always past it (and past its bounce, which carries on the way it fell). At a wall, wait
+      // for the marks already locked behind you to fall (or go at once if one is locked on you), then
+      // dash back through
+      out.push(run('sunspot (scattered): keep walking, at a wall let the marks behind fall, phase ' + ph + ' from x=' + px, ph, 'sunspot', px, (t, st) => {
+        if (!st.dir) st.dir = P.x < 640 ? 1 : -1;
+        if ((P.x < 150 && st.dir < 0) || (P.x > 1130 && st.dir > 0)) {
+          const back = -st.dir, sp = G.hazards.list.filter((h) => h.kind === 'spot' && !h.dead);
+          const blocked = sp.some((h) => ['lock', 'dive', 'boom', 'hop'].includes(h.st) && (h.mx - P.x) * back > -40 && Math.abs(h.mx - P.x) < 260);
+          const onMe = sp.some((h) => (h.st === 'lock' || h.st === 'dive') && Math.abs(h.mx - P.x) < 90);
+          if (blocked && !onMe) { hold(0, 0); return; }
+          st.dir = back; I.pressed.dash = true;
+        }
+        hold(st.dir < 0, st.dir > 0);
+      }));
+      G.debug.variant = 'gathered';
+      // once its mark locks, walk well clear of it, toward the middle; then clear of its bounce
+      out.push(run('sunspot (gathered): walk well clear once the mark locks, phase ' + ph + ' from x=' + px, ph, 'sunspot', px, (t, st) => {
+        const h = heavySpot();
+        if (h && h.locked && h.st !== 'hop' && st.from !== h) { st.from = h; st.goal = G.clamp(h.mx + (h.mx < 640 ? 1 : -1) * 175, 70, 1210); }
+        if (h && h.st === 'hop' && st.hop !== h) { st.hop = h; st.goal = Math.abs(P.x - h.mx) > 120 ? null : G.clamp(h.mx + (G.sign(P.x - h.mx) || 1) * 140, 70, 1210); }
+        if (st.goal != null && Math.abs(P.x - st.goal) > 8) hold(P.x > st.goal, P.x < st.goal); else { st.goal = null; hold(0, 0); }
+      }));
+    }
+    G.debug.variant = 'gathered';
+    out.push(run('sunspot (gathered): dash through the burst as it lands, phase ' + ph, ph, 'sunspot', 640, (t, st) => {
+      const h = heavySpot();
+      if (h && h.st === 'dive' && h.e > h.diveT - 0.05 && P.dashCd <= 0 && P.dashT <= 0) { st.dir = h.mx < 640 ? 1 : -1; hold(st.dir < 0, st.dir > 0); I.pressed.dash = true; }
+      else if (P.dashT <= 0) hold(0, 0);
+      // (the bounce in phase III: then it is a mark to walk off)
+      if (h && h.st === 'hop') stepClear(st, spotXs(), 60, 1220, 110);
+    }));
+  }
+  G.debug.variant = 'plain';
+
   // ---- the corrupted Warden's own two (corrupt.js; forced on here)
   G.debug.corrupt = true;
   const prints = () => G.hazards.list.filter((h) => h.kind === 'afterhand');

@@ -65,6 +65,34 @@
   AU.define('gulp', () => { S.tone({ type: 'sine', f0: 170, f1: 66, dur: 0.18, vol: 0.26 }); S.noise({ dur: 0.12, vol: 0.12, type: 'lowpass', f0: 620, f1: 200 }); });
   AU.define('thunder', () => { S.noise({ dur: 2.4, vol: 0.26, type: 'lowpass', f0: 520, f1: 55, attack: 0.05 }); S.tone({ type: 'sine', f0: 48, f1: 28, dur: 1.8, vol: 0.2 }); });
   AU.define('drain', () => { S.noise({ dur: 1.8, vol: 0.24, f0: 1300, f1: 180, q: 1.3, attack: 0.3 }); S.tone({ type: 'sine', f0: 44, f1: 30, dur: 1.8, vol: 0.18, attack: 0.3 }); });
+  // the sea drawn back off the shore: a long hiss falling away, the deep under it
+  AU.define('ebb', (o) => {
+    const d = (o && o.dur) || 1;
+    S.noise({ dur: d, vol: 0.2, f0: 2400, f1: 260, q: 0.9, attack: d * 0.3 });
+    S.noise({ dur: d * 0.9, vol: 0.08, type: 'highpass', f0: 4600, attack: d * 0.4 });
+    S.tone({ type: 'sine', f0: 66, f1: 38, dur: d, vol: 0.14, attack: d * 0.3 });
+  });
+  // a wave rolling in: a long roar that swells and breaks
+  AU.define('surf', (o) => {
+    const v = (o && o.vol) || 1;
+    S.noise({ dur: 1.5, vol: 0.34 * v, type: 'lowpass', f0: 1500, f1: 200, attack: 0.18 });
+    S.noise({ dur: 1.0, vol: 0.12 * v, type: 'highpass', f0: 2600, attack: 0.15 });
+    S.tone({ type: 'sine', f0: 58, f1: 32, dur: 1.2, vol: 0.28 * v, attack: 0.1 });
+  });
+  // water forced up its throat under pressure: a gurgle that climbs and tightens
+  AU.define('swell', (o) => {
+    const d = (o && o.dur) || 0.8;
+    S.tone({ type: 'sine', f0: 80, f1: 190, dur: d, vol: 0.2, attack: d * 0.5 });
+    S.noise({ dur: d, vol: 0.14, type: 'lowpass', f0: 300, f1: 900, attack: d * 0.4 });
+    for (let i = 0; i < 4; i++) S.tone({ f0: 260 + i * 70, f1: 520 + i * 90, dur: 0.05, vol: 0.05, delay: d * (0.2 + i * 0.18) });
+  });
+  // the jet itself: a hard, steady rush of water
+  AU.define('jet', (o) => {
+    const d = (o && o.dur) || 0.8;
+    S.noise({ dur: d, vol: 0.32, f0: 700, f1: 1200, q: 0.6, attack: 0.03 });
+    S.noise({ dur: d, vol: 0.12, type: 'highpass', f0: 3400, attack: 0.03 });
+    S.tone({ type: 'sawtooth', f0: 52, f1: 44, dur: d, vol: 0.1, attack: 0.04 });
+  });
   AU.vary.splash = 2; AU.vary.bubble = 3; AU.vary.bite = 1.5; AU.vary.spout = 1.5;
 
   // ------------------------------------------------------------------ the arena
@@ -181,15 +209,17 @@
       'In high water the floor drags at your legs. A dash is still a dash, and the wreckage is dry.',
       'If the spines on its coil stand up and rattle, the coil comes back off the far wall.',
       'In the maelstrom the current drags you towards the eye. Count how often its fin circles: twice round, and it comes up twice.',
+      'Watch how far the sea draws back before a wave. Far out, the bed laid bare: a breaker too tall to jump, so dash through it. Only a little: a low swell to jump.',
+      'Jaws clamped and gills flared, it is about to spit a jet. Head up high: the jet comes down from the sky to the floor, so get in under its chin. Head down by the floor: a swell runs along the floor, then the jet follows over your head, so jump the first and stay down for the second.',
     ],
     hudCols: [null, ['#3ad6c0', '#cffff6'], ['#ffb44a', '#ffe8c4'], ['#a896ff', '#ece6ff']],
     BASE_HP: 2900, poise0: 400, w: 128, h: 80,
     answer: 'volley',
     gaps: [0, 0.95, 0.8, 0.65],
     bags: {
-      1: ['lunge', 'snap', 'slam', 'spouts', 'snap', 'volley'],
-      2: ['lunge', 'snap', 'slam', 'spouts', 'sweep', 'volley', 'snap'],
-      3: ['lunge', 'snap', 'slam', 'spouts', 'sweep', 'maw', 'volley', 'maw'],
+      1: ['lunge', 'snap', 'slam', 'spouts', 'snap', 'volley', 'breaker', 'jet'],
+      2: ['lunge', 'snap', 'slam', 'spouts', 'sweep', 'volley', 'snap', 'breaker', 'jet'],
+      3: ['lunge', 'snap', 'slam', 'spouts', 'sweep', 'maw', 'volley', 'maw', 'breaker', 'jet'],
     },
     cards: { 2: ['HIGH WATER', 'The sea comes in'], 3: ['MAELSTROM', 'All of it goes down'] },
     first: { 1: 'lunge', 2: 'sweep', 3: 'maw' },
@@ -212,6 +242,7 @@
     B.wave = null; B.wash = 0; B.bolt = null; B.boltT = 5; B.calm = 0; B.shadow = null; B.wall = null; B.finCircle = null;
     B.lastPX = G.player.x; B.front = null; B.circling = 0; B.pullK = 1;
     B.vh = null; B.under = null; b.voidEye = 0; b.voidEyeT = 0; b.voidThroat = 0;
+    B.ebb = { z: 0, to: 0, sea: SEA1, hold: false };
   };
 
   B.kiting = (P, b) => !!P.plat || Math.abs(P.x - b.x) > 430 || (!P.onGround && P.y < FLOOR - 150 && Math.abs(P.x - b.x) > 160);
@@ -219,11 +250,11 @@
     const b = B.body;
     b.hurt = false; b.coil = 0; b.chatter = 0; b.fin = 0; b.throatT = 0; b.fast = false; b.direct = false;
     if (B.tail.on && B.tail.pose !== 'under') { B.tail.pose = 'under'; B.tail.rate = 3; }
-    B.finCircle = null; B.pullK = 1;
+    B.finCircle = null; B.pullK = 1; B.ebb.hold = false;
     letGoVoid();
   };
   B.onInterrupt = function () {
-    B.finCircle = null; B.tail.pose = 'under'; B.tail.rate = 3;
+    B.finCircle = null; B.tail.pose = 'under'; B.tail.rate = 3; B.ebb.hold = false;
     // (the hazards were just cleared: the hydra's crack is put back to seal itself, not cut off)
     if (B.vh) { const c = voidCrack(B.vh.root, 0.01); c.t = 0.01; c.closing = true; c.holds = B.vh; }
     letGoVoid();
@@ -439,6 +470,106 @@
         }
         drawColumn(ctx, this.x, this.w * 2, this.t, this.tele, this.active);
       },
+    });
+  }
+
+  // A wave rolling along the shore (dir +1: to the right). Tall, a breaker over the head of anyone on the
+  // floor or the wreckage, to be dashed through; low, a swell to jump. It is drawn over the platforms
+  // (B.drawOver), breaks on the far wall, and leaves foam behind it.
+  function roller(x0, dir, tall, speed) {
+    const hgt = tall ? 400 : 52, back = tall ? 96 : 66;
+    return H.add({
+      kind: tall ? 'breaker' : 'wave', roller: true, tall, x: x0, x0, dir, speed, hgt, layer: 'none', srcX: x0, rise: 0, crash: 0,
+      update(dt) {
+        this.rise = Math.min(1, this.t / (tall ? 0.45 : 0.3));
+        if (!this.crash) {
+          this.x += this.dir * this.speed * G.lerp(0.5, 1, this.rise) * dt;
+          const lipY = FLOOR - this.hgt * this.rise * 0.88;
+          if (Math.random() < dt * (tall ? 80 : 34)) G.fx.spawn({ kind: 'spark', x: this.x + this.dir * G.rand(0, tall ? 46 : 12), y: lipY + G.rand(-10, 10), vx: this.dir * G.rand(80, 320), vy: -G.rand(60, tall ? 380 : 200), life: G.rand(0.4, 0.8), size: G.rand(1.4, 2.8), color: WATER, grav: 1200, a: 0.55 });
+          if (Math.random() < dt * 26) G.fx.spawn({ x: this.x - this.dir * G.rand(20, back + 160), y: FLOOR - G.rand(1, 6), vx: this.dir * G.rand(20, 90), vy: 0, life: G.rand(0.5, 1), size: G.rand(2, 4), color: WATER, a: 0.32 });
+          if (tall && Math.random() < dt * 8) G.fx.shake(2);
+          // it breaks on the far wall
+          if ((this.dir > 0 && this.x > WR - 8) || (this.dir < 0 && this.x < WL + 8)) {
+            this.crash = 0.001;
+            G.audio.play('splash'); if (tall) G.audio.play('slam');
+            G.fx.shake(tall ? 14 : 6); G.fx.kick(this.dir * (tall ? 5 : 2), 0);
+            for (let i = 0; i < (tall ? 5 : 2); i++) splash(this.x - this.dir * 10, FLOOR - 10 - i * (tall ? 70 : 20), tall ? 1.3 : 0.7, -this.dir);
+            if (tall) G.fx.ripple(this.x, FLOOR - 160, 260, 0.4, 1);
+          }
+        } else {
+          this.crash += dt * (tall ? 1.6 : 2.6);
+          if (this.crash >= 1) this.dead = true;
+        }
+        this.srcX = this.x - this.dir * 40;
+      },
+      hits(P) {
+        if (this.crash || this.rise < 0.45) return false;
+        const b = P.box(), a = this.x - this.dir * back, c = this.x + this.dir * 12;
+        return b.cx + b.hw > Math.min(a, c) && b.cx - b.hw < Math.max(a, c) && b.cy + b.hh > FLOOR - this.hgt * this.rise * (tall ? 1 : 0.85);
+      },
+      // (the breaker, for the scripted dodger: the ground just ahead of it is unsafe, so it gets behind it)
+      danger(P) {
+        if (!tall || this.crash) return null;
+        const ahead = (P.x - this.x) * this.dir;
+        if (ahead < -back - 10 || ahead > 640) return null;
+        const a = this.x - this.dir * back, c = this.x + this.dir * 640;
+        return [(a + c) / 2, (back + 640) / 2 + 6, Math.max(0, ahead) / this.speed];
+      },
+    });
+  }
+
+  // A jet of brine from its jaws. The attack sets where it comes from and where it points (ox, oy, ang)
+  // every frame, from the head, so the jet goes where the head goes. front: how far the water has got.
+  function jet() {
+    return H.add({
+      kind: 'jet', ox: 0, oy: 0, ang: 0, ex: 0, ey: 0, width: 30, front: 3000, on: false, k: 0, warn: 0, layer: 'under',
+      srcX: 0, xc: null, vc: 0, done: false, len: 0,
+      col() { return G.corrupt.active() ? BLOOD : WATER; },
+      update(dt) {
+        this.k = G.damp(this.k, this.on ? 1 : 0, this.on ? 24 : 10, dt);
+        const c = Math.cos(this.ang), s = Math.sin(this.ang);
+        let len = this.front;
+        this.grounded = false;
+        if (s > 0.02) { const Lf = (FLOOR - this.oy) / s; if (Lf < len) { len = Lf; this.grounded = true; } }
+        this.walled = false;
+        const Lw = c > 0.02 ? (WR - this.ox) / c : c < -0.02 ? (WL - this.ox) / c : 1e9;
+        if (Lw < len) { len = Lw; this.walled = true; this.grounded = false; }
+        len = Math.max(0, len);
+        if (this.on) { this.lenOn = len; this.wasOn = true; } else if (this.wasOn) len = Math.min(len, this.lenOn);
+        this.len = len;
+        this.ex = this.ox + c * len; this.ey = this.oy + s * len; this.srcX = this.ox;
+        // where it crosses a standing hero's middle, and how fast that point moves (for the dodger)
+        const u = Math.abs(s) > 1e-3 ? (FLOOR - 22 - this.oy) / s : -1;
+        const xc = u > 0 && u <= len ? this.ox + c * u : null;
+        if (xc != null && this.xc != null && this.on) this.vc = G.damp(this.vc, (xc - this.xc) / Math.max(dt, 1e-4), 25, dt);
+        else if (xc == null) this.vc = 0;
+        this.xc = xc;
+        if (this.on && this.k > 0.5) {
+          const col = this.col();
+          if ((this.grounded || this.walled) && Math.random() < dt * 60) G.fx.spawn({ kind: 'spark', x: this.ex, y: this.ey - 4, vx: (this.grounded ? c * G.rand(60, 300) : -c * G.rand(40, 200)) + G.rand(-120, 120), vy: -G.rand(160, 520), life: G.rand(0.35, 0.7), size: G.rand(1.6, 3), color: col, grav: 1300, a: 0.6 });
+          if (this.grounded && (this.sx == null || Math.abs(this.ex - this.sx) > 46)) { this.sx = this.ex; G.fx.dust(this.ex, FLOOR, 1, { speed: [20, 90], size: [6, 12], life: [0.4, 0.8], up: 60, a: 0.22, color: '150,190,200' }); }
+          if (Math.random() < dt * 30) { const q = Math.random(); G.fx.spawn({ kind: 'spark', x: G.lerp(this.ox, this.ex, q), y: G.lerp(this.oy, this.ey, q), vx: c * 200 + G.rand(-40, 40), vy: s * 200 + G.rand(-60, 30), life: G.rand(0.2, 0.4), size: G.rand(1.2, 2), color: col, grav: 900, a: 0.45 }); }
+        }
+        if (this.done && this.k < 0.02) this.dead = true;
+      },
+      hits(P) { return this.on && this.k > 0.6 && this.len > 4 && G.distPointSeg(P.x, P.y - 22, this.ox, this.oy, this.ex, this.ey) < this.width / 2 + 9; },
+      danger(P) {
+        if (!this.on || this.xc == null) return null;
+        const hw = this.width / 2 + 22;
+        // (the first moment it crosses, before its speed is known, the attack's word for which way it goes)
+        let v = this.vc;
+        if (this.sd && this.stop != null) {
+          // all the ground between it and where the attack will stop it is still to be crossed
+          const a = this.xc, c = this.stop;
+          if ((c - a) * this.sd <= 0) return [a, hw, 0];
+          return [(a + c) / 2, Math.abs(c - a) / 2 + hw, Math.max(0, (P.x - a) * this.sd) / Math.max(Math.abs(v), 600)];
+        }
+        if (Math.abs(v) < 60) return [this.xc, hw, 0];
+        // sweeping: the ground it has yet to cross is what is unsafe
+        const sd = Math.sign(v), reach = G.clamp(Math.abs(v) * 0.5, 80, 640);
+        return [this.xc + sd * reach / 2, reach / 2 + hw, Math.max(0, (P.x - this.xc) * sd) / Math.abs(v)];
+      },
+      draw(ctx) { drawJet(ctx, this); },
     });
   }
 
@@ -1060,6 +1191,251 @@
     V.tx = G.rpick([430, 640, 850].filter((v) => Math.abs(v - V.x) > 60));
   }
 
+  // Breaker: it goes out to sea and draws the water back off the shore, then sends it in again as a wave
+  // from one wall to the other. The tell is how far the sea draws back. Far, the bed laid bare out to
+  // where the water stands and a long hiss, while it rears tall and leans back with it: a breaker too
+  // tall to jump, so dash through its face. Only a little, a short dip: a low swell to jump.
+  //   II: a second wave from the other side, close behind the first. III: three, each told by its own draw.
+  function* atkBreaker() {
+    const b = B.body, P = G.player, T = K.T(), eb = B.ebb, n = B.phase;
+    let from = P.x < 640 ? 1 : -1; // (the first comes in from the far side)
+    yield* sinkAway(0.42);
+    let w = null;
+    for (let i = 0; i < n; i++) {
+      const tall = K.chance(0.5, 'tall');
+      const hx = 640 + from * 760, z = 0.5;
+      if (i) yield* wait(0.25); // (under the water, round to the other side)
+      // up out of the sea, far out on that side
+      b.direct = true; b.x = hx; b.z = z; b.y = B.sea.y + 170; b.ang = b.ta = -Math.PI / 2 - from * 0.35;
+      splashAt(hx, z, 1.4); G.audio.play('splash', { vol: 0.6 });
+      const top = B.sea.y - (tall ? 330 : 170);
+      yield* tween(b, { y: top }, 0.32, E.outCubic);
+      // it draws the sea back after it, leaning back as it does
+      const draw = (tall ? (i ? 0.85 : 1.0) : (i ? 0.55 : 0.62)) * T;
+      eb.hold = true; eb.to = tall ? 0.62 : 0.13;
+      eb.sea = (B.sea.to < FLOOR ? FLOOR : SEA1) + (tall ? 70 : 24);
+      b.throatT = tall ? 1 : 0.45; b.jawT = tall ? 0.55 : 0.25;
+      G.audio.play('ebb', { dur: draw }); if (tall) G.audio.play('hiss');
+      const a0 = b.ang, a1 = -Math.PI / 2 + from * (tall ? 0.42 : 0.12);
+      let e = 0;
+      while (e < draw) {
+        const dt = yield;
+        e += dt;
+        const k = Math.min(1, e / draw), q = E.inOutQuad(k);
+        b.ang = G.lerp(a0, a1, q) + Math.sin(e * 9) * 0.025 * k;
+        b.y = top - (tall ? 44 : 14) * q + Math.sin(e * 5) * 3;
+        b.gill = Math.max(b.gill, 0.6 * k);
+      }
+      // (the wave before must be well on its way first: held there, straining)
+      const frac = B.phase === 3 ? 0.68 : 0.8;
+      while (w && !w.dead && Math.abs(w.x - w.x0) < frac * (WR - WL)) {
+        const dt = yield;
+        e += dt;
+        b.ang = a1 + Math.sin(e * 23) * 0.02; b.y = top - (tall ? 44 : 14) + Math.sin(e * 31) * 2;
+      }
+      // and heaves forward and down into the water: the sea comes back in as a wave
+      b.throatT = 0; b.jawT = 0;
+      const a2 = -Math.PI / 2 - from * 1.15, y0 = b.y;
+      G.audio.play('lunge');
+      e = 0;
+      while (e < 0.28) {
+        e += yield;
+        const k = Math.min(1, e / 0.28);
+        b.ang = G.lerp(a1, a2, E.inQuad(k)); b.y = G.lerp(y0, B.sea.y + 150, E.inQuad(k)); b.x = hx - from * 70 * k;
+      }
+      eb.hold = false;
+      splashAt(b.x, z, 2.4); G.fx.shake(tall ? 12 : 7); G.audio.play('surf', { vol: tall ? 1 : 0.6 });
+      if (tall) { const q = proj(b.x, B.sea.y, z); G.fx.ripple(q.x, q.y, 300, 0.4, 1); }
+      w = roller(from > 0 ? WR + 40 : WL - 40, -from, tall, tall ? 540 : 500);
+      w.from = from;
+      from = -from;
+    }
+    // it comes in behind the last of them, onto the shore by the hero, and lies there
+    let e = 0;
+    while (!w.dead && e < 3.5 && (P.x - w.x) * w.dir > -70) e += yield;
+    const f = w.from;
+    yield* breach(G.clamp(P.x + f * 210, WL + 120, WR - 120), -f);
+    b.exposed = true;
+    yield* wait(B.phase === 3 ? 0.9 : 1.05);
+    b.exposed = false;
+  }
+
+  // Jet: it clamps its jaws on a throat full of water, gills flared and spurting at the corners, and spits
+  // it out as a jet that its head carries. The tell is where its head is while it swells.
+  //   Reared up high, snout to the sky: the jet comes down out of the sky to the floor in front of it and
+  //   ends short of its chin. Get in under its chin, or behind it, or dash through the jet as it comes.
+  //   Head down by the floor: the jet is driven into the floor and a swell runs out along it (jump), then
+  //   its head comes up level and the jet follows the swell out over a standing head (stay down).
+  //   II: the high jet pans back up again; the low one sends a second swell after the level jet.
+  //   III: the high one leaves a geyser where it struck the floor; under the level jet the floor boils
+  //   up beneath the hero, so walk out of it.
+  function aimJet(J, b, flat) {
+    const m = mouth(b);
+    J.ox = m.x; J.oy = m.y;
+    let a = b.ang;
+    if (flat) {
+      // the level jet never dips into a standing hero
+      const f = Math.cos(a) >= 0 ? 1 : -1;
+      let tilt = f > 0 ? a : Math.PI - a;
+      tilt = Math.atan2(Math.sin(tilt), Math.cos(tilt));
+      a = aim(f, Math.min(tilt, -0.02));
+    }
+    J.ang = a;
+  }
+  function openJet(J, b, f, dur) {
+    J.on = true; b.throatT = 0; b.throat = 0.7; b.jawT = 0.32; b.fast = true;
+    G.audio.play('jet', { dur }); G.audio.play('splash', { vol: 0.5 });
+    G.fx.kick(-f * 4, 0); G.fx.shake(7); G.fx.punch(0.01);
+    const m = mouth(b); G.fx.ripple(m.x, m.y, 150, 0.25, 0.6);
+  }
+  // pushed back on its neck by the force of it, and shuddering
+  function bear(b, f, hx, dt, push) {
+    b.tx = hx - f * push;
+    b.va += G.rand(-1, 1) * 50 * dt; b.vy += G.rand(-1, 1) * 1400 * dt;
+    if (Math.random() < dt * 8) G.fx.shake(2);
+  }
+  function* jetHigh(J, b, f, hx, T) {
+    const END = 1.0, far = f > 0 ? WR - 6 : WL + 6, HY = FLOOR - 22;
+    // the tilt that puts the jet through a standing hero's middle at x, from where its jaws are now
+    const tiltTo = (x) => { const m = mouth(b); return Math.atan2(HY - m.y, Math.max(30, (x - m.x) * f)); };
+    // where the jet will cross a standing hero when the head is bowed all the way (END), short of its chin
+    const stopAt = () => { const oy = b.ty - HH + 4 + Math.sin(END) * 96 * HS, ox = b.tx + f * Math.cos(END) * 96 * HS; return ox + f * (HY - oy) / Math.tan(END); };
+    let tt = 0; // (time since it opened, for the bob of its head)
+    const step = (dt, tilt, push) => {
+      tt += dt;
+      b.ta = aim(f, tilt);
+      b.ty = FLOOR - 280 + 24 * Math.sin(Math.min(1, tt / 1.1) * Math.PI);
+      bear(b, f, hx, dt, push);
+      aimJet(J, b);
+    };
+    openJet(J, b, f, B.phase >= 2 ? 2.4 : 1.4);
+    // down out of the sky (over everyone's head) until it meets the far wall at a standing height...
+    let e = 0;
+    J.sd = -f; J.stop = stopAt();
+    while (e < 0.32) {
+      const dt = yield;
+      e += dt;
+      step(dt, G.lerp(-0.98, tiltTo(far), E.inQuad(Math.min(1, e / 0.32))), 26 + 30 * Math.min(1, e / 0.2));
+      J.stop = stopAt();
+    }
+    // ...then it rakes in along the floor towards its chin at a steady pace, slowing at the end
+    const s0 = stopAt(), rake = G.clamp(Math.abs(far - s0) / (K.gentle() ? 700 : 820), 0.4, 0.95);
+    e = 0;
+    while (e < rake) {
+      const dt = yield;
+      e += dt;
+      const k = Math.min(1, e / rake), x = G.lerp(far, s0, 0.75 * k + 0.25 * E.outQuad(k));
+      step(dt, Math.min(END, tiltTo(x)), 56);
+      J.stop = s0;
+    }
+    // (back up, from the second phase, it runs out to the wall)
+    if (B.phase >= 2) { J.sd = f; J.stop = f > 0 ? WR : WL; } else { J.sd = 0; J.stop = null; }
+    // (III) the floor where it struck boils up after it
+    if (B.phase === 3) spout(G.clamp(J.ex, WL + 60, WR - 60), 130, 0.62 * T);
+    e = 0;
+    const hold = B.phase >= 2 ? 0.3 : 0.14;
+    while (e < hold) { const dt = yield; e += dt; step(dt, END, 56); }
+    if (B.phase < 2) return;
+    // II: out along the floor again to the wall, and up off it
+    const s1 = J.xc == null ? s0 : J.xc, back = G.clamp(Math.abs(far - s1) / 900, 0.35, 0.8);
+    e = 0;
+    while (e < back) {
+      const dt = yield;
+      e += dt;
+      const k = Math.min(1, e / back);
+      step(dt, Math.min(END, tiltTo(G.lerp(s1, far, E.inQuad(k)))), 56);
+    }
+    const t1 = tiltTo(far);
+    e = 0;
+    while (e < 0.28) { const dt = yield; e += dt; step(dt, G.lerp(t1, -0.7, E.outQuad(Math.min(1, e / 0.28))), 50); }
+  }
+  function* jetLow(J, b, f, hx, T) {
+    const P = G.player;
+    const beats = B.phase >= 2 ? ['swell', 'level', 'swell'] : ['swell', 'level'];
+    for (let i = 0; i < beats.length; i++) {
+      let e = 0;
+      if (beats[i] === 'swell') {
+        if (i) {
+          // down again by the floor, throat filling
+          target(hx - f * 20, FLOOR - 26, 0, aim(f, 0.55)); b.fast = false; b.throatT = 0.8; G.audio.play('gulp');
+          while (e < 0.5 * T) { const dt = yield; e += dt; b.gill = Math.max(b.gill, 0.5 + 0.5 * Math.sin(e * 24)); aimJet(J, b); }
+          e = 0;
+        }
+        // into the floor under its chin: the water skids away along it
+        openJet(J, b, f, 0.42);
+        let sent = false;
+        while (e < 0.4) {
+          const dt = yield;
+          e += dt;
+          bear(b, f, hx, dt, 46); b.ty = FLOOR - 46; aimJet(J, b);
+          if (!sent && J.grounded) {
+            sent = true;
+            roller(G.clamp(J.ex, WL + 30, WR - 30), f, false, 520);
+            splash(J.ex, FLOOR - 6, 1.1); G.fx.thud(J.ex, FLOOR, 0.6, { noCrack: true });
+          }
+        }
+        if (!sent) roller(G.clamp(J.ex, WL + 30, WR - 30), f, false, 520);
+        J.on = false;
+      } else {
+        // its head jerks up level, a gulp, and the jet follows the swell out over a standing head
+        target(hx - f * 30, FLOOR - 64, 0, aim(f, -0.03)); b.fast = true; b.throat = 0.9; G.audio.play('gulp');
+        while (e < 0.38) { const dt = yield; e += dt; aimJet(J, b, true); }
+        J.front = 0; openJet(J, b, f, 2.6);
+        let boiled = B.phase < 3, past = 0;
+        while (past < 0.32) {
+          const dt = yield;
+          J.front += 520 * dt;
+          bear(b, f, hx, dt, 40); b.ty = FLOOR - 64; aimJet(J, b, true);
+          if (J.walled) past += dt;
+          if (!boiled && (P.x - J.ex) * f < 40) { boiled = true; spout(G.clamp(P.x + P.vx * 0.2, WL + 60, WR - 60), 110, 0.75 * T); }
+        }
+        J.on = false; J.front = 3000;
+      }
+    }
+  }
+  function* atkJet() {
+    const b = B.body, P = G.player, T = K.T();
+    const high = K.chance(0.5, 'high');
+    const hx = G.clamp(P.x - facePlayer() * (high ? 380 : 430), WL + 110, WR - 110);
+    const f = P.x >= hx ? 1 : -1;
+    yield* glide(hx, high ? FLOOR - 230 : FLOOR - 50, 0, aim(f, high ? -0.6 : 0.3), 0.8);
+    // the tell: the throat fills, the jaws clamp, the gills flare and water spurts at the corners
+    const J = jet();
+    const tele = (high ? 0.9 : 0.85) * T;
+    target(hx - f * 26, high ? FLOOR - 280 : FLOOR - 26, 0, aim(f, high ? -0.98 : 0.55));
+    // (its neck winds tighter as it fills: low, to brace against the floor)
+    b.throatT = 1; b.jawT = 0;
+    const coil0 = b.coil || 0, coil1 = high ? 0.2 : 0.7;
+    G.audio.play('swell', { dur: tele });
+    let e = 0;
+    while (e < tele) {
+      const dt = yield;
+      e += dt;
+      const k = Math.min(1, e / tele);
+      b.coil = G.lerp(coil0, coil1, E.outQuad(Math.min(1, k * 1.6)));
+      b.gill = Math.max(b.gill, 0.55 + 0.45 * Math.sin(e * 24));
+      b.va += G.rand(-1, 1) * 40 * k * dt;
+      if (Math.random() < dt * 18 * k) {
+        const m = mouth(b);
+        G.fx.spawn({ kind: 'spark', x: m.x - Math.cos(b.ang) * 40, y: m.y - Math.sin(b.ang) * 40 + 6, vx: G.rand(-60, 60) - f * 40, vy: G.rand(-140, -20), life: 0.5, size: 1.6, color: WATER, grav: 1300, a: 0.6 });
+      }
+      aimJet(J, b); J.warn = G.clamp((k - 0.5) / 0.5, 0, 1);
+    }
+    J.warn = 0;
+    if (high) yield* jetHigh(J, b, f, hx, T); else yield* jetLow(J, b, f, hx, T);
+    J.on = false; J.done = true;
+    b.fast = false; b.throatT = 0;
+    // spent: its head comes down onto the shore, water running from its jaws, and its neck unwinds
+    target(b.x, FLOOR - 12, 0, aim(f, 0.08)); b.jawT = 0.3;
+    const c0 = b.coil;
+    e = 0;
+    while (e < 0.3) { e += yield; b.coil = c0 * (1 - E.inOutQuad(Math.min(1, e / 0.3))); }
+    b.coil = 0;
+    b.exposed = true;
+    yield* wait(B.phase === 3 ? 0.8 : 0.95);
+    b.exposed = false;
+  }
+
   // ------------------------------------------------------------------ corrupted: its own two attacks
   // the ground a bite sweeps: from a little behind the head to where its jaws shut, at the height it strikes
   function aimFang(f, base, tip, dir, yb) {
@@ -1319,7 +1695,7 @@
     const b = B.body;
     if (B.dying || b.beached) return;
     b.direct = false; b.hurt = false; b.fast = false;
-    if (name === 'lunge' || name === 'spouts' || name === 'maw' || name === 'snap' || name === 'hydra' || name === 'undertow') {
+    if (name === 'lunge' || name === 'spouts' || name === 'maw' || name === 'snap' || name === 'hydra' || name === 'undertow' || name === 'breaker') {
       b.ty = FLOOR - 64; b.tz = 0; b.tx = b.x;
       yield* wait(0.12);
       b.va += b.face * 10; splash(b.x, level(0) - 6, 0.5); G.audio.play('splash', { vol: 0.4 });
@@ -1331,7 +1707,7 @@
       B.tail.pose = 'under'; B.tail.rate = 3;
       b.ty = FLOOR - 26;
       yield* wait(0.32);
-    } else if (name === 'volley') {
+    } else if (name === 'volley' || name === 'jet') {
       b.jawT = 0.35; b.ty = FLOOR - 60;
       for (let i = 0; i < 6; i++) { const m = mouth(b); G.fx.spawn({ kind: 'spark', x: m.x, y: m.y, vx: G.rand(-30, 30), vy: G.rand(20, 80), life: 0.7, size: 1.8, color: WATER, grav: 1200, a: 0.6 }); }
       yield* wait(0.3);
@@ -1342,7 +1718,7 @@
     yield* wait(0.12);
   };
 
-  B.ATTACKS = { lunge: atkLunge, snap: atkSnap, slam: atkSlam, spouts: atkSpouts, volley: atkVolley, sweep: atkSweep, maw: atkMaw, hydra: atkHydra, undertow: atkUndertow };
+  B.ATTACKS = { lunge: atkLunge, snap: atkSnap, slam: atkSlam, spouts: atkSpouts, volley: atkVolley, sweep: atkSweep, maw: atkMaw, breaker: atkBreaker, jet: atkJet, hydra: atkHydra, undertow: atkUndertow };
   // its corrupted self's own two (corrupt.js): the hydra in every phase, the undertow from the second
   B.corruptBags = { 1: ['hydra'], 2: ['hydra', 'undertow'], 3: ['hydra', 'undertow'] };
 
@@ -1353,7 +1729,7 @@
   B.onStagger = function () {
     const b = B.body;
     b.hurt = false; b.coil = 0; b.chatter = 0; b.fin = 0; b.throatT = 0; b.direct = true;
-    B.tail.pose = 'under'; B.tail.rate = 3; B.finCircle = null;
+    B.tail.pose = 'under'; B.tail.rate = 3; B.finCircle = null; B.ebb.hold = false;
   };
   B.dying0 = function () { B.body.beached = true; };
   // thrown up and down onto the shore, where it lies on its side, gasping
@@ -1560,7 +1936,9 @@
     b.hidden = b.z > 0.08 || b.y - HH * 0.6 > level(b.z);
 
     // ---- the sea, the maelstrom, the body
-    sea.y = G.damp(sea.y, sea.to, 1.4, dt);
+    const eb = B.ebb;
+    if (eb.hold) { sea.y = G.damp(sea.y, eb.sea, 3.2, dt); eb.z = G.damp(eb.z, eb.to, 3.6, dt); }
+    else { sea.y = G.damp(sea.y, sea.to, eb.z > 0.01 ? 3 : 1.4, dt); eb.z = G.damp(eb.z, 0, 4, dt); if (eb.z < 0.002) eb.z = 0; }
     if (B.dying || B.dead) { sea.to = SEA1; V.to = 0; }
     V.k = G.damp(V.k, V.to, 1.2, dt); V.x = G.damp(V.x, V.tx, 0.8, dt); V.spin += dt * (1 + 2.4 * V.k);
     if (B.wash > 0) B.wash = Math.max(0, B.wash - dt * 1.1);
@@ -1966,6 +2344,7 @@
       for (let k = 0; k < 5; k++) { ctx.globalAlpha = 0.25 + 0.15 * Math.sin(G.t * 3 + k); ctx.drawImage(G.fx.glow(P.boss), p.x - 200 * p.s + k * 90 * p.s - 4, p.y - 3, 8, 6); }
       ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
     }
+    drawEbb(ctx);
     // waves breaking on the causeway, while the sea is below it
     if (sea > FLOOR - 2 && sea < FLOOR + 50) {
       for (let j = 0; j < 2; j++) {
@@ -2165,6 +2544,140 @@
     ctx.stroke();
     if (Math.random() < 0.8) { const p = pts[(Math.random() * pts.length) | 0]; G.fx.spawn({ kind: 'spark', x: p.x, y: p.y, vx: G.rand(-60, 60), vy: -G.rand(60, 200), life: 0.6, size: 2, color: WATER, grav: 600, a: 0.5 }); }
   }
+  // the sea drawn back off the shore (the breaker's tell): the bed laid bare out to where the water stands
+  function drawEbb(ctx) {
+    const eb = B.ebb;
+    if (!eb || eb.z < 0.004) return;
+    const P = G.pal(), top = proj(640, FLOOR + 22, eb.z).y, bot = FLOOR + 1;
+    if (bot - top < 1) return;
+    const g = ctx.createLinearGradient(0, top, 0, bot);
+    g.addColorStop(0, 'rgba(5,9,11,0.9)'); g.addColorStop(1, 'rgba(12,20,22,0.96)');
+    ctx.fillStyle = g; ctx.fillRect(-80, top, G.W + 160, bot - top);
+    // rocks, weed and pools on the bed, wet along their tops
+    ctx.lineWidth = 1;
+    for (let i = 0; i < 36; i++) {
+      const z = 0.02 + ((i * 0.381) % 1) * 0.6;
+      if (z > eb.z - 0.01) continue;
+      const pool = i % 5 === 0, p = proj(((i * 277) % 1600) - 160, FLOOR + 22, z), r = (10 + (i % 4) * 7) * p.s;
+      ctx.fillStyle = pool ? 'rgba(22,38,42,0.9)' : 'rgba(2,5,6,0.88)';
+      ctx.beginPath(); ctx.ellipse(p.x, p.y, r * (pool ? 2.3 : 1), r * 0.38, 0, 0, G.TAU); ctx.fill();
+      ctx.strokeStyle = G.rgba(P.rim, pool ? 0.3 : 0.16);
+      ctx.beginPath(); ctx.ellipse(p.x, p.y - r * 0.08, r * (pool ? 2.3 : 1), r * 0.38, 0, Math.PI * 1.1, Math.PI * 1.9); ctx.stroke();
+    }
+    // water running off the bed after the sea
+    ctx.strokeStyle = G.rgba(WATER, 0.14);
+    for (let i = 0; i < 18; i++) {
+      const u = (G.t * 0.9 + i * 0.173) % 1, x = ((i * 191) % 1400) - 60, y = G.lerp(bot - 2, top + 2, u);
+      ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x, y - 4 - 8 * (1 - u)); ctx.stroke();
+    }
+    // the water's edge far out, foaming as it runs away
+    ctx.strokeStyle = G.rgba(WATER, 0.4); ctx.lineWidth = 2;
+    ctx.beginPath();
+    for (let x = -80; x <= G.W + 80; x += 16) {
+      const y = top + Math.sin(x * 0.02 + G.t * 3) * 1.6 + Math.sin(x * 0.051 - G.t * 4.4);
+      if (x === -80) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+  }
+  // a wave rolling along the shore: a body of dark water rising to a crest that runs ahead of its foot
+  function drawRoller(ctx, h) {
+    const vo = G.corrupt.active(), P = G.pal();
+    const k = E.outCubic(h.rise) * (h.crash ? 1 - E.inQuad(Math.min(1, h.crash)) : 1), Hc = h.hgt * k;
+    if (Hc < 2) return;
+    const d = h.dir, x = h.x, F = FLOOR + 3, L = h.tall ? 330 : 170;
+    // the lip leans out ahead of the foot, and folds back into the wall as it breaks
+    const lean = (h.tall ? 48 : 10) * (h.crash ? 1 - h.crash : 1) * k;
+    const c = rgbStr(P.near), foam = vo ? BLOOD : WATER;
+    ctx.save();
+    // foam left on the floor behind it
+    const wg = ctx.createLinearGradient(x - d * (L + 300), 0, x - d * L * 0.5, 0);
+    wg.addColorStop(0, G.rgba(foam, 0)); wg.addColorStop(1, G.rgba(foam, 0.16 * k));
+    ctx.fillStyle = wg; ctx.fillRect(Math.min(x - d * (L + 300), x - d * L * 0.5), F - 6, L * 0.5 + 300, 6);
+    ctx.beginPath();
+    ctx.moveTo(x - d * L, F);
+    ctx.bezierCurveTo(x - d * L * 0.55, F - Hc * 0.08, x - d * L * 0.4, F - Hc * 0.75, x - d * 40, F - Hc * 0.96);
+    ctx.quadraticCurveTo(x - d * 6, F - Hc * 1.05, x + d * lean, F - Hc * 0.86);
+    if (h.tall) ctx.quadraticCurveTo(x + d * (lean + 8), F - Hc * 0.66, x + d * lean * 0.4, F - Hc * 0.6);
+    ctx.bezierCurveTo(x + d * 4, F - Hc * 0.5, x + d * 14, F - Hc * 0.2, x + d * 8, F);
+    ctx.closePath();
+    const g = ctx.createLinearGradient(0, F - Hc, 0, F);
+    g.addColorStop(0, vo ? 'rgba(10,1,5,0.95)' : G.rgba(c, 0.92)); g.addColorStop(1, vo ? 'rgba(3,0,2,0.97)' : 'rgba(3,6,8,0.95)');
+    ctx.fillStyle = g; ctx.fill();
+    ctx.clip();
+    // sea-green through the thin water at the top, going dark and deep towards the foot
+    const gl = ctx.createLinearGradient(0, F - Hc, 0, F);
+    gl.addColorStop(0, G.rgba(foam, vo ? 0.07 : 0.3)); gl.addColorStop(0.45, G.rgba(foam, vo ? 0.02 : 0.1)); gl.addColorStop(1, G.rgba(foam, 0));
+    ctx.fillStyle = gl; ctx.fillRect(Math.min(x - d * L, x + d * 60), F - Hc - 20, L + 60, Hc + 24);
+    // the face catching what light there is, brightest where it stands steepest
+    const fg = ctx.createLinearGradient(x - d * 90, 0, x + d * (lean + 10), 0);
+    fg.addColorStop(0, G.rgba(foam, 0)); fg.addColorStop(1, G.rgba(foam, vo ? 0.06 : 0.2));
+    ctx.fillStyle = fg; ctx.fillRect(Math.min(x - d * 90, x + d * (lean + 10)), F - Hc, 100 + lean, Hc);
+    // (tall) the hollow under the lip
+    if (h.tall) {
+      const hg = ctx.createLinearGradient(x + d * lean, 0, x - d * 40, 0);
+      hg.addColorStop(0, 'rgba(2,4,6,0.32)'); hg.addColorStop(1, 'rgba(2,4,6,0)');
+      ctx.fillStyle = hg;
+      ctx.beginPath(); ctx.ellipse(x + d * lean * 0.2, F - Hc * 0.7, 30 + lean * 0.5, Hc * 0.06, d * 0.25, 0, G.TAU); ctx.fill();
+    }
+    // water streaming down its back and face
+    ctx.strokeStyle = G.rgba(foam, vo ? 0.18 : 0.24); ctx.lineWidth = 1.4;
+    for (let i = 0; i < (h.tall ? 12 : 5); i++) {
+      const u = (h.t * 0.9 + i * 0.137) % 1, sx = x - d * (8 + i * (L / 14)), y0 = F - Hc * (1 - u * 0.9);
+      ctx.beginPath(); ctx.moveTo(sx, y0); ctx.lineTo(sx - d * 6, y0 + 18 + 34 * u); ctx.stroke();
+    }
+    ctx.restore();
+    // white water along the crest: a band, and clots of foam tumbling in it
+    ctx.save(); ctx.lineCap = 'round';
+    const cx0 = x - d * L * 0.36, cy0 = F - Hc * 0.86, qx = x - d * 6, qy = F - Hc * 1.05, cx1 = x + d * lean, cy1 = F - Hc * 0.86;
+    ctx.beginPath(); ctx.moveTo(cx0, cy0); ctx.quadraticCurveTo(qx, qy, cx1, cy1);
+    ctx.strokeStyle = G.rgba(foam, 0.26); ctx.lineWidth = (h.tall ? 16 : 6) * Math.max(0.3, k); ctx.stroke();
+    ctx.strokeStyle = G.rgba(foam, 0.55); ctx.lineWidth = 2; ctx.stroke();
+    ctx.fillStyle = G.rgba(foam, 0.3);
+    for (let i = 0; i < (h.tall ? 14 : 6); i++) {
+      const u = ((i * 0.618) + h.t * 0.7) % 1, w0 = (1 - u) * (1 - u), w1 = 2 * (1 - u) * u, w2 = u * u;
+      const px = w0 * cx0 + w1 * qx + w2 * cx1, py = w0 * cy0 + w1 * qy + w2 * cy1 + Math.sin(h.t * 9 + i) * 3;
+      ctx.beginPath(); ctx.arc(px, py, (h.tall ? 4 : 2) + (i % 3) * (h.tall ? 2.5 : 1), 0, G.TAU); ctx.fill();
+    }
+    // (tall) a curtain of spray falling from the lip ahead of the face
+    if (h.tall && !h.crash) {
+      ctx.strokeStyle = G.rgba(foam, 0.16); ctx.lineWidth = 1.5;
+      for (let i = 0; i < 7; i++) {
+        const u = (h.t * 2.2 + i * 0.29) % 1, sx = x + d * (lean * (0.4 + 0.5 * ((i * 0.37) % 1))), y0 = F - Hc * (0.84 - 0.5 * u);
+        ctx.beginPath(); ctx.moveTo(sx, y0); ctx.lineTo(sx + d * 2, y0 + 26); ctx.stroke();
+      }
+    }
+    ctx.restore();
+  }
+  // the jet: a rope of dark water with a lighter core, tearing along its length, bursting where it strikes
+  function drawJet(ctx, h) {
+    const vo = G.corrupt.active(), P = G.pal();
+    if (!h.on && h.k < 0.03) {
+      if (h.warn > 0.01) {
+        // where it will open up (it is a thing thrown, so it is marked): faint, along the head's aim
+        ctx.save(); ctx.setLineDash([10, 12]); ctx.lineDashOffset = -h.t * 60;
+        ctx.strokeStyle = G.rgba(DANGER, 0.1 + 0.35 * h.warn); ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(h.ox, h.oy); ctx.lineTo(h.ex, h.ey); ctx.stroke(); ctx.restore();
+      }
+      return;
+    }
+    if (h.len < 2) return;
+    const w = h.width * h.k * (1 + 0.07 * Math.sin(h.t * 70)), c = rgbStr(P.near);
+    const line = () => { ctx.beginPath(); ctx.moveTo(h.ox, h.oy); ctx.lineTo(h.ex, h.ey); ctx.stroke(); };
+    ctx.save(); ctx.lineCap = 'round';
+    ctx.strokeStyle = vo ? 'rgba(6,0,3,0.82)' : G.rgba(c, 0.6); ctx.lineWidth = w * 1.5; line();
+    ctx.strokeStyle = vo ? 'rgba(34,2,12,0.92)' : G.rgba(WATER, 0.4); ctx.lineWidth = w * 0.8; line();
+    ctx.strokeStyle = vo ? G.rgba(BLOOD, 0.55) : G.rgba(P.hot, 0.22); ctx.lineWidth = Math.max(1, w * 0.2); line();
+    // water tearing along it
+    ctx.setLineDash([22, 30]); ctx.lineDashOffset = -h.t * 2400; ctx.lineCap = 'butt';
+    const nx = -Math.sin(h.ang), ny = Math.cos(h.ang);
+    ctx.strokeStyle = G.rgba(vo ? BLOOD : WATER, 0.5); ctx.lineWidth = 2;
+    for (const o of [-0.3, 0.32]) { ctx.beginPath(); ctx.moveTo(h.ox + nx * o * w, h.oy + ny * o * w); ctx.lineTo(h.ex + nx * o * w, h.ey + ny * o * w); ctx.stroke(); }
+    ctx.setLineDash([]);
+    // spray where it strikes
+    ctx.fillStyle = G.rgba(vo ? BLOOD : WATER, 0.26 * h.k);
+    ctx.beginPath(); ctx.ellipse(h.ex, h.ey, w * 1.3, w * 0.8, 0, 0, G.TAU); ctx.fill();
+    ctx.restore();
+  }
   // wreckage on the floating platforms (high water) and weed on the rocks (the maelstrom)
   function drawFlotsam(ctx) {
     const P = G.pal();
@@ -2208,7 +2721,10 @@
   };
   // the hydra's void head is drawn on its own, over the boss: a corrupted boss is drawn as one black
   // shape (corrupt.js), and this head is to be seen as something else, black flesh with blood in it
-  B.drawOver = function (ctx) { if (!B.dead) drawVoidHead(ctx); };
+  B.drawOver = function (ctx) {
+    for (const h of H.list) if (h.roller && !h.dead) drawRoller(ctx, h);
+    if (!B.dead) drawVoidHead(ctx);
+  };
   // corrupted, only its body is drawn black (corrupt.js): the flotsam, its wave and the surge are not it
   B.corruptBehind = (ctx) => drawFlotsam(ctx);
   B.corruptFront = (ctx) => drawSurf(ctx);

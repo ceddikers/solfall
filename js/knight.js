@@ -26,9 +26,9 @@
     answer: 'sever',
     gaps: [0, 1.0, 0.8, 0.6],
     bags: {
-      1: ['cleave', 'overhead', 'charge', 'grip', 'graves', 'hurl', 'sever'],
-      2: ['cleave2', 'overhead', 'charge', 'grip', 'graves', 'wraiths', 'desecrate', 'whirl', 'rend', 'hurl', 'sever'],
-      3: ['reap', 'overhead', 'charge', 'grip', 'wraiths', 'desecrate', 'whirl', 'rend', 'leap', 'hurl', 'sever'],
+      1: ['cleave', 'overhead', 'charge', 'grip', 'graves', 'hurl', 'sever', 'heel', 'thrust'],
+      2: ['cleave2', 'overhead', 'charge', 'grip', 'graves', 'wraiths', 'desecrate', 'whirl', 'rend', 'hurl', 'sever', 'heel', 'thrust'],
+      3: ['reap', 'overhead', 'charge', 'grip', 'wraiths', 'desecrate', 'whirl', 'rend', 'leap', 'hurl', 'sever', 'heel', 'thrust'],
     },
     cards: { 2: ['THE HOST', 'The dead answer the call'], 3: ['BLOOD OATH', 'It will not fall alone'] },
     first: { 1: 'cleave', 2: 'wraiths', 3: 'leap' },
@@ -64,7 +64,33 @@
     push: [0.34, -38, 24, 0, -28, 0, 26, -88, 1.5708, -8, -30],
     // corrupted: down on one knee with the sword held up in both hands, point to the sky (the Colossus)
     vigil: [0.06, -36, 24, 0, -30, 0, 8, -126, -1.5708, 999, 0],
+    // the Heel (it looks back over its shoulder in both): the blade let down to rest its point on the
+    // floor in front, or hoisted level over the shoulder, pointing straight back at whoever is there.
+    // Then it pivots, and the cut ends in front of it, on the side that was its back.
+    heelLow: [0.24, -52, 24, 0, -22, 0, 30, -44, 0.28, 999, 0],
+    heelHigh: [0.1, -56, 18, 0, -22, 0, 2, -104, -2.95, 999, 0],
+    heelLowCut: [0.3, -48, 30, 0, -22, 0, 44, -40, 0.24, -24, -66],
+    heelHighCut: [0.16, -56, 26, 0, -20, 0, 46, -86, 0.06, -26, -80],
+    // the Thrust: drawn back level with the point forward, weight on the back foot and the off hand
+    // laid along the flat; at the hip (low) or at the shoulder (high). Then the lunge, point first.
+    drawLow: [-0.2, -54, 30, 0, -26, 0, -22, -50, 0.02, 30, -54],
+    drawHigh: [-0.16, -56, 28, 0, -26, 0, -18, -94, 0.03, 30, -98],
+    thrustLow: [0.44, -42, 52, 0, -42, 0, 56, -40, 0.03, -30, -72],
+    thrustHigh: [0.32, -48, 50, 0, -40, 0, 60, -88, -0.01, -30, -80],
+    // where each tell has got to by its end: sunk lower, wound further, the blade drawn further back
+    heelLowDeep: [0.36, -46, 26, 0, -24, 0, 22, -38, 0.239, 999, 0],
+    heelHighDeep: [0.22, -52, 20, 0, -24, 0, -8, -100, -3.02, 999, 0],
+    drawLowDeep: [-0.3, -48, 32, 0, -32, 0, -36, -48, 0.02, 20, -52],
+    drawHighDeep: [-0.26, -50, 30, 0, -32, 0, -32, -92, 0.03, 20, -96],
   };
+  // A tell is not a pose held still: it keeps building (POSES.dyn, written by the attack each frame,
+  // from where it starts towards how deep it goes)
+  POSES.dyn = POSES.idle.slice();
+  function building(from, to, k) {
+    const A = POSES[from], Z = POSES[to], d = POSES.dyn, q = E.inOutQuad(G.clamp(k, 0, 1));
+    for (let i = 0; i < NP; i++) d[i] = A[i] === 999 ? 999 : A[i] + (Z[i] - A[i]) * q;
+    return 'dyn';
+  }
   const NP = 11;
   function walkPose(t) {
     const s = Math.sin(t), c = Math.cos(t), p = POSES.idle.slice();
@@ -78,6 +104,7 @@
     const b = B.body;
     b.x = 900; b.y = FLOOR + 150; b.pose = 'kneel'; b.p = POSES.kneel.slice(); b.walkT = 0; b.hurt = false; b.spin = 0; b.spinning = false; b.fast = false;
     b.bare = false; b.still = false; b.voidK = 0; b.voidOn = false; b.hush = false; b.smooth = 0; b.fd = -1;
+    b.look = 0; b.lookV = 0; b.lookT = 0; b.behindT = 0; B.sinceHeel = 0;
     B.cape = D.chain(9, b.x, b.y - 100);
     WL = G.WALL_L; WR = G.WALL_R; B.ring = false; B.swords = []; B.lost = null;
   };
@@ -89,7 +116,7 @@
     if (b.hush && G.state === 'fight' && !G.player.dead && !G.paused) G.audio.duck(1);
     b.hush = false;
   }
-  B.onRelease = function () { const b = B.body; b.hurt = false; b.pose = 'idle'; b.spinning = false; b.fast = false; b.unarmed = false; b.blaze = 0; b.voidOn = false; unhush(); };
+  B.onRelease = function () { const b = B.body; b.hurt = false; b.pose = 'idle'; b.spinning = false; b.fast = false; b.unarmed = false; b.blaze = 0; b.voidOn = false; b.lookT = 0; unhush(); };
   B.onStagger = function () { B.body.pose = 'kneel'; };
   B.onInterrupt = function () { B.lost = null; unhush(); };
   B.staggerWord = 'DISARMED';
@@ -160,7 +187,7 @@
     const g = { x, y: FLOOR, face, p: POSES[wind].slice(), kx: 0, a: 0, fired: false };
     const m = (ang) => (face > 0 ? ang : Math.PI - ang);
     const ao = {
-      x: x + face * 10, y: FLOOR - 86, r: (o.r || 195) * 0.95, a0: m(o.a0), a1: m(o.a1), tele, active: 0.12, owner: g, tint,
+      x: x + face * 10, y: FLOOR - (o.cy || 86), r: (o.r || 195) * 0.95, a0: m(o.a0), a1: m(o.a1), tele, active: 0.12, owner: g, tint,
       onFire() { g.fired = true; g.to = POSES[o.pose]; G.audio.play('blade'); G.fx.shake(4); },
     };
     if (harmless) { ao.hits = () => false; ao.heavy = true; } // for show, in the scene where the Host first rises
@@ -690,6 +717,240 @@
     yield* drag();
   }
 
+  // ------------------------------------------------------------------ the heel and the thrust
+  G.audio.define('bladeGrind', () => {
+    // steel dragged over stone as its point comes to rest on the floor
+    G.audio.synth.noise({ type: 'bandpass', f0: 2600, f1: 1500, q: 6, dur: 0.42, vol: 0.09, attack: 0.05 });
+    G.audio.synth.tone({ type: 'sawtooth', f0: 190, f1: 150, dur: 0.36, vol: 0.025, attack: 0.04 });
+  });
+  G.audio.define('knightThrust', () => {
+    // the point driven through the air: a narrow hiss that drops, and the weight of the lunge under it
+    G.audio.synth.noise({ type: 'bandpass', f0: 5200, f1: 1300, q: 3.5, dur: 0.2, vol: 0.2 });
+    G.audio.synth.tone({ type: 'triangle', f0: 120, f1: 52, dur: 0.24, vol: 0.32 });
+  });
+
+  // Where the sword is in the world, from the guard to the point (for the cuts that follow the blade).
+  function bladeLine(b) {
+    const f = b.face, ang = b.p[8], hx = b.x + f * b.p[6], hy = b.y + b.p[7];
+    return { hx, hy, px: hx + f * Math.cos(ang) * SWORD, py: hy + Math.sin(ang) * SWORD };
+  }
+
+  // The Heel. Its back takes more and nothing covers it, so a hero who lives there is answered: it
+  // looks back over its shoulder, and whips the greatsword round behind it.
+  //   Its tell: the helm turns first, then the blade goes where the cut will come from. Let down with
+  //   its point grinding on the floor: a low sweep round along the ground (jump). Hoisted level over
+  //   the shoulder, pointing back: a high backhand at chest height (stay on the ground, or back off).
+  //   The Host makes it twice (its ghost, a beat later); under the Blood Oath it turns straight into
+  //   an overhead.
+  // It comes on its own when the hero has spent long enough at its back (B.choose); drawn from the
+  // bag with the hero in front, it turns its back on them first, and lets them come.
+  // (Not every time: its back is still the place to be, so two other attacks come between.)
+  B.choose = function () {
+    const b = B.body;
+    B.sinceHeel = (B.sinceHeel || 0) + 1;
+    if ((b.behindT || 0) > 2.2 && B.sinceHeel >= 3 && B.bags[B.phase].includes('heel')) { b.behindT = 0; return 'heel'; }
+    return '';
+  };
+  function* atkHeel() {
+    const b = B.body, P = G.player, T = K.T();
+    const tele = [0, 0.8, 0.72, 0.62][B.phase] * T, SPIN = 0.17;
+    b.fast = false; b.spinning = false; B.sinceHeel = 0;
+    if ((P.x - b.x) * b.face > -14) {
+      // the hero is in front: it turns away from them with a heavy step, as if it had done with them
+      b.face = P.x > b.x ? -1 : 1;
+      b.pose = 'heft';
+      yield* tween(b, { x: G.clamp(b.x + b.face * 28, WL + 50, WR - 50) }, 0.32, E.inOutQuad);
+      G.audio.play('stepHeavy'); G.fx.kick(0, 1.2);
+      G.fx.dust(b.x + b.face * 14, FLOOR, 2, { speed: [20, 100], size: [5, 9], up: 24, a: 0.32 });
+      b.pose = 'idle';
+      yield* wait(0.26);
+    }
+    const back = -b.face, low = K.chance(0.5, 'low');
+    // the helm turns first
+    b.lookT = 1;
+    yield* wait(0.16);
+    b.pose = low ? 'heelLow' : 'heelHigh';
+    G.audio.play('charge', { dur: tele });
+    if (low) G.audio.play('bladeGrind');
+    // (the low sweep turns about the knee, not the shoulder: it stays under a jump even up close)
+    const o = low ? { a0: 1.5, a1: 0.2, r: 192, cy: 50, pose: 'heelLowCut' } : { a0: -1.0, a1: 0.14, r: 200, cy: 86, pose: 'heelHighCut' };
+    const m = (ang) => (back > 0 ? ang : Math.PI - ang);
+    H.arc({
+      // (it lands as the turn finishes, so the cut and the blade arrive together)
+      x: b.x + back * 10, y: b.y - o.cy, r: o.r, a0: m(o.a0), a1: m(o.a1), tele: tele - 0.05, active: 0.15, owner: b,
+      follow(h) { if (!h.fired) { h.x = b.x + back * 10; h.y = b.y - o.cy; } },
+      onFire() {
+        G.audio.play('cleave'); G.fx.shake(7);
+        // the low sweep's path along the floor (its arc is mostly below the floor line)
+        if (low) G.fx.cut(b.x + back * 105, FLOOR - 20, back > 0 ? 0 : Math.PI, 220, 7, G.pal().boss, G.pal().hot, 0.18);
+        if (B.phase >= 2) echo(b.x, back, o, low ? 'heelLow' : 'heelHigh');
+      },
+    });
+    let e = 0;
+    while (e < tele - SPIN) {
+      const dt = yield;
+      e += dt;
+      const k = e / (tele - SPIN);
+      b.pose = building(low ? 'heelLow' : 'heelHigh', low ? 'heelLowDeep' : 'heelHighDeep', k);
+      b.jit = k > 0.72 ? 0.9 : 0;
+      // the point bites the floor as the weight comes onto it
+      if (low && Math.random() < dt * 18) {
+        const L = bladeLine(b);
+        G.fx.spawn({ kind: 'spark', x: L.px, y: FLOOR - 2, vx: -b.face * G.rand(40, 200), vy: -G.rand(60, 220), life: G.rand(0.12, 0.3), size: G.rand(1.4, 2.6), color: G.pal().hot, drag: 2, grav: 900 });
+      }
+    }
+    // the whip: it pivots on its front foot and the blade comes round with the whole body behind it
+    b.jit = 0;
+    b.spinning = true; b.spin = 0; b.fast = true; b.pose = o.pose;
+    G.audio.play('whoosh');
+    const x0 = b.x, x1 = G.clamp(b.x + back * 12, WL + 50, WR - 50); // (a pivot, not a step in)
+    let s = 0;
+    while (s < SPIN) {
+      const dt = yield;
+      s += dt;
+      const k = Math.min(1, s / SPIN);
+      // it gathers speed through the turn, and the weight of the blade carries it round and slows it
+      b.spin = Math.PI * (k < 0.7 ? k * k / 0.7 : 1 - (1 - k) * (1 - k) / 0.3);
+      b.x = G.lerp(x0, x1, E.outCubic(k));
+    }
+    b.spinning = false; b.spin = 0;
+    b.face = back; b.tqf = back; b.tqP = 1; // (the turn is the spin itself: K.turn must not turn it again)
+    b.lookT = 0; b.look = 0; b.lookV = 0;   // (the helm already faced this way)
+    if (b.pv) b.pv[1] += 30;
+    if (low) G.fx.dust(b.x + back * 120, FLOOR, 4, { dir: back, speed: [80, 300], size: [6, 11], up: 30, a: 0.36 });
+    while (e + s < tele + 0.02) { e += yield; }
+    yield* wait(0.12);
+    if (B.phase === 3) {
+      // the Blood Oath: no pause between them, the cut carries straight up into the overhead
+      yield* overhead(0.4 * T, 0.26 * T, 1.05);
+    } else {
+      // it stands into the follow-through, then lets the blade's weight settle
+      yield* tween(b, { x: G.clamp(b.x + back * 10, WL + 50, WR - 50) }, 0.18, E.outCubic);
+      yield* wait(B.phase === 2 ? 0.55 : 0.45);
+    }
+  }
+
+  // The thrust's spectral lance (from the second phase): the point's line goes on to the wall.
+  // (Low, it is jumped like a cut thrown along the floor; high, it passes over a standing hero.)
+  function lance(x, y, dir, low) {
+    const tint = tintNow(), speed = K.gentle() ? 820 : 940;
+    return H.add({
+      kind: low ? 'flycut' : 'crescent', x, y, dir, vx: dir * speed, speed, tint,
+      update(dt) {
+        this.x += dir * speed * dt; this.srcX = this.x - dir * 40;
+        if (Math.random() < 0.7) G.fx.spawn({ x: this.x - dir * G.rand(10, 120), y: this.y + G.rand(-6, 6), vx: -dir * G.rand(20, 90), vy: G.rand(-14, 14), life: G.rand(0.15, 0.4), size: G.rand(2, 4), color: tint.boss });
+        if (this.x < WL - 30 || this.x > WR + 30) {
+          this.dead = true;
+          G.fx.burst(G.clamp(this.x, WL, WR), this.y, { n: 10, color: tint.hot, speed: [100, 380], angle: dir > 0 ? Math.PI : 0, spread: 1.8, life: [0.15, 0.35], kind: 'spark', size: [1.6, 3] });
+          G.fx.shake(3);
+        }
+      },
+      hits(Pl) { const pd = Pl.pad || 0; return G.rectsOverlap(Pl.box(), { cx: this.x - dir * 40, cy: this.y, hw: 46 + pd, hh: 9 + pd }); },
+      draw(ctx) {
+        // a ghost of the blade's point: long, thin and see-through, its core the only bright part
+        const x = this.x, y = this.y, a = Math.min(1, this.t / 0.06);
+        ctx.save();
+        ctx.globalAlpha *= a;
+        ctx.globalCompositeOperation = 'lighter';
+        D.glow(ctx, tint.boss, x - dir * 40, y, 70, 0.4);
+        for (const [col, w, al] of [[tint.boss, 9, 0.5], [DANGER, 5, 0.7], [tint.hot, 1.8, 0.95]]) {
+          ctx.fillStyle = G.rgba(col, al);
+          D.poly(ctx, [x, y, x - dir * 34, y - w, x - dir * 150, y - w * 0.35, x - dir * 150, y + w * 0.35, x - dir * 34, y + w]); ctx.fill();
+        }
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.restore();
+      },
+    });
+  }
+
+  // One thrust: the draw (the tell), then the point goes and the body follows it.
+  function* thrustOnce(low, tele, first) {
+    const b = B.body, P = G.player;
+    b.fast = false; b.pose = low ? 'drawLow' : 'drawHigh';
+    if (first) G.audio.play('charge', { dur: tele });
+    else G.audio.play('pull');
+    let e = 0, hit = null, glinted = false;
+    while (e < tele) {
+      const dt = yield;
+      e += dt;
+      // it can still turn while it settles its weight back; after that the line is set
+      if (e < tele * 0.5 && (P.x - b.x) * b.face < -20) facePlayer();
+      const k = e / tele;
+      b.pose = building(low ? 'drawLow' : 'drawHigh', low ? 'drawLowDeep' : 'drawHighDeep', k);
+      b.jit = k > 0.75 ? 0.8 : 0;
+      if (Math.random() < dt * 10) G.fx.dust(b.x - b.face * 26, FLOOR, 1, { dir: -b.face, speed: [20, 90], size: [5, 8], life: [0.3, 0.5], up: 16, a: 0.28 });
+      if (!glinted && e >= tele - 0.2) {
+        // the point catches the light: it is coming
+        glinted = true;
+        const L = bladeLine(b);
+        G.fx.glint(L.px, L.py, 30, G.pal().hot); G.audio.play('glint');
+      }
+      if (!hit && e >= tele - 0.12) {
+        const L = bladeLine(b);
+        // What hurts is the blade itself, guard to point, wherever the lunge carries it. (Until it
+        // goes it hurts nobody, and for the tests' scripted hero, who jumps cuts flying at it, it
+        // stands just short of them if they are in the lunge's reach: so it jumps as the point
+        // glints, as a player would, rather than when the point is already on it.)
+        const d = b.face;
+        hit = H.add({
+          kind: low ? 'flycut' : 'crescent', x: L.px, y: L.py, dir: d, vx: d * 900, live: false, done: false, owner: b,
+          update() { const Q = bladeLine(b); const ahead = (P.x - b.x) * d; this.x = this.live ? Q.px : ahead > -20 && ahead < 430 ? P.x - d * 100 : b.x - d * 900; this.y = Q.py; this.srcX = Q.hx; if (this.done) this.dead = true; },
+          hits(Pl) {
+        if (!this.live) return false;
+        const L = bladeLine(b), r = 13 + (Pl.pad || 0);
+        for (const dy of [6, 22, 38]) if (G.distPointSeg(Pl.x, Pl.y - dy, L.hx, L.hy, L.px, L.py) < r) return true;
+        return false;
+          },
+        });
+      }
+    }
+    const dir = b.face;
+    b.jit = 0;
+    b.fast = true; b.pose = low ? 'thrustLow' : 'thrustHigh';
+    G.audio.play('knightThrust');
+    hit.live = true;
+    const x0 = b.x, x1 = G.clamp(b.x + dir * (low ? 190 : 200), WL + 50, WR - 50), LT = 0.26;
+    let s = 0, streak = false;
+    while (s < LT) {
+      const dt = yield;
+      s += dt;
+      b.x = G.lerp(x0, x1, E.outCubic(Math.min(1, s / LT)));
+      if (!streak && s > 0.05) {
+        // the line of the point, drawn for a moment along the air it went through
+        streak = true;
+        const L = bladeLine(b);
+        G.fx.cut(L.px - dir * 120, L.py, dir > 0 ? 0 : Math.PI, 260, 7, G.pal().boss, G.pal().hot, 0.16);
+        G.fx.kick(dir * 3, 0); G.fx.shake(5);
+      }
+      if (Math.random() < dt * 50) G.fx.dust(b.x - dir * 34, FLOOR, 1, { dir: -dir, speed: [40, 220], size: [6, 11], life: [0.3, 0.6], up: 30, a: 0.36 });
+    }
+    // the front foot comes down and takes the whole weight of it
+    G.audio.play('stomp'); G.fx.shake(4);
+    G.fx.thud(b.x + dir * 50, FLOOR, 0.6, { noCrack: true });
+    if (b.pv) b.pv[1] += 34;
+    hit.done = true;
+    if (B.phase >= 2) { const L = bladeLine(b); lance(L.px, L.py, dir, low); G.audio.play('streak'); }
+  }
+
+  // The Thrust: the one blow it makes point first, and the longest reach it has on foot.
+  //   Its tell is the height of the draw: at the hip, a low thrust (jump it); at the shoulder, a high
+  //   one (stay on the ground, or dash through). From the second phase the point's line flies on to
+  //   the wall; under the Blood Oath it pulls the blade back and thrusts again, at a height the
+  //   re-draw shows.
+  function* atkThrust() {
+    const b = B.body, P = G.player, T = K.T();
+    if (Math.abs(P.x - b.x) > 430) yield* approach(400, 300, 0.8);
+    facePlayer();
+    yield* thrustOnce(K.chance(0.5, 'low'), [0, 0.82, 0.74, 0.64][B.phase] * T, true);
+    if (B.phase === 3) {
+      yield* wait(0.1);
+      facePlayer();
+      yield* thrustOnce(K.chance(0.5, 'low2'), 0.48 * T, false);
+    }
+    // stretched out at the end of it: a moment open before it can haul the blade back
+    yield* wait(B.phase === 3 ? 0.42 : 0.55);
+  }
+
   // ------------------------------------------------------------------ corrupted
   // Two attacks only its corrupted self uses (corrupt.js, B.corruptBags), in the void's own colours.
 
@@ -1150,6 +1411,7 @@
     hurl: atkHurl,
     cleave: atkCleave, cleave2: atkCleave2, overhead: atkOverhead, charge: atkCharge, grip: atkGrip, graves: atkGraves,
     wraiths: atkWraiths, desecrate: atkDesecrate, whirl: atkWhirl, rend: atkRend, leap: atkLeap, reap: atkReap,
+    heel: atkHeel, thrust: atkThrust,
     requiem: atkRequiem, colossus: atkColossus, // (corrupted only: B.corruptBags)
   };
 
@@ -1274,6 +1536,12 @@
       }
     }
     if (b.smooth > 0) b.smooth -= dt; // (every turn is eased now, by K.turn: b.smooth is left for the attacks that set it)
+    // the helm turns on its own spring, a little ahead of the body (the Heel's first tell)
+    b.lookV = (b.lookV || 0) + (((b.lookT || 0) - (b.look || 0)) * 380 - (b.lookV || 0) * 30) * dt;
+    b.look = (b.look || 0) + b.lookV * dt;
+    // how long the hero has kept to its back, close in and on the ground (the Heel answers it)
+    const behind = B.active && !b.spinning && (P.x - b.x) * b.face < -14 && Math.abs(P.x - b.x) < 300 && P.y > FLOOR - 170;
+    b.behindT = G.clamp((b.behindT || 0) + (behind ? dt : -dt * 1.5), 0, 4);
     // the Requiem's black blade: it creeps up from the guard, and drains away when the attack ends
     if (!b.voidOn && b.voidK > 0) b.voidK = Math.max(0, b.voidK - dt * 2.5);
     if (b.voidK > 0.3 && !b.unarmed && Math.random() < dt * 30 * b.voidK) {
@@ -1517,6 +1785,12 @@
     const ex = shx + Math.sin(lean) * 15 + 2, ey = shy - Math.cos(lean) * 15 - 3;
     ctx.save();
     ctx.translate(ex, ey); ctx.rotate(lean * 0.5);
+    if (b.look) {
+      // looking back over its shoulder: the helm turns (narrows, then faces the other way) and dips
+      const c = Math.cos(G.clamp(b.look, -0.2, 1.2) * Math.PI);
+      ctx.rotate(0.14 * Math.sin(G.clamp(b.look, 0, 1) * Math.PI));
+      ctx.scale(c < 0 ? Math.min(-0.3, c) : Math.max(0.3, c), 1);
+    }
     ctx.fillStyle = trim;
     D.poly(ctx, [-7, -9, -17, -17, -27, -34, -15, -25, -4, -14]); ctx.fill();
     D.poly(ctx, [3, -12, 6, -22, 17, -37, 13, -22, 9, -11]); ctx.fill();

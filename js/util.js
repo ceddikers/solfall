@@ -3,7 +3,7 @@
 
 const G = window.G = {};
 
-G.VERSION = '1.9d';
+G.VERSION = '2.0a';
 G.bgK = 1; // how many pixels per unit the painted backdrops are kept at (set in game.js, resize)
 G.W = 1280;          // logical view size
 G.H = 720;

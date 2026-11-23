@@ -33,9 +33,9 @@
     answer: 'shards', kiting: (P) => !P.onGround && P.y < FLOOR - 150,
     gaps: [0, 0.95, 0.75, 0.6],
     bags: {
-      1: ['shards', 'rime', 'fireball', 'bolts', 'spheres', 'comet', 'invoke'],
-      2: ['shards', 'rime', 'fireball', 'bolts', 'spheres', 'firewall', 'crystals', 'storm', 'comet', 'invoke'],
-      3: ['shards', 'fireball', 'bolts', 'firewall', 'crystals', 'storm', 'blizzard', 'rime', 'comet', 'invoke'],
+      1: ['shards', 'rime', 'fireball', 'bolts', 'spheres', 'comet', 'invoke', 'nova', 'serpent'],
+      2: ['shards', 'rime', 'fireball', 'bolts', 'spheres', 'firewall', 'crystals', 'storm', 'comet', 'invoke', 'nova', 'serpent'],
+      3: ['shards', 'fireball', 'bolts', 'firewall', 'crystals', 'storm', 'blizzard', 'rime', 'comet', 'invoke', 'nova', 'serpent'],
     },
     cards: { 2: ['CONFLUENCE', 'The spells begin to overlap'], 3: ['TRINITY', 'Every element answers'] },
     first: { 1: 'shards', 2: 'crystals', 3: 'blizzard' },
@@ -52,6 +52,8 @@
     B.iceK = 0; B.storm = 0; B.zap = 0; B.skyBolts = []; b.aflame = false;
     b.dark = 0; b.dk = [0, 0, 0]; b.track = 0; b.slit = 0; b.readTilt = 1.6; B.readAim = null;
     B.cape = D.chain(9, b.x, b.y - 92);
+    b.spT = null; b.spK = 0; b.lean = 0; b.leanV = 0; b.leanT = 0; b.hl = 0; b.hv = 0; b.pvy = 0; b.py = b.y;
+    B.novaArcs = []; B.glaze = null; B.picks = 0; B.novaPick = null;
   };
   const setElem = (el) => { B.body.elem = el; };
   const face = () => { const b = B.body; b.face = G.player.x >= b.x ? 1 : -1; };
@@ -66,16 +68,32 @@
     const b = B.body, k = b.gk || 0, gn = b.gest || b.gestWas;
     const g = gn === 'read' ? { hx: 30, hy: -70, tilt: b.readTilt } : GEST[gn];
     const s = { hx: 23 + 9 * c, hy: -62 - 18 * c, tilt: 0.07 + 0.42 * c };
-    return g && k > 0.001 ? { hx: G.lerp(s.hx, g.hx, k), hy: G.lerp(s.hy, g.hy, k), tilt: G.lerp(s.tilt, g.tilt, k) } : s;
+    const r = g && k > 0.001 ? { hx: G.lerp(s.hx, g.hx, k), hy: G.lerp(s.hy, g.hy, k), tilt: G.lerp(s.tilt, g.tilt, k) } : s;
+    // held by hand (holdStaff): on springs
+    const q = b.spK || 0;
+    return q > 0.001 && b.sp ? { hx: G.lerp(r.hx, b.sp.hx, q), hy: G.lerp(r.hy, b.sp.hy, q), tilt: G.lerp(r.tilt, b.sp.tilt, q) } : r;
   };
   const tip = () => {
     const b = B.body, s = staff(b.cast);
     return { x: b.x + b.face * (s.hx + Math.sin(s.tilt) * 96), y: b.y + s.hy - Math.cos(s.tilt) * 96 };
   };
 
-  B.onRelease = function () { const b = B.body; b.want = 0; b.spent = false; b.charge = 0; b.hidden = false; b.alpha = 1; B.blizz = 0; b.gest = null; b.merge = 0; b.dark = 0; b.track = 0; b.slit = 0; B.readAim = null; };
+  B.onRelease = function () { const b = B.body; b.want = 0; b.spent = false; b.charge = 0; b.hidden = false; b.alpha = 1; B.blizz = 0; b.gest = null; b.merge = 0; b.dark = 0; b.track = 0; b.slit = 0; B.readAim = null; b.spT = null; b.leanT = 0; };
   B.onInterrupt = function () { B.shards.length = 0; };
-  B.onStagger = function () { const b = B.body; b.alpha = 1; b.elem = null; };
+  B.onStagger = function () { const b = B.body; b.alpha = 1; b.elem = null; b.spT = null; b.leanT = 0; if (B.glaze) B.glaze.fade = true; };
+  // a hero who reaches it is met with a Nova (not twice running, and not too often)
+  B.choose = function () {
+    const b = B.body, P = G.player;
+    B.picks = (B.picks || 0) + 1;
+    if (B.picks - (B.novaPick == null ? -99 : B.novaPick) < 5 || b.hidden) return '';
+    if (Math.abs(P.x - b.x) < 190 && Math.abs(P.y - b.y) < 140 && G.rng() < 0.5) {
+      // (it takes the place of the one in the bag, so a hero who stays close still sees the rest of its spells)
+      const i = B.bag ? B.bag.indexOf('nova') : -1;
+      if (i >= 0) B.bag.splice(i, 1);
+      return 'nova';
+    }
+    return '';
+  };
   B.staggerWord = 'SILENCED'; B.staggerMult = 1.2; B.staggerDur = 1.15;
   B.onHit = function (dmg, info) {
     if (!B.staggered) return;
@@ -1019,12 +1037,479 @@
     b.homeY = GY;
   }
 
+  // ------------------------------------------------------------------ v2.0a: the Nova and the Serpent
+  // Two spells it casts in every phase. The Nova is what a hero who reaches it meets: it comes down out
+  // of the air and plants its staff. The Serpent is fire that goes into the floor and comes up alive.
+  const AS = G.audio.synth;
+  G.audio.define('novaIce', () => {
+    AS.tone({ type: 'sine', f0: 150, f1: 46, dur: 0.32, vol: 0.42 });
+    AS.noise({ dur: 0.36, vol: 0.3, type: 'highpass', f0: 4200, f1: 1800, q: 0.7 });
+    AS.tone({ type: 'triangle', f0: 2400, f1: 3100, dur: 0.45, vol: 0.05 });
+    AS.tone({ type: 'triangle', f0: 3300, f1: 2700, dur: 0.38, vol: 0.04, delay: 0.04 });
+  });
+  G.audio.define('novaBolt', () => {
+    AS.tone({ type: 'sine', f0: 110, f1: 38, dur: 0.46, vol: 0.5 });
+    AS.noise({ dur: 0.42, vol: 0.4, f0: 3000, f1: 600, q: 0.6 });
+    AS.tone({ type: 'sawtooth', f0: 900, f1: 140, dur: 0.22, vol: 0.06 });
+  });
+  G.audio.define('crackle', () => {
+    AS.noise({ dur: 0.05, vol: 0.11, type: 'highpass', f0: 5200, q: 0.6 });
+    AS.tone({ type: 'square', f0: 1800 + Math.random() * 1400, dur: 0.025, vol: 0.022 });
+  });
+  G.audio.define('serpent', () => {
+    AS.noise({ dur: 0.6, vol: 0.3, f0: 600, f1: 2400, q: 0.6, attack: 0.07 });
+    AS.tone({ type: 'sawtooth', f0: 70, f1: 125, dur: 0.55, vol: 0.11, attack: 0.06 });
+  });
+  G.audio.vary.crackle = 3; G.audio.vary.serpent = 2;
+
+  // The staff, held by hand for these two: a target pose that the staff follows on springs, so it
+  // lags, overshoots a little and settles, instead of being set (stiff: how hard it is driven).
+  function holdStaff(t, stiff) {
+    const b = B.body;
+    if (!b.spT || (b.spK || 0) < 0.02) { const s = staff(b.cast); b.sp = { hx: s.hx, hy: s.hy, tilt: s.tilt, vhx: 0, vhy: 0, vt: 0 }; }
+    b.spT = t; b.spS = stiff || 1;
+  }
+
+  // Ice: frost spikes erupt in a front running out both ways from the staff. The front starts slow and
+  // builds to full speed over its first quarter second, so a hero beside it has time to jump.
+  function frostNova(x0, v) {
+    const cw = 40, cells = [], acc = 0.24;
+    const tAt = (r) => (r < v * acc / 2 ? Math.sqrt(2 * r * acc / v) : acc + (r - v * acc / 2) / v);
+    for (const d of [-1, 1]) {
+      for (let i = 0; i < 40; i++) {
+        const r = 24 + i * cw, cx = x0 + d * r;
+        if (cx < WL + 10 || cx > WR - 10) break;
+        cells.push({ x: cx, at: tAt(r), h: 56 - Math.min(12, i * 0.8), seed: (i * 5 + (d > 0 ? 2 : 0)) % 7, d, up: false });
+      }
+    }
+    const last = cells.reduce((m, c) => Math.max(m, c.at), 0);
+    return H.add({
+      kind: 'rime', layer: 'under', tint: ICE, cells, cw, hgt: 56, active: 0.22, x: x0,
+      update() {
+        for (const c of this.cells) {
+          if (!c.up && this.t >= c.at) {
+            c.up = true;
+            if (c.seed % 2 === 0) G.fx.burst(c.x, FLOOR - 6, { n: 3, color: ICE.hot, speed: [90, 330], angle: -Math.PI / 2 + c.d * 0.5, spread: 1.1, life: [0.2, 0.45], kind: 'shard', size: [2, 5], grav: 900 });
+            if (c.seed === 3) G.fx.dust(c.x, FLOOR, 1, { dir: c.d, speed: [30, 120], size: [6, 10], up: 40, a: 0.3, color: '200,230,250' });
+          }
+        }
+        if (this.t > last + this.active + 0.5) this.dead = true;
+      },
+      hits(P) {
+        for (const c of this.cells) {
+          if (this.t >= c.at && this.t < c.at + this.active && Math.abs(P.x - c.x) < cw / 2 + 5 && P.y > FLOOR - c.h + 8) { this.srcX = c.x; return true; }
+        }
+        return false;
+      },
+      draw(ctx) {
+        // the glaze the front leaves behind it on the floor
+        ctx.globalCompositeOperation = 'lighter';
+        for (const d of [-1, 1]) {
+          let reach = 0;
+          for (const c of this.cells) if (c.d === d && this.t >= c.at) reach = Math.max(reach, Math.abs(c.x - this.x));
+          if (reach <= 0) continue;
+          const f = Math.max(0, 1 - Math.max(0, this.t - last) / 0.5);
+          ctx.fillStyle = G.rgba(ICE.boss, 0.22 * f);
+          ctx.fillRect(Math.min(this.x, this.x + d * reach), FLOOR - 3, reach, 5);
+        }
+        for (const c of this.cells) {
+          const e = this.t - c.at;
+          if (e < 0 || e > this.active + 0.36) continue;
+          // up in a flash, then cracking and sinking back in splinters
+          const up = Math.min(1, e / 0.045), gone = e < this.active ? 0 : (e - this.active) / 0.36;
+          const h = c.h * up * (1 - 0.55 * gone), a = 1 - gone * gone;
+          for (let s = -1; s <= 1; s++) {
+            const sx = c.x + s * 13 + (c.seed - 3) * 1.4, sh = h * (s === 0 ? 1 : 0.58 + 0.05 * c.seed), lean = s * 6 + c.d * 4;
+            ctx.fillStyle = G.rgba(ICE.boss, 0.7 * a);
+            ctx.beginPath(); ctx.moveTo(sx - 9, FLOOR); ctx.lineTo(sx + lean, FLOOR - sh); ctx.lineTo(sx + 9, FLOOR); ctx.closePath(); ctx.fill();
+            ctx.fillStyle = G.rgba(ICE.hot, 0.85 * a);
+            ctx.beginPath(); ctx.moveTo(sx - 2.5, FLOOR); ctx.lineTo(sx + lean, FLOOR - sh); ctx.lineTo(sx + 4, FLOOR); ctx.closePath(); ctx.fill();
+          }
+        }
+        ctx.globalCompositeOperation = 'source-over';
+      },
+    });
+  }
+
+  // Lightning: a dome of it, burst out of the planted staff. It is far taller than it is wide, so the
+  // way out is sideways, not up.
+  const DOME_H = 1.7;
+  function dome(x, R, tele) {
+    return H.add({
+      kind: 'blast', layer: 'under', tint: BOLT, x, y: FLOOR, r: R, tele, boom: 0.2, fired: false, arcs: null,
+      update() {
+        if (!this.fired && this.t >= this.tele) {
+          this.fired = true;
+          this.arcs = [];
+          for (let i = 0; i < 6; i++) {
+            const a = Math.PI * (0.08 + 0.84 * i / 5);
+            this.arcs.push(boltPath(this.x, FLOOR - 70, this.x - Math.cos(a) * this.r, FLOOR - Math.sin(a) * this.r * DOME_H));
+          }
+          G.fx.burst(this.x, FLOOR - 40, { n: 24, color: BOLT.hot, speed: [200, 700], angle: -Math.PI / 2, spread: 3, life: [0.15, 0.4], kind: 'spark', size: [2, 3.5], grav: 500 });
+          G.fx.ripple(this.x, FLOOR - 60, this.r * 1.6);
+        }
+        if (this.fired && this.t < this.tele + this.boom && Math.random() < 0.6) {
+          const a = G.rand(0.05, Math.PI - 0.05);
+          G.fx.spawn({ kind: 'spark', x: this.x - Math.cos(a) * this.r, y: FLOOR - Math.sin(a) * this.r * DOME_H, vx: G.rand(-200, 200), vy: G.rand(-200, 100), life: G.rand(0.08, 0.18), size: G.rand(1.2, 2.4), color: BOLT.hot, len: 0.05 });
+        }
+        this.srcX = this.x;
+        if (this.t >= this.tele + this.boom + 0.3) this.dead = true;
+      },
+      hits(P) {
+        if (!this.fired || this.t > this.tele + this.boom) return false;
+        const q = P.box(), dx = Math.max(0, Math.abs(this.x - q.cx) - q.hw), dy = Math.max(0, FLOOR - (q.cy + q.hh));
+        return (dx * dx) / ((this.r - 6) * (this.r - 6)) + (dy * dy) / ((this.r * DOME_H) * (this.r * DOME_H)) < 1;
+      },
+      draw(ctx) {
+        const R = this.r, Rv = R * DOME_H, x = this.x;
+        if (!this.fired) {
+          // a spell's reach, which the hero could not otherwise see: the danger colour, filling
+          const k = this.t / this.tele, late = k > 0.8 ? 0.5 + 0.5 * Math.sin(this.t * 55) : 0;
+          ctx.fillStyle = G.rgba(DANGER, 0.05 + 0.05 * k + 0.07 * late);
+          ctx.beginPath(); ctx.ellipse(x, FLOOR, R, Rv, 0, Math.PI, G.TAU); ctx.fill();
+          ctx.fillStyle = G.rgba(DANGER, 0.16);
+          ctx.beginPath(); ctx.ellipse(x, FLOOR, R * k, Rv * k, 0, Math.PI, G.TAU); ctx.fill();
+          ctx.strokeStyle = G.rgba(DANGER, 0.45 + 0.4 * k); ctx.lineWidth = 2.5;
+          ctx.setLineDash([14, 9]); ctx.lineDashOffset = -this.t * 60;
+          ctx.beginPath(); ctx.ellipse(x, FLOOR, R, Rv, 0, Math.PI, G.TAU); ctx.stroke();
+          ctx.setLineDash([]);
+          return;
+        }
+        const f = G.clamp((this.t - this.tele) / (this.boom + 0.3), 0, 1), fade = 1 - f * f;
+        const grow = 0.86 + 0.14 * Math.sqrt(Math.min(1, (this.t - this.tele) / this.boom));
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.fillStyle = G.rgba(BOLT.boss, 0.2 * fade);
+        ctx.beginPath(); ctx.ellipse(x, FLOOR, R * grow, Rv * grow, 0, Math.PI, G.TAU); ctx.fill();
+        ctx.strokeStyle = G.rgba(BOLT.boss, 0.75 * fade); ctx.lineWidth = 3 * fade + 1;
+        ctx.beginPath(); ctx.ellipse(x, FLOOR, R * grow, Rv * grow, 0, Math.PI, G.TAU); ctx.stroke();
+        for (const pts of this.arcs) drawBolt(ctx, pts, fade * 0.42); // (lightning without a white-out: the Magus stays readable inside it)
+        ctx.globalCompositeOperation = 'source-over';
+      },
+    });
+  }
+
+  // One nova. ice: sinks to the floor with the staff low, its head circling, frost creeping from its
+  // feet; then a breath up, and the staff driven down. bolt: rises with the staff overhead, spinning
+  // faster and faster as lightning crawls down to the floor around it; then the staff driven down.
+  function* novaOne(kind, windup) {
+    const b = B.body;
+    face();
+    B.novaEl = kind === 'ice' ? ICE : BOLT; setElem(B.novaEl); b.want = 1;
+    const y0 = b.y, R = [0, 165, 175, 190][B.phase] + (K.hard() ? 10 : 0);
+    if (kind === 'ice') {
+      G.audio.play('frost');
+      B.glaze = { x: b.x, r: 0, a: 1 };
+      let e = 0;
+      while (e < windup) {
+        const dt = yield;
+        e += dt;
+        const k = Math.min(1, e / windup), a = e * 9;
+        b.y = G.lerp(y0, FLOOR - 10, E.outCubic(Math.min(1, k * 1.5)));
+        b.leanT = 0.08 * Math.min(1, k * 2);
+        holdStaff({ hx: 30 + Math.cos(a) * 6, hy: -48 + Math.sin(a) * 4, tilt: 1.78 + Math.sin(a) * 0.16 });
+        B.glaze.x = b.x; B.glaze.r = 130 * E.outQuad(k);
+        if (Math.random() < dt * 30) G.fx.burst(b.x + G.rand(-1, 1) * B.glaze.r, FLOOR - 3, { n: 1, color: ICE.hot, speed: [20, 90], angle: -Math.PI / 2, spread: 1, life: [0.2, 0.5], kind: 'shard', size: [2, 4] });
+      }
+      // a breath up
+      holdStaff({ hx: 30, hy: -86, tilt: 0.3 }, 2.2); b.leanT = -0.07;
+      yield* tween(b, { y: FLOOR - 32 }, 0.2, E.outQuad);
+      // and down
+      holdStaff({ hx: 38, hy: -58, tilt: 0.04 }, 6); b.leanT = 0.12;
+      yield* tween(b, { y: FLOOR - 6 }, 0.08, E.inCubic);
+      const sx = b.x + b.face * 30;
+      frostNova(sx, ([0, 760, 820, 900][B.phase]) * (K.gentle() ? 0.88 : 1));
+      G.audio.play('novaIce'); G.fx.shake(10); G.fx.stop(0.05);
+      G.fx.thud(sx, FLOOR, 1.0, { col: ICE.boss });
+      G.fx.shards(sx, FLOOR - 10, 9, ICE.boss, { angle: -Math.PI / 2, spread: 2.4, speed: [120, 420], size: [2, 5] });
+      b.sq = 0.14;
+    } else {
+      dome(b.x + b.face * 10, R, windup + 0.1);
+      let e = 0, spin = 0, crk = 0;
+      while (e < windup) {
+        const dt = yield;
+        e += dt; crk -= dt;
+        const k = Math.min(1, e / windup);
+        b.y = G.lerp(y0, GY - 28, E.outCubic(k));
+        b.leanT = -0.09 * k;
+        spin += dt * (4 + 22 * k * k);
+        holdStaff({ hx: 8, hy: -126, tilt: -0.2 + spin }, 1.5);
+        if (crk <= 0) { crk = 0.11 - 0.06 * k; G.audio.play('crackle'); }
+        // lightning crawls down out of the staff and earths itself at the edge of the dome
+        if (Math.random() < dt * (3 + 16 * k)) {
+          const o = tip(), ex = b.x + b.face * 10 + (Math.random() < 0.5 ? -1 : 1) * R * G.rand(0.85, 1);
+          B.novaArcs.push({ pts: boltPath(o.x, o.y, ex, FLOOR), life: 0.1 });
+          G.fx.burst(ex, FLOOR - 2, { n: 2, color: BOLT.hot, speed: [60, 220], angle: -Math.PI / 2, spread: 2, life: [0.1, 0.25], kind: 'spark', size: [1.5, 2.5] });
+        }
+      }
+      // and down: the spin brought round to the floor
+      b.sp.tilt = Math.atan2(Math.sin(b.sp.tilt), Math.cos(b.sp.tilt));
+      holdStaff({ hx: 38, hy: -58, tilt: 0.04 }, 6); b.leanT = 0.12;
+      yield* tween(b, { y: FLOOR - 6 }, 0.1, E.inCubic);
+      G.audio.play('novaBolt'); G.audio.play('zap'); G.fx.shake(12); G.fx.stop(0.06);
+      G.fx.thud(b.x + b.face * 30, FLOOR, 1.1, { col: BOLT.boss });
+      b.sq = 0.16;
+    }
+    B.glaze && (B.glaze.fade = true);
+    // it rocks back off the planted staff
+    b.recV = (b.recV || 0) - b.face * 1.4;
+    b.leanT = -0.04;
+    yield* wait(0.12);
+  }
+
+  function* atkNova() {
+    const b = B.body, P = G.player, T = K.T();
+    B.novaPick = B.picks || 0;
+    if (Math.abs(P.x - b.x) > 230 || Math.abs(P.y - b.y) > 170 || b.y < GY - 40) {
+      // the hero is not near: it steps out of the air beside them
+      let side = P.x < 640 ? 1 : -1;
+      if (Math.abs(P.x + side * 130 - 640) > 560) side = -side;
+      yield* blink(G.clamp(P.x + side * 130, WL + 70, WR - 70), GY);
+    }
+    face();
+    const first = K.chance(0.5, 'dome') ? 'bolt' : 'ice', second = first === 'ice' ? 'bolt' : 'ice';
+    const W1 = { ice: 0.85, bolt: 0.95 };
+    yield* novaOne(first, W1[first] * T);
+    if (B.phase >= 2) {
+      // a second, of the other kind, hard on the first (harder still in the last phase)
+      const tight = B.phase === 3;
+      yield* wait(tight ? 0.08 : 0.28);
+      yield* novaOne(second, (second === 'ice' ? (tight ? 0.5 : 0.65) : (tight ? 0.62 : 0.75)) * T);
+    }
+    yield* wait(0.25);
+    // it lifts off the staff and floats back up
+    b.spT = null; b.leanT = 0;
+    yield* tween(b, { y: GY }, 0.4, E.outCubic);
+    if (B.phase === 3) {
+      const el = B.novaEl;
+      setElem(el === BOLT ? ICE : BOLT); b.want = 1;
+      echo(el);
+      yield* wait(0.85 * T + 0.3);
+    }
+  }
+
+  // Fire: a serpent. It slithers along the floor in surges, up onto the platform the hero stands on,
+  // and turns after them, but it cannot turn on the spot: jumping over it is the way past. A blade
+  // can cut it (the long one takes two). If it is not cut down it bursts where it is.
+  function serpent(x, dir, o) {
+    const P = G.player;
+    return H.add({
+      kind: 'serpent', layer: 'over', tint: FIRE, x, gy: FLOOR, y: FLOOR - 13, vx: dir * 80, vy: 0, dir,
+      r: o.big ? 18 : 14, slashable: true, once: true, hp: o.hp, life: o.life, rise: 0, trail: [{ x, y: FLOOR }],
+      len: o.len, ph: G.rand(0, 6), plat: null, lastPool: x, stall: 0, out: 0, dying: false, flick: 0,
+      update(dt) {
+        this.rise = Math.min(1, this.rise + dt / 0.3);
+        this.flick = Math.max(0, this.flick - dt * 5);
+        if (this.dying) { this.out += dt; if (this.out > 0.4) this.dead = true; return; }
+        this.life -= dt;
+        // the slither: it pushes in surges, fast then slow, like a snake drawing itself along
+        this.ph += dt * (o.big ? 6.5 : 8.5);
+        const surge = 0.42 + 0.58 * Math.pow(Math.max(0, Math.sin(this.ph)), 1.4);
+        const want = Math.abs(P.x - this.x) > 6 ? G.sign(P.x - this.x) : G.sign(this.vx) || this.dir;
+        const max = o.speed * surge * Math.min(1, 0.3 + this.rise);
+        if (this.stall > 0) { this.stall -= dt; this.vx = G.damp(this.vx, 0, 7, dt); }
+        else {
+          this.vx += want * (o.big ? 560 : 720) * dt;
+          if (Math.abs(this.vx) > max) this.vx = G.damp(this.vx, G.sign(this.vx) * max, 6, dt);
+        }
+        this.x += this.vx * dt;
+        if (this.x < WL + 18) { this.x = WL + 18; this.vx = Math.abs(this.vx) * 0.3; }
+        if (this.x > WR - 18) { this.x = WR - 18; this.vx = -Math.abs(this.vx) * 0.3; }
+        // the floor, or the platform the hero stands on once the head is under it
+        let target = FLOOR, plat = null;
+        const pp = P.plat;
+        if (pp && !pp.gone && P.onGround && this.x > pp.x - 4 && this.x < pp.x + pp.w + 4) { target = pp.top; plat = pp; }
+        else if (this.plat && !this.plat.gone && this.x > this.plat.x && this.x < this.plat.x + this.plat.w) { target = this.plat.top; plat = this.plat; }
+        if (target < this.gy - 1) {
+          // it rears up the side
+          this.gy = G.damp(this.gy, target, 7, dt); this.vy = 0;
+          if (this.gy - target < 3) { this.gy = target; this.plat = plat; }
+        } else if (target > this.gy + 1) {
+          // off the edge: it drops
+          this.vy += 1900 * dt; this.gy = Math.min(target, this.gy + this.vy * dt);
+          if (this.gy >= target) { this.gy = target; this.vy = 0; this.plat = plat; G.fx.burst(this.x, target - 4, { n: 6, color: FIRE.boss, speed: [60, 240], angle: -Math.PI / 2, spread: 2.4, life: [0.2, 0.45], size: [2, 5] }); }
+        } else { this.gy = target; this.plat = plat; }
+        this.y = this.gy - 13 - (target < this.gy - 1 ? 6 : 0);
+        // the path the body follows
+        const lp = this.trail[0];
+        if (Math.abs(lp.x - this.x) + Math.abs(lp.y - this.gy) > 3) this.trail.unshift({ x: this.x, y: this.gy });
+        if (this.trail.length > this.len * 4 + 6) this.trail.length = this.len * 4 + 6;
+        this.srcX = this.x - this.vx * 0.05;
+        if (Math.random() < dt * 30) {
+          const q = this.trail[Math.floor(Math.random() * this.trail.length)];
+          G.fx.spawn({ x: q.x + G.rand(-4, 4), y: q.y - G.rand(4, 16), vx: G.rand(-20, 20), vy: -G.rand(40, 140), life: G.rand(0.2, 0.5), size: G.rand(2, 4.5), color: FIRE.boss });
+        }
+        // the second phase: the long one leaves the floor burning behind it
+        // (never at the hero's feet, where jumping over it lands them, nor beside another burning patch)
+        const px = G.clamp(this.x - G.sign(this.vx) * 40, WL + 60, WR - 60);
+        if (o.pools && o.big && this.gy >= FLOOR - 1 && Math.abs(this.x - this.lastPool) > 200 && Math.abs(px - P.x) > 200 && !H.list.some((h) => h.kind === 'pool' && !h.dead && Math.abs(h.x - px) < 200)) {
+          this.lastPool = this.x;
+          H.pool({ x: px, w: 92, tele: 0.55, active: 1.5, tint: FIRE });
+        }
+        if (this.life <= 0) this.burst();
+      },
+      // for the scripted dodger: the ground its head is heading for
+      danger(Pl) {
+        if (this.dying || Math.abs(this.gy - Pl.y) > 70) return null;
+        return [this.x + this.vx * 0.25, this.r + 44, Math.max(0, Math.abs(Pl.x - this.x) - 40) / Math.max(140, Math.abs(this.vx))];
+      },
+      hits(Pl) { return !this.dying && this.rise > 0.6 && G.circleRect(this.x, this.y, this.r * 0.85, Pl.box()); },
+      // touched the hero, or cut down: it comes apart in embers
+      pop() {
+        if (this.dying) return;
+        this.dying = true; this.slashable = false;
+        for (let i = 0; i < this.trail.length; i += 4) {
+          const q = this.trail[i];
+          G.fx.burst(q.x, q.y - 10, { n: 2, color: FIRE.boss, speed: [30, 160], angle: -Math.PI / 2, spread: 2.6, life: [0.25, 0.6], size: [2, 5], grav: -60 });
+        }
+        G.fx.dust(this.x, this.gy - 6, 3, { speed: [10, 60], size: [8, 14], life: [0.6, 1], up: 90, a: 0.38, color: '70,62,66' });
+        G.audio.play('orbPop');
+      },
+      slash() {
+        if (this.dying) return;
+        this.hp--;
+        if (this.hp <= 0) { this.pop(); return; }
+        // the long one takes a cut, recoils, and comes on again
+        this.stall = 0.45; this.vx = -G.sign(P.x - this.x) * 170; this.flick = 1;
+        G.audio.play('orbPop'); G.fx.stop(0.04);
+        G.fx.burst(this.x, this.y, { n: 10, color: FIRE.hot, speed: [100, 380], life: [0.15, 0.4], kind: 'spark', size: [2, 3.5] });
+      },
+      // left alone, it bursts where it is (in the last phase the long one splits in two instead)
+      burst() {
+        if (this.dying) return;
+        if (o.split) {
+          for (const d of [-1, 1]) serpent(G.clamp(this.x + d * 20, WL + 30, WR - 30), d, { len: 10, speed: 420, life: 2.3, hp: 1, pools: o.pools });
+          G.audio.play('serpent'); G.fx.shake(5);
+        } else {
+          H.blast({ x: this.x, y: this.gy - 10, r: o.big ? 108 : 80, tele: 0.38, tint: FIRE, boom: 0.12 });
+          // (a short one, in the second phase on, leaves its patch of burning floor where it bursts, as a fireball does)
+          if (o.pools && !o.big && this.gy >= FLOOR - 1) H.pool({ x: G.clamp(this.x, WL + 60, WR - 60), w: 120, tele: 0.45, active: 2.2, tint: FIRE });
+        }
+        this.pop();
+      },
+      draw(ctx) {
+        const n = this.len, gap = 11, pts = [];
+        // walk back along the path, a point every gap
+        let need = 0, acc = 0;
+        for (let i = 0; i < this.trail.length && pts.length < n; i++) {
+          if (i === 0) { pts.push(this.trail[0]); need = gap; continue; }
+          const a = this.trail[i - 1], c = this.trail[i], d = Math.hypot(c.x - a.x, c.y - a.y);
+          acc += d;
+          while (acc >= need && pts.length < n) { const k = 1 - (acc - need) / Math.max(0.001, d); pts.push({ x: G.lerp(a.x, c.x, k), y: G.lerp(a.y, c.y, k) }); need += gap; }
+        }
+        const fade = this.dying ? Math.max(0, 1 - this.out / 0.4) : 1;
+        const em = this.life < 0.6 && !this.dying ? 0.5 + 0.5 * Math.sin(this.t * 40) : 0; // it swells before it bursts
+        ctx.save();
+        if (this.rise < 1) { ctx.beginPath(); ctx.rect(-80, -400, G.W + 160, this.gy + 400 + 2); ctx.clip(); }
+        const sink = (1 - this.rise) * 34;
+        // a body of living coal: dark, a low burning glow round it, and seams of fire that pulse down its length
+        const seg = [];
+        for (let i = pts.length - 1; i >= 0; i--) {
+          const q = pts[i], k = i / Math.max(1, n - 1);
+          const wv = Math.sin(this.ph * 1.3 - i * 0.75) * (2 + 5 * k); // the slither runs down its length
+          seg.push({ x: q.x, y: q.y - 11 * (1 - 0.5 * k) + wv + sink, r: (this.r - 2) * (1 - 0.72 * k) * (1 + 0.15 * em), k, i });
+        }
+        ctx.globalCompositeOperation = 'lighter';
+        for (const g of seg) { ctx.fillStyle = G.rgba(FIRE.boss, (0.2 - 0.1 * g.k) * fade); ctx.beginPath(); ctx.arc(g.x, g.y, g.r * 1.6, 0, G.TAU); ctx.fill(); }
+        ctx.globalCompositeOperation = 'source-over';
+        for (const g of seg) { ctx.fillStyle = 'rgba(30,9,5,' + (0.95 * fade) + ')'; ctx.beginPath(); ctx.arc(g.x, g.y, g.r, 0, G.TAU); ctx.fill(); }
+        ctx.globalCompositeOperation = 'lighter';
+        for (const g of seg) {
+          const pulse = 0.5 + 0.5 * Math.sin(this.ph * 2 - g.i * 0.9);
+          ctx.fillStyle = G.rgba(FIRE.boss, (0.5 + 0.3 * em) * (1 - 0.5 * g.k) * fade);
+          ctx.beginPath(); ctx.ellipse(g.x, g.y - g.r * 0.25, g.r * 0.7, g.r * 0.32, 0, 0, G.TAU); ctx.fill();
+          ctx.fillStyle = G.rgba(FIRE.hot, 0.42 * pulse * (1 - 0.6 * g.k) * fade);
+          ctx.beginPath(); ctx.arc(g.x, g.y - g.r * 0.3, g.r * 0.26, 0, G.TAU); ctx.fill();
+        }
+        ctx.globalCompositeOperation = 'source-over';
+        // the head: a dark skull in its own flame, jaw open, two eyes
+        const hd = G.sign(this.vx) || this.dir, hx = this.x, hy = this.y + sink + Math.sin(this.ph * 1.3) * 2;
+        const gape = 0.3 + 0.25 * Math.max(0, Math.sin(this.ph)) + 0.3 * this.flick;
+        ctx.save();
+        ctx.translate(hx, hy); ctx.scale(hd, 1);
+        ctx.globalAlpha = fade;
+        ctx.fillStyle = this.flick > 0.5 ? G.rgba(FIRE.hot, 1) : '#2a0d06';
+        const r = this.r;
+        ctx.beginPath(); ctx.moveTo(-r * 0.9, -r * 0.55); ctx.quadraticCurveTo(r * 0.2, -r * 1.05, r * 1.25, -r * 0.2 - gape * 4); ctx.lineTo(r * 0.3, -r * 0.05); ctx.lineTo(-r * 0.9, r * 0.25); ctx.closePath(); ctx.fill();
+        ctx.beginPath(); ctx.moveTo(-r * 0.7, r * 0.2); ctx.lineTo(r * 0.3, r * 0.1); ctx.lineTo(r * 1.05, r * 0.25 + gape * 6); ctx.quadraticCurveTo(0, r * 0.75, -r * 0.7, r * 0.5); ctx.closePath(); ctx.fill();
+        ctx.strokeStyle = G.rgba(FIRE.boss, 0.9); ctx.lineWidth = 1.6;
+        ctx.beginPath(); ctx.moveTo(-r * 0.9, -r * 0.55); ctx.quadraticCurveTo(r * 0.2, -r * 1.05, r * 1.25, -r * 0.2 - gape * 4); ctx.stroke();
+        D.glow(ctx, FIRE.boss, r * 0.25, -r * 0.4, 10, 0.8);
+        ctx.fillStyle = G.rgba(FIRE.hot, 1);
+        D.poly(ctx, [r * 0.05, -r * 0.48, r * 0.55, -r * 0.42, r * 0.12, -r * 0.3]); ctx.fill();
+        ctx.restore();
+        ctx.restore();
+      },
+    });
+  }
+
+  function* atkSerpent() {
+    yield* reposition();
+    const b = B.body, T = K.T();
+    // the tell, in how the staff is swirled low in front: one slow wide turn is the one long serpent;
+    // quick tight circles are a brood of short ones
+    const brood = K.chance(0.5, 'brood');
+    face(); setElem(FIRE); b.want = 1;
+    const windup = (brood ? 0.8 : 0.95) * T, y0 = b.y;
+    G.audio.play('charge', { dur: windup });
+    let e = 0, a = -Math.PI / 2;
+    while (e < windup) {
+      const dt = yield;
+      e += dt;
+      const k = Math.min(1, e / windup);
+      a += dt * (brood ? 16 : G.TAU * 0.95 / windup);
+      const amp = brood ? 0.17 : 0.45;
+      holdStaff({ hx: 30 + Math.cos(a) * (brood ? 4 : 12), hy: -56 + Math.sin(a) * (brood ? 3 : 8), tilt: (brood ? 1.6 : 1.5) + Math.sin(a) * amp }, 1.4);
+      b.leanT = 0.04 + 0.03 * k + Math.sin(a) * (brood ? 0.01 : 0.03);
+      b.y = y0 + 8 * E.outQuad(k);
+      if (Math.random() < 0.7) { const o = tip(); G.fx.spawn({ x: o.x + G.rand(-3, 3), y: o.y + G.rand(-3, 3), vx: G.rand(-30, 30), vy: -G.rand(20, 80), life: G.rand(0.25, 0.5), size: G.rand(3, 6), color: FIRE.boss }); }
+    }
+    // the staff drives down at the floor in front, and the fire goes into the ground
+    holdStaff({ hx: 42, hy: -52, tilt: 1.95 }, 2); b.leanT = 0.12;
+    yield* wait(0.09);
+    const sx = G.clamp(b.x + b.face * 84, WL + 40, WR - 40);
+    G.audio.play('serpent'); G.audio.play('whoosh'); G.fx.shake(6);
+    G.fx.thud(sx, FLOOR, 0.8, { col: FIRE.boss });
+    G.fx.burst(sx, FLOOR - 4, { n: 14, color: FIRE.boss, speed: [80, 360], angle: -Math.PI / 2, spread: 1.6, life: [0.3, 0.7], size: [3, 7], grav: -100 });
+    b.recV = (b.recV || 0) - b.face * 1.0;
+    const ph = B.phase, pools = ph >= 2, mine = [];
+    if (!brood) mine.push(serpent(sx, b.face, { big: true, len: 22, speed: 330, life: 4.2, hp: 2, pools, split: ph === 3 }));
+    else mine.push(serpent(sx, b.face, { len: 11, speed: 410, life: 3.2, hp: 1, pools }));
+    yield* wait(0.12);
+    b.leanT = -0.03;
+    holdStaff({ hx: 34, hy: -62, tilt: 1.2 }, 1.2);
+    if (brood) {
+      const n = ph === 3 ? 3 : 2;
+      for (let i = 1; i < n; i++) {
+        yield* wait(0.26);
+        const x2 = G.clamp(b.x + b.face * (60 + i * 40), WL + 40, WR - 40);
+        G.audio.play('serpent');
+        G.fx.burst(x2, FLOOR - 4, { n: 8, color: FIRE.boss, speed: [80, 300], angle: -Math.PI / 2, spread: 1.6, life: [0.3, 0.6], size: [3, 6], grav: -100 });
+        mine.push(serpent(x2, b.face, { len: 11, speed: 410, life: 3.2 - 0.15 * i, hp: 1, pools }));
+      }
+    }
+    // it conducts them: the staff follows the lead serpent until they are spent
+    let t = 0;
+    while (t < 3.4 && mine.some((s) => !s.dead && !s.dying)) {
+      const dt = yield;
+      t += dt;
+      const s = mine.find((q) => !q.dead && !q.dying);
+      if (!s) break;
+      if (Math.abs(s.x - b.x) > 20) b.face = s.x > b.x ? 1 : -1;
+      const dx = (s.x - b.x) * b.face, dy = s.y - (b.y - 70);
+      holdStaff({ hx: 32, hy: -62, tilt: G.clamp(Math.atan2(Math.max(10, dx), -dy), 0.7, 2.3) }, 0.8);
+      b.leanT = 0.06;
+    }
+    b.spT = null; b.leanT = 0;
+    yield* tween(b, { y: y0 }, 0.3, E.outQuad);
+    yield* wait(0.3);
+  }
+
   // Back to rest. The staff comes down and what is left of the spell leaves it in its element's own
   // way: ice drops off the head of the staff in splinters, fire goes out in smoke, lightning crawls
   // down the wood and earths itself. Then the Magus sinks a little in the air and floats back up.
-  const ELEM_OF = { shards: ICE, rime: ICE, crystals: ICE, blizzard: ICE, fireball: FIRE, firewall: FIRE, comet: FIRE, cataclysm: FIRE, bolts: BOLT, spheres: BOLT, storm: BOLT, invoke: BOLT, blacksun: VOID, foresight: VOID };
+  const ELEM_OF = { serpent: FIRE, shards: ICE, rime: ICE, crystals: ICE, blizzard: ICE, fireball: FIRE, firewall: FIRE, comet: FIRE, cataclysm: FIRE, bolts: BOLT, spheres: BOLT, storm: BOLT, invoke: BOLT, blacksun: VOID, foresight: VOID };
   B.recover = function* (name) {
-    const b = B.body, el = ELEM_OF[name] || ICE;
+    const b = B.body, el = name === 'nova' ? (B.novaEl || ICE) : (ELEM_OF[name] || ICE);
     if (b.hidden || b.spent) return;
     const o = tip();
     b.want = 0; b.charge = 0; setElem(el);
@@ -1068,6 +1553,7 @@
     shards: coda(atkShards, ICE), rime: coda(atkRime, ICE), fireball: coda(atkFireball, FIRE), bolts: coda(atkBolts, BOLT),
     spheres: coda(atkSpheres, BOLT), firewall: coda(atkFirewall, FIRE), crystals: coda(atkCrystals, ICE), storm: coda(atkStorm, BOLT),
     blizzard: atkBlizzard, cataclysm: atkCataclysm,
+    nova: atkNova, serpent: coda(atkSerpent, FIRE),
     blacksun: atkBlacksun, foresight: atkForesight, // corrupted only
   };
 
@@ -1170,6 +1656,28 @@
       const dx = (B.readAim.ax - (b.x + b.face * 30)) * b.face, dy = B.readAim.ay - (b.y - 70);
       b.readTilt = G.damp(b.readTilt, G.clamp(Math.atan2(dx, -dy), 0.4, 2.9), 10, dt);
     }
+    // the staff held by hand follows its pose on springs (a little under-damped: it overshoots and settles)
+    if (b.spT && b.sp) {
+      const kS = 230 * (b.spS || 1), cS = 2 * Math.sqrt(kS) * 0.72, s = b.sp, t = b.spT;
+      if (Math.abs(t.tilt - s.tilt) > Math.PI) s.tilt += G.TAU * Math.round((t.tilt - s.tilt) / G.TAU);
+      s.vhx += (kS * (t.hx - s.hx) - cS * s.vhx) * dt; s.hx += s.vhx * dt;
+      s.vhy += (kS * (t.hy - s.hy) - cS * s.vhy) * dt; s.hy += s.vhy * dt;
+      s.vt += (kS * (t.tilt - s.tilt) - cS * s.vt) * dt; s.tilt += s.vt * dt;
+    }
+    b.spK = G.damp(b.spK || 0, b.spT ? 1 : 0, b.spT ? 16 : 7, dt);
+    // the body leans on a spring too
+    b.leanV = (b.leanV || 0) + (140 * ((b.leanT || 0) - (b.lean || 0)) - 15 * (b.leanV || 0)) * dt;
+    b.lean = (b.lean || 0) + b.leanV * dt;
+    // the hem lags the body: when it drops the robe floats up, and when it stops the robe swings on down
+    if (dt > 0) {
+      const vy = (b.y - (b.py == null ? b.y : b.py)) / dt, ay = G.clamp((vy - (b.pvy || 0)) / dt, -9000, 9000);
+      b.hv = (b.hv || 0) + (-190 * (b.hl || 0) - 13 * (b.hv || 0) - ay * 0.6) * dt;
+      b.hl = G.clamp((b.hl || 0) + b.hv * dt, -12, 12);
+      b.py = b.y; b.pvy = vy;
+    }
+    for (const s of B.novaArcs) s.life -= dt;
+    B.novaArcs = B.novaArcs.filter((s) => s.life > 0);
+    if (B.glaze && B.glaze.fade) { B.glaze.a -= dt * 1.6; if (B.glaze.a <= 0) B.glaze = null; }
     D.chainStep(B.cape, b.x - b.face * 12, b.y - 92, dt, { seg: 13, grav: 50, drift: 24, face: b.face, wave: 10, rate: 5 });
     for (const s of B.shards) s.life -= dt;
     B.shards = B.shards.filter((s) => s.life > 0);
@@ -1281,6 +1789,18 @@
 
   // The frozen floor and the storm overhead: drawn over the arena, under the hero.
   B.drawOver = function (ctx) {
+    if (B.glaze && B.glaze.r > 2) {
+      // frost creeping out from under it, before an ice Nova
+      const gz = B.glaze, a = Math.max(0, gz.a);
+      const g = ctx.createRadialGradient(gz.x, FLOOR, 4, gz.x, FLOOR, gz.r);
+      g.addColorStop(0, G.rgba(ICE.hot, 0.5 * a)); g.addColorStop(0.7, G.rgba(ICE.boss, 0.28 * a)); g.addColorStop(1, G.rgba(ICE.boss, 0));
+      ctx.fillStyle = g;
+      ctx.beginPath(); ctx.ellipse(gz.x, FLOOR + 2, gz.r, 9, 0, 0, G.TAU); ctx.fill();
+      ctx.strokeStyle = G.rgba(ICE.hot, 0.45 * a); ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      for (let i = 0; i < 9; i++) { const s = (i * 0.37) % 1, x1 = gz.x + (s * 2 - 1) * gz.r * 0.9; ctx.moveTo(gz.x + (x1 - gz.x) * 0.3, FLOOR - 1); ctx.lineTo(x1, FLOOR + 1 + (i % 3)); }
+      ctx.stroke();
+    }
     if (B.iceK > 0.001) {
       const l = Math.max(WL, 640 - 640 * B.iceK), r = Math.min(WR, 640 + 640 * B.iceK), w = r - l;
       const g = ctx.createLinearGradient(0, FLOOR - 5, 0, FLOOR + 26);
@@ -1331,6 +1851,7 @@
       ctx.fillStyle = G.rgba(ICE.hot, a);
       D.poly(ctx, [s.x, s.y - 12, s.x + 5, s.y, s.x, s.y + 12, s.x - 5, s.y]); ctx.fill();
     }
+    if (B.novaArcs.length) { ctx.globalCompositeOperation = 'lighter'; for (const s of B.novaArcs) drawBolt(ctx, s.pts, Math.min(1, s.life / 0.06) * 0.7); ctx.globalCompositeOperation = 'source-over'; }
     if (b.hidden || b.alpha <= 0.01) return;
 
     const down = B.staggered || b.spent || B.dying;
@@ -1352,6 +1873,7 @@
     ctx.translate(b.x + b.kx + jx, b.y + bob);
     K.recoil(ctx, b);
     ctx.scale(K.faceX(b), 1); // (a turn narrows the figure through it: see K.turn)
+    if (b.lean) ctx.rotate(G.clamp(b.lean, -0.35, 0.4)); // (leaning into a cast, about its feet)
     if (down) ctx.rotate(0.28);
 
     D.glow(ctx, col, 0, -70, 130, 0.2 + 0.2 * c);
@@ -1369,15 +1891,17 @@
     const g = ctx.createLinearGradient(0, -96, 0, 6);
     g.addColorStop(0, '#2c3690'); g.addColorStop(0.5, '#181d58'); g.addColorStop(1, '#070920');
     ctx.fillStyle = g;
-    D.poly(ctx, [-15, -95, 15, -95, 11, -64, 15, -44, 22 + sw, -22, 29 + sw, -6, 21 + sw, 5, 15 + sw * 0.6, -7, 8, 7, 1, -6, -6 + sw * 0.5, 6, -12, -7, -19 + sw, 4, -28 + sw, -9, -21, -30, -14, -46, -10, -64]);
+    // the hem lags the body (b.hl): the lower robe lifts and flares, or swings on down
+    const hl = b.hl || 0, hem = (a) => { if (!hl) return a; const o = a.slice(); for (let i = 0; i < o.length; i += 2) { const q = G.clamp((o[i + 1] + 50) / 56, 0, 1); o[i] *= 1 + Math.abs(hl) * 0.018 * q; o[i + 1] -= hl * q; } return o; };
+    D.poly(ctx, hem([-15, -95, 15, -95, 11, -64, 15, -44, 22 + sw, -22, 29 + sw, -6, 21 + sw, 5, 15 + sw * 0.6, -7, 8, 7, 1, -6, -6 + sw * 0.5, 6, -12, -7, -19 + sw, 4, -28 + sw, -9, -21, -30, -14, -46, -10, -64]));
     ctx.fill();
     // light along the leading edge
     ctx.fillStyle = G.rgba(col, 0.28);
-    D.poly(ctx, [15, -95, 11, -64, 15, -44, 22 + sw, -22, 29 + sw, -6, 25 + sw, -7, 18 + sw, -24, 11, -44, 7.5, -64, 11, -95]); ctx.fill();
+    D.poly(ctx, hem([15, -95, 11, -64, 15, -44, 22 + sw, -22, 29 + sw, -6, 25 + sw, -7, 18 + sw, -24, 11, -44, 7.5, -64, 11, -95])); ctx.fill();
     // hem trim
     ctx.strokeStyle = G.rgba(col, 0.75); ctx.lineWidth = 1.6;
     ctx.beginPath();
-    [[29 + sw, -6], [21 + sw, 5], [15 + sw * 0.6, -7], [8, 7], [1, -6], [-6 + sw * 0.5, 6], [-12, -7], [-19 + sw, 4], [-28 + sw, -9]].forEach((p, i) => (i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1])));
+    [[29 + sw, -6], [21 + sw, 5], [15 + sw * 0.6, -7], [8, 7], [1, -6], [-6 + sw * 0.5, 6], [-12, -7], [-19 + sw, 4], [-28 + sw, -9]].map((p) => hem(p)).forEach((p, i) => (i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1])));
     ctx.stroke();
     // stole: two hanging bands marked with runes
     for (const sx of [-5.5, 3]) {

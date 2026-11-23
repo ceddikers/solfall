@@ -23,13 +23,35 @@
     answer: 'hunt',
     gaps: [0, 0.8, 0.62, 0.5],
     bags: {
-      1: ['lunge', 'flurry', 'knives', 'ambush', 'backstab', 'echo'],
-      2: ['pincer', 'flurry', 'knives', 'ambush', 'backstab', 'mirror', 'rain', 'cross', 'echo'],
-      3: ['pincer', 'flurry', 'ambush', 'backstab', 'mirror', 'rain', 'cross', 'cuts', 'mark', 'echo', 'hunt'],
+      1: ['lunge', 'flurry', 'knives', 'ambush', 'backstab', 'echo', 'stance', 'crescent'],
+      2: ['pincer', 'flurry', 'knives', 'ambush', 'backstab', 'mirror', 'rain', 'cross', 'echo', 'stance', 'crescent'],
+      3: ['pincer', 'flurry', 'ambush', 'backstab', 'mirror', 'rain', 'cross', 'cuts', 'mark', 'echo', 'hunt', 'stance', 'crescent'],
     },
     cards: { 2: ['SHADOWS', 'It no longer hunts alone'], 3: ['EXECUTION', 'No more warnings than these'] },
     first: { 1: 'lunge', 2: 'mirror', 3: 'cuts' },
   };
+
+  // its own sounds (never a hero's: Eos's draw, sheath and iai stay hers)
+  {
+    const S = G.audio.synth;
+    // a blow caught on a hand's width of drawn steel: a dry scrape and a thin, sour ring
+    G.audio.define('veilparry', () => {
+      S.noise({ dur: 0.04, vol: 0.32, type: 'highpass', f0: 4200 });
+      S.tone({ type: 'square', f0: 2400, f1: 1300, dur: 0.06, vol: 0.09 });
+      S.tone({ type: 'triangle', f0: 1240, f1: 1170, dur: 0.38, vol: 0.06 });
+      S.noise({ dur: 0.09, vol: 0.18, type: 'lowpass', f0: 700, f1: 200 });
+    });
+    // its blades seated in their sheaths: a low, dry tick and nothing after it
+    G.audio.define('veilclick', () => {
+      S.noise({ dur: 0.025, vol: 0.26, f0: 1500, q: 5 });
+      S.tone({ type: 'triangle', f0: 380, f1: 300, dur: 0.06, vol: 0.12 });
+    });
+    // the crescent in flight: air cut over and over, loudest as it turns
+    G.audio.define('veilwhirr', (o) => {
+      const dur = o.dur || 1.4, n = Math.round(dur / 0.075);
+      for (let i = 0; i < n; i++) S.noise({ dur: 0.055, vol: 0.03 + 0.07 * Math.sin(Math.PI * (i + 0.5) / n), f0: 1500 + 600 * Math.sin(Math.PI * i / n), q: 3, delay: i * 0.075 });
+    });
+  }
 
   // ------------------------------------------------------------------ poses
   // lean (upper body), hip height, whole-body turn, two feet (x, y), two hands (x, y, blade angle)
@@ -56,7 +78,31 @@
     strings: [-0.14, -38, 0, 16, 0, -14, 0, -8, -80, -2.0, -22, -44, 2.4],
     cast: [0.35, -36, 0, 21, 0, -16, 0, 37, -55, -0.15, 30, -45, 0.1],
     streak: null, // (corrupted) the dash, laid along the line of a cut (set for each cut)
+    // the stance: bowed, both blades home along the forearms, the lead hand on the hilt either low at
+    // the hip (the cut will come low) or high at the shoulder (it will come at a leaping height)
+    stanceLo: [0.6, -30, 0, 19, 0, -18, 0, 7, -35, 2.75, -3, -38, 2.85],
+    stanceHi: [0.6, -30, 0, 19, 0, -18, 0, 11, -62, -2.7, -1, -50, -2.85],
+    // a blow caught on a hand's width of drawn steel
+    parry: [0.25, -34, 0, 21, 0, -16, 0, 24, -52, -1.25, -4, -42, 2.8],
+    // the draw at a leaping height: laid out flat in the air, the blade out ahead
+    drawHi: [1.3, -34, 0, -14, -12, -30, -4, 56, -44, -0.12, 2, -38, 3.0],
+    // the crescent: wound back over the head, or swept back low by the hip; let go; watched; caught
+    windOver: [-0.32, -38, 0, 18, 0, -17, 0, -18, -92, -2.3, 12, -58, 0.35],
+    throwOver: [0.72, -31, 0, 23, 0, -14, -2, 36, -34, 0.6, -2, -42, 2.8],
+    windSide: [0.15, -27, 0, 21, 0, -19, 0, -15, -44, 3.05, 21, -46, 0.25],
+    throwSide: [0.55, -30, 0, 27, 0, -12, 0, 40, -38, 0.0, -10, -44, 2.8],
+    watch: [0.12, -37, 0, 15, 0, -14, 0, 26, -50, 2.4, -12, -46, 2.7],
+    catch: [-0.05, -38, 0, 12, 0, -16, 0, 30, -60, -0.6, -13, -47, 2.7],
   };
+  // poses it snaps into rather than eases (the rest follow at the usual rate)
+  const SNAP = { dash: 60, dive: 60, streak: 60, drawHi: 60, throwOver: 44, throwSide: 44, parry: 50 };
+  // a pose between two others, written into a figure's own scratch pose (a.live)
+  function mixPose(a, P0, P1, k) {
+    const p = a.live || (a.live = P0.slice());
+    for (let i = 0; i < NP; i++) p[i] = P0[i] + (P1[i] - P0[i]) * k;
+    a.pose = 'live';
+    return p;
+  }
   const NP = 13;
   function runPose(t) {
     const s = Math.sin(t), c = Math.cos(t);
@@ -72,8 +118,15 @@
     B.lights = true; B.dark = 0; B.wires = []; B.wireHit = 0;
     B.pinned = null; B.strings = 0;
   };
-  B.onRelease = function () { const b = B.body; b.fading = false; b.hurt = false; b.pose = 'idle'; b.hidden = false; B.pinned = null; B.strings = 0; };
-  B.onInterrupt = function () { B.body.fading = false; for (const c of B.clones) smoke(c.x, c.y - 40); B.clones.length = 0; B.pinned = null; B.strings = 0; };
+  B.onRelease = function () { const b = B.body; b.fading = false; b.hurt = false; b.pose = 'idle'; b.hidden = false; B.pinned = null; B.strings = 0; b.still = false; b.held = false; B.guard = null; };
+  B.onInterrupt = function () { const b = B.body; b.fading = false; for (const c of B.clones) smoke(c.x, c.y - 40); B.clones.length = 0; B.pinned = null; B.strings = 0; b.still = false; b.held = false; B.guard = null; };
+  // In its stance a blow is caught, not taken (see atkStance). Dawnbreak is not caught.
+  B.blocked = function (t, info) {
+    const g = B.guard;
+    if (!g || !g.on || t.kind !== 'body' || G.player.ulting) return false;
+    if (!g.hit) g.hit = { x: info.x, y: info.y };
+    return true;
+  };
   B.onStagger = function () { B.body.pose = 'kneel'; };
   B.staggerWord = 'CAUGHT'; B.staggerMult = 1.9; B.staggerDur = 0.7;
   B.staggerIn = function* () {
@@ -602,6 +655,428 @@
     yield* wait(0.7);
   }
 
+  // ------------------------------------------------------------------ the stance
+  // Stance. It sheathes both blades and goes still, head bowed, its scarf settling. Strike it and it
+  // catches the blow on a hand's width of steel, is gone, and cuts back through where you stand (step
+  // or dash off the line). Wait, and it draws: through you, along the floor, to the far side.
+  //   the lead hand low on the hilt, by the hip: the cut comes low along the floor (jump it)
+  //   the lead hand high, at the shoulder: it springs and cuts at a leaping height (stay down)
+  // In the second phase a shadow takes the stance on your other side and draws a beat after it; in
+  // the third it draws, takes a new grip where it lands, and draws back the other way.
+
+  // The stance as it deepens (k from 0 to 1): lower, more bowed, the breath held by the end.
+  function stanceTo(a, high, k) {
+    const p = mixPose(a, POSES[high ? 'stanceHi' : 'stanceLo'], POSES[high ? 'stanceHi' : 'stanceLo'], 0);
+    p[0] += 0.09 * k; p[1] += 3.5 * k;
+    p[1] += Math.sin(B.t * 2.2 + (a.clone ? 1.3 : 0)) * 0.6 * (1 - k);
+    a.still = true;
+  }
+  // Hold the stance for `dur`, deepening; the blade catches the light just before it draws. Stops at
+  // once if a blow is caught (B.guard.hit). `lane`: a quiet lane for a low draw (tests read it).
+  function* holdStance(a, high, dur, from) {
+    if (!high) H.lane({ x: WL, y: FLOOR - 66, w: WR - WL, h: 66, dir: a.face, dur, quiet: true });
+    let e = 0, glinted = false;
+    while (e < dur && !a.gone) {
+      const dt = yield;
+      e += dt;
+      stanceTo(a, high, (from || 0) + (1 - (from || 0)) * E.inQuad(Math.min(1, e / dur)));
+      if (!glinted && dur - e < 0.2) {
+        glinted = true;
+        const hx = a.x + a.face * a.p[7], hy = a.y + a.p[8];
+        G.fx.glint(hx, hy, a.clone ? 18 : 24, a.clone ? '170,160,210' : G.pal().hot, 0.2); G.audio.play('glint');
+      }
+      if (a === B.body && B.guard && B.guard.hit) return false;
+    }
+    return true;
+  }
+  // The draw: across the floor through the hero to `toX`. Low, it goes as a lunge goes; high, it
+  // springs first and then crosses laid out flat at a leaping height. Returns its line, for the
+  // trail it leaves when the blade goes home.
+  function* iaiDraw(a, high, toX) {
+    const dir = G.sign(toX - a.x) || a.face, sh = !!a.clone;
+    a.face = dir; a.still = false;
+    const trailCol = sh ? '60,50,96' : G.pal().boss;
+    if (high) {
+      // the spring: up off the back foot, before anything can cut
+      a.pose = 'drawHi';
+      G.fx.dust(a.x, FLOOR, 4, { dir: -dir, speed: [40, 200], size: [5, 10], up: 24 });
+      const y0 = a.y, x0 = a.x;
+      let e = 0;
+      while (e < 0.09 && !a.gone) { e += yield; const k = Math.min(1, e / 0.09); a.y = y0 - 54 * E.outQuad(k); a.x = x0 + dir * 8 * k; }
+    }
+    if (a.gone) return null;
+    a.hurt = true;
+    G.audio.play('streak'); G.audio.play('blade');
+    a.pose = high ? 'drawHi' : 'dash';
+    const x0 = a.x, y0 = a.y, dist = Math.abs(toX - x0), dur = Math.max(0.15, dist / 1500);
+    let e = 0;
+    while (e < dur && !a.gone) {
+      e += yield;
+      const k = Math.min(1, e / dur);
+      // out of the sheath at once, and slowing all the way to the far side
+      a.x = G.lerp(x0, toX, E.outQuad(k));
+      if (high) a.y = y0 + 8 * k * k;
+      if (k > 0.8) a.hurt = false;
+      G.fx.spawn({ x: a.x - dir * 20, y: a.y - G.rand(10, 60), vx: -dir * G.rand(40, 200), vy: G.rand(-30, 30), life: 0.25, size: G.rand(4, 9), color: sh ? '20,16,34' : G.pal().boss });
+    }
+    a.hurt = false;
+    if (a.gone) return null;
+    if (high) {
+      // down out of the air, onto the forward foot
+      a.pose = 'air';
+      const y1 = a.y;
+      let f = 0;
+      while (f < 0.14 && !a.gone) { const dt = yield; f += dt; const k = Math.min(1, f / 0.14); a.y = G.lerp(y1, FLOOR, k * k); a.x = G.clamp(a.x + dir * 140 * (1 - k) * dt, WL + 30, WR - 30); }
+      a.y = FLOOR;
+      if (!sh) { G.fx.thud(a.x, FLOOR, 0.45, { noCrack: true }); G.audio.play('land'); }
+    }
+    a.pose = 'skid';
+    G.fx.dust(a.x, FLOOR, 5, { dir, speed: [60, 260], size: [6, 12], up: 30 });
+    return high ? { x0, x1: a.x, y0: FLOOR - 86, y1: FLOOR - 62, col: trailCol } : { x0, x1: a.x, y0: FLOOR - 20, y1: FLOOR - 42, col: trailCol };
+  }
+  // The blade home, with a dry click, and the line of each cut it made shows for a moment.
+  function* sheatheHome(a, trails) {
+    a.pose = 'sheathe';
+    yield* wait(0.16);
+    if (a.gone) return;
+    G.audio.play('veilclick');
+    for (const tr of trails) {
+      if (!tr) continue;
+      const mx = (tr.x0 + tr.x1) / 2, my = (tr.y0 + tr.y1) / 2, ang = Math.atan2(tr.y1 - tr.y0, tr.x1 - tr.x0);
+      G.fx.cut(mx, my, ang, Math.hypot(tr.x1 - tr.x0, tr.y1 - tr.y0), 3, tr.col, a.clone ? '170,160,210' : G.pal().hot, 0.4);
+    }
+  }
+
+  function* atkStance() {
+    const b = B.body, P = G.player, T = K.T(), ph = B.phase;
+    if (b.y < FLOOR - 1) { b.pose = 'air'; yield* tween(b, { y: FLOOR }, 0.2, E.inQuad); G.fx.thud(b.x, FLOOR, 0.5, { noCrack: true }); }
+    const high = K.chance(0.5, 'high');
+    b.face = P.x > b.x ? 1 : -1;
+    // the blades go home, a turn of each wrist, and it settles its weight
+    stanceTo(b, high, 0);
+    yield* wait(0.16);
+    G.audio.play('veilclick');
+    G.fx.dust(b.x, FLOOR, 2, { speed: [10, 60], size: [4, 7], up: 10 });
+    // its shadow, on the hero's other side (a fierce third phase too)
+    let c = null, cHigh = false;
+    if (ph === 2 || (ph === 3 && K.hard())) {
+      const sx = G.clamp(P.x + (P.x - b.x), WL + 60, WR - 60);
+      if (Math.abs(sx - P.x) > 120) {
+        c = clone(sx, FLOOR, G.sign(P.x - sx) || 1, 'crouch');
+        cHigh = K.chance(0.5, 'shadeHigh');
+        stanceTo(c, cHigh, 0);
+      }
+    }
+    const hold = (ph === 1 ? 1.05 : ph === 2 ? 1.0 : 0.88) * T;
+    B.guard = { on: true, hit: null };
+    // (the shadow keeps its stance alongside: it holds on a beat after the Veil draws)
+    const shadeGap = Math.max(0.8, 0.85 * T);
+    const shade = c ? (function* () {
+      yield* holdStance(c, cHigh, hold + shadeGap);
+      if (c.gone || !B.clones.includes(c)) return;
+      const tr = yield* iaiDraw(c, cHigh, farSide(c.x));
+      if (!c.gone) { yield* sheatheHome(c, [tr]); yield* wait(0.1); c.gone = true; smoke(c.x, c.y - 40); }
+    })() : null;
+    let waited;
+    if (shade) {
+      // the two run side by side until the Veil draws; the shadow's part goes on after
+      let done = false;
+      const veil = (function* () { waited = yield* holdStance(b, high, hold); done = true; })();
+      while (!done) { const dt = yield; veil.next(dt); shade.next(dt); }
+      B.shade = shade;
+    } else waited = yield* holdStance(b, high, hold);
+
+    if (!waited) {
+      // caught: the blow rings off a hand's width of steel, and it is gone
+      b.still = false; b.pose = 'parry';
+      const hx = b.x + b.face * 24, hy = b.y - 52;
+      G.audio.play('veilparry'); G.fx.stop(0.07); G.fx.shake(5);
+      G.fx.glint(hx, hy, 28, G.pal().hot, 0.22);
+      G.fx.burst(hx, hy, { n: 10, color: G.pal().hot, speed: [140, 480], angle: b.face > 0 ? Math.PI : 0, spread: 1.6, life: [0.1, 0.3], kind: 'spark', size: [1.4, 2.6], grav: 600 });
+      b.recV = (b.recV || 0) - b.face * 1.6; b.kx = -b.face * 5;
+      if (c && !c.gone) { c.gone = true; smoke(c.x, c.y - 40); }
+      B.shade = null;
+      yield* wait(0.14);
+      B.guard.on = false;
+      yield* vanish();
+      yield* wait(0.1);
+      // back through where the hero stands, from out of the dark
+      const gy = P.plat && P.onGround ? P.plat.y : FLOOR, px = P.x, py = gy - 24;
+      const ang = G.rng() < 0.5 ? G.rrand(0.5, 0.75) : Math.PI - G.rrand(0.5, 0.75), len = 560;
+      const tele = (ph === 3 ? 0.3 : 0.36) * T;
+      cutLine(px - Math.cos(ang) * len * 0.6, py - Math.sin(ang) * len * 0.6, ang, len, tele);
+      yield* wait(tele + 0.04);
+      appear(G.clamp(px + Math.cos(ang) * len * 0.4, WL + 50, WR - 50), FLOOR, 'skid');
+      B.guard = null;
+      yield* wait(0.75);
+      return;
+    }
+    B.guard = null;
+    b.face = P.x > b.x ? 1 : -1;
+    const trails = [];
+    const veilPart = (function* () {
+      trails.push(yield* iaiDraw(b, high, farSide(b.x)));
+      if (ph === 3) {
+        // a new grip where it lands, and back the other way
+        const high2 = K.chance(0.5, 'high2');
+        yield* wait(0.08);
+        b.face = P.x > b.x ? 1 : -1;
+        stanceTo(b, high2, 0.3);
+        yield* holdStance(b, high2, 0.42 * T, 0.3);
+        b.face = P.x > b.x ? 1 : -1;
+        trails.push(yield* iaiDraw(b, high2, farSide(b.x)));
+      }
+      yield* sheatheHome(b, trails);
+      b.exposed = true;
+      yield* wait(0.55);
+      b.exposed = false;
+    })();
+    if (B.shade) { const sg = B.shade; B.shade = null; yield* par(veilPart, sg); } else yield* veilPart;
+  }
+
+  // ------------------------------------------------------------------ the crescent
+  // Crescent. A great curved blade from its back, thrown, that flies out past the hero and comes
+  // home to its hand. The throw tells the flight:
+  //   overhand, the arm wound high behind the head: up and over you, then back low along the floor
+  //   (stay down while it goes over, jump it as it comes home)
+  //   sidearm, swept back low by the hip: out low along the floor, then back at a leaping height
+  //   (jump it going out, stay down as it comes home)
+  // In the second phase a shadow on your other side throws one with it, the same way; in the third it
+  // catches the blade and throws again at once, and that throw says how the second one flies.
+  const LOWY = FLOOR - 24, HIGHY = FLOOR - 90, TOPY = FLOOR - 250;
+
+  // The blade's shape: a thick crescent, the edge round its outside.
+  function crescentShape(ctx, x, y, rot, R, col, hot, al, edge) {
+    ctx.save();
+    ctx.translate(x, y); ctx.rotate(rot); ctx.globalAlpha = al;
+    ctx.beginPath();
+    ctx.arc(0, 0, R, 0.947, G.TAU - 0.947, false);
+    ctx.arc(R * 0.3, 0, R * 0.86, -1.234, 1.234, true);
+    ctx.closePath();
+    ctx.fillStyle = '#1b1730'; ctx.fill();
+    if (edge) { ctx.strokeStyle = G.rgba(DANGER, 0.8); ctx.lineWidth = 2; ctx.stroke(); }
+    ctx.strokeStyle = G.rgba(hot, 0.9); ctx.lineWidth = 1.4;
+    ctx.beginPath(); ctx.arc(0, 0, R - 1.5, 1.05, G.TAU - 1.05, false); ctx.stroke();
+    // the grip, wrapped, at the back of the curve
+    ctx.fillStyle = G.rgba(col, 0.9); ctx.fillRect(-R * 0.86, -4, 4, 8);
+    ctx.restore();
+  }
+  // Held in the lead hand, its points forward along the hand, before it is thrown (or after a catch).
+  function heldCrescent(ctx, a, al, gleamOnly) {
+    const p = a.p, f = a.face, hx = a.x + f * p[7], hy = a.y + p[8];
+    const an = f > 0 ? p[9] : Math.PI - p[9];
+    const cx = hx + Math.cos(an) * 12, cy = hy + Math.sin(an) * 12, pal = G.pal();
+    const col = a.clone ? '120,110,160' : pal.boss, hot = a.clone ? '200,195,230' : pal.hot;
+    if (gleamOnly) {
+      D.glow(ctx, col, cx, cy, 24, 0.6 * al);
+      ctx.strokeStyle = G.rgba(hot, 0.8 * al); ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.arc(cx, cy, 19, an + Math.PI + 1.05, an + Math.PI + G.TAU - 1.05, false); ctx.stroke();
+      return;
+    }
+    crescentShape(ctx, cx, cy, an + Math.PI, 20, col, hot, al, false);
+  }
+
+  // The thrown blade. Out past the hero with the speed going out of it; it turns over in the air
+  // (overhand: down out of its climb to the floor; sidearm: up off the floor to a leaping height);
+  // then home, gathering speed and easing into the hand. Short of room, it bites into the wall and
+  // hangs there: the hero always has time to land between the way out and the way back.
+  const smoothInv = (y) => { let lo = 0, hi = 1; for (let i = 0; i < 18; i++) { const m = (lo + hi) / 2; if (m * m * (3 - 2 * m) < y) lo = m; else hi = m; } return (lo + hi) / 2; };
+  function crescentBlade(a, over, x0, y0, dir, speed) {
+    const P = G.player, sh = !!a.clone;
+    const xf = G.clamp(x0 + dir * Math.max(560, Math.abs(P.x - x0) + 280), WL + 46, WR - 46);
+    const lodge = Math.abs(xf - (WL + 46)) < 2 || Math.abs(xf - (WR - 46)) < 2;
+    const tOut = Math.max(0.38, Math.abs(xf - x0) / speed), turnT = over ? 0.3 : 0.22;
+    // the time from passing the hero on the way out to passing them on the way back
+    const span = Math.abs(xf - x0) || 1, f = G.clamp(Math.abs(P.x - x0) / span, 0, 1);
+    const tAt = tOut * (1 - Math.sqrt(1 - f)), tRetEst = Math.max(0.38, span / (speed * 1.1));
+    const gap = (tOut - tAt) + turnT + tRetEst * smoothInv(Math.min(0.999, (1 - f) * span / Math.max(1, span - 30)));
+    const tHang = turnT + Math.max(0, 0.85 - gap);
+    const y1 = over ? LOWY : HIGHY;
+    return H.add({
+      kind: 'veilblade', x: x0, y: y0, dir, vx: dir * speed, vy: 0, spin: 0, trail: [], owner: a, over, tRet: 0, xc: x0, yc: y0, caught: false, ret: false, lodged: false,
+      update(dt) {
+        const px = this.x, py = this.y, t = this.t;
+        if (t < tOut) {
+          const k = t / tOut;
+          this.x = G.lerp(x0, xf, E.outQuad(k));
+          if (over) this.y = G.lerp(y0, TOPY, Math.sin(k * Math.PI / 2));
+          else this.y = k < 0.14 ? G.lerp(y0, LOWY, E.outQuad(k / 0.14)) : LOWY;
+        } else if (t < tOut + tHang) {
+          const e = t - tOut, k = Math.min(1, e / turnT);
+          if (lodge && !this.lodged) {
+            this.lodged = true;
+            G.audio.play('tink'); G.fx.shake(3);
+            G.fx.burst(xf + dir * 14, this.y, { n: 10, color: sh ? '150,140,190' : G.pal().hot, speed: [100, 380], angle: dir > 0 ? Math.PI : 0, spread: 1.8, life: [0.12, 0.35], kind: 'spark', size: [1.4, 2.6], grav: 800 });
+          }
+          // over: it turns over at the top of its climb and comes down; sidearm: it lifts off the floor
+          this.x = xf + (lodge ? 0 : dir * 10 * Math.sin(k * Math.PI / 2));
+          this.y = over ? G.lerp(TOPY, LOWY, E.inQuad(k)) : G.lerp(LOWY, HIGHY, E.inOutQuad(k));
+          if (lodge && over && k < 1 && Math.random() < dt * 30) G.fx.burst(this.x + dir * 12, this.y, { n: 1, color: sh ? '150,140,190' : G.pal().hot, speed: [40, 160], angle: -Math.PI / 2, spread: 1, life: [0.1, 0.2], kind: 'spark', size: [1, 2], grav: 600 });
+        } else {
+          if (!this.ret) {
+            this.ret = true;
+            const o = this.owner;
+            this.xc = o.x + (G.sign(xf - o.x) || 1) * 30; this.yc = o.y - 60;
+            this.tRet = Math.max(0.38, Math.abs(this.xc - xf) / (speed * 1.1));
+            if (this.lodged) { G.audio.play('tink'); G.fx.dust(xf, this.y, 2, { speed: [20, 90], size: [4, 7], up: 10 }); }
+          }
+          const k = Math.min(1, (t - tOut - tHang) / this.tRet), q = k * k * (3 - 2 * k);
+          this.x = G.lerp(xf, this.xc, q);
+          this.y = k > 0.86 ? G.lerp(y1, this.yc, E.outQuad((k - 0.86) / 0.14)) : y1;
+          if (k >= 1) this.home();
+        }
+        if (dt > 0) { this.vx = (this.x - px) / dt; this.vy = (this.y - py) / dt; }
+        if (Math.abs(this.vx) > 1) this.dir = Math.sign(this.vx);
+        this.srcX = this.x - this.dir * 20;
+        // (tests: low and coming on, it is jumped; at a leaping height, it is let pass)
+        this.kind = this.y > FLOOR - 60 ? 'flycut' : this.y > FLOOR - 130 ? 'crescent' : 'veilblade';
+        const stuck = this.lodged && !this.ret;
+        if (!stuck) this.spin += dt * 24 * (this.dir || 1);
+        this.trail.push({ x: this.x, y: this.y, r: this.spin });
+        if (this.trail.length > 5) this.trail.shift();
+        // skimming the floor, it throws sparks and grit
+        if (this.y > FLOOR - 34 && Math.random() < dt * 40) {
+          G.fx.burst(this.x, FLOOR - 2, { n: 1, color: sh ? '150,140,190' : G.pal().hot, speed: [80, 260], angle: this.dir > 0 ? Math.PI + 0.5 : -0.5, spread: 0.6, life: [0.1, 0.25], kind: 'spark', size: [1.2, 2.2], grav: 700 });
+          if (Math.random() < 0.3) G.fx.dust(this.x, FLOOR, 1, { speed: [20, 80], size: [4, 7], up: 12 });
+        }
+      },
+      // home: into the hand that threw it, or, if that hand is gone, it falls and clatters
+      home() {
+        this.dead = true;
+        const o = this.owner, b = B.body;
+        const lost = o.gone || (o === b && (b.hidden || B.staggered || B.dying || B.dead));
+        if (lost) {
+          G.audio.play('tink');
+          G.fx.burst(this.x, this.y, { n: 8, color: sh ? '150,140,190' : G.pal().hot, speed: [80, 300], life: [0.15, 0.4], kind: 'spark', size: [1.4, 2.6], grav: 700 });
+          smoke(this.x, this.y);
+        } else this.caught = true;
+      },
+      hits(Pl) { return G.rectsOverlap(Pl.box(), { cx: this.x, cy: this.y, hw: 17, hh: 15 }); },
+      draw(ctx) {
+        const pal = G.pal(), col = sh ? '120,110,160' : pal.boss, hot = sh ? '200,195,230' : pal.hot;
+        ctx.globalCompositeOperation = 'lighter';
+        D.glow(ctx, col, this.x, this.y, 40, sh ? 0.25 : 0.4);
+        ctx.globalCompositeOperation = 'source-over';
+        for (let i = 0; i < this.trail.length - 1; i++) {
+          const q = this.trail[i];
+          crescentShape(ctx, q.x, q.y, q.r, 22, col, hot, 0.08 + 0.05 * i, false);
+        }
+        crescentShape(ctx, this.x, this.y, this.spin, 22, col, hot, sh ? 0.8 : 1, true);
+      },
+    });
+  }
+
+  // The wind-up and the throw. The arm goes back the whole time, the weight with it; a glint on the
+  // blade at the top, then the body follows the arm through. Returns the blade (none if it died).
+  function* throwFrom(a, over, wind, speed) {
+    const P = G.player;
+    a.face = P.x > a.x ? 1 : -1;
+    a.held = true;
+    const W = POSES[over ? 'windOver' : 'windSide'];
+    // (as with a lunge, the low throw has a lane that is never drawn: the wind-up is the warning)
+    if (!over) H.lane({ x: WL, y: FLOOR - 66, w: WR - WL, h: 66, dir: a.face, dur: wind, quiet: true });
+    let e = 0, glinted = false;
+    while (e < wind && !a.gone) {
+      const dt = yield;
+      e += dt;
+      const k = Math.min(1, e / wind);
+      if (k < 0.6 && Math.abs(P.x - a.x) > 20) a.face = P.x > a.x ? 1 : -1;
+      const p = mixPose(a, POSES.idle, W, 0.55 + 0.45 * E.inQuad(k));
+      // a last settle onto the back foot before it lets go
+      if (k > 0.8) { p[1] += 2.5 * (k - 0.8) / 0.2; p[0] -= (over ? 0.08 : 0.05) * (k - 0.8) / 0.2; }
+      if (!glinted && wind - e < 0.15) {
+        glinted = true;
+        const hx = a.x + a.face * a.p[7], hy = a.y + a.p[8];
+        G.fx.glint(hx, hy, a.clone ? 18 : 24, a.clone ? '170,160,210' : G.pal().hot, 0.18); G.audio.play('glint');
+      }
+    }
+    if (a.gone) { a.held = false; return null; }
+    if (Math.abs(P.x - a.x) < 110) {
+      // crowded at the last moment: a hop back with the arm still cocked, and it throws as it lands
+      const away = a.x > P.x ? 1 : -1, x0 = a.x, tx = G.clamp(a.x + away * 130, WL + 40, WR - 40);
+      let f = 0;
+      while (f < 0.22 && !a.gone) { f += yield; const k = Math.min(1, f / 0.22); a.x = G.lerp(x0, tx, E.outQuad(k)); a.y = FLOOR - 4 * 46 * k * (1 - k); }
+      a.y = FLOOR; a.face = P.x > a.x ? 1 : -1;
+      G.fx.dust(a.x, FLOOR, 3, { dir: away, speed: [30, 140], size: [5, 9], up: 20 });
+      if (a.gone) { a.held = false; return null; }
+    }
+    const dir = a.face;
+    a.pose = over ? 'throwOver' : 'throwSide'; a.held = false;
+    G.audio.play('arrowHeavy');
+    const blade = crescentBlade(a, over, a.x + dir * 30, a.y + (over ? -84 : -50), dir, speed);
+    if (!a.clone) G.audio.play('veilwhirr', { dur: 1.7 });
+    if (!a.clone) b0Recoil(dir * 1.4);
+    yield* tween(a, { x: G.clamp(a.x + dir * 16, WL + 30, WR - 30) }, 0.12, E.outCubic);
+    return blade;
+  }
+  const b0Recoil = (v) => { const b = B.body; b.recV = (b.recV || 0) + v; };
+  // It watches the blade out and back and reaches for it; the catch turns it a little with the weight.
+  function* catchBlade(a, blade) {
+    a.pose = 'watch';
+    while (!blade.dead && !a.gone) {
+      yield;
+      if (blade.ret && Math.abs(blade.x - a.x) < 170) a.pose = 'catch';
+    }
+    if (a.gone || !blade.caught) return false;
+    a.held = true;
+    G.audio.play('tink');
+    const hx = a.x + a.face * 30, hy = a.y - 60;
+    G.fx.burst(hx, hy, { n: 6, color: a.clone ? '150,140,190' : G.pal().hot, speed: [80, 260], angle: blade.dir > 0 ? 0 : Math.PI, spread: 1.2, life: [0.1, 0.25], kind: 'spark', size: [1.2, 2.2], grav: 500 });
+    if (!a.clone) b0Recoil(blade.dir * 1.8);
+    a.pose = 'watch';
+    yield* tween(a, { x: G.clamp(a.x + blade.dir * 10, WL + 30, WR - 30) }, 0.12, E.outQuad);
+    return true;
+  }
+
+  // Room to throw: a spring back off a hero who is too close (the held blade goes with it).
+  function* makeRoom() {
+    const b = B.body, P = G.player;
+    if (Math.abs(P.x - b.x) >= 160) return;
+    const away = b.x > P.x ? 1 : -1, tx = G.clamp(b.x + away * 170, WL + 50, WR - 50), x0 = b.x;
+    b.face = -away; b.pose = 'air';
+    let e = 0;
+    while (e < 0.3) { e += yield; const k = Math.min(1, e / 0.3); b.x = G.lerp(x0, tx, k); b.y = FLOOR - 4 * 80 * k * (1 - k); }
+    b.y = FLOOR; b.pose = 'crouch';
+    G.fx.dust(b.x, FLOOR, 3, { speed: [30, 140], size: [5, 9], up: 24 });
+    yield* wait(0.06);
+  }
+  function* atkCrescent() {
+    const b = B.body, P = G.player, T = K.T(), ph = B.phase;
+    if (b.y < FLOOR - 1) { b.pose = 'air'; yield* tween(b, { y: FLOOR }, 0.2, E.inQuad); G.fx.thud(b.x, FLOOR, 0.5, { noCrack: true }); }
+    yield* makeRoom();
+    const over = K.chance(0.5, 'over');
+    let c = null;
+    if (ph === 2 || (ph === 3 && K.hard())) {
+      const sx = G.clamp(P.x + (P.x - b.x), WL + 60, WR - 60);
+      if (Math.abs(sx - P.x) > 140) c = clone(sx, FLOOR, G.sign(P.x - sx) || 1, 'crouch');
+    }
+    const wind = (ph === 3 ? 0.5 : 0.58) * T, speed = ph === 3 ? 900 : 820;
+    const run = function* (a) {
+      const bl = yield* throwFrom(a, over, wind, speed);
+      if (bl) yield* catchBlade(a, bl);
+      if (a.clone && !a.gone) { yield* wait(0.1); a.gone = true; a.held = false; smoke(a.x, a.y - 40); }
+    };
+    if (c) yield* par(run(b), run(c));
+    else yield* run(b);
+    if (ph === 3 && b.held) {
+      // caught, and thrown again at once: this throw says how the second one flies
+      const over2 = K.chance(0.5, 'over2');
+      yield* wait(0.06);
+      yield* makeRoom();
+      const bl = yield* throwFrom(b, over2, 0.4 * T, 940);
+      if (bl) yield* catchBlade(b, bl);
+    }
+    // the blade goes back over its shoulder
+    b.pose = 'sheathe';
+    yield* wait(0.1);
+    b.heldA = 1;
+    yield* tween(b, { heldA: 0 }, 0.12, E.inQuad);
+    b.held = false; b.heldA = 1;
+    G.audio.play('veilclick');
+    yield* wait(0.08);
+  }
+
+
   // ------------------------------------------------------------------ corrupted (corrupt.js)
   // Two attacks only the corrupted Veil uses, in the void's black and crimson.
 
@@ -1075,7 +1550,7 @@
 
   // Back to rest. After a cut it flicks both blades clean; after a throw the arm comes home across
   // its waist; after an ambush it tears the blade out of the floor and springs back off it.
-  const THROWS = { knives: 1, rain: 1, hunt: 1, flurry: 1, pastself: 1 };
+  const THROWS = { knives: 1, rain: 1, hunt: 1, flurry: 1, pastself: 1, crescent: 1 };
   B.recover = function* (name) {
     const b = B.body, P = G.player;
     if (b.hidden || b.y < FLOOR - 1) return;
@@ -1092,6 +1567,10 @@
     } else if (THROWS[name]) {
       b.pose = 'sheathe';
       yield* wait(0.22);
+    } else if (name === 'stance') {
+      // already sheathed: it straightens out of the crouch and lets the breath go
+      b.face = P.x > b.x ? 1 : -1; b.pose = 'idle';
+      yield* wait(0.16);
     } else {
       b.face = P.x > b.x ? 1 : -1; b.pose = 'flick';
       G.audio.play('glint');
@@ -1107,6 +1586,7 @@
   B.ATTACKS = {
     hunt: atkHunt,
     echo: atkEcho,
+    stance: atkStance, crescent: atkCrescent,
     lunge: atkLunge, pincer: atkPincer, flurry: atkFlurry, knives: atkKnives, ambush: atkAmbush, backstab: atkBackstab,
     mirror: atkMirror, rain: atkRain, cross: atkCross, cuts: atkCuts, mark: atkMark,
     // corrupted only (corrupt.js)
@@ -1201,8 +1681,8 @@
 
   function stepPose(a, dt) {
     if (a.pose === 'run') a.runT += dt * 15;
-    const target = a.pose === 'run' ? runPose(a.runT) : (POSES[a.pose] || POSES.idle);
-    const k = 1 - Math.exp(-(a.pose === 'dash' || a.pose === 'dive' || a.pose === 'streak' ? 60 : 24) * dt);
+    const target = a.pose === 'run' ? runPose(a.runT) : a.pose === 'live' && a.live ? a.live : (POSES[a.pose] || POSES.idle);
+    const k = 1 - Math.exp(-(SNAP[a.pose] || 24) * dt);
     for (let i = 0; i < NP; i++) a.p[i] += (target[i] - a.p[i]) * k;
   }
 
@@ -1211,7 +1691,10 @@
     stepPose(b, dt);
     if (b.vis == null) b.vis = 1;
     else if (b.vis < 1 && !b.fading && !b.hidden) b.vis = Math.min(1, b.vis + dt / 0.09);
-    D.chainStep(B.scarf, b.x - b.face * 4, b.y + b.p[1] - 36, dt, { seg: 8, grav: 30, drift: 46, face: b.face, wave: 14, rate: 9 });
+    // (in its stance the scarf stops lifting and hangs)
+    b.calm = G.damp(b.calm || 0, b.still ? 1 : 0, b.still ? 2.5 : 6, dt);
+    D.chainStep(B.scarf, b.x - b.face * 4, b.y + b.p[1] - 36, dt, { seg: 8, grav: 30 + 40 * b.calm, drift: 46 * (1 - 0.75 * b.calm), face: b.face, wave: 14 * (1 - 0.85 * b.calm), rate: 9 });
+    for (const a of [b].concat(B.clones)) a.gleam = G.damp(a.gleam || 0, a.still || a.held ? 1 : 0, 6, dt);
     for (const c of B.clones) stepPose(c, dt);
     B.clones = B.clones.filter((c) => !c.gone);
     // the dark: full while the lights are out, thinner while it is staggered, gone when it dies
@@ -1435,6 +1918,17 @@
     };
     if (!b.hidden) eye(b, pal.boss, 1);
     for (const c of B.clones) eye(c, pal.boss, c.hurt ? 1 : 0.7);
+    // and whatever its blades catch: the hand on the hilt in its stance, the crescent held back to
+    // throw, show through the dark as its eyes do (they are the tell)
+    for (const a of b.hidden ? B.clones : [b].concat(B.clones)) {
+      if ((a.gleam || 0) < 0.02) continue;
+      const k = a.gleam * B.dark * (a.clone ? 0.75 : 1);
+      if (a.held) { heldCrescent(ctx, a, k, true); continue; }
+      const hx = a.x + a.face * a.p[7], hy = a.y + a.p[8], an = a.face > 0 ? a.p[9] : Math.PI - a.p[9];
+      D.glow(ctx, pal.boss, hx, hy, 18, 0.7 * k);
+      ctx.strokeStyle = G.rgba(pal.hot, 0.85 * k); ctx.lineWidth = 1.6; ctx.lineCap = 'round';
+      D.line(ctx, hx + Math.cos(an) * 3, hy + Math.sin(an) * 3, hx + Math.cos(an) * 26, hy + Math.sin(an) * 26);
+    }
     ctx.globalCompositeOperation = 'source-over';
     drawStrings(ctx, B.dark);
   };
@@ -1463,6 +1957,7 @@
     for (const c of B.clones) {
       D.glow(ctx, col, c.x, c.y - 44, 60, 0.25);
       figure(ctx, c, 0.78);
+      if (c.held) heldCrescent(ctx, c, 0.8);
     }
     if (b.hidden) return;
     if (B.pinned) {
@@ -1494,9 +1989,9 @@
     }
     ctx.globalCompositeOperation = 'source-over';
     // afterimages while it dashes or dives
-    if (b.pose === 'dash' || b.pose === 'dive') {
+    if (b.pose === 'dash' || b.pose === 'dive' || b.pose === 'drawHi') {
       for (let i = 1; i <= 3; i++) {
-        const gx = b.pose === 'dash' ? b.x - b.face * i * 34 : b.x, gy = b.pose === 'dive' ? b.y - i * 40 : b.y;
+        const gx = b.pose !== 'dive' ? b.x - b.face * i * 34 : b.x, gy = b.pose === 'dive' ? b.y - i * 40 : b.y;
         figure(ctx, Object.assign({}, b, { x: gx, y: gy, flash: 0, clone: true, hurt: false }), 0.3 - i * 0.07);
       }
     }
@@ -1508,6 +2003,7 @@
       figure(ctx, b, Math.max(0, e));
       ctx.restore();
     } else figure(ctx, b, 1);
+    if (b.held) heldCrescent(ctx, b, v * (b.heldA == null ? 1 : b.heldA));
     drawStrings(ctx, 1);
   };
   // (corrupted) strings between her spread fingers, catching the light; in the dark they show

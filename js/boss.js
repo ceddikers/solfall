@@ -42,7 +42,9 @@
       x: 640, y: -200, r: 84, ctrl: true, open: 1, charge: 0, flash: 0,
       lx: 0, ly: 0, pulse: 0, spinHint: 0, hurt: false, jit: 0, sun: 0, embedded: false,
       blink: 0, blinkT: 3,
+      vx: 0, vy: 0, swell: 0, swellT: 0, swellV: 0, flA: 0, flK: 0, // (the Flare and the Sunspot)
     };
+    B.spots = [];
     B.hands = [mkHand(-1), mkHand(1)];
     for (const h of B.hands) h.hp = h.maxHp = Math.round(B.maxHp * 0.07);
     B.shardA = 0; B.shardSpin = 0.9; B.haloR = 0; B.haloHurt = false;
@@ -161,7 +163,7 @@
   // ------------------------------------------------------------------ script control
   function release() {
     const c = B.core;
-    c.ctrl = false; c.charge = 0; c.pulse = 0; c.spinHint = 0; c.hurt = false; c.embedded = false; c.jit = 0;
+    c.ctrl = false; c.charge = 0; c.pulse = 0; c.spinHint = 0; c.hurt = false; c.embedded = false; c.jit = 0; c.swellT = 0;
     for (const h of B.hands) { h.ctrl = false; h.hurt = false; h.stuck = false; h.hot = 0; }
     B.shardsOut = false; B.shardSpin = 0.9; B.haloR = 0; B.haloHurt = false;
     G.wind = 0; G.bounds = null;
@@ -444,10 +446,12 @@
 
   // ------------------------------------------------------------------ attack selection
   const BAGS = {
-    1: ['slam', 'sweep', 'clap', 'lance', 'rain', 'flick', 'crossfire', 'sunburst'],
-    2: ['slam2', 'sweep2', 'clap', 'lance3', 'rain', 'pulse', 'comb', 'rocket', 'tide', 'fan', 'cage', 'duet', 'crossfire', 'flick', 'sunburst'],
-    3: ['dive', 'storm', 'wheel', 'singularity', 'rain', 'pulse', 'fan', 'halo', 'dive'],
+    // the Flare and the Sunspot (v2.0a) are the core's alone, so they are there in every phase
+    1: ['slam', 'sweep', 'clap', 'lance', 'rain', 'flick', 'crossfire', 'sunburst', 'flare', 'sunspot'],
+    2: ['slam2', 'sweep2', 'clap', 'lance3', 'rain', 'pulse', 'comb', 'rocket', 'tide', 'fan', 'cage', 'duet', 'crossfire', 'flick', 'sunburst', 'flare', 'sunspot'],
+    3: ['dive', 'storm', 'wheel', 'singularity', 'rain', 'pulse', 'fan', 'halo', 'dive', 'flare', 'sunspot'],
   };
+  B.bags = BAGS; // (read by tools/motion-check.js)
   // How many whole hands an attack needs. Attacks that need more than are left are skipped.
   const NEEDS = {
     sunburst: 1, slam: 1, sweep: 1, clap: 2, slam2: 1, sweep2: 1, comb: 2, rocket: 1,
@@ -1810,6 +1814,469 @@
     }
   }
 
+  // ------------------------------------------------------------------ the core's own two (v2.0a)
+  // The Flare and the Sunspot are the core's alone, so they carry on into phase III, where the hands
+  // are gone. Both move the core on a spring: it gathers before it throws, gives with the throw, and
+  // carries past where it settles once.
+
+  // A span of time: fn(k 0..1, dt, elapsed) every step.
+  function* during(dur, fn) { let e = 0; while (e < dur) { const dt = yield; e += dt; fn(Math.min(1, e / dur), dt, e); } }
+  // The core on a spring, a little under-damped: it is heavy, so it overshoots once and settles.
+  function coreTo(tx, ty, dt, k, z) {
+    const c = B.core; k = k || 55; z = z || 8.5;
+    c.vx = (c.vx || 0) + ((tx - c.x) * k - (c.vx || 0) * z) * dt;
+    c.vy = (c.vy || 0) + ((ty - c.y) * k - (c.vy || 0) * z) * dt;
+    c.x += c.vx * dt; c.y += c.vy * dt;
+  }
+  // where its idle drift will be in `ahead` seconds, so the drift takes over without a jolt
+  const driftAt = (ahead) => ({
+    x: 640 + Math.sin((B.t + ahead) * 0.45) * (B.phase === 3 ? 190 : 70),
+    y: HOME_Y[B.phase] + Math.sin((B.t + ahead) * 0.9) * 14,
+  });
+  // back to rest: it rides the spring home to where the drift will be, the swell going out of it
+  function* coreHome(dur) {
+    const c = B.core;
+    c.swellT = 0;
+    yield* during(dur, (k, dt) => { const d = driftAt(dur * (1 - k)); coreTo(d.x, d.y, dt, 26 + 30 * k, 9); });
+    c.vx = c.vy = 0;
+  }
+
+  G.audio.define('flare', () => {
+    const S = G.audio.synth;
+    S.noise({ dur: 0.42, vol: 0.32, type: 'bandpass', f0: 260, f1: 1700, q: 0.7, attack: 0.03 });
+    S.noise({ dur: 0.55, vol: 0.2, type: 'lowpass', f0: 700, f1: 160, q: 0.8, attack: 0.05 });
+    S.tone({ type: 'sawtooth', f0: 96, f1: 52, dur: 0.5, vol: 0.09, attack: 0.03 });
+  });
+  G.audio.define('spot', (o) => {
+    const S = G.audio.synth, hv = o && o.heavy;
+    S.noise({ dur: hv ? 0.32 : 0.18, vol: hv ? 0.3 : 0.22, type: 'bandpass', f0: hv ? 620 : 1100, f1: hv ? 120 : 240, q: 2.2 });
+    S.tone({ type: 'sine', f0: hv ? 110 : 170, f1: hv ? 38 : 70, dur: hv ? 0.42 : 0.24, vol: hv ? 0.3 : 0.18 });
+  });
+  G.audio.vary.spot = 1.5;
+
+  // ---- FLARE
+  // The corona swells out on one side and a loop of fire lashes out of it. Where it swells is the tell:
+  // low on a side, the loop slaps the floor and rakes it to the wall on that side (jump it); high, it
+  // climbs up over the hero and comes down on them from above (step out from under). Phase II lashes
+  // both sides in turn; phase III is quicker, a lash along the floor is hauled back and rakes it again
+  // on the way home, and a blow from above throws waves both ways and leaves the floor burning.
+  function* atkFlare() {
+    const c = B.core, P = G.player;
+    c.ctrl = true; c.vx = c.vy = 0;
+    let side = Math.abs(P.x - c.x) < 40 ? (G.rng() < 0.5 ? -1 : 1) : G.sign(P.x - c.x);
+    const n = B.phase === 1 ? 1 : 2;
+    for (let i = 0; i < n; i++) {
+      yield* lash(side, chance(0.5, i === 0 ? 'high' : 'high2'));
+      side = -side;
+    }
+    yield* coreHome(0.6);
+  }
+
+  function* lash(side, high) {
+    const c = B.core, P = G.player, P3 = B.phase === 3;
+    const T = G.diff().tele * (P3 ? 0.85 : 1);
+    const x0 = c.x, y0 = c.y;
+    c.flA = side > 0 ? (high ? -0.95 : 0.62) : (high ? Math.PI + 0.95 : Math.PI - 0.62);
+    // the wind-up: the corona bulges out on that side while the core draws back from it (rising to
+    // throw down, sinking to throw up); the last of it trembles
+    const tell = 0.8 * T;
+    G.audio.play('charge', { dur: tell });
+    yield* during(tell, (k, dt) => {
+      const e = E.inOutQuad(k);
+      c.flK = e; c.swellT = 0.065 * e; c.charge = 0.4 * e;
+      coreTo(x0 - side * 36 * e, y0 + (high ? 20 : -18) * e, dt, 42, 9);
+      c.jit = k > 0.72 ? (k - 0.72) / 0.28 * 1.8 : 0;
+      if (Math.random() < dt * 26 * e) {
+        const a = c.flA + G.rand(-0.35, 0.35);
+        G.fx.spawn({ x: c.x + Math.cos(a) * c.r * 1.1, y: c.y + Math.sin(a) * c.r * 1.1, vx: Math.cos(a) * G.rand(30, 110), vy: Math.sin(a) * G.rand(30, 110) - 30, life: G.rand(0.3, 0.6), size: G.rand(3, 6), color: G.pal().boss, wob: 40 });
+      }
+    });
+    c.jit = 0;
+    // the throw: the core gives with it, a hard shrug toward the side it throws at
+    const fl = flareBody(side, high);
+    G.audio.play('flare');
+    c.kick = 1; c.swellT = -0.035; c.charge = 0;
+    c.vx += side * 300; c.vy += high ? -150 : 130;
+    G.fx.kick(side * 3, high ? -2 : 2);
+    if (!high) yield* rake(fl, side, x0, y0, T, P3);
+    else yield* overhead(fl, side, x0, y0, T, P3);
+    // the loop is drawn back into the corona and the bulge goes down
+    const tx = fl.tx, ty = fl.ty;
+    yield* during(0.3, (k, dt) => {
+      const rt = fl.root(), e = E.inOutQuad(k);
+      fl.tx = G.lerp(tx, rt.x, e); fl.ty = G.lerp(ty, rt.y, e); fl.fade = 1 - e * 0.7;
+      c.flK = 0.35 * (1 - k);
+      coreTo(x0, y0, dt, 34, 8);
+    });
+    fl.dead = true; c.flK = 0;
+  }
+
+  // low: it slaps the floor beside the core and the tip runs along it to the wall
+  function* rake(fl, side, x0, y0, T, P3) {
+    const c = B.core;
+    const sx = G.clamp(c.x + side * 52, WL + 30, WR - 30);
+    const r0 = fl.root(), sy = FLOOR - 6;
+    yield* during(0.12, (k, dt) => {
+      const e = E.inQuad(k);
+      fl.tx = G.lerp(r0.x + side * 40, sx, e); fl.ty = G.lerp(r0.y + 30, sy, e);
+      coreTo(x0 + side * 16, y0 + 8, dt, 50, 8);
+    });
+    // the slap
+    G.fx.shake(7); G.fx.kick(0, 3); G.audio.play('slam');
+    G.fx.thud(sx, FLOOR, 0.8, { col: G.pal().boss });
+    G.fx.scorch(sx, 60, G.pal().boss);
+    G.fx.burst(sx, FLOOR - 6, { n: 14, color: G.pal().hot, speed: [150, 520], angle: side > 0 ? -0.5 : -Math.PI + 0.5, spread: 1.2, life: [0.15, 0.4], kind: 'spark', size: [2, 3.5], grav: 900 });
+    fl.crest = true; fl.crestX = sx; fl.ty = sy; fl.dir = side;
+    let e = 0;
+    const speed = P3 ? 660 : 560; // (about a ground wave's pace: a jump on sight clears it)
+    while (true) {
+      const dt = yield;
+      e += dt;
+      fl.crestX += side * speed * G.lerp(0.35, 1, Math.min(1, e / 0.4)) * dt;
+      fl.tx = fl.crestX;
+      coreTo(x0 + side * 22, y0 + 6, dt, 34, 8);
+      c.flK = G.lerp(1, 0.45, Math.min(1, e / 0.5));
+      if (Math.random() < dt * 22) G.fx.dust(fl.crestX - side * 20, FLOOR, 1, { dir: -side, speed: [20, 90], size: [5, 9], up: 30, a: 0.3 });
+      if (fl.crestX < WL + 10 || fl.crestX > WR - 10) break;
+    }
+    // it breaks on the wall
+    const wx = G.clamp(fl.crestX, WL + 12, WR - 12);
+    G.fx.shake(6); G.audio.play('boom');
+    G.fx.burst(wx, FLOOR - 26, { n: 14, color: G.pal().boss, speed: [80, 320], angle: side > 0 ? Math.PI * 1.25 : -Math.PI * 0.25, spread: 1.4, life: [0.25, 0.6], size: [3, 7] });
+    G.fx.dust(wx, FLOOR, 4, { dir: -side, speed: [40, 200], size: [6, 11], up: 70 });
+    if (P3) {
+      // phase III: the core hauls the lash back, and its tip rakes the floor all the way home again
+      fl.crestX = wx; fl.dir = -side;
+      c.vx -= side * 160;
+      G.audio.play('flare');
+      e = 0;
+      while (true) {
+        const dt = yield;
+        e += dt;
+        fl.crestX -= side * 620 * G.lerp(0.4, 1, Math.min(1, e / 0.3)) * dt;
+        fl.tx = fl.crestX;
+        coreTo(x0 - side * 14, y0 + 4, dt, 34, 8);
+        if (Math.random() < dt * 22) G.fx.dust(fl.crestX + side * 20, FLOOR, 1, { dir: side, speed: [20, 90], size: [5, 9], up: 30, a: 0.3 });
+        if ((fl.crestX - sx) * side <= 0) break;
+      }
+    }
+    fl.crest = false;
+    yield* during(0.1, (k, dt) => coreTo(x0 + side * 10, y0, dt, 34, 8));
+  }
+
+  // high: it climbs over the hero, hangs there, and comes down
+  function* overhead(fl, side, x0, y0, T, P3) {
+    const c = B.core, P = G.player;
+    const r0 = fl.root(), top = 104;
+    let tx = G.clamp(P.x, WL + 70, WR - 70);
+    const m = columnMark(tx, 132);
+    // up and over
+    yield* during(0.3, (k, dt) => {
+      const e = E.outCubic(k);
+      tx = G.damp(tx, G.clamp(P.x, WL + 70, WR - 70), 5, dt);
+      fl.tx = G.lerp(r0.x, tx, e); fl.ty = G.lerp(r0.y, top, E.outQuad(k)) - Math.sin(Math.PI * k) * 40;
+      m.x = tx; m.k = 0.25 * k;
+      coreTo(x0 + side * 14, y0 - 10, dt, 46, 8);
+    });
+    // it hangs over the hero, following them
+    const aimT = 0.42 * T, lockT = 0.26 * T;
+    yield* during(aimT, (k, dt, e) => {
+      tx = G.damp(tx, G.clamp(P.x + P.vx * 0.12, WL + 70, WR - 70), 6, dt);
+      fl.tx = tx; fl.ty = top + Math.sin(e * 9) * 5;
+      m.x = tx; m.k = 0.25 + 0.45 * k;
+      coreTo(x0 + side * 10, y0 - 6, dt, 40, 9);
+    });
+    // locked: it shivers and draws up a touch before it falls
+    m.locked = true;
+    G.audio.play('charge', { dur: lockT });
+    yield* during(lockT, (k, dt) => {
+      fl.tx = tx + G.rand(-2.5, 2.5); fl.ty = top - 16 * E.outQuad(k);
+      m.k = 0.7 + 0.3 * k;
+      c.flK = 1 - 0.3 * k;
+      coreTo(x0 + side * 6, y0 - 14 * k, dt, 40, 9);
+    });
+    // down, the whole loop cracking after it; the core is yanked toward the blow
+    fl.falling = true;
+    c.vy += 180; c.vx += Math.sign(tx - c.x) * 90;
+    const fy = fl.ty;
+    yield* during(0.13, (k, dt) => {
+      fl.tx = tx; fl.ty = G.lerp(fy, FLOOR - 8, E.inQuad(k));
+      coreTo(x0, y0 + 14, dt, 40, 8);
+    });
+    fl.falling = false; fl.impactT = 0.08;
+    m.dead = true;
+    const Pl = G.pal();
+    G.fx.shake(13); G.fx.punch(0.02); G.fx.kick(0, 4); G.audio.play('slam');
+    G.fx.thud(tx, FLOOR, 1.3, { col: Pl.boss });
+    G.fx.ripple(tx, FLOOR - 30, 220, 0.3, 0.8);
+    G.fx.scorch(tx, 90, Pl.boss);
+    G.fx.burst(tx, FLOOR - 8, { n: 22, color: Pl.hot, speed: [160, 620], angle: -Math.PI / 2, spread: 2.4, life: [0.15, 0.45], kind: 'spark', size: [2, 4], grav: 900 });
+    G.fx.burst(tx, FLOOR - 8, { n: 10, color: Pl.boss, speed: [60, 260], angle: -Math.PI / 2, spread: 2.6, life: [0.35, 0.8], size: [5, 10] });
+    if (G.arena.gust) G.arena.gust(tx, FLOOR - 30, 1);
+    if (P3) {
+      H.shockwave(tx - 50, -1, 440, 44);
+      H.shockwave(tx + 50, 1, 440, 44);
+      H.pool({ x: tx, w: 150, tele: 0.25, active: 1.3 });
+    }
+    // it lies there a moment, burning
+    yield* during(0.2, (k, dt) => coreTo(x0, y0 + 6, dt, 36, 8));
+  }
+
+  // The loop itself: a lash of fire from the side of the core to its tip (fl.tx, fl.ty), which the
+  // scripts move. Only the tip hurts: as it runs along the floor (crest), as it falls, as it lands.
+  function flareBody(side, high) {
+    const c = B.core;
+    return H.add({
+      kind: 'flare', layer: 'over', side, high, ang: c.flA,
+      tx: c.x + Math.cos(c.flA) * c.r, ty: c.y + Math.sin(c.flA) * c.r,
+      crest: false, crestX: 0, falling: false, impactT: 0, fade: 1, dmg: 1,
+      root() { return { x: c.x + Math.cos(this.ang) * c.r * 0.95, y: c.y + Math.sin(this.ang) * c.r * 0.95 }; },
+      ctl(rt) {
+        if (!this.high) {
+          // low: it lies along the floor behind its tip, like a dragged lash
+          const run = Math.abs(this.tx - rt.x);
+          return { x: this.tx - this.side * Math.min(170, run * 0.5), y: Math.min(FLOOR - 12, this.ty + 50) };
+        }
+        return { x: (rt.x + this.tx) / 2 + this.side * 40, y: Math.min(rt.y, this.ty) - 120 };
+      },
+      update(dt) {
+        this.impactT = Math.max(0, this.impactT - dt);
+        this.srcX = this.crest ? this.crestX - (this.dir || this.side) * 30 : this.tx;
+        // fire licks off along the lash
+        const rt = this.root(), q = this.ctl(rt);
+        if (Math.random() < 0.7 * this.fade) {
+          const u = Math.random(), iu = 1 - u;
+          const x = iu * iu * rt.x + 2 * iu * u * q.x + u * u * this.tx, y = iu * iu * rt.y + 2 * iu * u * q.y + u * u * this.ty;
+          G.fx.spawn({ x, y, vx: G.rand(-30, 30), vy: -G.rand(40, 140), life: G.rand(0.25, 0.5), size: G.rand(3, 6), color: G.pal().boss, wob: 50 });
+        }
+      },
+      hits(P) {
+        if (this.crest) return G.rectsOverlap(P.box(), { cx: this.crestX, cy: FLOOR - 24, hw: 15, hh: 22 });
+        if (this.falling) return Math.abs(P.x - this.tx) < 58 && P.y > this.ty - 140 && P.y - 44 < this.ty + 24;
+        if (this.impactT > 0) return Math.abs(P.x - this.tx) < 70 && P.y > FLOOR - 90;
+        return false;
+      },
+      draw(ctx) {
+        const Pl = G.pal(), rt = this.root(), q = this.ctl(rt), f = this.fade, N = 22;
+        const pts = [];
+        for (let i = 0; i <= N; i++) {
+          const u = i / N, iu = 1 - u;
+          // it writhes a little along its length, more toward the tip
+          const w = Math.sin(B.t * 17 + u * 9) * 5 * u * (this.crest ? 0.4 : 1);
+          pts.push([iu * iu * rt.x + 2 * iu * u * q.x + u * u * this.tx, iu * iu * rt.y + 2 * iu * u * q.y + u * u * this.ty + w]);
+        }
+        ctx.globalCompositeOperation = 'lighter'; ctx.lineCap = 'round';
+        for (const [col, ws, al] of [[Pl.boss, 2, 0.13], [Pl.boss, 1, 0.62], [Pl.hot, 0.28, 0.62]]) { // (fire, not light: a thin hot heart)
+          ctx.strokeStyle = G.rgba(col, al * f);
+          for (let i = 0; i < N; i++) {
+            const u = i / N;
+            ctx.lineWidth = G.lerp(24, 8, u) * ws * f;
+            ctx.beginPath(); ctx.moveTo(pts[i][0], pts[i][1]); ctx.lineTo(pts[i + 1][0], pts[i + 1][1]); ctx.stroke();
+          }
+        }
+        // the tip running along the floor: a wave of fire
+        if (this.crest) {
+          const d = this.dir || this.side, x = this.crestX, F = FLOOR, h = 52 * (1 + 0.08 * Math.sin(this.t * 40));
+          ctx.fillStyle = G.rgba(Pl.boss, 0.3);
+          ctx.beginPath(); ctx.moveTo(x - d * 84, F); ctx.quadraticCurveTo(x - d * 10, F - h * 0.5, x + d * 8, F - h * 1.15); ctx.quadraticCurveTo(x + d * 20, F - h * 0.4, x + d * 22, F); ctx.closePath(); ctx.fill();
+          ctx.fillStyle = G.rgba(Pl.boss, 0.85);
+          ctx.beginPath(); ctx.moveTo(x - d * 54, F); ctx.quadraticCurveTo(x - d * 6, F - h * 0.45, x + d * 6, F - h); ctx.quadraticCurveTo(x + d * 15, F - h * 0.4, x + d * 16, F); ctx.closePath(); ctx.fill();
+          ctx.fillStyle = G.rgba(Pl.hot, 0.95);
+          ctx.beginPath(); ctx.moveTo(x - d * 22, F); ctx.quadraticCurveTo(x, F - h * 0.4, x + d * 5, F - h * 0.8); ctx.quadraticCurveTo(x + d * 10, F - h * 0.3, x + d * 10, F); ctx.closePath(); ctx.fill();
+        }
+        ctx.globalCompositeOperation = 'source-over';
+      },
+    });
+  }
+
+  // ---- SUNSPOT
+  // Dark spots creep over the burning rim of the core, then tear loose as dark orbs that drift out,
+  // hang, and dive at where the hero is (a mark shows where each will land). How the spots gather is
+  // the tell: left scattered, several light divers one after another (each can be cut down); crawling
+  // together into one, a single heavy diver that bursts wide on the floor for 2 (dash through the
+  // burst, or be well clear). Phase II has more spots; in phase III every diver bounces once off the
+  // floor, on the way it came down, and comes down again (its new mark shows where).
+  function* atkSunspot() {
+    const c = B.core, T = G.diff().tele;
+    c.ctrl = true; c.vx = c.vy = 0;
+    const x0 = c.x, y0 = c.y;
+    const one = chance(0.35, 'gathered');
+    const n = [0, 3, 4, 4][B.phase] + (hard() ? 1 : 0); // (phase III's bounce is what makes it harder)
+    B.spots = [];
+    for (let i = 0; i < n; i++) {
+      const a = -Math.PI / 2 + ((i + 0.5) / n - 0.5) * 2.7 + G.rand(-0.1, 0.1);
+      B.spots.push({ a, a0: a, s: 0, size: G.rand(0.85, 1.1), born: i * 0.13, merge: 0 });
+    }
+    // the spots creep in one after another while the core rises and strains (its eye narrows); spots that
+    // will be one heavy diver crawl together over the rim in the second half
+    const tell = 0.95 * T;
+    G.audio.play('charge', { dur: tell });
+    yield* during(tell, (k, dt, e) => {
+      const g = E.inOutQuad(k);
+      c.swellT = 0.05 * g; c.open = 1 - 0.35 * g;
+      coreTo(x0, y0 - 24 * g, dt, 40, 9);
+      for (const s of B.spots) {
+        s.s = G.clamp((e - s.born) / 0.32, 0, 1);
+        if (one && k > 0.42) { s.merge = E.inOutCubic((k - 0.42) / 0.58); s.a = G.lerp(s.a0, -Math.PI / 2, s.merge); }
+      }
+      c.jit = k > 0.82 ? 1.2 : 0;
+    });
+    c.jit = 0;
+    if (one) B.spots = [{ a: -Math.PI / 2, a0: -Math.PI / 2, s: 1, size: 2.1, born: 0, merge: 1 }];
+    // they tear loose, each with a shudder through the core away from it
+    const gap = [0, 0.5, 0.42, 0.42][B.phase];
+    const order = B.spots.slice().sort((p, q) => Math.abs(q.a + Math.PI / 2) - Math.abs(p.a + Math.PI / 2)); // the outermost first
+    for (let i = 0; i < order.length; i++) {
+      const s = order[i];
+      const sx = c.x + Math.cos(s.a) * c.r, sy = c.y + Math.sin(s.a) * c.r;
+      B.spots.splice(B.spots.indexOf(s), 1);
+      // (the heavy one swings out toward the hero as it tears loose)
+      diver(sx, sy, one ? -Math.PI / 2 + G.clamp((G.player.x - c.x) / 400, -1, 1) * 0.75 : s.a, one);
+      G.audio.play('spot', { heavy: one });
+      c.kick = one ? 1 : 0.55; c.open = 1;
+      c.vx -= Math.cos(s.a) * (one ? 170 : 90); c.vy -= Math.sin(s.a) * (one ? 170 : 90);
+      G.fx.burst(sx, sy, { n: one ? 12 : 6, color: '10,6,16', speed: [40, 180], life: [0.4, 0.8], size: [5, 10], angle: s.a, spread: 1.2 });
+      G.fx.burst(sx, sy, { n: one ? 10 : 5, color: G.pal().boss, speed: [100, 340], life: [0.15, 0.35], kind: 'spark', size: [1.8, 3], angle: s.a, spread: 1.4 });
+      if (one) G.fx.shake(6);
+      if (i < order.length - 1) yield* during(gap, (k, dt) => coreTo(x0, y0 - 24, dt, 40, 9));
+    }
+    // it hangs back and watches them fall, then goes home
+    let e = 0;
+    while (e < 5 && H.list.some((h) => h.kind === 'spot' && !h.dead)) {
+      const dt = yield;
+      e += dt;
+      coreTo(x0, y0 - 18 + Math.sin(e * 3) * 4, dt, 36, 9);
+    }
+    yield* coreHome(0.6);
+  }
+
+  // One dark orb torn off the core. It drifts out from where it tore, hangs, takes aim (a mark on the
+  // floor follows the hero, then locks), and dives; it bursts where it lands. Phase III: it bounces once.
+  function diver(x, y, a, heavy) {
+    const P = G.player, T = G.diff().tele, P3 = B.phase === 3;
+    const r = heavy ? 27 : 15, R = heavy ? 120 : 52;
+    const sp = heavy ? 300 : 380;
+    const clampX = (v) => G.clamp(v, WL + 50, WR - 50);
+    return H.add({
+      kind: 'spot', layer: 'over', x, y, r, heavy, st: 'drift', e: 0, dmg: heavy ? 2 : 1,
+      vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
+      mx: clampX(P.x), mk: 0, locked: false, R, bounced: false, slashable: !heavy, srcX: x,
+      aimT: (heavy ? 0.5 : 0.4) * T, lockT: (heavy ? 0.26 : 0.2) * T, diveT: heavy ? 0.4 : 0.32,
+      update(dt) {
+        this.e += dt;
+        this.srcX = this.x;
+        if (this.st !== 'boom' && Math.random() < 0.6) G.fx.spawn({ kind: 'smoke', color: '10,6,16', a: 0.5, x: this.x + G.rand(-4, 4), y: this.y + G.rand(-4, 4), vx: G.rand(-15, 15), vy: G.rand(-30, -5), life: G.rand(0.3, 0.6), size: this.r * 0.7, grow: this.r * 1.2, drag: 2 });
+        switch (this.st) {
+          case 'drift': // out from the core, slowing as it goes
+            this.vx *= Math.exp(-2.6 * dt); this.vy *= Math.exp(-2.6 * dt);
+            if (this.y < 80 && this.vy < 0) this.vy *= Math.exp(-14 * dt); // (it keeps below the top of the view)
+            this.x += this.vx * dt; this.y += (this.vy - (this.y < 80 ? 0 : 30)) * dt;
+            if (this.e > 0.5) { this.st = 'aim'; this.e = 0; this.hy = this.y; }
+            break;
+          case 'aim': // it hangs, bobbing; the floor where it will land is marked and follows the hero
+            this.y = this.hy + Math.sin(this.e * 7) * 4;
+            this.mx = G.damp(this.mx, clampX(P.x + P.vx * 0.1), 7, dt);
+            this.mk = this.e / this.aimT * 0.7;
+            // the heavy one is drawn across to hang over its mark, so it falls like a stone
+            if (this.heavy) this.sway(dt);
+            if (this.e >= this.aimT) { this.st = 'lock'; this.e = 0; this.locked = true; }
+            break;
+          case 'lock': // it draws up and shivers, then goes
+            this.y = this.hy - 14 * G.ease.outQuad(Math.min(1, this.e / this.lockT));
+            if (this.heavy) this.sway(dt); else this.x += G.rand(-1.2, 1.2);
+            this.mk = 0.7 + 0.3 * Math.min(1, this.e / this.lockT);
+            if (this.e >= this.lockT) { this.st = 'dive'; this.e = 0; this.sx = this.x; this.sy = this.y; G.audio.play('streak'); }
+            break;
+          case 'dive': {
+            const k = Math.min(1, this.e / this.diveT), q = G.ease.inQuad(k);
+            this.x = G.lerp(this.sx, this.mx, q); this.y = G.lerp(this.sy, FLOOR - this.r * 0.6, q);
+            if (k >= 1) this.land(this.R, this.dmg, this.heavy);
+            break;
+          }
+          case 'hop': // the bounce: a plain arc on the way it was going
+            this.vy += 1500 * dt;
+            this.x += this.vx * dt; this.y += this.vy * dt;
+            if (this.y >= FLOOR - this.r * 0.6 && this.vy > 0) { this.y = FLOOR - this.r * 0.6; this.land(this.heavy ? 84 : 46, 1, false); }
+            break;
+          case 'boom':
+            if (this.e >= 0.09) {
+              if (P3 && !this.bounced) {
+                // up again, carrying on the way it came down (straight down: out from the middle)
+                this.bounced = true; this.st = 'hop'; this.e = 0;
+                const dir = Math.abs(this.x - this.sx) > 20 ? G.sign(this.x - this.sx) : (G.sign(this.x - 640) || 1);
+                this.vy = -640;
+                const air = 2 * 640 / 1500, want = heavy ? 200 : 240;
+                const lx = clampX(this.x + dir * want);
+                this.vx = (lx - this.x) / air; this.mx = lx; this.mk = 0.4; this.locked = true;
+              } else this.dead = true;
+            }
+            break;
+        }
+        if (this.st === 'hop') this.mk = Math.min(1, this.mk + dt * 1.2);
+      },
+      sway(dt) { // (on a spring: it swings in under its own weight and settles)
+        this.svx = (this.svx || 0) + ((this.mx - this.x) * 16 - (this.svx || 0) * 6.5) * dt;
+        this.x += this.svx * dt;
+      },
+      land(R, dmg, big) {
+        this.st = 'boom'; this.e = 0; this.R = R; this.dmg = dmg; this.mk = 0;
+        const Pl = G.pal();
+        G.audio.play(big ? 'slam' : 'boom');
+        G.fx.shake(big ? 15 : 5); G.fx.kick(0, big ? 4 : 1.5);
+        G.fx.thud(this.x, FLOOR, big ? 1.6 : 0.6, { col: Pl.boss });
+        G.fx.boom(this.x, FLOOR - 10, R * 0.75, { col: Pl.boss, hot: Pl.hot });
+        G.fx.ring(this.x, FLOOR - 6, { r0: this.r, r1: R * 1.05, life: big ? 0.36 : 0.26, color: Pl.boss, width: big ? 8 : 5 }); // (how far the burst reached)
+        G.fx.burst(this.x, FLOOR - 8, { n: big ? 18 : 8, color: '10,6,16', speed: [80, big ? 420 : 240], angle: -Math.PI / 2, spread: 2.6, life: [0.4, 0.9], size: [5, big ? 14 : 9] });
+        if (big) { G.fx.ripple(this.x, FLOOR - 30, 300, 0.36, 1); G.fx.punch(0.025); if (G.fx.jolt) G.fx.jolt(1.2); }
+      },
+      slash() {
+        this.dead = true; G.audio.play('orbPop');
+        G.fx.pop(this.x, this.y, G.pal().boss, this.r);
+        G.fx.burst(this.x, this.y, { n: 6, color: '10,6,16', speed: [40, 160], life: [0.3, 0.6], size: [4, 8] });
+      },
+      hits(Pp) {
+        if (this.st === 'boom') return G.circleRect(this.x, FLOOR - 8, this.R - 8, Pp.box());
+        return G.circleRect(this.x, this.y, this.r * 0.8, Pp.box());
+      },
+      draw(ctx) {
+        const Pl = G.pal();
+        // where it will land
+        if ((this.st === 'aim' || this.st === 'lock' || this.st === 'dive' || this.st === 'hop') && this.mk > 0) {
+          const k = Math.min(1, this.mk), late = this.locked ? 0.5 + 0.5 * Math.sin(this.t * 50) : 0, w = this.st === 'hop' ? (this.heavy ? 84 : 46) : this.R;
+          ctx.fillStyle = G.rgba(DANGER, 0.1 + 0.1 * k + 0.08 * late);
+          ctx.beginPath(); ctx.ellipse(this.mx, FLOOR - 1, w, 9, 0, 0, G.TAU); ctx.fill();
+          ctx.fillStyle = G.rgba(DANGER, 0.32);
+          ctx.beginPath(); ctx.ellipse(this.mx, FLOOR - 1, w * k, 9 * k, 0, 0, G.TAU); ctx.fill();
+          ctx.strokeStyle = G.rgba(DANGER, 0.5 + 0.4 * k); ctx.lineWidth = 2;
+          ctx.beginPath(); ctx.ellipse(this.mx, FLOOR - 1, w, 9, 0, 0, G.TAU); ctx.stroke();
+        }
+        if (this.st === 'boom') return;
+        // the orb: a dark body with a dull ring of the sun's colour round it, darker at the heart
+        const rr = this.r * (1 + 0.07 * Math.sin(this.t * 14)) * (this.st === 'lock' ? 1.08 : 1);
+        ctx.fillStyle = 'rgba(2,1,4,0.35)';
+        ctx.beginPath(); ctx.arc(this.x, this.y, rr * 1.7, 0, G.TAU); ctx.fill();
+        ctx.globalCompositeOperation = 'lighter';
+        // a ragged little corona: a piece of the eclipse torn off, still burning at the edge
+        ctx.fillStyle = G.rgba(Pl.boss, 0.55);
+        ctx.beginPath();
+        for (let i = 0; i < 12; i++) {
+          const a = i / 12 * G.TAU + this.t * 0.8, L = rr * (0.25 + 0.3 * (0.5 + 0.5 * Math.sin(this.t * 11 + i * 2.3))), da = 0.2;
+          ctx.moveTo(this.x + Math.cos(a - da) * rr, this.y + Math.sin(a - da) * rr);
+          ctx.lineTo(this.x + Math.cos(a) * (rr + L), this.y + Math.sin(a) * (rr + L));
+          ctx.lineTo(this.x + Math.cos(a + da) * rr, this.y + Math.sin(a + da) * rr);
+        }
+        ctx.fill();
+        ctx.strokeStyle = G.rgba(Pl.boss, 0.5); ctx.lineWidth = rr * 0.5;
+        ctx.beginPath(); ctx.arc(this.x, this.y, rr * 1.05, 0, G.TAU); ctx.stroke();
+        ctx.strokeStyle = G.rgba(DANGER, 0.85); ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(this.x, this.y, rr * 1.0, 0, G.TAU); ctx.stroke();
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.fillStyle = '#050208';
+        ctx.beginPath(); ctx.arc(this.x, this.y, rr * 0.88, 0, G.TAU); ctx.fill();
+      },
+    });
+  }
+
   const ATTACKS = B.ATTACKS = {
     reckoning, sunburst: atkSunburst,
     slam: atkSlam, sweep: atkSweep, clap: atkClap, lance: atkLance, rain: atkRain,
@@ -1820,6 +2287,7 @@
     dive: atkDive, storm: atkStorm, wheel: atkWheel, singularity: atkSingularity,
     halo: atkHalo, supernova: atkSupernova,
     afterhands: atkAfterhands, pendulum: atkPendulum,
+    flare: atkFlare, sunspot: atkSunspot,
   };
 
   // ------------------------------------------------------------------ update
@@ -1829,6 +2297,15 @@
     c.flash = Math.max(0, c.flash - dt * 6);
     for (const h of B.hands) { h.flash = Math.max(0, h.flash - dt * 6); h.kx = (h.kx || 0) * Math.exp(-13 * dt); }
     c.kick = (c.kick || 0) * Math.exp(-11 * dt);
+    // the core's swell is a spring (it overshoots as it lets go); the Flare's bulge and the Sunspot's
+    // spots fade on their own once their attack is over or cut short
+    c.swellV = (c.swellV || 0) + (((c.swellT || 0) - (c.swell || 0)) * 140 - (c.swellV || 0) * 11) * dt;
+    c.swell = (c.swell || 0) + c.swellV * dt;
+    if (B.attackName !== 'flare') c.flK = Math.max(0, (c.flK || 0) - dt * 3);
+    if (B.spots && B.spots.length && B.attackName !== 'sunspot') {
+      for (const s of B.spots) s.fade = (s.fade == null ? 1 : s.fade) - dt * 3;
+      B.spots = B.spots.filter((s) => s.fade > 0);
+    }
     for (const r of B.rays) r.t += dt;
 
     if (B.script) {
@@ -1964,6 +2441,7 @@
     ctx.translate(c.x + (c.jit ? G.rand(-c.jit, c.jit) : 0), c.y + (c.jit ? G.rand(-c.jit, c.jit) : 0));
     if (B.dead) { drawSun(ctx, c); ctx.restore(); return; }
     if (c.kick > 0.01) { const ks = 1 - 0.045 * c.kick; ctx.scale(ks, ks); }
+    if (c.swell) ctx.scale(1 + c.swell, 1 + c.swell);
     const dim = B.staggered ? 0.4 : 1;
     const ch = c.charge;
 
@@ -1979,7 +2457,9 @@
       for (let i = 0; i < N; i++) {
         const a = i / N * G.TAU + t * 0.06;
         const n = (Math.sin(t * 1.9 + i * 2.4) * 0.5 + 0.5) * (0.55 + 0.45 * Math.sin(t * 3.1 + i * 1.7));
-        const L = r * (0.14 + 0.44 * Math.max(0, n)) * (1 + ch * 0.5) * (pass === 0 ? 1 : 0.5) * (0.4 + 0.6 * dim);
+        let L = r * (0.14 + 0.44 * Math.max(0, n)) * (1 + ch * 0.5) * (pass === 0 ? 1 : 0.5) * (0.4 + 0.6 * dim);
+        // the Flare's tell: the corona bulges out on one side
+        if (c.flK > 0.01) { const d = G.angDiff(a, c.flA); L *= 1 + 2.6 * c.flK * Math.exp(-d * d / 0.16); }
         const da = G.TAU / N * (pass === 0 ? 0.48 : 0.26);
         ctx.moveTo(Math.cos(a - da) * r * 0.97, Math.sin(a - da) * r * 0.97);
         ctx.lineTo(Math.cos(a) * (r + L), Math.sin(a) * (r + L));
@@ -2000,6 +2480,33 @@
     ctx.fillStyle = g;
     ctx.beginPath(); ctx.arc(0, 0, r, 0, G.TAU); ctx.fill();
 
+    // the Flare's tell, past the bulge: loops of fire standing up off the rim on that side
+    if (c.flK > 0.05) {
+      ctx.globalCompositeOperation = 'lighter'; ctx.lineCap = 'round';
+      for (let i = 0; i < 3; i++) {
+        const off = (i - 1) * 0.3, a = c.flA + off, hgt = r * (0.5 + 0.55 * c.flK) * (1 - Math.abs(off) * 0.9) * (1 + 0.12 * Math.sin(t * 9 + i * 2));
+        const a0 = a - 0.16, a1 = a + 0.16;
+        ctx.strokeStyle = G.rgba(i === 1 ? P.hot : P.boss, (0.35 + 0.4 * c.flK) * dim); ctx.lineWidth = 5 + 4 * c.flK;
+        ctx.beginPath(); ctx.moveTo(Math.cos(a0) * r, Math.sin(a0) * r);
+        ctx.quadraticCurveTo(Math.cos(a) * (r + hgt * 2), Math.sin(a) * (r + hgt * 2), Math.cos(a1) * r, Math.sin(a1) * r); ctx.stroke();
+      }
+      ctx.globalCompositeOperation = 'source-over';
+    }
+    // the Sunspot's tell: dark spots eating into the burning rim, the corona dimmed round each
+    if (B.spots && B.spots.length) {
+      for (const s of B.spots) {
+        const k = s.s * (s.fade == null ? 1 : s.fade);
+        if (k <= 0.01) continue;
+        const sr = r * 0.17 * s.size * k * (1 + 0.08 * Math.sin(t * 6 + s.a0 * 3)), px = Math.cos(s.a) * r, py = Math.sin(s.a) * r;
+        const g2 = ctx.createRadialGradient(px, py, 0, px, py, sr * 2.7);
+        g2.addColorStop(0, 'rgba(3,2,6,0.92)'); g2.addColorStop(0.45, 'rgba(3,2,6,0.55)'); g2.addColorStop(1, 'rgba(3,2,6,0)');
+        ctx.fillStyle = g2; ctx.beginPath(); ctx.arc(px, py, sr * 2.7, 0, G.TAU); ctx.fill();
+        ctx.fillStyle = '#040207'; ctx.beginPath(); ctx.arc(px, py, sr, 0, G.TAU); ctx.fill();
+        // (a hot thread of penumbra round it, so the spots still read on a corrupted, pitch-black core)
+        ctx.strokeStyle = G.rgba(P.hot, 0.7 * k); ctx.lineWidth = 2.5;
+        ctx.beginPath(); ctx.arc(px, py, sr * 1.35, 0, G.TAU); ctx.stroke();
+      }
+    }
     // cracks in phase 3, more as it weakens
     if (B.phase === 3) {
       const frac = 1 - B.hp / (B.maxHp / 3);
