@@ -93,7 +93,32 @@
     S.noise({ dur: d, vol: 0.12, type: 'highpass', f0: 3400, attack: 0.03 });
     S.tone({ type: 'sawtooth', f0: 52, f1: 44, dur: d, vol: 0.1, attack: 0.04 });
   });
-  AU.vary.splash = 2; AU.vary.bubble = 3; AU.vary.bite = 1.5; AU.vary.spout = 1.5;
+  // a barnacle spat out: a wet pop, and the click of shell
+  AU.define('levSpit', () => {
+    S.noise({ dur: 0.09, vol: 0.2, type: 'lowpass', f0: 1400, f1: 400 });
+    S.tone({ type: 'sine', f0: 260, f1: 120, dur: 0.07, vol: 0.18 });
+    S.tone({ type: 'square', f0: 1800, f1: 1500, dur: 0.015, vol: 0.04, delay: 0.03 });
+  });
+  // a barnacle bursting into spines: a dry crack of shell and a hiss of brine
+  AU.define('levShell', () => {
+    S.noise({ dur: 0.05, vol: 0.34, type: 'highpass', f0: 2800 });
+    S.tone({ type: 'square', f0: 640, f1: 210, dur: 0.06, vol: 0.08 });
+    S.noise({ dur: 0.3, vol: 0.12, type: 'highpass', f0: 4200, attack: 0.02 });
+  });
+  // the gyre: the bay turning, a deep churn that builds and builds
+  AU.define('levChurn', (o) => {
+    const d = (o && o.dur) || 3;
+    S.noise({ dur: d, vol: 0.2, type: 'lowpass', f0: 500, f1: 900, attack: d * 0.2 });
+    S.tone({ type: 'sine', f0: 40, f1: 52, dur: d, vol: 0.18, attack: d * 0.2 });
+    S.noise({ dur: d, vol: 0.06, f0: 1800, f1: 1200, q: 2, attack: d * 0.3 });
+  });
+  // something huge coming up under the floor: a rumble that climbs
+  AU.define('levRumble', (o) => {
+    const d = (o && o.dur) || 0.8;
+    S.tone({ type: 'sine', f0: 34, f1: 62, dur: d, vol: 0.3, attack: d * 0.5 });
+    S.noise({ dur: d, vol: 0.16, type: 'lowpass', f0: 160, f1: 420, attack: d * 0.4 });
+  });
+  AU.vary.splash = 2; AU.vary.bubble = 3; AU.vary.bite = 1.5; AU.vary.spout = 1.5; AU.vary.levSpit = 2; AU.vary.levShell = 2;
 
   // ------------------------------------------------------------------ the arena
   G.THEMES.leviathan = [null,
@@ -211,15 +236,21 @@
       'In the maelstrom the current drags you towards the eye. Count how often its fin circles: twice round, and it comes up twice.',
       'Watch how far the sea draws back before a wave. Far out, the bed laid bare: a breaker too tall to jump, so dash through it. Only a little: a low swell to jump.',
       'Jaws clamped and gills flared, it is about to spit a jet. Head up high: the jet comes down from the sky to the floor, so get in under its chin. Head down by the floor: a swell runs along the floor, then the jet follows over your head, so jump the first and stay down for the second.',
+      'Ride on its head, or wait on the wreckage over it, and it goes down and comes up under you. The ground heaves where it will: step off the spot.',
+      'Its gills pumping while it rears for a lunge: it is holding its breath, and goes late. Wait for it.',
+      'Barnacles burst a moment after they land. Its head swinging wide as it fills: they land all over. A quick tight bob: a line of them laid towards you.',
+      'When it bites its way after you, watch its snout each time it draws back: down at the sand, jump; cocked up, stay down. The last bite buries its jaws. Hit it then.',
+      'When it coils round the bay, the spouts come up everywhere but in the gap in its coil. Keep with the gap.',
     ],
     hudCols: [null, ['#3ad6c0', '#cffff6'], ['#ffb44a', '#ffe8c4'], ['#a896ff', '#ece6ff']],
     BASE_HP: 2900, poise0: 400, w: 128, h: 80,
     answer: 'volley',
+    antiAir: 'breach', // (the kit: a hero riding over its head is answered by this)
     gaps: [0, 0.95, 0.8, 0.65],
     bags: {
-      1: ['lunge', 'snap', 'slam', 'spouts', 'snap', 'volley', 'breaker', 'jet'],
-      2: ['lunge', 'snap', 'slam', 'spouts', 'sweep', 'volley', 'snap', 'breaker', 'jet'],
-      3: ['lunge', 'snap', 'slam', 'spouts', 'sweep', 'maw', 'volley', 'maw', 'breaker', 'jet'],
+      1: ['lunge', 'snap', 'slam', 'spouts', 'snap', 'volley', 'breaker', 'jet', 'barnacles', 'thrash', 'gyre'],
+      2: ['lunge', 'snap', 'slam', 'spouts', 'sweep', 'volley', 'snap', 'breaker', 'jet', 'barnacles', 'thrash', 'gyre'],
+      3: ['lunge', 'snap', 'slam', 'spouts', 'sweep', 'maw', 'volley', 'maw', 'breaker', 'jet', 'barnacles', 'thrash', 'gyre'],
     },
     cards: { 2: ['HIGH WATER', 'The sea comes in'], 3: ['MAELSTROM', 'All of it goes down'] },
     first: { 1: 'lunge', 2: 'sweep', 3: 'maw' },
@@ -243,18 +274,25 @@
     B.lastPX = G.player.x; B.front = null; B.circling = 0; B.pullK = 1;
     B.vh = null; B.under = null; b.voidEye = 0; b.voidEyeT = 0; b.voidThroat = 0;
     B.ebb = { z: 0, to: 0, sea: SEA1, hold: false };
+    B.gyre = null; B.gyrePts = [];
   };
 
   B.kiting = (P, b) => !!P.plat || Math.abs(P.x - b.x) > 430 || (!P.onGround && P.y < FLOOR - 150 && Math.abs(P.x - b.x) > 160);
+  // over its head (the kit's anti-air timer): its head is the body, a skull on a neck that moves; the
+  // hero is over it when above the skull within a little of its length, on it, hopping on it, or up on
+  // the wreckage or a rock just above it. Out at sea or under the water it has no head to ride.
+  B.overhead = (P, b) => !b.hidden && !b.beached && b.z < 0.06 && Math.abs(P.x - b.x) < B.w / 2 + 70 && P.y < b.y - HH * 1.7 && P.y > b.y - HH * 2 - 330;
   B.onRelease = function () {
     const b = B.body;
     b.hurt = false; b.coil = 0; b.chatter = 0; b.fin = 0; b.throatT = 0; b.fast = false; b.direct = false;
     if (B.tail.on && B.tail.pose !== 'under') { B.tail.pose = 'under'; B.tail.rate = 3; }
     B.finCircle = null; B.pullK = 1; B.ebb.hold = false;
+    if (B.gyre) B.gyre.to = 0;
     letGoVoid();
   };
   B.onInterrupt = function () {
     B.finCircle = null; B.tail.pose = 'under'; B.tail.rate = 3; B.ebb.hold = false;
+    if (B.gyre) B.gyre.to = 0;
     // (the hazards were just cleared: the hydra's crack is put back to seal itself, not cut off)
     if (B.vh) { const c = voidCrack(B.vh.root, 0.01); c.t = 0.01; c.closing = true; c.holds = B.vh; }
     letGoVoid();
@@ -314,29 +352,32 @@
   // ------------------------------------------------------------------ hazards of its own
   // A spout: the floor boils, then a column of water is torn up from it to the top of the sky.
   // The boiling and a rim are the warning (it comes from under the floor, where nothing shows).
-  function spout(x, w, tele) {
+  //   dim: (the gyre, a whole shore of them at once) drawn fainter and thrown up with less spray, so a
+  //   curtain of them does not light the screen
+  function spout(x, w, tele, dim) {
+    const dk = dim || 1;
     return H.add({
-      kind: 'spout', x, w, tele, active: 0.45, layer: 'under', fired: false,
+      kind: 'spout', x, w, tele, active: 0.45, layer: 'under', fired: false, dim: dk,
       update(dt) {
         this.srcX = this.x;
         if (this.t < this.tele && Math.random() < dt * 22) G.fx.spawn({ x: this.x + G.rand(-this.w * 0.4, this.w * 0.4), y: level(0) - 2, vx: G.rand(-10, 10), vy: -G.rand(40, 120), life: G.rand(0.2, 0.45), size: G.rand(1.4, 2.6), color: WATER, a: 0.5 });
         if (this.t >= this.tele && !this.fired) {
           this.fired = true;
-          G.audio.play('spout'); G.fx.shake(5); G.fx.kick(0, -2);
-          splash(this.x, level(0) - 4, 1.1);
+          G.audio.play('spout'); G.fx.shake(5 * dk); G.fx.kick(0, -2 * dk);
+          splash(this.x, level(0) - 4, 1.1 * dk);
           G.fx.ripple(this.x, FLOOR - 140, 170, 0.3, 0.7);
         }
-        if (this.fired && this.t < this.tele + this.active && Math.random() < dt * 40) {
+        if (this.fired && this.t < this.tele + this.active && Math.random() < dt * 40 * dk) {
           G.fx.spawn({ kind: 'spark', x: this.x + G.rand(-this.w / 2, this.w / 2), y: G.rand(40, FLOOR - 40), vx: G.rand(-160, 160), vy: G.rand(-200, 40), life: G.rand(0.3, 0.6), size: G.rand(1.4, 2.6), color: WATER, grav: 1200, a: 0.5 });
         }
         if (this.t > this.tele + this.active + 0.45) this.dead = true;
       },
       hits(P) { return this.t >= this.tele && this.t < this.tele + this.active && Math.abs(P.x - this.x) < this.w / 2 - 4; },
       danger() { return this.t < this.tele + this.active ? [this.x, this.w / 2 + 16, this.tele - this.t] : null; },
-      draw(ctx) { drawColumn(ctx, this.x, this.w, this.t, this.tele, this.active); },
+      draw(ctx) { drawColumn(ctx, this.x, this.w, this.t, this.tele, this.active, this.dim); },
     });
   }
-  function drawColumn(ctx, x, w, t, tele, active) {
+  function drawColumn(ctx, x, w, t, tele, active, dim) {
     const P = G.pal(), F = level(0) - 1;
     if (t < tele) {
       const k = t / tele;
@@ -351,8 +392,8 @@
       }
       return;
     }
-    const e = t - tele, up = Math.min(1, e / 0.08), f = e < active ? 1 : Math.max(0, 1 - (e - active) / 0.45);
-    const cw = w * (0.5 + 0.5 * up) * (0.85 + 0.15 * f);
+    const e = t - tele, up = Math.min(1, e / 0.08), f0 = e < active ? 1 : Math.max(0, 1 - (e - active) / 0.45), f = f0 * (dim || 1);
+    const cw = w * (0.5 + 0.5 * up) * (0.85 + 0.15 * f0);
     // the top falls back once it is spent
     const topY = e < active ? G.lerp(F, -60, E.outCubic(up)) : G.lerp(-60, F, E.inQuad(Math.min(1, (e - active) / 0.45)));
     ctx.save();
@@ -571,6 +612,184 @@
       },
       draw(ctx) { drawJet(ctx, this); },
     });
+  }
+
+  // The ground over it as it rises under the hero (the breach): it darkens and heaves, following the
+  // hero, then holds still a moment before the jaws come up through it. A column from the floor to the
+  // top of the sky: up on the wreckage or in the air is no safer than the floor. It comes from under
+  // the ground, where nothing shows, so the heave is drawn, with a rim in the warning colour.
+  function heave(x, w, tele, lock) {
+    const P = G.player;
+    return H.add({
+      kind: 'heave', x, w, tele, lock, active: 0.34, layer: 'under',
+      update(dt) {
+        this.srcX = this.x;
+        if (this.t < this.tele - this.lock) this.x = G.damp(this.x, G.clamp(P.x, WL + 80, WR - 80), 5.5, dt);
+        // grit and water shaken up off it, more as it nears
+        const k = Math.min(1, this.t / this.tele);
+        if (this.t < this.tele && Math.random() < dt * (6 + 30 * k)) {
+          G.fx.spawn({ kind: 'spark', x: this.x + G.rand(-this.w * 0.45, this.w * 0.45), y: level(0) - 2, vx: G.rand(-40, 40), vy: -G.rand(60, 200 + 260 * k), life: G.rand(0.25, 0.5), size: G.rand(1.2, 2.4), color: flooded() ? WATER : '150,150,140', grav: 1300, a: 0.5 });
+        }
+        if (this.t < this.tele && Math.random() < dt * 10 * k) G.fx.shake(1.5);
+        if (this.t > this.tele + this.active + 0.3) this.dead = true;
+      },
+      hits(Pl) { return this.t >= this.tele && this.t < this.tele + this.active && Math.abs(Pl.x - this.x) < this.w / 2 - 6; },
+      danger() { return this.t < this.tele + this.active ? [this.x, this.w / 2 + 18, this.tele - this.t] : null; },
+      // (once the jaws are through, the torn ground settles back over a moment)
+      draw(ctx) {
+        if (this.t < this.tele) drawHeave(ctx, this);
+        else if (this.t < this.tele + 0.22) { ctx.save(); ctx.globalAlpha = 1 - (this.t - this.tele) / 0.22; drawHeave(ctx, this); ctx.restore(); }
+      },
+    });
+  }
+  function drawHeave(ctx, h) {
+    const P = G.pal(), F = level(0) - 1, k = Math.min(1, h.t / h.tele), wet = flooded();
+    const held = h.t > h.tele - h.lock ? (h.t - (h.tele - h.lock)) / h.lock : 0;
+    const x = h.x + (held ? Math.sin(h.t * 70) * 1.5 * held : 0);
+    // the floor going dark over something huge
+    ctx.save();
+    ctx.translate(x, F); ctx.scale(1, 0.16);
+    const g = ctx.createRadialGradient(0, 0, 0, 0, 0, h.w * 0.9);
+    g.addColorStop(0, 'rgba(0,0,0,' + (0.2 + 0.45 * k) + ')'); g.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, h.w * 0.9, 0, G.TAU); ctx.fill();
+    ctx.restore();
+    // the heave: the ground (or the flood) bulging up over it, cracked across its top
+    const hh = (3 + 13 * k * k) * (1 + 0.12 * Math.sin(h.t * 34));
+    ctx.fillStyle = wet ? G.rgba(rgbStr(P.near), 0.75) : 'rgba(9,14,16,0.92)';
+    ctx.beginPath(); ctx.moveTo(x - h.w * 0.62, F + 2); ctx.quadraticCurveTo(x, F - hh * 2, x + h.w * 0.62, F + 2); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = wet ? G.rgba(WATER, 0.3 + 0.3 * k) : G.rgba(P.rim, 0.25 + 0.3 * k); ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(x - h.w * 0.62, F + 2); ctx.quadraticCurveTo(x, F - hh * 2, x + h.w * 0.62, F + 2); ctx.stroke();
+    if (!wet && k > 0.3) {
+      ctx.strokeStyle = 'rgba(0,0,0,0.7)'; ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      for (const o of [-0.34, -0.1, 0.16, 0.38]) { const cx = x + o * h.w, cy = F - hh * (1 - o * o * 3.2); ctx.moveTo(cx, cy); ctx.lineTo(cx + o * 12, cy + 4 + 6 * k); }
+      ctx.stroke();
+    }
+    // the rim in the warning colour, and late, two eyes in the dark under it
+    ctx.strokeStyle = G.rgba(DANGER, 0.2 + 0.5 * k); ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.ellipse(x, F, h.w / 2, 9, 0, 0, G.TAU); ctx.stroke();
+    if (k > 0.55) {
+      const a = (k - 0.55) / 0.45 * G.clamp(1 - (h.t - h.tele) / 0.22, 0, 1), a0 = ctx.globalAlpha;
+      ctx.globalCompositeOperation = 'lighter';
+      for (const d of [-1, 1]) { ctx.globalAlpha = 0.45 * a * a0; ctx.drawImage(G.fx.glow(P.boss), x + d * 20 - 10, F - 6, 20, 12); }
+      ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
+    }
+  }
+
+  // A barnacle (the barnacles): spat out, it sticks where it strikes (the floor, a wall, the wreckage)
+  // and bursts into a crown of spines when its fuse runs out. It is a thing thrown, so its slit burns
+  // in the warning colour, faster as it nears; once it has stuck, a blade cracks it open harmlessly.
+  //   side: 0 on the floor or the wreckage (spines up), 1 on the west wall, -1 on the east (spines out)
+  //   tx: where it was spat at; it is caught by the wreckage only if that is where it was aimed (one
+  //   aimed past the wreckage flies by it)
+  function barnacle(x, y, vx, vy, fuse, tx) {
+    return H.add({
+      kind: 'barnacle', x, y, vx, vy, fuse, tx, r: 10, state: 'fly', st: 0, bt: 0, side: 0, plat: null, slashable: false, srcX: x, spin: G.rand(0, 6),
+      update(dt) {
+        if (this.state === 'fly') {
+          const py = this.y;
+          this.vy += 1300 * dt; this.x += this.vx * dt; this.y += this.vy * dt; this.spin += dt * 9;
+          this.srcX = this.x;
+          if (Math.random() < dt * 30) G.fx.spawn({ kind: 'spark', x: this.x, y: this.y, vx: -this.vx * 0.1, vy: -this.vy * 0.1, life: 0.3, size: 1.4, color: WATER, grav: 900, a: 0.5 });
+          if (this.x < WL + 7 || this.x > WR - 7) { this.x = G.clamp(this.x, WL + 7, WR - 7); this.stick(this.x < 640 ? 1 : -1); }
+          else if (this.vy > 0) {
+            for (const p of G.arena.platforms) {
+              if (p.gone || p.rise < 0.9 || this.tx < p.x || this.tx > p.x + p.w) continue;
+              if (py <= p.y + 2 && this.y >= p.y && this.x > p.x + 4 && this.x < p.x + p.w - 4) { this.y = p.y - 6; this.plat = p; this.stick(0); break; }
+            }
+            if (this.state === 'fly' && this.y >= FLOOR) { this.y = FLOOR - 6; this.stick(0); }
+          }
+          // (one still in the air when its time comes goes off where it lands)
+        } else if (this.state === 'stuck') {
+          this.st += dt;
+          if (this.plat) this.y = this.plat.y - 6;
+          if (this.t >= this.fuse) {
+            this.state = 'burst'; this.bt = 0; this.slashable = false;
+            G.audio.play('levShell'); G.fx.shake(3);
+            const a = this.area(), up = this.side ? 0 : -Math.PI / 2, ang = this.side > 0 ? 0 : this.side < 0 ? Math.PI : up;
+            G.fx.burst(this.x, this.y - (this.side ? 0 : 2), { n: 10, color: G.corrupt.active() ? BLOOD : '214,220,207', kind: 'spark', speed: [180, 520], angle: ang, spread: 2.2, life: [0.2, 0.45], size: [1.6, 3], grav: 900, a: 0.8 });
+            G.fx.burst(a.cx, a.cy, { n: 6, color: WATER, kind: 'spark', speed: [100, 300], angle: ang, spread: 2.6, life: [0.3, 0.6], size: [1.4, 2.6], grav: 1300, a: 0.55 });
+            if (!this.side && this.y >= FLOOR - 10) G.fx.dust(this.x, FLOOR, 2, { speed: [30, 130], size: [5, 10], life: [0.4, 0.8], up: 50, a: 0.25 });
+          }
+        } else {
+          this.bt += dt;
+          if (this.state === 'burst' && this.bt > 0.16) this.state = 'spent';
+          if (this.bt > 0.5) this.dead = true;
+        }
+      },
+      stick(side) {
+        this.state = 'stuck'; this.side = side; this.st = 0; this.vx = this.vy = 0; this.r = 13; this.slashable = true;
+        // (its fuse is counted from the spit: one that lands late does not burst late)
+        this.fuse = Math.max(this.fuse, this.t + 0.35);
+        G.audio.play('tink', { vol: 0.5 });
+        G.fx.burst(this.x, this.y, { n: 4, color: WATER, kind: 'spark', speed: [60, 200], angle: side > 0 ? 0 : side < 0 ? Math.PI : -Math.PI / 2, spread: 2, life: [0.2, 0.4], size: [1.2, 2], grav: 1200, a: 0.5 });
+      },
+      // where its spines reach: a crown up from the floor or the wreckage, or straight out from a wall
+      area() {
+        if (this.side) return { cx: this.x + this.side * 48, cy: this.y, hw: 52, hh: 46 };
+        return { cx: this.x, cy: this.y + 6 - 48, hw: 50, hh: 56 };
+      },
+      // (only the spines hurt: a shell still in the air is no blow)
+      hits(P) { return this.state === 'burst' && G.rectsOverlap(P.box(), this.area()); },
+      danger() {
+        if (this.state === 'fly') {
+          // where it will come down on the floor (a little wider: it may stick to the wreckage instead)
+          const g = 1300, dy = FLOOR - this.y, t = (this.vy + Math.sqrt(Math.max(0, this.vy * this.vy + 2 * g * dy))) / g;
+          return [G.clamp(this.x + this.vx * t, WL + 10, WR - 10), 70, Math.max(0, this.fuse - this.t)];
+        }
+        if (this.state !== 'stuck' && this.state !== 'burst') return null;
+        const a = this.area();
+        if (a.cy + a.hh < FLOOR - 60) return null; // up on the wreckage or high on a wall: not the floor's danger
+        return [a.cx, a.hw + 16, Math.max(0, this.fuse - this.t)];
+      },
+      slash() {
+        if (this.state !== 'fly' && this.state !== 'stuck') return;
+        this.state = 'spent'; this.bt = 0.2; this.slashable = false;
+        G.audio.play('orbPop');
+        G.fx.burst(this.x, this.y - 4, { n: 8, color: '214,220,207', kind: 'spark', speed: [80, 260], angle: -Math.PI / 2, spread: 2.8, life: [0.2, 0.45], size: [1.4, 2.6], grav: 1200, a: 0.7 });
+      },
+      draw(ctx) { drawBarnacle(ctx, this); },
+    });
+  }
+  function drawBarnacle(ctx, h) {
+    const P = G.pal(), vo = G.corrupt.active(), warn = vo ? BLOOD : DANGER;
+    const fade = h.state === 'spent' ? Math.max(0, 1 - (h.bt - 0.16) / 0.34) : 1;
+    if (fade <= 0) return;
+    ctx.save();
+    ctx.translate(h.x, h.y + (h.state !== 'fly' && !h.side ? 6 : 0));
+    ctx.rotate(h.state === 'fly' ? h.spin : h.side > 0 ? Math.PI / 2 : h.side < 0 ? -Math.PI / 2 : 0);
+    ctx.globalAlpha = fade;
+    const k = h.state === 'stuck' ? G.clamp(h.t / h.fuse, 0, 1) : h.state === 'fly' ? 0 : 1;
+    // (stuck) the reach of its spines, faint, then firmer as it is about to go
+    if (h.state === 'stuck' && k > 0.45) {
+      ctx.strokeStyle = G.rgba(warn, 0.08 + 0.32 * (k - 0.45) / 0.55); ctx.lineWidth = 1.5;
+      ctx.setLineDash([6, 7]);
+      ctx.beginPath(); ctx.ellipse(0, -30, 50, 60, 0, Math.PI, G.TAU); ctx.stroke();
+      ctx.setLineDash([]);
+    }
+    // the spines, out in a crown, then drawn back in
+    if (h.state === 'burst' || h.state === 'spent') {
+      const out = h.state === 'burst' ? E.outCubic(Math.min(1, h.bt / 0.06)) : 1 - E.inQuad(Math.min(1, (h.bt - 0.16) / 0.3));
+      ctx.lineCap = 'round';
+      for (let i = 0; i < 9; i++) {
+        const a = -Math.PI / 2 + (i - 4) * 0.3, L = (48 + (i % 3) * 18 - Math.abs(i - 4) * 4) * out;
+        ctx.strokeStyle = vo ? 'rgba(60,8,22,0.95)' : 'rgba(196,204,190,0.95)'; ctx.lineWidth = 3.2;
+        ctx.beginPath(); ctx.moveTo(Math.cos(a) * 5, -6 + Math.sin(a) * 5); ctx.lineTo(Math.cos(a) * L, -6 + Math.sin(a) * L); ctx.stroke();
+        ctx.strokeStyle = G.rgba(vo ? BLOOD : P.hot, 0.6); ctx.lineWidth = 1.2;
+        ctx.beginPath(); ctx.moveTo(Math.cos(a) * L * 0.7, -6 + Math.sin(a) * L * 0.7); ctx.lineTo(Math.cos(a) * L, -6 + Math.sin(a) * L); ctx.stroke();
+      }
+    }
+    // the shell: a squat cone of plates, pale ridges, weed at its foot
+    const shell = vo ? '#14040a' : '#1c2b2e', ridge = vo ? 'rgba(120,20,44,0.8)' : 'rgba(205,212,198,0.75)';
+    ctx.fillStyle = shell;
+    ctx.beginPath(); ctx.moveTo(-12, 0); ctx.lineTo(-10, -7); ctx.lineTo(-5, -13); ctx.lineTo(5, -13); ctx.lineTo(10, -7); ctx.lineTo(12, 0); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = ridge; ctx.lineWidth = 1.3;
+    ctx.beginPath(); ctx.moveTo(-10, -1); ctx.lineTo(-5, -12); ctx.moveTo(-3, 0); ctx.lineTo(-1.5, -12.5); ctx.moveTo(4, 0); ctx.lineTo(2, -12.5); ctx.moveTo(10, -1); ctx.lineTo(5, -12); ctx.stroke();
+    // the slit at its top: the warning colour, beating faster as the fuse runs down
+    const beat = h.state === 'stuck' ? 0.5 + 0.5 * Math.sin(h.st * (8 + 34 * k)) : 0.6;
+    ctx.fillStyle = G.rgba(warn, (0.45 + 0.5 * k) * (0.55 + 0.45 * beat));
+    ctx.beginPath(); ctx.ellipse(0, -13, 4.5, 1.8 + 1.2 * k, 0, 0, G.TAU); ctx.fill();
+    ctx.restore();
   }
 
   // a bubble: a projectile, so its rim is the warning colour
@@ -851,7 +1070,9 @@
   // Lunge: it comes up at a wall, rears, and strikes the length of the shore.
   //   The tell is the rear. Low, snout to the ground and neck wound tight: it strikes along the floor.
   //   Up tall, snout to the sky: it strikes at head height, over anyone who stays on the ground.
-  function* lunge(side, first, low) {
+  //   Its gills pumping all through the rear: it holds its breath, coiled, and goes late (v2.1a).
+  //   After the strike its chin lies on the sand a moment, winded: the opening.
+  function* lunge(side, first, low, late) {
     const b = B.body, T = K.T(), dir = -side;
     const x0 = side > 0 ? WR - 120 : WL + 120, x1 = side > 0 ? WL + 130 : WR - 130;
     if (first) {
@@ -863,14 +1084,26 @@
     target(x0, low ? FLOOR - 30 : FLOOR - 275, 0, aim(dir, low ? 0.55 : -0.62));
     b.coil = low ? 1 : 0; b.jawT = low ? 0.15 : 0.3;
     G.audio.play('hiss');
-    const rear = (first ? 0.9 : 0.62) * T;
-    let e = 0, glinted = false;
-    while (e < rear) {
+    const rear = (first ? 0.9 : 0.62) * T, hold = late ? 0.52 * T : 0, all = rear + hold;
+    let e = 0, glinted = false, hint = null;
+    const live = { on: true };
+    while (e < all) {
       const dt = yield;
       e += dt;
-      b.tx = x0 + side * 34 * Math.min(1, e / rear); // it draws back into itself
+      b.tx = x0 + side * (34 * Math.min(1, e / rear) + (late ? 12 * G.clamp((e - rear) / hold, 0, 1) : 0)); // it draws back into itself
+      if (late) {
+        // (the held breath) gills pumping from the first moment, spurting at each beat, and once it has
+        // drawn back, a tremor
+        b.gill = Math.max(b.gill, 0.55 + 0.45 * Math.sin(e * 26));
+        if (Math.floor(e * 26 / G.TAU) !== Math.floor((e - dt) * 26 / G.TAU)) {
+          const c = Math.cos(b.ang), s = Math.sin(b.ang), gx = b.x - c * 52 * HS, gy = b.y - HH - s * 52 * HS;
+          for (let i = 0; i < 4; i++) G.fx.spawn({ kind: 'spark', x: gx + G.rand(-6, 6), y: gy + G.rand(-8, 8), vx: -c * G.rand(40, 140) + G.rand(-40, 40), vy: -G.rand(60, 180), life: G.rand(0.3, 0.55), size: G.rand(1.3, 2.2), color: WATER, grav: 1200, a: 0.6 });
+        }
+        if (e > rear) { b.va += G.rand(-1, 1) * 34 * dt; b.vy += G.rand(-1, 1) * 500 * dt; }
+      }
       if (Math.random() < dt * 14) { const m = mouth(b); G.fx.spawn({ kind: 'spark', x: m.x, y: m.y, vx: G.rand(-20, 20), vy: 40, life: 0.6, size: 1.6, color: WATER, grav: 1300, a: 0.6 }); }
-      if (!glinted && e >= rear - 0.22) { glinted = true; const m = mouth(b); G.fx.glint(m.x, m.y, 36, G.pal().hot, 0.3); G.audio.play('glint'); }
+      if (!glinted && e >= all - 0.22) { glinted = true; const m = mouth(b); G.fx.glint(m.x, m.y, 36, G.pal().hot, 0.3); G.audio.play('glint'); }
+      if (!hint && e >= all - 0.2) hint = cue(low ? 'flycut' : 'crescent', () => live.on, 190);
     }
     // the strike
     b.coil = 0; b.direct = true; b.hurt = true; b.jawT = 0.95; b.ta = aim(dir, low ? 0.05 : 0.03);
@@ -891,26 +1124,32 @@
         G.fx.spawn({ kind: 'spark', x: b.x - dir * 60, y: b.y - HH + G.rand(-40, 40), vx: -dir * G.rand(500, 900), vy: G.rand(-30, 30), life: G.rand(0.1, 0.2), size: G.rand(1.4, 2.4), color: G.pal().hot, len: 0.06, drag: 3, a: 0.5 });
       }
     }
-    b.hurt = false; b.jawT = 0;
+    b.hurt = false; b.jawT = 0; live.on = false;
     G.audio.play('bite');
     if (!low) { b.ta = aim(dir, 0.18); yield* tween(b, { y: FLOOR }, 0.2, E.inQuad); }
     crash(b.x + dir * 50, 1.15);
     G.fx.impact(b.x + dir * 40, FLOOR - 40, 0.06); G.fx.lines(b.x + dir * 60, FLOOR - 40, 14, G.pal().hot);
-    b.ta = aim(dir, 0.04);
+    // its chin goes down on the sand, winded, jaws slack, gills heaving
+    b.ta = aim(dir, 0.2); b.jawT = 0.3; b.gill = 1;
+    G.fx.dust(b.x + dir * 80, FLOOR, 3, { dir, speed: [30, 150], size: [6, 12], life: [0.5, 0.9], up: 40, a: 0.3 });
   }
   function* atkLunge() {
     const b = B.body, P = G.player;
     let side = P.x < 640 ? 1 : -1;
     const twice = B.phase === 3 ? K.chance(0.7, 'twice') : B.phase === 2 && K.chance(0.4, 'twice');
-    yield* lunge(side, true, !K.chance(0.5, 'high'));
-    if (twice) { yield* wait(0.22); side = -side; yield* lunge(side, false, !K.chance(0.5, 'high')); }
+    const late = () => K.chance(B.phase === 1 ? 0.3 : 0.4, 'late');
+    yield* lunge(side, true, !K.chance(0.5, 'high'), late());
+    if (twice) { yield* wait(0.22); b.jawT = 0; side = -side; yield* lunge(side, false, !K.chance(0.5, 'high'), late()); }
     b.exposed = true;
-    yield* wait(B.phase === 3 ? 0.95 : 1.15);
-    b.exposed = false;
+    let e = 0;
+    const lie = B.phase === 3 ? 1.05 : 1.3;
+    while (e < lie) { const dt = yield; e += dt; b.gill = Math.max(b.gill, 0.4 + 0.4 * Math.sin(e * 7)); }
+    b.exposed = false; b.jawT = 0;
   }
 
   // Snap: it glides in low over the shore and bites. A jaw that chatters while it draws back means a
-  // second bite follows.
+  // second bite follows. A hero who stays in front of its jaws after that is snapped at again, sooner
+  // (v2.1a: once in I and II, up to twice in III): its head jerks back the moment it sees them there.
   function* atkSnap() {
     const b = B.body, P = G.player, T = K.T();
     const twice = K.chance(B.phase === 1 ? 0.3 : 0.45, 'twice');
@@ -918,8 +1157,23 @@
     yield* glide(G.clamp(P.x - f * 220, WL + 110, WR - 110), FLOOR - 16, 0, aim(f, 0.12), 0.8, true);
     for (let i = 0; i < (twice ? 2 : 1); i++) {
       f = facePlayer();
-      const tele = (i ? 0.46 : 0.62) * T, ff = f;
-      b.fast = false; b.chatter = twice && !i ? 1 : 0;
+      yield* snapBite(f, (i ? 0.46 : 0.62) * T, twice && !i);
+    }
+    // still there in front of its jaws, on the ground or just off it: again
+    for (let n = 0; n < (B.phase === 3 ? 2 : 1); n++) {
+      const dx = P.x - b.x;
+      if (!(dx * b.face > 0 && Math.abs(dx) < 290 && P.y > FLOOR - 150)) break;
+      b.va -= b.face * 9; b.jawT = 0.5; G.audio.play('bite', { vol: 0.4 });
+      yield* snapBite(b.face, 0.52 * T, false);
+    }
+    b.exposed = true;
+    yield* wait(0.6);
+    b.exposed = false;
+  }
+  function* snapBite(f, tele, chatter) {
+    const b = B.body, ff = f;
+    {
+      b.fast = false; b.chatter = chatter ? 1 : 0;
       target(G.clamp(b.x - f * 40, WL + 100, WR - 100), FLOOR - 72, 0, aim(f, 0.45));
       b.jawT = 0.75;
       G.audio.play('hiss');
@@ -942,9 +1196,6 @@
       yield* wait(0.2);
       target(b.x, FLOOR - 12, 0, aim(f, 0.1));
     }
-    b.exposed = true;
-    yield* wait(0.6);
-    b.exposed = false;
   }
 
   // Slam: the head waits on the shore while the tail comes down out of the sky.
@@ -1436,6 +1687,312 @@
     b.exposed = false;
   }
 
+  // ------------------------------------------------------------------ v2.1a: from the boss study
+  // A cue for the scripted dodger in tools/boss-tests.js, which reads hazards by kind: it hurts nothing
+  // and draws nothing. 'flycut' (jump it as it comes) for a bite along the floor, 'crescent' (stay
+  // down) for a snap over a standing head; but a hero up on a rock is level with that snap, and jumps it.
+  // It follows the head (lead pixels ahead of it) while live() says so.
+  function cue(kind, live, lead) {
+    const b = B.body, P = G.player;
+    return H.add({
+      kind, want: kind, layer: 'none', x: b.x, y: FLOOR - 22, vx: 0, dir: 0,
+      update() {
+        const up = P.y < FLOOR - 40;
+        this.kind = this.want === 'crescent' && up ? 'flycut' : this.want;
+        this.y = up ? P.y - 22 : FLOOR - 22;
+        this.x = b.x + b.face * (lead || 80); this.vx = b.face * 600; this.dir = b.face;
+        if (!live()) this.dead = true;
+      },
+    });
+  }
+
+  // Breach: its answer to a hero riding over its head (on it, hopping on it, or waiting on the wreckage
+  // or a rock above it). It rears back off them with a hiss and goes down; the ground under the hero
+  // darkens and heaves as it rises beneath them, following them, then holds still a moment, and it
+  // comes up through that spot jaws first, past the top of the sky. Staying up there is no answer:
+  // stepping off the spot is.
+  //   II: it drops back and comes up a second time, under wherever the hero went.
+  //   III: it comes down on the shore as a slam, and a wave runs out each way.
+  function* atkBreach() {
+    const b = B.body, P = G.player, T = K.T();
+    const n = B.phase >= 2 ? 2 : 1;
+    // it rears back off them, jaws parting, and goes down
+    b.jawT = 0.55; G.audio.play('hiss');
+    target(b.x - b.face * 40, b.y - 60, 0, aim(b.face, -0.55)); b.fast = true;
+    yield* wait(0.24);
+    b.jawT = 0; b.fast = false;
+    yield* sinkAway(0.36);
+    let x = P.x;
+    for (let i = 0; i < n; i++) {
+      const tele = (i ? 0.66 : 0.84) * T, lock = i ? 0.26 : 0.3;
+      const hz = heave(G.clamp(P.x, WL + 80, WR - 80), 136, tele, lock);
+      G.audio.play('levRumble', { dur: tele });
+      // down under the floor it follows the heave (its neck goes out to sea, out of sight)
+      b.direct = true; b.z = 0.3; b.y = FLOOR + 220;
+      let e = 0;
+      while (e < tele) { e += yield; b.x = hz.x; }
+      x = hz.x;
+      // up through it, jaws wide, past the top of the sky
+      // (canted a little towards the hero, so the jaws show in profile rather than edge-on)
+      b.z = 0; b.x = x; b.y = FLOOR + 170; b.ang = b.ta = -Math.PI / 2 + 0.34 * (P.x >= x ? 1 : -1); b.jawT = 1; b.jaw = 1;
+      G.fx.impact(x, FLOOR - 220, 0.06); G.fx.punch(0.025); G.fx.shake(14);
+      G.fx.lines(x, FLOOR - 140, 18, G.pal().hot, { r0: 60, speed: [900, 1600] });
+      G.audio.play('lunge'); G.audio.play('seaRoar');
+      splash(x, level(0) - 4, 2);
+      if (!flooded()) G.fx.dust(x, FLOOR, 6, { speed: [80, 320], size: [8, 16], life: [0.6, 1.1], up: 90, a: 0.3 });
+      yield* tween(b, { y: FLOOR - 540 }, 0.24, E.outQuad);
+      b.jawT = 0; G.audio.play('bite');
+      yield* wait(0.18);
+      if (i < n - 1) {
+        // it falls back down the way it came, under the floor
+        b.ta = -Math.PI / 2 - 0.1;
+        yield* tween(b, { y: FLOOR + 200 }, 0.3, E.inQuad);
+        splash(x, level(0) - 4, 1.2); G.audio.play('splash');
+      }
+    }
+    // it comes down on the shore beside the spot, away from the hero, facing them
+    const f = P.x >= x ? 1 : -1, lx = G.clamp(x - f * 150, WL + 120, WR - 120);
+    b.ta = aim(f, 0.55);
+    yield* tween(b, { x: lx, y: FLOOR }, 0.36, E.inQuad);
+    b.ta = aim(f, 0.12);
+    if (B.phase === 3) {
+      // (III) it comes down as a slam: the shore jumps, and a wave runs out each way
+      crash(lx, 1.7);
+      G.fx.impact(lx, FLOOR - 50, 0.07); G.fx.lines(lx, FLOOR - 40, 16, G.pal().hot, { r0: 40 });
+      for (const d of [-1, 1]) H.shockwave(lx + d * 70, d, 500, 46, { boss: '120,200,215', hot: '220,245,250' });
+    } else crash(lx, 1.3);
+    b.exposed = true;
+    let e = 0;
+    const lie = B.phase === 3 ? 0.95 : 1.1;
+    while (e < lie) { const dt = yield; e += dt; b.gill = Math.max(b.gill, 0.4 + 0.4 * Math.sin(e * 8)); }
+    b.exposed = false;
+  }
+
+  // Barnacles: it rears and spits clusters of spiked barnacles that stick where they land (the floor, a
+  // wall, the wreckage) and burst into spines a moment later. The tell is how it spits.
+  //   Its head swings wide from side to side as its throat fills: they are flung all over the shore,
+  //   with room between them.
+  //   A tight, quick bob, snout down towards the hero: a line of them laid out towards the hero and past
+  //   them, nearest first, close together. Get off the line: past its end, or back towards the head.
+  //   II: more of them. III: they go off one after another, a chain running down the line.
+  function* atkBarnacles() {
+    const b = B.body, P = G.player, T = K.T();
+    const line = K.chance(0.5, 'line');
+    const f = facePlayer(), hx = G.clamp(P.x - f * 420, WL + 120, WR - 120);
+    yield* glide(hx, line ? FLOOR - 150 : FLOOR - 215, 0, aim(f, line ? 0.2 : -0.35), 0.8);
+    // the tell, as its throat fills
+    const tele = 0.72 * T;
+    b.throatT = 0.85; G.audio.play('gulp');
+    let e = 0;
+    while (e < tele) {
+      const dt = yield;
+      e += dt;
+      const k = Math.min(1, e / tele);
+      if (line) {
+        // quick, tight bobs, snout down at the hero
+        if (Math.floor(e / 0.14) !== Math.floor((e - dt) / 0.14)) { b.vy += 240; b.va += f * 2.5; }
+        b.ta = aim(f, 0.24); b.tx = hx; b.ty = FLOOR - 150;
+      } else {
+        // wide swings of its head from side to side, growing
+        const sw = Math.sin(e * 6.2) * E.outQuad(k);
+        b.ta = aim(f, -0.38 + 0.6 * sw); b.tx = hx - f * 50 * sw; b.ty = FLOOR - 215 + 20 * Math.abs(sw);
+      }
+      b.gill = Math.max(b.gill, 0.45 * k);
+    }
+    // where they go
+    const n = (line ? 3 : 4) + B.phase + (K.hard() ? 1 : 0), xs = [];
+    if (line) {
+      // from a little in front of its jaws to just past the hero, close enough that there is no gap
+      const x0 = hx + f * 175, x1 = P.x + f * 60, sp = G.clamp(((x1 - x0) * f) / Math.max(1, n - 1), 60, 125);
+      for (let i = 0; i < n; i++) xs.push(G.clamp(x0 + f * i * sp, WL + 30, WR - 30));
+    } else {
+      // scattered: across the shore, never closer than 190 to each other, one near the hero
+      xs.push(G.clamp(P.x + G.rrand(-60, 60), WL + 60, WR - 60));
+      for (let tries = 0; tries < 200 && xs.length < n; tries++) {
+        const x = G.rrand(WL + 60, WR - 60);
+        if (xs.every((v) => Math.abs(v - x) >= 190)) xs.push(x);
+      }
+      xs.sort((a, c) => (a - c) * f);
+    }
+    const base = B.phase === 1 ? 1.45 : B.phase === 2 ? 1.3 : 1.15, gap = line ? 0.12 : 0.17;
+    b.throatT = 0;
+    for (let i = 0; i < xs.length; i++) {
+      const m = mouth(b), tx = xs[i], tf = G.clamp(Math.abs(tx - m.x) / 760, 0.5, 0.95);
+      const vx = (tx - m.x) / tf, vy = (FLOOR - m.y - 0.5 * 1300 * tf * tf) / tf;
+      // its head flicks the way it spits, and the jaws snap open
+      if (line) { b.vy += 300; b.va -= f * 4; } else { b.ta = Math.atan2(vy, vx); }
+      b.jawT = 0.85; b.jaw = Math.max(b.jaw, 0.5);
+      // (III) a chain: each goes off a beat after the one before, all down the line
+      const fuse = tf + base + (B.phase === 3 ? i * 0.2 - i * gap : 0);
+      barnacle(m.x, m.y, vx, vy, Math.max(tf + 0.4, fuse), tx);
+      G.audio.play('levSpit'); G.fx.kick(-f * 1.5, 0);
+      G.fx.burst(m.x, m.y, { n: 4, color: WATER, kind: 'spark', speed: [80, 220], angle: Math.atan2(vy, vx), spread: 0.8, life: [0.2, 0.4], size: [1.2, 2.2], grav: 1200, a: 0.6 });
+      yield* wait(gap * 0.4);
+      b.jawT = 0.15;
+      yield* wait(gap * 0.6);
+    }
+    // spent: its head sags, water running from its jaws
+    target(b.x, FLOOR - 40, 0, aim(f, 0.12)); b.jawT = 0.3;
+    b.exposed = true;
+    yield* wait(0.75);
+    b.exposed = false; b.jawT = 0;
+  }
+
+  // Thrash: it comes up onto the shore and bites its way after the hero, again and again, each bite a
+  // short lunge from where the last ended. The last drives its jaws into the sand, and it lies there
+  // stuck, gasping and tugging, for a long moment.
+  //   The tell for each bite is its snout as it draws back: down at the sand, a low bite along the
+  //   floor (jump it); cocked up at the air, a snap at head height over a standing hero (stay down).
+  //   The last is always low. 3 bites in I, 4 in II, 5 in III, each read a little shorter.
+  function* atkThrash() {
+    const b = B.body, P = G.player, T = K.T();
+    const n = 2 + B.phase;
+    let f = facePlayer();
+    yield* glide(G.clamp(P.x - f * 300, WL + 110, WR - 110), FLOOR - 40, 0, aim(f, 0.2), 0.7, true);
+    G.audio.play('hiss');
+    for (let i = 0; i < n; i++) {
+      const last = i === n - 1, high = !last && K.chance(0.4, 'high');
+      f = facePlayer();
+      const read = (last ? 0.62 : G.lerp(0.5, 0.36, i / Math.max(1, n - 2))) * T * (B.phase === 3 ? 0.92 : 1);
+      // it draws back, the neck winding, snout down at the sand or cocked up at the air, and follows
+      b.direct = false; b.fast = true; b.jawT = high ? 0.6 : 0.35;
+      const c0 = b.coil || 0, c1 = last ? 0.95 : 0.6;
+      let e = 0, glinted = false, hint = null;
+      const live = { on: true };
+      while (e < read) {
+        const dt = yield;
+        e += dt;
+        const k = Math.min(1, e / read);
+        b.coil = G.lerp(c0, c1, E.outQuad(k));
+        b.tx = G.clamp(P.x - f * (240 + 30 * k), WL + 100, WR - 100);
+        b.ty = high ? FLOOR - 150 - 24 * k : FLOOR - 10 + 6 * k;
+        b.ta = aim(f, high ? -0.55 - 0.2 * k : 0.42 + 0.14 * k);
+        if (!glinted && e >= read - 0.18) { glinted = true; const m = mouth(b); G.fx.glint(m.x, m.y, 30, G.pal().hot, 0.24); G.audio.play('glint'); }
+        if (!hint && e >= read - 0.2) hint = cue(high ? 'crescent' : 'flycut', () => live.on);
+      }
+      // the bite: head first, the neck snapping straight behind it
+      b.coil = 0; b.direct = true; b.hurt = true; b.jawT = 1;
+      const x0 = b.x, y0 = high ? b.y : FLOOR, reach = last ? 330 : 270;
+      const x1 = G.clamp(x0 + f * Math.min(reach, Math.max(150, Math.abs(P.x - x0) + 50)), WL + 90, WR - 90);
+      const y1 = high ? FLOOR - 100 : last ? (flooded() ? FLOOR - 2 : FLOOR + 12) : FLOOR;
+      b.ta = aim(f, high ? -0.04 : last ? 0.42 : 0.06);
+      G.audio.play('whoosh');
+      e = 0;
+      const d = last ? 0.17 : 0.13;
+      while (e < d) {
+        const dt = yield;
+        e += dt;
+        const k = E.outQuad(Math.min(1, e / d));
+        b.x = G.lerp(x0, x1, k); b.y = G.lerp(y0, y1, k);
+        if (!high && Math.random() < dt * 60) G.fx.spawn({ kind: 'spark', x: b.x - f * G.rand(20, 70), y: level(0) - 3, vx: -f * G.rand(60, 240), vy: -G.rand(150, 420), life: G.rand(0.3, 0.6), size: G.rand(1.4, 2.6), color: flooded() ? WATER : '150,150,140', grav: 1400, a: 0.55 });
+      }
+      b.jawT = 0; b.jaw = 0.2; G.audio.play('bite');
+      const mo = mouth(b);
+      G.fx.lines(mo.x, mo.y, 10, G.pal().hot, { r0: 18 });
+      if (!high) splash(mo.x, level(0) - 4, 0.5);
+      live.on = false;
+      if (last) break;
+      // a shake of the head on the bite, then it hauls its head back to come again
+      yield* wait(0.07);
+      b.hurt = false;
+      b.va += (i % 2 ? 1 : -1) * 10;
+      yield* wait(0.08);
+      b.direct = false; b.fast = false; b.jawT = 0.15;
+      target(G.clamp(b.x - f * 110, WL + 100, WR - 100), FLOOR - 70, 0, aim(f, 0.05));
+      yield* wait(0.24);
+    }
+    // jaws driven into the sand: stuck there, gasping, tugging at it
+    b.hurt = false;
+    crash(b.x + f * 70, 1.25);
+    G.fx.lines(b.x + f * 70, FLOOR - 30, 12, G.pal().hot, { r0: 30 });
+    if (!flooded()) for (const d of [-1, 1]) G.fx.dust(b.x + f * 80, FLOOR, 4, { dir: d, speed: [60, 260], size: [7, 14], life: [0.6, 1.1], up: 70, a: 0.32 });
+    b.exposed = true;
+    const stuck = B.phase === 3 ? 1.3 : 1.5;
+    let e = 0;
+    while (e < stuck) {
+      const dt = yield;
+      e += dt;
+      b.gill = Math.max(b.gill, 0.55 + 0.45 * Math.sin(e * 9));
+      b.jawT = 0.05;
+      if (Math.floor(e / 0.42) !== Math.floor((e - dt) / 0.42)) {
+        b.va -= f * 7; b.vy -= 200;
+        G.fx.dust(b.x + f * 80, FLOOR, 2, { dir: -f, speed: [30, 140], size: [5, 10], life: [0.4, 0.8], up: 40, a: 0.28 });
+        G.audio.play('stomp');
+      }
+    }
+    b.exposed = false;
+    // it tears its jaws free in a spray of sand
+    b.ta = aim(f, -0.25);
+    G.audio.play('splash', { vol: 0.5 });
+    if (!flooded()) G.fx.dust(b.x + f * 80, FLOOR, 5, { dir: -f, speed: [60, 300], size: [6, 13], life: [0.5, 1], up: 80, a: 0.32 });
+    yield* tween(b, { y: FLOOR - 52 }, 0.22, E.outQuad);
+  }
+
+  // Gyre: it goes out to sea and coils itself into a ring round the bay, and the water inside it turns.
+  // Its head rises in the middle of the ring to watch. Spouts tear up all along the shore except where
+  // the coil has its gap, and the ring turns, and the gap with it: keep with the gap. Then the coil falls
+  // in, and its head comes down on the shore, spent.
+  //   II: it turns further (and the flood drags at the legs). III: faster and further, swinging back on
+  //   itself, with the current pulling.
+  const GYRE_A = 430, GYRE_HALF = 120;
+  const gyreGap = (th) => 640 + GYRE_A * Math.cos(th);
+  function* atkGyre() {
+    const b = B.body, P = G.player, T = K.T();
+    const steps = B.phase + 4, dth = [0, 0.38, 0.4, 0.46][B.phase];
+    const th0 = [0, 0.8, 0.55, 0.42][B.phase], s = P.x >= 640 ? 1 : -1; // (the gap starts on the hero's side)
+    const thAt = (u) => { const th = th0 + u * dth; return s > 0 ? th : Math.PI - th; };
+    const tele = 0.56 * T, iv = Math.max(tele + 0.3, B.phase === 3 ? 0.78 : 0.86);
+    yield* sinkAway(0.4);
+    B.pullK = B.phase === 3 ? 0.35 : 1;
+    const gy = B.gyre = { k: 0, to: 1, th: thAt(0), spin: 0, look: 0 };
+    // up in the middle of the ring, watching
+    b.direct = true; b.x = 640; b.z = 0.55; b.y = B.sea.y + 160; b.ang = b.ta = -Math.PI / 2;
+    G.audio.play('levChurn', { dur: 0.55 + steps * iv + 0.6 });
+    splashAt(640, 0.55, 1.8); G.audio.play('splash');
+    const look = () => {
+      const q = proj(b.x, b.y - HH, b.z), dx = P.x - q.x, f = dx >= 0 ? 1 : -1;
+      b.ta = aim(f, G.clamp(Math.atan2(P.y - 30 - q.y, Math.abs(dx)), -0.3, 1.0));
+    };
+    yield* tween(b, { y: B.sea.y - 230 }, 0.5, E.outCubic);
+    let e = 0;
+    while (e < 0.55) { const dt = yield; e += dt; look(); b.y = B.sea.y - 230 + Math.sin(e * 3) * 6; }
+    // the spouts: a ring of them that turns, every one but those at the gap in its coil
+    const pulse = (g) => {
+      for (const sd of [-1, 1]) {
+        for (let x = g + sd * (GYRE_HALF + 55); sd < 0 ? x > WL - 50 : x < WR + 50; x += sd * 100) {
+          const cx = G.clamp(x, WL + 45, WR - 45);
+          if (Math.abs(cx - g) - 55 < GYRE_HALF) continue; // (never into the gap)
+          spout(cx, 110, tele, 0.55);
+        }
+      }
+    };
+    let t = 0, next = 0;
+    const end = (steps - 1) * iv + tele + 0.45;
+    while (t < end) {
+      const dt = yield;
+      t += dt;
+      // the coil turns so that its gap is where the gap will be when the spouts now boiling come up
+      gy.th = thAt(G.clamp((t - tele) / iv, 0, steps - 1));
+      look(); b.y = B.sea.y - 230 + Math.sin(t * 3) * 6;
+      if (next < steps && t >= next * iv) { pulse(gyreGap(thAt(next))); next++; }
+    }
+    // the coil falls in, and its head comes down on the shore, spent
+    gy.to = 0;
+    for (let i = 0; i < 6; i++) { const a = gy.th + 0.6 + i; splashAt(640 + GYRE_A * Math.cos(a) * 1.4, 0.62 - 0.36 * Math.sin(a), 1.6); }
+    G.audio.play('surf'); G.fx.shake(8);
+    const f = facePlayer(), lx = G.clamp(P.x - f * 210, WL + 120, WR - 120);
+    b.ta = aim(f, 0.7);
+    yield* tween(b, { x: lx, y: FLOOR, z: 0 }, 0.46, E.inQuad);
+    b.ta = aim(f, 0.12);
+    crash(lx, 1.4);
+    B.pullK = 1;
+    b.exposed = true;
+    e = 0;
+    const lie = B.phase === 3 ? 1.0 : 1.2;
+    while (e < lie) { const dt = yield; e += dt; b.gill = Math.max(b.gill, 0.4 + 0.4 * Math.sin(e * 8)); }
+    b.exposed = false;
+  }
+
   // ------------------------------------------------------------------ corrupted: its own two attacks
   // the ground a bite sweeps: from a little behind the head to where its jaws shut, at the height it strikes
   function aimFang(f, base, tip, dir, yb) {
@@ -1695,7 +2252,7 @@
     const b = B.body;
     if (B.dying || b.beached) return;
     b.direct = false; b.hurt = false; b.fast = false;
-    if (name === 'lunge' || name === 'spouts' || name === 'maw' || name === 'snap' || name === 'hydra' || name === 'undertow' || name === 'breaker') {
+    if (name === 'lunge' || name === 'spouts' || name === 'maw' || name === 'snap' || name === 'hydra' || name === 'undertow' || name === 'breaker' || name === 'breach' || name === 'thrash' || name === 'gyre') {
       b.ty = FLOOR - 64; b.tz = 0; b.tx = b.x;
       yield* wait(0.12);
       b.va += b.face * 10; splash(b.x, level(0) - 6, 0.5); G.audio.play('splash', { vol: 0.4 });
@@ -1707,7 +2264,7 @@
       B.tail.pose = 'under'; B.tail.rate = 3;
       b.ty = FLOOR - 26;
       yield* wait(0.32);
-    } else if (name === 'volley' || name === 'jet') {
+    } else if (name === 'volley' || name === 'jet' || name === 'barnacles') {
       b.jawT = 0.35; b.ty = FLOOR - 60;
       for (let i = 0; i < 6; i++) { const m = mouth(b); G.fx.spawn({ kind: 'spark', x: m.x, y: m.y, vx: G.rand(-30, 30), vy: G.rand(20, 80), life: 0.7, size: 1.8, color: WATER, grav: 1200, a: 0.6 }); }
       yield* wait(0.3);
@@ -1718,7 +2275,11 @@
     yield* wait(0.12);
   };
 
-  B.ATTACKS = { lunge: atkLunge, snap: atkSnap, slam: atkSlam, spouts: atkSpouts, volley: atkVolley, sweep: atkSweep, maw: atkMaw, breaker: atkBreaker, jet: atkJet, hydra: atkHydra, undertow: atkUndertow };
+  B.ATTACKS = {
+    lunge: atkLunge, snap: atkSnap, slam: atkSlam, spouts: atkSpouts, volley: atkVolley, sweep: atkSweep, maw: atkMaw, breaker: atkBreaker, jet: atkJet,
+    breach: atkBreach, barnacles: atkBarnacles, thrash: atkThrash, gyre: atkGyre,
+    hydra: atkHydra, undertow: atkUndertow,
+  };
   // its corrupted self's own two (corrupt.js): the hydra in every phase, the undertow from the second
   B.corruptBags = { 1: ['hydra'], 2: ['hydra', 'undertow'], 3: ['hydra', 'undertow'] };
 
@@ -1729,7 +2290,8 @@
   B.onStagger = function () {
     const b = B.body;
     b.hurt = false; b.coil = 0; b.chatter = 0; b.fin = 0; b.throatT = 0; b.direct = true;
-    B.tail.pose = 'under'; B.tail.rate = 3; B.finCircle = null; B.ebb.hold = false;
+    B.tail.pose = 'under'; B.tail.rate = 3; B.finCircle = null; B.ebb.hold = false; B.pullK = 1;
+    if (B.gyre) B.gyre.to = 0;
   };
   B.dying0 = function () { B.body.beached = true; };
   // thrown up and down onto the shore, where it lies on its side, gasping
@@ -1992,6 +2554,26 @@
       }
       const sh = tl.shake ? Math.sin(G.t * 34) * 26 : 0;
       sample(B.tailPts, { x: tl.ex, y: sea.y + 90, z: tl.ez }, { x: tl.ex, y: sea.y - 150, z: tl.ez }, { x: tl.c2x, y: tl.c2y, z: tl.c2z }, { x: tl.tipX + sh, y: tl.tipY, z: tl.tipZ }, 24, 112, 40, 8, 7);
+    }
+
+    // ---- (the gyre) its coil in a ring round the bay, the gap in it facing the shore at gy.th; humps
+    // of it roll round the ring as the water turns
+    const gy = B.gyre;
+    if (gy) {
+      gy.k = G.damp(gy.k, gy.to, gy.to ? 2.4 : 4.5, dt);
+      gy.spin += dt * (0.5 + 1.8 * gy.k);
+      const pts = B.gyrePts, N = 46, gapA = 0.6;
+      for (let i = 0; i < N; i++) {
+        const a = gy.th + gapA / 2 + (G.TAU - gapA) * i / (N - 1);
+        const z = 0.62 - 0.36 * Math.sin(a), sc = 1 / (1 + DEPTH * z);
+        const hump = Math.max(0, Math.sin(a * 5 - gy.spin * 2.2));
+        const q = pts[i] || (pts[i] = {});
+        q.x = 640 + GYRE_A * Math.cos(a) / sc; q.z = z;
+        q.y = sea.y + 46 - gy.k * (34 + 70 * hump * hump); q.w = 70; q.foam = false;
+      }
+      pts.length = N;
+      if (gy.k > 0.3 && Math.random() < dt * 10) { const p = pts[(Math.random() * N) | 0]; splashAt(p.x, p.z, 0.5); }
+      if (!gy.to && gy.k < 0.01) B.gyre = null;
     }
 
     // ---- rain sheeting off it, and water pouring off a head that rises fast
@@ -2514,6 +3096,29 @@
     ctx.strokeStyle = G.rgba(WATER, 0.35); ctx.lineWidth = 1.5;
     ctx.beginPath(); ctx.moveTo(x + d * 30, y); ctx.lineTo(x - d * 50, y - 4); ctx.moveTo(x + d * 30, y); ctx.lineTo(x - d * 50, y + 4); ctx.stroke();
   }
+  // (the gyre) the water of the bay turning inside the coil: streaks of foam going round, darker in the middle
+  function drawGyre(ctx) {
+    const gy = B.gyre;
+    if (!gy || gy.k < 0.02) return;
+    const P = G.pal(), k = gy.k, sea = B.sea.y;
+    const at = (q, a) => { const z = 0.62 - 0.36 * q * Math.sin(a), s = 1 / (1 + DEPTH * z); return proj(640 + GYRE_A * q * Math.cos(a) / s, sea, z); };
+    const c = at(0, 0);
+    ctx.save();
+    ctx.translate(c.x, c.y); ctx.scale(1, 0.12);
+    const g = ctx.createRadialGradient(0, 0, 0, 0, 0, GYRE_A * 0.8);
+    g.addColorStop(0, 'rgba(0,0,0,' + 0.55 * k + ')'); g.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, GYRE_A * 0.8, 0, G.TAU); ctx.fill();
+    ctx.restore();
+    ctx.lineCap = 'round';
+    for (let i = 0; i < 9; i++) {
+      const q = 0.18 + i * 0.09, a0 = gy.spin * (1.9 - q) + i * 2.3;
+      ctx.strokeStyle = G.rgba(i % 2 ? WATER : P.rim, 0.32 * k * (1.1 - q));
+      ctx.lineWidth = 1.5 + 1.5 * (1 - q);
+      ctx.beginPath();
+      for (let j = 0; j <= 10; j++) { const p = at(q, a0 + j * 0.15); if (j) ctx.lineTo(p.x, p.y); else ctx.moveTo(p.x, p.y); }
+      ctx.stroke();
+    }
+  }
   // the surge that brings the flood
   function drawWave(ctx) {
     const w = B.wave;
@@ -2700,9 +3305,11 @@
   B.drawGround = function (ctx) {
     const b = B.body;
     drawSea(ctx);
+    drawGyre(ctx);
     if (!B.dead) {
       // its coils far out in the sea (behind the water line); corrupted, they are black like the rest of it
       const far = (c) => {
+        if (B.gyre && B.gyrePts.length) drawChain(c, B.gyrePts, true, {});
         B.humps.forEach((h, i) => drawChain(c, B.humpPts[i], true, {}));
         if (B.tail.on) { drawChain(c, B.tailPts, true, {}); drawFluke(c, true); }
         if (B.spine.length) drawChain(c, B.spine, true, { fin: b.fin, up: headUp(b) });

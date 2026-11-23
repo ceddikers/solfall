@@ -2,7 +2,7 @@
 
 A side-on boss rush for the browser: four heroes, four three-phase bosses, played as a run of
 ever-harder trials. You pick a hero and a relic before the run and win a boon after each victory.
-Version 2.0a.
+Version 2.1a.
 
 This is an early slice of a planned boss-rush roguelite (short runs, a boon after each boss,
 bosses drawn from a pool). A run meets the four bosses in a shuffled order, then meets them again, harder.
@@ -112,6 +112,43 @@ hero (`tools/feel-check.js`).
 - Settings, Reset progress erases Sunshards, upgrades, trophies and records (it has to be chosen twice).
 
 Not done: touch controls, a colour-blind alternative to red-orange warnings, gamepad rebinding.
+
+## What the great bosses do (v2.1a)
+
+A study of how bosses work in Hollow Knight, Dark Souls, Sekiro, Elden Ring, Dead Cells and Cuphead
+(`docs/boss-study.md`), and new moves for every boss built from what it found. Nothing is copied: each
+idea is a principle, and every move is told through that boss's own body.
+
+What the study found, and what each boss now does with it:
+
+- **Nowhere to hide on its head.** Riding over a boss's head (standing on it, hopping on it, or waiting on
+  a ledge just above) for about 1.4 s now brings that boss's own answer, cast at where you are: staying up
+  there does not escape it, moving off does (`B.above` / `B.antiAir` in `js/bosskit.js`; the Warden's own
+  in `js/boss.js`).
+- **Delays and branches.** Old moves gained a held or branching form, told by a small difference in the
+  body, so a reflex dodge on the usual beat is not enough.
+- **Pressure.** Each boss has a chain that chases you and ends in a committal blow.
+- **Punish windows.** Big moves now end stuck, dazed or spent for a clear moment.
+- **Projectiles that behave differently**: rolling, bouncing, mines, homing, splitting, thread traps.
+- **Spectacle that asks something**: a wall or a field with a gap to find and keep with.
+
+| Boss | Over its head | New moves | Reworked |
+|---|---|---|---|
+| Cinder Wolf | **Skysnap**: ears up, head to the sky, it leaps jaws-first up through you (or, with you just over its back, rolls over and rakes the air) | **Harry**: one snort per bound, snapping bounds that chase you, then jaws buried in the floor. **Cinders**: head down, coals roll along the floor and back off the wall (jump the clump); head thrown up, they bounce down (cut them). **Blaze**: up on the rock, fire runs across the floor; sitting and howling, the gap is in front of it; slamming the rock, it is at the walls | **Pounce**: a held form, mane sunk and tail clamped still. **Bite**: a third snap from phase II |
+| Drowned Leviathan | **Breach**: the ground under you heaves and follows, locks, and it bursts up through it | **Barnacles**: spiked mines that stick and burst (scattered, or in a line toward you). **Thrash**: 3-5 chained bites, snout down for low, head cocked for high, the last buries its jaws. **Gyre**: it coils round the bay and spouts tear up everywhere but one moving gap | **Lunge**: a late form, gills pumping. Afterwards its chin lies winded. **Snap**: bites again while you stay in front |
+| Silent Veil | **Skyhook**: it looks up, appears over you and drops heel-first, or cuts straight up from a deep crouch | **Snare**: knives strung with thread that tightens and snaps (underhand low, overhand high). **Dance**: one blade-tap per cut, then dash-cuts that chase you, then it kneels open. **Moonfall**: the dark comes down and crescents of falling blades sweep across with a low or high gap | **Lunge**: a feint, weight back, that stops short, hops back and throws knives. **Flurry**: a third cut held high behind its head |
+| Unburied Knight | **Skyward**: visor up, a rising cut through the air above it, or grave-blades up through you | **March**: a combo that carries on while you are in reach (a long stride means another cut, feet set wide the finisher, which buries the blade). **Souls**: flames that follow you, stop and split into shards. **Tolling**: rows of grave-blades too tall to jump, each with one gap | **Overhead**: a delayed form, blade further back, visor flickering; every overhead now strains to pull free. **Cleave**: turns and sweeps behind it if you went through |
+| Threefold Magus | **Spire**: a rune follows you near the top of the screen, then a bolt comes down the column and frost spears up | **Motes**: homing orbs (ice splinters when cut; lightning climbs over you and strikes). **Blinkfall**: its robe flickers where it will appear, then it drops staff-first, 2-4 times, and slumps dizzy. **Glacier**: a wall of ice spears with a gap the staff points to | **Fireball**: a smouldering form (a dark coal) that bursts late and wide. **Bolts**: fork onto you if you stand still |
+| Eclipsed Warden | **Corona**: light gathers on the core's crown, then a fan of rays fires up through you | **Spears**: a rank of spears crosses with a gap where the core sits (low or high). **Charge**: one eye-blink per rush, the core rushes you and lies dazed. **Orbit**: embers circle the core and are flung one by one (slow) or all at once (fast) | **Slam**: a delayed form; fists stay stuck longer and strain. **Sweep**: rolls off the wall and comes back if you jumped it |
+
+As before, phases I and II are about as hard as each boss's other moves and phase III pushes harder.
+
+Measured (Vesper, seed 1): `tools/boss-tests.js` loses 11 over 446 runs: the 9 it lost before (one of them,
+the Leviathan's phase III Slam, now lands on seed 1 because the bigger bags change the draws), plus 2 in the
+Wolf's phase III Harry, where the scripted player only walks away from bounds a player has to go through or
+over. Every new move loses 0 in phases I and II. The scripted player now jumps rolling coals instead of
+running from them. `tools/dodge-tests.js` passes all 136 (47 new). Each boss's anti-air fires in all three
+phases with a hero kept over its head. Not yet checked by play: how well each new tell reads at full speed.
 
 ## Two new moves for every boss (v2.0a)
 
@@ -1220,6 +1257,7 @@ To use these in a new attack, call the ready-made mixes in `js/fx.js`: `G.fx.hit
 | `js/moments.js` | Reckoning, Riposte, Sunder, Clash, Last Light and the last push |
 | `js/hub.js` | the Vigil: the camp between runs, its places, the sparring post, the bell and the lantern |
 | `tools/feel-check.js` | whole fights played by a scripted hero, to measure Dawnbreak, Flow and Reckonings |
+| `docs/boss-study.md` | the v2.1a study of bosses in other games, and what Solfall took from it |
 | `tools/motion-check.js` | every attack, whole fights and every hero, drawn frame by frame, to find motion that pops, flickers or stops dead (see v1.9c) |
 | `js/input.js` | keyboard, mouse and gamepad mapped to actions |
 | `js/audio.js` | every sound and the music, synthesised in code (no audio files) |

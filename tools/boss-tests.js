@@ -48,6 +48,8 @@
         }
         case 'aim': break;
         case 'orb': {
+          // (a coal rolling along the floor is jumped, not run from: see act())
+          if (h.roller) break;
           // where a falling orb will land, or where a flying one crosses the hero's height
           if (h.vy > 60 || h.grav) {
             const g = h.grav || 0, dy = (FLOOR - 20) - h.y;

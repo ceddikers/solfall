@@ -43,8 +43,9 @@
       lx: 0, ly: 0, pulse: 0, spinHint: 0, hurt: false, jit: 0, sun: 0, embedded: false,
       blink: 0, blinkT: 3,
       vx: 0, vy: 0, swell: 0, swellT: 0, swellV: 0, flA: 0, flK: 0, // (the Flare and the Sunspot)
+      crA: -Math.PI / 2, crK: 0, daze: 0, hurtDmg: 0, // (the Corona's crown, the Charge's daze, v2.1a)
     };
-    B.spots = [];
+    B.spots = []; B.orbit = []; B.above = 0;
     B.hands = [mkHand(-1), mkHand(1)];
     for (const h of B.hands) h.hp = h.maxHp = Math.round(B.maxHp * 0.07);
     B.shardA = 0; B.shardSpin = 0.9; B.haloR = 0; B.haloHurt = false;
@@ -163,7 +164,7 @@
   // ------------------------------------------------------------------ script control
   function release() {
     const c = B.core;
-    c.ctrl = false; c.charge = 0; c.pulse = 0; c.spinHint = 0; c.hurt = false; c.embedded = false; c.jit = 0; c.swellT = 0;
+    c.ctrl = false; c.charge = 0; c.pulse = 0; c.spinHint = 0; c.hurt = false; c.embedded = false; c.jit = 0; c.swellT = 0; c.hurtDmg = 0;
     for (const h of B.hands) { h.ctrl = false; h.hurt = false; h.stuck = false; h.hot = 0; }
     B.shardsOut = false; B.shardSpin = 0.9; B.haloR = 0; B.haloHurt = false;
     G.wind = 0; G.bounds = null;
@@ -233,7 +234,7 @@
   function beginPhase(n) {
     interrupt();
     B.invuln = true; B.staggered = false; B.poise = 0;
-    B.phase = n; B.bag = [];
+    B.phase = n; B.bag = []; B.above = 0;
     for (const h of B.hands) { h.broken = 0; h.hp = h.maxHp; } // a new phase makes the hands whole
     G.player.onPhase(); // the Wardstone relic recharges each phase
     B.script = n === 2 ? toPhase2() : toPhase3();
@@ -447,9 +448,11 @@
   // ------------------------------------------------------------------ attack selection
   const BAGS = {
     // the Flare and the Sunspot (v2.0a) are the core's alone, so they are there in every phase
-    1: ['slam', 'sweep', 'clap', 'lance', 'rain', 'flick', 'crossfire', 'sunburst', 'flare', 'sunspot'],
-    2: ['slam2', 'sweep2', 'clap', 'lance3', 'rain', 'pulse', 'comb', 'rocket', 'tide', 'fan', 'cage', 'duet', 'crossfire', 'flick', 'sunburst', 'flare', 'sunspot'],
-    3: ['dive', 'storm', 'wheel', 'singularity', 'rain', 'pulse', 'fan', 'halo', 'dive', 'flare', 'sunspot'],
+    // and the Spears, the Charge and the Orbit (v2.1a), the core's alone too. (The Corona is not in a bag:
+    // it is the answer to a hero riding over its head, see think)
+    1: ['slam', 'sweep', 'clap', 'lance', 'rain', 'flick', 'crossfire', 'sunburst', 'flare', 'sunspot', 'spears', 'charge', 'orbit'],
+    2: ['slam2', 'sweep2', 'clap', 'lance3', 'rain', 'pulse', 'comb', 'rocket', 'tide', 'fan', 'cage', 'duet', 'crossfire', 'flick', 'sunburst', 'flare', 'sunspot', 'spears', 'charge', 'orbit'],
+    3: ['dive', 'storm', 'wheel', 'singularity', 'rain', 'pulse', 'fan', 'halo', 'dive', 'flare', 'sunspot', 'spears', 'charge', 'orbit'],
   };
   B.bags = BAGS; // (read by tools/motion-check.js)
   // How many whole hands an attack needs. Attacks that need more than are left are skipped.
@@ -497,6 +500,7 @@
     return B.lastAtk;
   }
 
+  const ABOVE_T = 1.4; // (as the other bosses, js/bosskit.js)
   function* think() {
     const low = B.phase === 3 && B.hp < B.maxHp * 0.12;
     const gap = [0, 0.95, 0.75, 0.6][B.phase] * G.diff().pace * (low ? 0.55 : 1);
@@ -505,6 +509,9 @@
     // the last stand: once, when the Warden is nearly spent
     if (!name && low && !B.lastStand) { B.lastStand = true; name = 'supernova'; }
     if (!name && G.moments.due(B)) name = 'reckoning';
+    // a hero who keeps riding over its head (bouncing on the core, or hanging above it) is answered from
+    // below, at where they are: the Corona (v2.1a)
+    if (!name && B.above >= ABOVE_T && B.lastAtk !== 'corona') { name = 'corona'; B.lastAtk = name; B.above = 0; }
     if (!name) name = nextAttack();
     if (!ATTACKS[name] || !canUse(name)) name = B.phase === 3 ? 'rain' : 'lance';
     B.attackName = name;
@@ -596,8 +603,19 @@
     while (e < lockT) {
       e += yield;
       const k = Math.min(1, e / lockT);
-      h.y = y0 - 36 * E.outCubic(k);
+      h.y = y0 - (o.late ? 58 : 36) * E.outCubic(k);
       m.k = 0.7 + 0.3 * k;
+    }
+    if (o.late) {
+      // the delayed blow (v2.1a): it draws up higher and hangs there, knuckles cocked back, opening and
+      // closing once before it drops, a breath after a hero who goes on the flash expects it
+      yield* during(0.36 * T, (k, dt, q) => {
+        h.y = y0 - 58 - 8 * Math.sin(Math.PI * k);
+        h.rot = -h.side * 0.18 * Math.sin(Math.PI * k);
+        h.curl = 1 - 0.3 * Math.sin(Math.PI * Math.min(1, k * 1.6));
+        h.kx = G.rand(-2, 2) * k;
+      });
+      h.curl = 1; h.rot = 0;
     }
     h.hurt = true; h.hurtDmg = o.heavy ? 2 : 1;
     yield* tween(h, { y: FLOOR - 64 }, 0.085, E.inQuad);
@@ -614,15 +632,28 @@
       H.shockwave(h.x + 56, 1, o.wave, 46);
       yield* wait(0.4); // it took more out of the hand: it is stuck for longer
     }
-    yield* wait(o.stuck);
+    // stuck fast: it strains to pull free, and tears loose at the end
+    if (o.stuck > 0.3) {
+      const sy = h.y;
+      yield* during(o.stuck, (k, dt, q) => {
+        h.kx = Math.sin(q * 31) * (0.6 + 2.2 * k * k);
+        h.rot = Math.sin(q * 6.5) * 0.05 * k;
+        if (k > 0.82) h.y = G.lerp(sy, sy - 22, E.outQuad((k - 0.82) / 0.18));
+        if (Math.random() < dt * (3 + 8 * k)) G.fx.dust(h.x + G.rand(-56, 56), FLOOR, 1, { speed: [10, 60], size: [4, 8], up: 20, a: 0.3 });
+      });
+      h.rot = 0;
+      G.fx.burst(h.x, FLOOR - 8, { n: 6, color: '22,18,32', speed: [80, 260], angle: -Math.PI / 2, spread: 1.6, life: [0.4, 0.8], size: [3, 7], kind: 'chunk', grav: 1500 });
+    } else yield* wait(o.stuck);
     h.stuck = false;
   }
 
   function* atkSlam() {
-    yield* slam(nearHand(), { track: 0.72, stuck: 1.2, wave: 470, heavy: chance(0.3, 'heavy') });
+    // (v2.1a: stuck for longer, the opening a slam gives; and a delayed form, not with the heavy one)
+    const heavy = chance(0.3, 'heavy');
+    yield* slam(nearHand(), { track: 0.72, stuck: 1.55, wave: 470, heavy, late: !heavy && chance(0.3, 'late') });
   }
 
-  function* sweepOnce(h, fromX, toX, tele) {
+  function* sweepOnce(h, fromX, toX, tele, seen) {
     const dir = G.sign(toX - fromX);
     H.lane({ x: WL, y: FLOOR - 116, w: WR - WL, h: 116, dir, dur: tele });
     G.audio.play('charge', { dur: tele });
@@ -637,6 +668,8 @@
       // a beat of grace as it starts, so a jump on the flash clears it even right beside the hand
       h.hurt = e > 0.09;
       h.x = G.lerp(x0, toX, E.inOutQuad(Math.min(1, e / dur)));
+      // (did the hero go over it? the Sweep's return answers a jump)
+      if (seen && !G.player.onGround && Math.abs(h.x - G.player.x) < 80) seen.jumped = true;
       G.fx.shake(2.5);
       G.fx.burst(h.x - dir * 50, FLOOR - 4, { n: 1, color: '190,190,210', speed: [40, 200], angle: -Math.PI / 2, spread: 2, life: [0.3, 0.6], size: [4, 8] });
       G.fx.burst(h.x - dir * 40, FLOOR - G.rand(10, 100), { n: 1, color: G.pal().boss, speed: [40, 200], angle: dir > 0 ? Math.PI : 0, spread: 0.8, life: [0.2, 0.4], size: [3, 6] });
@@ -644,20 +677,34 @@
     h.hurt = false; h.hot = 0;
   }
 
-  function* sweep(h, back) {
+  function* sweep(h, back, branch) {
     const T = G.diff().tele;
     h.ctrl = true;
     const fromX = h.side > 0 ? WR - 70 : WL + 70, toX = h.side > 0 ? WL + 70 : WR - 70;
     // the hand lies on its side, low enough that one jump clears it
     yield* tween(h, { x: fromX, y: FLOOR - 58, curl: 0.3, rot: -h.side * Math.PI / 2 }, 0.5);
-    yield* sweepOnce(h, fromX, toX, 0.8 * T);
+    const seen = {};
+    yield* sweepOnce(h, fromX, toX, 0.8 * T, seen);
     if (back) {
       yield* wait(0.2);
       yield* sweepOnce(h, toX, fromX, 0.55 * T);
+    } else if (branch && seen.jumped && chance(0.6, 'return')) {
+      // (v2.1a) it felt the hero go over it: the hand skids into the wall, rolls over onto its other
+      // side with a heave, and comes back along the floor
+      const dir = G.sign(toX - fromX), r0 = h.rot;
+      G.fx.dust(h.x + dir * 40, FLOOR, 4, { dir: -dir, speed: [40, 200], size: [6, 11], up: 50 });
+      G.fx.shake(4); G.audio.play('boom');
+      yield* during(0.34, (k, dt) => {
+        h.rot = G.lerp(r0, -r0, E.inOutCubic(k));
+        h.y = FLOOR - 58 - Math.sin(Math.PI * k) * 46;
+        h.x = toX + dir * 10 * Math.sin(Math.PI * k);
+        h.curl = 0.3 + 0.4 * Math.sin(Math.PI * k);
+      });
+      yield* sweepOnce(h, toX, fromX, 0.5 * T);
     }
     yield* wait(0.35);
   }
-  function* atkSweep() { yield* sweep(G.rpick(usableHands()), false); }
+  function* atkSweep() { yield* sweep(G.rpick(usableHands()), false, true); }
   function* atkSweep2() { yield* sweep(G.rpick(usableHands()), true); }
 
   function* atkClap() {
@@ -777,7 +824,7 @@
     const n = hard() ? 3 : 2;
     for (let i = 0; i < n; i++) {
       const h = i % 2 === 0 ? a : b, last = i === n - 1;
-      yield* slam(h, { track: i === 0 ? 0.62 : 0.5, stuck: last ? 1.0 : 0.12, wave: 540 });
+      yield* slam(h, { track: i === 0 ? 0.62 : 0.5, stuck: last ? 1.35 : 0.12, wave: 540, late: last && chance(0.35, 'late') });
       if (!last) h.ctrl = false;
     }
   }
@@ -2277,6 +2324,468 @@
     });
   }
 
+  // ================================================================== v2.1a: from the boss study
+  // (docs/boss-study.md) An answer to a hero who rides over its head (Corona), a wall with a gap
+  // (Spears), a chain of rushes that ends in a crash and a long opening (Charge), and embers that
+  // circle before they are let go (Orbit). All four are the core's alone, so they are there in every
+  // phase, phase III included.
+  G.audio.define('wCrown', () => { // light gathering on the crown: a rising, breathy swell
+    const S = G.audio.synth;
+    S.tone({ type: 'sine', f0: 150, f1: 420, dur: 0.6, vol: 0.12, attack: 0.3 });
+    S.noise({ dur: 0.6, vol: 0.12, type: 'bandpass', f0: 600, f1: 2200, q: 1.4, attack: 0.35 });
+  });
+  G.audio.define('wSpear', () => { // one spear taking its place in the rank: a short glassy shimmer
+    const S = G.audio.synth;
+    S.tone({ type: 'triangle', f0: 640, f1: 940, dur: 0.16, vol: 0.05 });
+    S.noise({ dur: 0.14, vol: 0.06, type: 'highpass', f0: 2600, f1: 3400, q: 0.7 });
+  });
+  G.audio.vary.wSpear = 2;
+  G.audio.define('wVolley', () => { // the rank let go: a long rushing hiss under a low drone
+    const S = G.audio.synth;
+    S.noise({ dur: 0.8, vol: 0.24, type: 'bandpass', f0: 1900, f1: 480, q: 0.8, attack: 0.03 });
+    S.tone({ type: 'sawtooth', f0: 120, f1: 64, dur: 0.55, vol: 0.07 });
+  });
+  G.audio.define('wRush', () => { // the core thrown at the hero: a hollow, heavy whoosh
+    const S = G.audio.synth;
+    S.noise({ dur: 0.28, vol: 0.3, type: 'bandpass', f0: 380, f1: 1500, q: 0.9, attack: 0.01 });
+    S.tone({ type: 'sine', f0: 86, f1: 44, dur: 0.32, vol: 0.22 });
+  });
+  G.audio.vary.wRush = 1.5;
+  G.audio.define('wWhir', (o) => { // embers circling: a whirr, higher and tighter when they spin fast
+    const S = G.audio.synth, fast = o && o.fast;
+    S.noise({ dur: (o && o.dur) || 0.9, vol: 0.11, type: 'bandpass', f0: fast ? 900 : 360, f1: fast ? 1600 : 520, q: 3, attack: 0.2 });
+  });
+  G.audio.define('wFling', () => {
+    const S = G.audio.synth;
+    S.noise({ dur: 0.13, vol: 0.17, type: 'bandpass', f0: 2300, f1: 700, q: 1.6 });
+  });
+  G.audio.vary.wFling = 1.5;
+
+  // The hands keep out of the core's way while it works alone: spread wide, a little above it.
+  function handsWide(dt, spread, lift) {
+    const c = B.core;
+    for (const h of usableHands()) {
+      h.ctrl = true;
+      const tx = G.clamp(c.x + h.side * (spread || 340), 90, 1190), ty = G.clamp(c.y + (lift == null ? 60 : lift), 100, FLOOR - 120);
+      h.x = G.damp(h.x, tx, 4.5, dt); h.y = G.damp(h.y, ty, 4.5, dt);
+      h.rot = G.damp(h.rot, h.side * 0.3, 6, dt); h.curl = G.damp(h.curl, 0.3, 6, dt);
+    }
+  }
+  // The eye shuts once for each of what is coming (the Warden's count, as for its lances).
+  function* blinks(n) {
+    const c = B.core;
+    c.blink = 0; c.blinkT = Math.max(c.blinkT, 3);
+    yield* during(0.18, (k, dt) => handsWide(dt));
+    for (let k = 0; k < n; k++) {
+      G.audio.play('uiMove');
+      G.fx.ring(c.x, c.y, { r0: 104, r1: 62, life: 0.16, color: G.pal().hot, width: 3 });
+      yield* tween(c, { open: 0.06 }, 0.07, E.inQuad);
+      yield* tween(c, { open: 1 }, 0.09, E.outQuad);
+      yield* during(0.13, (q, dt) => handsWide(dt));
+    }
+  }
+
+  // ---- CORONA
+  // The answer to a hero riding over its head (bouncing on the core, or hanging in the air above it for
+  // a second and a half). The light of the corona gathers on its crown while it sinks under them, and
+  // the column under the hero is marked; then a fan of five rays bursts up through where they are and
+  // embers erupt up the column. Moving off sideways answers it; staying up there does not. Phase II:
+  // the fan sweeps to the side the crown leans to (go the other way). Phase III: a second fan,
+  // between the first one's rays, aimed again at where the hero went.
+  function* atkCorona() {
+    const c = B.core, P = G.player, P2 = B.phase >= 2, P3 = B.phase === 3;
+    const T = G.diff().tele * (P3 ? 0.92 : 1);
+    c.ctrl = true; c.vx = c.vy = 0;
+    const x0 = c.x, y0 = c.y;
+    const fans = P3 ? 2 : 1;
+    for (let f = 0; f < fans; f++) {
+      const tell = (f === 0 ? 0.8 : 0.55) * T;
+      // phase II: the side the fan will sweep to; the crown leans that way
+      const sweep = P2 ? (chance(0.5, f === 0 ? 'left' : 'left2') ? -1 : 1) : 0;
+      const aim = G.clamp(Math.atan2(P.y - 22 - c.y, P.x - c.x), -Math.PI / 2 - 0.42, -Math.PI / 2 + 0.42);
+      c.crA = -Math.PI / 2 + sweep * 0.45;
+      G.audio.play('wCrown');
+      // the column under the hero: embers will erupt up it as the rays go
+      const colX = G.clamp(P.x, WL + 50, WR - 50);
+      const col = H.zone({ x: colX - 40, y: -80, w: 80, h: FLOOR + 80, tele: tell, active: 0.24, style: 'embers', onFire() { G.audio.play('boom'); G.fx.shake(4); } });
+      corona(col, emberColumn);
+      for (let i = 0; i < 5; i++) {
+        const a = aim + (i - 2) * 0.34 + (f === 1 ? 0.17 : 0);
+        H.beam({
+          ox: c.x, oy: c.y, ang: a, tele: tell, lock: 0.32 * T, active: P2 ? 0.42 : 0.2, fade: 0.25, width: 24, maxLen: 1400,
+          spin: sweep * 1.45, sfx: i === 2 ? 'beam' : false, shake: i === 2 ? 6 : 0,
+          follow(b) { b.ox = c.x + Math.cos(b.ang) * c.r * 0.9; b.oy = c.y + Math.sin(b.ang) * c.r * 0.9; },
+        });
+        corona(H.list[H.list.length - 1], coronaRay);
+      }
+      // the wind-up: it sinks and draws in under the hero, the crown swelling; the last of it trembles
+      yield* during(tell, (k, dt) => {
+        const e = E.inOutQuad(k);
+        c.crK = e; c.swellT = 0.05 * e; c.charge = 0.3 * e;
+        coreTo(x0 - sweep * 16 * e, y0 + 28 * e, dt, 42, 9);
+        c.jit = k > 0.74 ? (k - 0.74) / 0.26 * 1.6 : 0;
+        handsWide(dt, 360, 40);
+        if (Math.random() < dt * 30 * e) {
+          const a = c.crA + G.rand(-0.7, 0.7), rr = c.r * G.rand(1.6, 2.2);
+          // motes of light drawn in to the crown
+          G.fx.spawn({ x: c.x + Math.cos(a) * rr, y: c.y + Math.sin(a) * rr, vx: -Math.cos(a) * 150, vy: -Math.sin(a) * 150, life: 0.35, size: G.rand(2, 4), color: G.pal().boss, kind: 'spark' });
+        }
+      });
+      c.jit = 0;
+      // the burst: it heaves up with the rays, and the column erupts
+      c.kick = 1; c.swellT = -0.04; c.charge = 0; c.vy -= 280; c.vx += sweep * 140;
+      G.fx.kick(0, -3);
+      G.fx.burst(colX, FLOOR - 6, { n: 16, color: G.pal().boss, speed: [320, 900], angle: -Math.PI / 2, spread: 0.3, life: [0.35, 0.8], size: [3, 6], grav: 300 });
+      G.fx.dust(colX, FLOOR, 3, { speed: [40, 160], size: [6, 11], up: 60 });
+      yield* during(P2 ? 0.42 : 0.24, (k, dt) => { c.crK = 0.5 * (1 - k); coreTo(x0, y0 + 12, dt, 30, 8); handsWide(dt, 360, 40); });
+      if (f < fans - 1) yield* during(0.08, (k, dt) => coreTo(x0, y0 + 8, dt, 34, 8));
+    }
+    c.crK = 0;
+    yield* coreHome(0.6);
+  }
+
+  // The Corona's rays and column are warned like any beam or column, but once they go they are drawn
+  // as fire, not as white light: (hazard, fired draw) keeps the shared warning and swaps the rest
+  function corona(h, fired) {
+    const warn = h.draw;
+    h.draw = function (ctx) { if (this.t < this.tele) warn.call(this, ctx); else fired.call(this, ctx); };
+  }
+  function coronaRay(ctx) {
+    const Pl = G.pal();
+    const f = this.firing ? Math.min(1, (this.t - this.tele) / 0.04) : Math.max(0, 1 - (this.t - this.tele - this.active) / this.fade);
+    if (f <= 0) return;
+    const w = this.width * f * (1 + 0.08 * Math.sin(this.t * 70));
+    ctx.lineCap = 'round'; ctx.globalCompositeOperation = 'lighter';
+    for (const [col, ws, al] of [[Pl.boss, 1.9, 0.1], [Pl.boss, 0.7, 0.42], [Pl.hot, 0.18, 0.36]]) {
+      ctx.strokeStyle = G.rgba(col, al * f); ctx.lineWidth = w * ws;
+      ctx.beginPath(); ctx.moveTo(this.ox, this.oy); ctx.lineTo(this.ex, this.ey); ctx.stroke();
+    }
+    ctx.globalCompositeOperation = 'source-over';
+  }
+  // embers erupting up the column: tongues of the sun's colour, flickering, thinning as they rise
+  function emberColumn(ctx) {
+    const Pl = G.pal();
+    const f = this.firing ? Math.min(1, (this.t - this.tele) / 0.05) : Math.max(0, 1 - (this.t - this.tele - this.active) / this.fade);
+    if (f <= 0) return;
+    const cx = this.x + this.w / 2, top = -40;
+    ctx.globalCompositeOperation = 'lighter';
+    const g = ctx.createLinearGradient(0, FLOOR, 0, top);
+    g.addColorStop(0, G.rgba(Pl.boss, 0.4 * f)); g.addColorStop(1, G.rgba(Pl.boss, 0.06 * f));
+    ctx.fillStyle = g; ctx.fillRect(this.x + this.w * 0.12, top, this.w * 0.76, FLOOR - top);
+    ctx.lineCap = 'round';
+    for (let i = 0; i < 5; i++) {
+      const x = cx + (i - 2) * this.w * 0.17 + Math.sin(this.t * 23 + i * 2.1) * 4, h = (FLOOR - top) * (0.6 + 0.4 * Math.sin(this.t * 17 + i * 1.3));
+      ctx.strokeStyle = G.rgba(i === 2 ? Pl.hot : Pl.boss, (i === 2 ? 0.4 : 0.32) * f); ctx.lineWidth = i === 2 ? 4 : 7;
+      ctx.beginPath(); ctx.moveTo(x, FLOOR); ctx.lineTo(x + Math.sin(this.t * 9 + i) * 8, FLOOR - h); ctx.stroke();
+    }
+    ctx.globalCompositeOperation = 'source-over';
+  }
+
+  // ---- SPEARS
+  // Spears of light form in a rank along the far wall, from the top of the view to the floor, all but
+  // where the core hangs: the gap in the rank is at its height. It sinks low (the gap is at the floor:
+  // stay down) or rises to the height of a jump (the gap is in the air: be up in it as the rank passes,
+  // stand on a platform, or dash through). Then the rank is let go across the arena. Phase II sends a
+  // second back from the other wall; in phase III the core bobs between the two heights as the rank
+  // crosses, and the gap goes with it. A core that sinks to the floor can be struck while it waits.
+  const SP_LOW = FLOOR - 76, SP_HIGH = FLOOR - 206;
+  function* atkSpears() {
+    const c = B.core, P = G.player, T = G.diff().tele, P3 = B.phase === 3;
+    c.ctrl = true; c.vx = c.vy = 0;
+    const n = B.phase === 1 ? 1 : 2;
+    let from = P.x < 640 ? 1 : -1; // it forms on the far side from the hero: the whole arena to cross
+    for (let i = 0; i < n; i++) {
+      const high = chance(0.5, i === 0 ? 'high' : 'high2');
+      const gy = high ? SP_HIGH : SP_LOW;
+      const w = spearWall(from);
+      const tell = (i === 0 ? 1.05 : 0.72) * T, cx0 = c.x, cy0 = c.y;
+      G.audio.play('charge', { dur: tell });
+      // the core goes to the gap's height, leaning a little away from the rank as it forms
+      let next = 0;
+      yield* during(tell, (k, dt, e) => {
+        const g = E.inOutQuad(Math.min(1, k * 1.5));
+        coreTo(G.lerp(cx0, 640 + from * 30, g), G.lerp(cy0, gy, g), dt, 30, 8.5);
+        w.form = k;
+        c.swellT = 0.03 * k; c.open = 1 - 0.25 * k;
+        handsWide(dt, 400, -170);
+        if (e >= next) { next += 0.09; G.audio.play('wSpear'); }
+      });
+      w.form = 1; w.go = true;
+      G.audio.play('wVolley'); G.fx.shake(4); G.fx.kick(-w.dir * 2, 0);
+      c.kick = 0.6; c.vx += w.dir * 60;
+      // it holds the gap open while the rank crosses (phase III: it bobs between the two heights)
+      let e = 0;
+      const bob0 = high ? -Math.PI / 2 : Math.PI / 2; // (starts at the height it showed)
+      while (!w.dead) {
+        const dt = yield;
+        e += dt;
+        const ty = P3 ? (SP_LOW + SP_HIGH) / 2 - Math.sin(bob0 + e * 3.4) * (SP_LOW - SP_HIGH) / 2 : gy;
+        coreTo(640 + from * 12, ty, dt, 40, 9);
+        c.swellT = 0.03; c.open = 0.75;
+        handsWide(dt, 400, -170);
+      }
+      c.swellT = 0; c.open = 1;
+      from = -from;
+      if (i < n - 1) yield* during(0.15, (k, dt) => coreTo(640, c.y, dt, 30, 8));
+    }
+    yield* coreHome(0.8);
+  }
+
+  // A rank of spears from the top of the view to the floor, with a gap where the core is (the gap goes
+  // with the core). Only the heads hurt: the shafts behind them are light that trails off.
+  const SP_ROWS = [];
+  for (let y = -6; y < FLOOR - 4; y += 23) SP_ROWS.push(y);
+  function spearWall(from) {
+    const c = B.core;
+    return H.add({
+      kind: 'spears', layer: 'over', from, dir: -from, x: from > 0 ? WR - 4 : WL + 4, form: 0, go: false, v: 0, dmg: 1,
+      gapTop: 0, gapBot: 0, srcX: 0,
+      update(dt) {
+        // the gap: from a little above the core's middle to below it, tall enough for a hero
+        this.gapTop = c.y - 76; this.gapBot = c.y + 102;
+        if (this.go) {
+          this.v = Math.min(580, this.v + 1500 * dt);
+          this.x += this.dir * this.v * dt;
+          if ((this.dir > 0 && this.x > WR + 90) || (this.dir < 0 && this.x < WL - 90)) this.dead = true;
+          // where its lowest heads skim the floor, sparks and dust
+          if (this.gapBot < FLOOR - 30 && Math.random() < dt * 30) {
+            G.fx.burst(this.x, FLOOR - 4, { n: 1, color: G.pal().hot, speed: [80, 260], angle: this.dir > 0 ? -2.6 : -0.5, spread: 0.6, life: [0.15, 0.3], kind: 'spark', size: [1.5, 3], grav: 800 });
+            G.fx.dust(this.x - this.dir * 20, FLOOR, 1, { dir: -this.dir, speed: [20, 80], size: [5, 9], up: 24, a: 0.25 });
+          }
+        }
+        this.srcX = this.x - this.dir * 30;
+      },
+      // how present the spear on a row is: 0 in the gap, 1 out of it (soft at the edges)
+      here(y) { const d = Math.max(this.gapTop - y, y - this.gapBot); return G.clamp((d + 4) / 16, 0, 1); },
+      hits(Pp) {
+        if (!this.go) return false;
+        const b = Pp.box();
+        // the band of the heads
+        const hx = this.x - this.dir * 10;
+        if (Math.abs(b.cx - hx) > b.hw + 16) return false;
+        // hurt unless the hero's whole body is inside the gap
+        return b.cy - b.hh < this.gapTop || b.cy + b.hh > this.gapBot;
+      },
+      draw(ctx) {
+        const Pl = G.pal(), d = this.dir, N = SP_ROWS.length;
+        // (it fades as it goes into the far wall)
+        const past = this.go ? (d > 0 ? this.x - WR : WL - this.x) : -1, out = G.clamp(1 - past / 80, 0, 1);
+        if (out <= 0) return;
+        ctx.lineCap = 'round';
+        for (let i = 0; i < N; i++) {
+          const y = SP_ROWS[i], pres = this.here(y);
+          if (pres <= 0.01) continue;
+          // they form outward from the gap, one after another
+          const near = y < this.gapTop ? (this.gapTop - y) / 600 : (y - this.gapBot) / 600;
+          const s = G.clamp((this.form * 1.25 - near) / 0.25, 0, 1);
+          if (s <= 0) continue;
+          const a = pres * E.outCubic(s) * out;
+          // a spear slides out of the wall as it forms; in flight, a trail of light behind its head
+          const hx = this.x - d * (1 - E.outBack(s)) * 70 + (this.go ? 0 : Math.sin(this.t * 6 + i) * 2 * d);
+          const L = this.go ? 80 + Math.min(150, this.v * 0.28) : 70;
+          // the shaft: dark, with the sun's colour along it; in flight a smear of it trails behind
+          const g = ctx.createLinearGradient(hx - d * L, 0, hx, 0);
+          g.addColorStop(0, G.rgba(Pl.boss, 0)); g.addColorStop(1, G.rgba(Pl.boss, 0.5 * a));
+          ctx.strokeStyle = g; ctx.lineWidth = 9;
+          ctx.beginPath(); ctx.moveTo(hx - d * L, y); ctx.lineTo(hx - d * 20, y); ctx.stroke();
+          ctx.strokeStyle = 'rgba(8,5,14,' + (0.85 * a) + ')'; ctx.lineWidth = 3.5;
+          ctx.beginPath(); ctx.moveTo(hx - d * Math.min(L, 64), y); ctx.lineTo(hx - d * 20, y); ctx.stroke();
+          // the head: a long dark blade with a burning edge
+          ctx.fillStyle = 'rgba(8,5,14,' + (0.92 * a) + ')';
+          ctx.beginPath(); ctx.moveTo(hx + d * 8, y); ctx.lineTo(hx - d * 24, y - 8); ctx.lineTo(hx - d * 18, y); ctx.lineTo(hx - d * 24, y + 8); ctx.closePath(); ctx.fill();
+          ctx.globalCompositeOperation = 'lighter';
+          ctx.fillStyle = G.rgba(Pl.boss, 0.35 * a);
+          ctx.beginPath(); ctx.moveTo(hx + d * 8, y); ctx.lineTo(hx - d * 24, y - 8); ctx.lineTo(hx - d * 18, y); ctx.lineTo(hx - d * 24, y + 8); ctx.closePath(); ctx.fill();
+          ctx.strokeStyle = G.rgba(Pl.hot, 0.7 * a); ctx.lineWidth = 1.8;
+          ctx.beginPath(); ctx.moveTo(hx - d * 24, y - 8); ctx.lineTo(hx + d * 8, y); ctx.lineTo(hx - d * 24, y + 8); ctx.stroke();
+          ctx.globalCompositeOperation = 'source-over';
+        }
+      },
+    });
+  }
+
+  // ---- CHARGE
+  // The core comes for the hero itself: it blinks once for each rush (two, three, four by phase; one
+  // more in the long form), then draws back from the hero, eye narrowed, and hurls itself at where they
+  // are, a short way past them; it turns and goes again. The last rush does not stop: it carries on into
+  // the floor (or a wall) and crashes. Then it lies there dazed and dimmed for a long moment: the time to
+  // punish. Each rush is dodged by stepping out of its line during the draw-back, or a dash through it.
+  function* atkCharge() {
+    const c = B.core, P = G.player, P3 = B.phase === 3;
+    const T = G.diff().tele * (P3 ? 0.9 : 1);
+    c.ctrl = true; c.vx = c.vy = 0;
+    const n = [0, 2, 3, 4][B.phase] + (chance(0.35, 'long') ? 1 : 0);
+    yield* blinks(n);
+    let ax = 0, ay = 1;
+    for (let i = 0; i < n; i++) {
+      const last = i === n - 1;
+      const tell = (i === 0 ? 0.66 : 0.5) * T, sx = c.x, sy = c.y;
+      G.audio.play('charge', { dur: tell });
+      // the draw-back: it pulls away from the hero, the corona streaming back from its face; the aim
+      // follows them, then holds for the last half (it trembles), so a step out of the line is in time
+      yield* during(tell, (k, dt) => {
+        if (k < 0.48) {
+          const tx = P.x, ty = Math.min(P.y - 22, FLOOR - c.r + 16);
+          const d = Math.hypot(tx - c.x, ty - c.y) || 1;
+          ax = (tx - c.x) / d; ay = (ty - c.y) / d;
+        }
+        // (it draws back further when it is close, so a rush always comes from a fair distance)
+        const back = Math.max(50, 300 - Math.hypot(P.x - sx, P.y - 22 - sy)), e = E.outQuad(k);
+        coreTo(sx - ax * back * e, Math.min(sy - ay * back * e, FLOOR - 250), dt, 60, 10);
+        c.open = 1 - 0.55 * e; c.swellT = 0.045 * e; c.charge = 0.35 * e;
+        c.flA = Math.atan2(-ay, -ax); c.flK = 0.55 * e;
+        c.jit = k > 0.48 ? 1.4 : 0;
+        handsWide(dt, 380, -150);
+      });
+      c.jit = 0; c.open = 0.7; c.flK = 0;
+      // the rush
+      c.hurt = true; c.hurtDmg = 1;
+      G.audio.play('wRush'); G.fx.kick(ax * 3, ay * 3); c.kick = 0.7;
+      const reach = Math.hypot(P.x - c.x, P.y - 22 - c.y) + 130;
+      let run = 0, v = 0, wall = 0, floor = false;
+      while (true) {
+        const dt = yield;
+        v = Math.min(last ? 1450 : 1250, v + 9500 * dt);
+        const step = v * dt;
+        c.x += ax * step; c.y += ay * step; run += step;
+        if (Math.random() < 0.9) G.fx.spawn({ x: c.x - ax * c.r * 0.9 + G.rand(-20, 20), y: c.y - ay * c.r * 0.9 + G.rand(-20, 20), vx: -ax * 160, vy: -ay * 160, life: 0.25, size: G.rand(4, 8), color: G.pal().boss });
+        handsWide(dt, 380, -150);
+        const fy = FLOOR - c.r + 16, lo = WL + c.r * 0.82, hi = WR - c.r * 0.82;
+        if (c.y >= fy) { c.y = fy; floor = true; }
+        if (c.x <= lo) { c.x = lo; wall = -1; }
+        if (c.x >= hi) { c.x = hi; wall = 1; }
+        if (c.y < 70) { c.y = 70; ay = Math.abs(ay); }
+        if (last ? (floor || wall) : (run >= Math.min(reach, 420) || floor || wall)) break;
+      }
+      if (!last) {
+        // it brakes on a spring and swings back up, turning on the hero again
+        c.hurt = false;
+        c.vx = ax * v * 0.22; c.vy = ay * v * 0.22;
+        if (floor) { c.vy = -Math.abs(c.vy) - 120; G.fx.dust(c.x, FLOOR, 3, { speed: [40, 180], size: [6, 10], up: 50 }); G.fx.shake(4); }
+        const bx = G.clamp(c.x + ax * 40, WL + 140, WR - 140), by = Math.min(c.y, FLOOR - 290);
+        yield* during(0.26, (k, dt) => { coreTo(bx, by, dt, 46, 9); handsWide(dt, 380, -150); });
+        c.open = 1;
+        continue;
+      }
+      // the crash
+      c.hurt = false;
+      const ix = c.x, iy = floor ? FLOOR : c.y;
+      impactFx(floor ? ix : ix + wall * c.r * 0.8, true);
+      if (floor) {
+        crush(ix, FLOOR - 70, 92, 80, 2); // (the core's own breadth: it lands where it is)
+        if (B.phase >= 2) { H.shockwave(ix - 90, -1, 560, 50); H.shockwave(ix + 90, 1, 560, 50); }
+        G.fx.ripple(ix, FLOOR - 40, 300, 0.36, 1);
+      } else {
+        crush(c.x + wall * 30, c.y, 100, 110, 2);
+        G.fx.burst(c.x + wall * c.r * 0.8, iy, { n: 14, color: '22,18,32', speed: [120, 460], angle: wall > 0 ? Math.PI : 0, spread: 1.6, life: [0.6, 1.1], size: [5, 11], kind: 'chunk', grav: 1500 });
+      }
+      if (G.arena.gust) G.arena.gust(ix, iy - 30, 1.3);
+      // dazed: dimmed, the eye half shut and swimming, stars round it; it is open the whole time
+      c.embedded = true; c.daze = 1; c.open = 0.18;
+      const dazeT = [0, 1.9, 1.7, 1.5][B.phase];
+      yield* during(dazeT, (k, dt, e) => {
+        c.daze = 1;
+        c.open = 0.18 + 0.1 * Math.sin(e * 3);
+        c.jit = k > 0.85 ? 1.2 : 0;
+        handsWide(dt, 380, -150);
+      });
+      c.jit = 0; c.embedded = false;
+      // it tears itself loose and rises, coming to as it goes: the eye opens, the daze fades
+      c.vy = -300; c.daze = 0.999;
+      G.fx.dust(c.x, floor ? FLOOR : c.y, 4, { speed: [40, 200], size: [6, 12], up: 70 });
+      const o0 = c.open, rx = c.x, ry = c.y;
+      yield* during(0.35, (k, dt) => { c.open = G.lerp(o0, 1, E.inOutQuad(k)); coreTo(rx, ry - 90, dt, 30, 8); handsWide(dt, 380, -150); });
+    }
+    yield* coreHome(0.8);
+  }
+
+  // ---- ORBIT
+  // Embers are drawn out of the corona and set circling the core. How fast they circle is the tell:
+  // slowly, and they are flung one by one, each at the hero from where the orbit has carried it (keep
+  // moving); in a whirl, and they all fly out at once as a ring (stand in a gap between them, or cut
+  // one down). Phase II has two rings, turning opposite ways (the second ring is let go a moment
+  // after the first, its embers between the first one's). In phase III the embers bounce once off a
+  // wall.
+  function* atkOrbit() {
+    const c = B.core, P = G.player, T = G.diff().tele, P2 = B.phase >= 2, P3 = B.phase === 3;
+    c.ctrl = true; c.vx = c.vy = 0;
+    const x0 = c.x, y0 = c.y;
+    const burst = chance(0.45, 'burst');
+    // (a whirl looses a full ring of eight; flung one by one, six a ring, so a walking hero has the room)
+    const rings = P2 ? 2 : 1, per = burst ? 8 : 6;
+    B.orbit = [];
+    for (let j = 0; j < rings; j++) {
+      for (let i = 0; i < per; i++) {
+        B.orbit.push({ ring: j, a: (i + j * 0.5) / per * G.TAU, R: c.r + 46 + j * 44, s: 0, born: (i + j * per) * 0.045, spin: (j ? -1 : 1) * (burst ? 4.4 : 1.15) });
+      }
+    }
+    const tell = 1.0 * T;
+    G.audio.play('wWhir', { fast: burst, dur: tell + 0.4 });
+    yield* during(tell, (k, dt, e) => {
+      for (const o of B.orbit) { o.s = G.clamp((e - o.born) / 0.3, 0, 1); o.a += o.spin * (0.35 + 0.65 * k) * dt; }
+      coreTo(x0, y0 - 14 * E.inOutQuad(k), dt, 40, 9);
+      c.swellT = 0.03 * k; c.charge = 0.25 * k;
+      handsWide(dt, 380, -140);
+    });
+    c.charge = 0;
+    const tint = null, wallB = P3;
+    const fling = (o, vx, vy) => {
+      const ex = c.x + Math.cos(o.a) * o.R, ey = c.y + Math.sin(o.a) * o.R;
+      H.orb(ex, ey, vx, vy, {
+        r: 11, tint, steer: wallB ? (b) => {
+          if (b.bounced) return;
+          if ((b.x < WL + b.r && b.vx < 0) || (b.x > WR - b.r && b.vx > 0)) {
+            b.vx = -b.vx; b.bounced = true;
+            G.fx.burst(b.x, b.y, { n: 5, color: G.pal().boss, speed: [60, 200], life: [0.15, 0.35], kind: 'spark', size: [1.5, 3] });
+          }
+        } : null,
+      });
+    };
+    if (burst) {
+      // all at once, ring by ring: out along their radius, carrying a little of their spin
+      for (let j = 0; j < rings; j++) {
+        const ring = B.orbit.filter((o) => o.ring === j);
+        for (const o of ring) {
+          const sp = 330, ra = o.a, tg = o.a + Math.PI / 2 * Math.sign(o.spin);
+          fling(o, Math.cos(ra) * sp + Math.cos(tg) * 40, Math.sin(ra) * sp + Math.sin(tg) * 40);
+        }
+        B.orbit = B.orbit.filter((o) => o.ring !== j);
+        G.audio.play('wFling'); G.audio.play('flare');
+        c.kick = 1; c.swellT = -0.03; G.fx.shake(5);
+        G.fx.ring(c.x, c.y, { r0: c.r, r1: c.r + 150 + j * 44, life: 0.3, color: G.pal().boss, width: 5 });
+        yield* during(j < rings - 1 ? 0.5 : 0.35, (k, dt) => {
+          for (const o of B.orbit) o.a += o.spin * dt;
+          coreTo(x0, y0 - 6, dt, 36, 9); handsWide(dt, 380, -140);
+        });
+      }
+    } else {
+      // one by one: each as the orbit carries it round to face the hero, flung straight at them; the
+      // inner ring first, then (phase II) a beat while the outer one closes in, then the outer
+      const gap = [0, 0.32, 0.3, 0.26][B.phase];
+      while (B.orbit.length) {
+        const ring = Math.min(...B.orbit.map((o) => o.ring)), left = B.orbit.filter((o) => o.ring === ring);
+        const ha = Math.atan2(P.y - 22 - c.y, P.x - c.x);
+        let best = null, bd = 9;
+        for (const o of left) { const d = Math.abs(G.angDiff(o.a, ha)); if (d < bd) { bd = d; best = o; } }
+        const ex = c.x + Math.cos(best.a) * best.R, ey = c.y + Math.sin(best.a) * best.R;
+        const d = Math.hypot(P.x - ex, P.y - 22 - ey) || 1, sp = 560;
+        fling(best, (P.x - ex) / d * sp, (P.y - 22 - ey) / d * sp);
+        B.orbit.splice(B.orbit.indexOf(best), 1);
+        G.audio.play('wFling');
+        c.kick = 0.45; c.vx -= (P.x - ex) / d * 50; c.vy -= (P.y - 22 - ey) / d * 50;
+        const beat = left.length === 1 && B.orbit.length > 1;
+        if (beat) G.audio.play('wWhir', { dur: 1 });
+        yield* during(beat ? 1.0 : gap, (k, dt) => {
+          for (const o of B.orbit) { o.a += o.spin * dt; if (beat) o.R = G.damp(o.R, c.r + 46, 4, dt); }
+          coreTo(x0, y0 - 10, dt, 36, 9); handsWide(dt, 380, -140);
+        });
+      }
+    }
+    c.swellT = 0;
+    yield* during(0.3, (k, dt) => { coreTo(x0, y0, dt, 34, 9); handsWide(dt, 380, -140); });
+    yield* coreHome(0.6);
+  }
+
   const ATTACKS = B.ATTACKS = {
     reckoning, sunburst: atkSunburst,
     slam: atkSlam, sweep: atkSweep, clap: atkClap, lance: atkLance, rain: atkRain,
@@ -2288,6 +2797,7 @@
     halo: atkHalo, supernova: atkSupernova,
     afterhands: atkAfterhands, pendulum: atkPendulum,
     flare: atkFlare, sunspot: atkSunspot,
+    corona: atkCorona, spears: atkSpears, charge: atkCharge, orbit: atkOrbit,
   };
 
   // ------------------------------------------------------------------ update
@@ -2302,6 +2812,12 @@
     c.swellV = (c.swellV || 0) + (((c.swellT || 0) - (c.swell || 0)) * 140 - (c.swellV || 0) * 11) * dt;
     c.swell = (c.swell || 0) + c.swellV * dt;
     if (B.attackName !== 'flare') c.flK = Math.max(0, (c.flK || 0) - dt * 3);
+    if (B.attackName !== 'corona') c.crK = Math.max(0, (c.crK || 0) - dt * 3);
+    if (B.attackName !== 'charge' || c.daze < 1) c.daze = Math.max(0, (c.daze || 0) - dt * 2.5);
+    if (B.orbit && B.orbit.length && B.attackName !== 'orbit') {
+      for (const o of B.orbit) o.s -= dt * 3;
+      B.orbit = B.orbit.filter((o) => o.s > 0);
+    }
     if (B.spots && B.spots.length && B.attackName !== 'sunspot') {
       for (const s of B.spots) s.fade = (s.fade == null ? 1 : s.fade) - dt * 3;
       B.spots = B.spots.filter((s) => s.fade > 0);
@@ -2360,6 +2876,9 @@
 
     // how long the player has been resting on a platform (see the swat attack)
     B.airT = G.clamp(B.airT + (!P.onGround && P.y < FLOOR - 110 && !P.dead ? dt : -dt * 0.7), 0, 4);
+    // riding over its head: bouncing on the core or hanging just above it (the Corona answers it)
+    const over = !P.dead && B.active && !B.staggered && Math.abs(P.x - c.x) < c.r + 64 && P.y < c.y - c.r * 0.55 && P.y > c.y - c.r - 360;
+    B.above = G.clamp((B.above || 0) + (over ? dt : -dt * 0.5), 0, ABOVE_T + 1);
     if (P.plat && !P.dead) { B.campT = Math.min(4, B.campT + dt); B.campPlat = P.plat; }
     else B.campT = Math.max(0, B.campT - dt * 0.5);
 
@@ -2379,7 +2898,7 @@
         b.hw *= 0.8; b.hh *= 0.88;
         if (G.rectsOverlap(P.box(), b)) P.tryHit(h.hurtDmg, h.x, h);
       }
-      if (c.hurt && G.circleRect(c.x, c.y, c.r * 0.88, P.box())) P.tryHit(2, c.x, c);
+      if (c.hurt && G.circleRect(c.x, c.y, c.r * 0.88, P.box())) P.tryHit(c.hurtDmg || 2, c.x, c);
       if (B.haloHurt && B.hasShards) {
         for (let i = 0; i < 6; i++) {
           const a = B.shardA + i * G.TAU / 6;
@@ -2442,7 +2961,7 @@
     if (B.dead) { drawSun(ctx, c); ctx.restore(); return; }
     if (c.kick > 0.01) { const ks = 1 - 0.045 * c.kick; ctx.scale(ks, ks); }
     if (c.swell) ctx.scale(1 + c.swell, 1 + c.swell);
-    const dim = B.staggered ? 0.4 : 1;
+    const dim = B.staggered ? 0.4 : 1 - 0.5 * (c.daze || 0);
     const ch = c.charge;
 
     // halo and corona
@@ -2460,6 +2979,8 @@
         let L = r * (0.14 + 0.44 * Math.max(0, n)) * (1 + ch * 0.5) * (pass === 0 ? 1 : 0.5) * (0.4 + 0.6 * dim);
         // the Flare's tell: the corona bulges out on one side
         if (c.flK > 0.01) { const d = G.angDiff(a, c.flA); L *= 1 + 2.6 * c.flK * Math.exp(-d * d / 0.16); }
+        // the Corona's tell: light gathering on its crown, leaning the way a phase II fan will sweep
+        if (c.crK > 0.01) { const d = G.angDiff(a, c.crA); L *= 1 + 1.9 * c.crK * Math.exp(-d * d / 0.45); }
         const da = G.TAU / N * (pass === 0 ? 0.48 : 0.26);
         ctx.moveTo(Math.cos(a - da) * r * 0.97, Math.sin(a - da) * r * 0.97);
         ctx.lineTo(Math.cos(a) * (r + L), Math.sin(a) * (r + L));
@@ -2595,9 +3116,26 @@
         ctx.closePath(); ctx.fill();
       }
     }
-    // dazed stars while staggered
-    if (B.staggered) {
-      ctx.fillStyle = G.rgba(G.COL.starHot, 0.95);
+    // the Orbit's embers circling it (in a whirl they streak)
+    if (B.orbit && B.orbit.length) {
+      ctx.globalCompositeOperation = 'lighter'; ctx.lineCap = 'round';
+      for (const o of B.orbit) {
+        const s = G.clamp(o.s, 0, 1);
+        if (s <= 0.01) continue;
+        const R = G.lerp(r * 0.9, o.R, E.outBack(s)), ex = Math.cos(o.a) * R, ey = Math.sin(o.a) * R;
+        const tail = G.clamp(Math.abs(o.spin) * 0.11, 0.08, 0.6) * Math.sign(o.spin);
+        ctx.strokeStyle = G.rgba(P.boss, 0.45 * s); ctx.lineWidth = 7;
+        ctx.beginPath(); ctx.arc(0, 0, R, o.a - (tail > 0 ? tail : 0), o.a - (tail < 0 ? tail : 0)); ctx.stroke();
+        ctx.fillStyle = G.rgba(DANGER, 0.85 * s);
+        ctx.beginPath(); ctx.arc(ex, ey, 10 * s, 0, G.TAU); ctx.fill();
+        ctx.fillStyle = G.rgba(P.hot, 0.9 * s);
+        ctx.beginPath(); ctx.arc(ex, ey, 5 * s, 0, G.TAU); ctx.fill();
+      }
+      ctx.globalCompositeOperation = 'source-over';
+    }
+    // dazed stars while staggered (and while the Charge has left it dazed)
+    if (B.staggered || c.daze > 0.05) {
+      ctx.fillStyle = G.rgba(G.COL.starHot, 0.95 * (B.staggered ? 1 : c.daze));
       for (let i = 0; i < 3; i++) {
         const a = t * 4 + i * 2.094;
         star4(ctx, Math.cos(a) * 56, -r - 26 + Math.sin(a) * 9, 9);

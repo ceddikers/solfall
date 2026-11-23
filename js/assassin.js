@@ -21,11 +21,12 @@
     hudCols: [null, ['#a070ff', '#e4d4ff'], ['#40e0a8', '#c8ffe8'], ['#d8d8f0', '#ffffff']],
     BASE_HP: 3000, poise0: 340, w: 36, h: 84,
     answer: 'hunt',
+    antiAir: 'skyhook', // (bosskit: a hero who keeps riding over its head)
     gaps: [0, 0.8, 0.62, 0.5],
     bags: {
-      1: ['lunge', 'flurry', 'knives', 'ambush', 'backstab', 'echo', 'stance', 'crescent'],
-      2: ['pincer', 'flurry', 'knives', 'ambush', 'backstab', 'mirror', 'rain', 'cross', 'echo', 'stance', 'crescent'],
-      3: ['pincer', 'flurry', 'ambush', 'backstab', 'mirror', 'rain', 'cross', 'cuts', 'mark', 'echo', 'hunt', 'stance', 'crescent'],
+      1: ['lunge', 'flurry', 'knives', 'ambush', 'backstab', 'echo', 'stance', 'crescent', 'snare', 'dance', 'moonfall'],
+      2: ['pincer', 'flurry', 'knives', 'ambush', 'backstab', 'mirror', 'rain', 'cross', 'echo', 'stance', 'crescent', 'snare', 'dance', 'moonfall'],
+      3: ['pincer', 'flurry', 'ambush', 'backstab', 'mirror', 'rain', 'cross', 'cuts', 'mark', 'echo', 'hunt', 'stance', 'crescent', 'snare', 'dance', 'moonfall'],
     },
     cards: { 2: ['SHADOWS', 'It no longer hunts alone'], 3: ['EXECUTION', 'No more warnings than these'] },
     first: { 1: 'lunge', 2: 'mirror', 3: 'cuts' },
@@ -47,6 +48,31 @@
       S.tone({ type: 'triangle', f0: 380, f1: 300, dur: 0.06, vol: 0.12 });
     });
     // the crescent in flight: air cut over and over, loudest as it turns
+    // blade laid on blade, once for each cut to come: a small, bright tick
+    G.audio.define('veiltap', () => {
+      S.noise({ dur: 0.018, vol: 0.2, type: 'highpass', f0: 5200 });
+      S.tone({ type: 'triangle', f0: 2650, f1: 2500, dur: 0.07, vol: 0.06 });
+    });
+    // its threads drawn tight: a thin whine climbing as they take the strain
+    G.audio.define('veilstrain', (o) => {
+      const dur = o.dur || 0.8;
+      S.tone({ type: 'sine', f0: 520, f1: 1500, dur, vol: 0.035 });
+      S.tone({ type: 'triangle', f0: 1046, f1: 2980, dur, vol: 0.018 });
+      S.noise({ dur, vol: 0.03, f0: 2600, f1: 4200, q: 8 });
+    });
+    // and let go: a whip-crack and the thread singing for a moment
+    G.audio.define('veilsnap', () => {
+      S.noise({ dur: 0.05, vol: 0.34, type: 'highpass', f0: 2400 });
+      S.tone({ type: 'square', f0: 1900, f1: 520, dur: 0.09, vol: 0.08 });
+      S.tone({ type: 'sine', f0: 1480, f1: 1420, dur: 0.32, vol: 0.05 });
+    });
+    // moonfall: a deep breath of cold air, and the hum of many blades turning in it
+    G.audio.define('veilmoon', (o) => {
+      const dur = o.dur || 1.6;
+      S.tone({ type: 'sine', f0: 92, f1: 70, dur, vol: 0.11 });
+      S.tone({ type: 'triangle', f0: 184, f1: 176, dur: dur * 0.8, vol: 0.04 });
+      S.noise({ dur, vol: 0.05, type: 'lowpass', f0: 600, f1: 240 });
+    });
     G.audio.define('veilwhirr', (o) => {
       const dur = o.dur || 1.4, n = Math.round(dur / 0.075);
       for (let i = 0; i < n; i++) S.noise({ dur: 0.055, vol: 0.03 + 0.07 * Math.sin(Math.PI * (i + 0.5) / n), f0: 1500 + 600 * Math.sin(Math.PI * i / n), q: 3, delay: i * 0.075 });
@@ -93,9 +119,25 @@
     throwSide: [0.55, -30, 0, 27, 0, -12, 0, 40, -38, 0.0, -10, -44, 2.8],
     watch: [0.12, -37, 0, 15, 0, -14, 0, 26, -50, 2.4, -12, -46, 2.7],
     catch: [-0.05, -38, 0, 12, 0, -16, 0, 30, -60, -0.6, -13, -47, 2.7],
+    // the skyhook: head back, looking up the column at the hero; or sunk deep with both blades turned
+    // up along the forearms, about to go straight up; and the heel coming down out of the air
+    lookUp: [-0.62, -38, 0, 10, 0, -16, 0, 10, -57, -1.3, -12, -42, 2.6],
+    coilUp: [0.34, -21, 0, 19, 0, -17, 0, 9, -24, -1.57, -15, -28, -1.4],
+    heel: [0.08, -46, 0, 5, 0, -9, -28, 16, -62, -1.25, -15, -58, -2.0],
+    // a lunge with its weight on the back foot and the blades held back: it will stop short
+    feint: [0.12, -29, 0, 21, 0, -21, 0, -21, -34, 2.95, -17, -43, 2.6],
+    // the flurry's last cut, held: the blade high behind the head
+    slashHold: [-0.2, -37, 0, 19, 0, -15, 0, -8, -88, -2.25, -14, -46, 2.7],
+    // the snare: an underhand flick (the arm back low, then through and up) and the yank
+    windUnder: [0.25, -29, 0, 19, 0, -17, 0, -24, -22, 2.7, -12, -44, 2.7],
+    flickUnder: [0.32, -32, 0, 21, 0, -15, 0, 34, -30, -0.35, -13, -44, 2.7],
+    pull: [-0.18, -37, 0, 15, 0, -16, 0, -18, -56, 2.5, 9, -46, 0.4],
+    // the dance: blade laid against blade at the chest, once for each cut to come
+    tapUp: [0.16, -36, 0, 15, 0, -14, 0, 17, -80, -1.25, 7, -52, -0.15],
+    tapDown: [0.24, -35, 0, 15, 0, -14, 0, 9, -54, 0.55, 7, -52, -0.15],
   };
   // poses it snaps into rather than eases (the rest follow at the usual rate)
-  const SNAP = { dash: 60, dive: 60, streak: 60, drawHi: 60, throwOver: 44, throwSide: 44, parry: 50 };
+  const SNAP = { dash: 60, dive: 60, streak: 60, drawHi: 60, throwOver: 44, throwSide: 44, parry: 50, heel: 60, flickUnder: 46, pull: 46 };
   // a pose between two others, written into a figure's own scratch pose (a.live)
   function mixPose(a, P0, P1, k) {
     const p = a.live || (a.live = P0.slice());
@@ -118,8 +160,8 @@
     B.lights = true; B.dark = 0; B.wires = []; B.wireHit = 0;
     B.pinned = null; B.strings = 0;
   };
-  B.onRelease = function () { const b = B.body; b.fading = false; b.hurt = false; b.pose = 'idle'; b.hidden = false; B.pinned = null; B.strings = 0; b.still = false; b.held = false; B.guard = null; };
-  B.onInterrupt = function () { const b = B.body; b.fading = false; for (const c of B.clones) smoke(c.x, c.y - 40); B.clones.length = 0; B.pinned = null; B.strings = 0; b.still = false; b.held = false; B.guard = null; };
+  B.onRelease = function () { const b = B.body; b.fading = false; b.hurt = false; b.pose = 'idle'; b.hidden = false; B.pinned = null; B.strings = 0; b.still = false; b.held = false; B.guard = null; B.moon = false; };
+  B.onInterrupt = function () { const b = B.body; b.fading = false; for (const c of B.clones) smoke(c.x, c.y - 40); B.clones.length = 0; B.pinned = null; B.strings = 0; b.still = false; b.held = false; B.guard = null; B.moon = false; };
   // In its stance a blow is caught, not taken (see atkStance). Dawnbreak is not caught.
   B.blocked = function (t, info) {
     const g = B.guard;
@@ -261,11 +303,65 @@
   }
 
   // ------------------------------------------------------------------ attacks
+  // Lunge. Its crouch says which:
+  //   blade forward, weight on the front foot: it crosses the floor (jump it, or dash through)
+  //   weight on the back foot, both blades held back: it goes, stops short with a skid, springs back
+  //   and throws a fan of knives at wherever the hero is (most likely in the air, over a lunge that
+  //   never came). It throws from its heels, and is open after.
   function* atkLunge() {
     const b = B.body, T = K.T();
+    if (K.chance(B.phase === 1 ? 0.3 : 0.4, 'feint')) { yield* feintLunge(b, 0.62 * T); return; }
     yield* lunge(b, farSide(b.x), 0.62 * T);
     if (K.hard()) { yield* wait(0.25); yield* lunge(b, farSide(b.x), 0.45 * T); }
-    yield* wait(0.85);
+    // it slides out of it and is slow to turn round: open for a moment
+    b.exposed = true;
+    yield* wait(0.55);
+    b.exposed = false;
+    yield* wait(0.3);
+  }
+  function* feintLunge(a, tele) {
+    const P = G.player, T = K.T(), dir = G.sign(P.x - a.x) || a.face;
+    a.face = dir;
+    // (the same quiet lane as a real lunge: the crouch is the only difference)
+    H.lane({ x: WL, y: a.y - 66, w: WR - WL, h: 66, dir, dur: tele, quiet: true });
+    let e = 0;
+    while (e < tele) {
+      e += yield;
+      const k = Math.min(1, e / tele);
+      const p = mixPose(a, POSES.crouch, POSES.feint, E.outQuad(Math.min(1, k * 1.6)));
+      p[1] += 2.5 * k;
+      if (!a.glinted && tele - e < 0.2) { a.glinted = true; G.fx.glint(a.x - dir * 18, a.y - 38, 22, G.pal().hot, 0.18); G.audio.play('glint'); }
+    }
+    a.glinted = false;
+    // it goes, and stops short
+    const stop = G.clamp(P.x - dir * 160, WL + 40, WR - 40);
+    if ((stop - a.x) * dir > 30) {
+      a.pose = 'dash'; G.audio.play('streak');
+      const x0 = a.x, dur = Math.max(0.1, Math.abs(stop - x0) / 1900);
+      e = 0;
+      while (e < dur) {
+        e += yield;
+        a.x = G.lerp(x0, stop, E.outQuad(Math.min(1, e / dur)));
+        G.fx.spawn({ x: a.x - dir * 20, y: a.y - G.rand(10, 60), vx: -dir * G.rand(40, 200), vy: G.rand(-30, 30), life: 0.25, size: G.rand(4, 9), color: G.pal().boss });
+      }
+    }
+    a.pose = 'skid';
+    G.fx.dust(a.x, FLOOR, 5, { dir, speed: [60, 260], size: [6, 12], up: 24 });
+    yield* wait(0.07);
+    yield* hopBack(a, 130, 0.26, 58);
+    // the fan, at where the hero is now
+    a.face = P.x > a.x ? 1 : -1;
+    const ox = a.x + a.face * 22, oy = a.y - 60, base = Math.atan2(P.y - 24 - oy, P.x - ox);
+    const n = B.phase === 1 ? 3 : 5, angs = [];
+    for (let i = 0; i < n; i++) angs.push(base + (i - (n - 1) / 2) * 0.13);
+    const tt = 0.36 * T;
+    volley(ox, oy, angs, tt, 760);
+    yield* wait(tt);
+    a.pose = 'throw';
+    yield* wait(0.22);
+    a.pose = 'skid'; a.exposed = true;
+    yield* wait(0.7);
+    a.exposed = false;
   }
 
   // The same lunge, with a shadow coming the other way a moment later.
@@ -286,6 +382,10 @@
   function* atkFlurry() {
     const b = B.body, P = G.player, T = K.T();
     const fast = K.chance(B.phase === 1 ? 0.4 : 0.5, 'fast');
+    // measured, its last cut may be held: the blade goes up high behind its head and stays there,
+    // trembling, past where the cut should have come; then it falls with everything behind it, and
+    // the Veil is carried past and left open (no knives after)
+    const held = !fast && K.chance(B.phase === 1 ? 0.35 : 0.45, 'held');
     // close the distance
     b.pose = 'run';
     let e = 0;
@@ -300,6 +400,7 @@
       // taking its time, it turns to follow the hero between cuts; in a hurry it commits to the way it faces,
       // so getting behind it (a dash straight through) is safe for the rest of the flurry
       if ((!fast || i === 0) && Math.abs(P.x - b.x) > 20) b.face = P.x > b.x ? 1 : -1;
+      if (held && i === n - 1) { yield* heldCut(); return; }
       b.pose = 'crouch';
       const tele = (fast ? (i === 0 ? 0.4 : 0.19) : (i === 0 ? 0.5 : 0.4)) * T, r = fast ? 86 : 112;
       if (i % 2 === 0) swing(b, { r, a0: -2.1, a1: 0.95, tele, pose: 'slashA' });
@@ -342,6 +443,26 @@
     }
     b.pose = 'skid';
     yield* wait(0.7);
+  }
+  function* heldCut() {
+    const b = B.body, P = G.player, T = K.T();
+    if (Math.abs(P.x - b.x) > 20) b.face = P.x > b.x ? 1 : -1;
+    const hold = 0.95 * T;
+    swing(b, { r: 134, a0: -2.35, a1: 1.05, tele: hold, pose: 'slashA' });
+    let e = 0;
+    while (e < hold) {
+      e += yield;
+      const k = Math.min(1, e / hold);
+      const p = mixPose(b, POSES.crouch, POSES.slashHold, E.outQuad(Math.min(1, k * 2.4)));
+      if (k > 0.42) { p[1] += Math.sin(B.t * 70) * 0.8; p[0] += Math.sin(B.t * 53) * 0.015; p[8] += Math.sin(B.t * 81) * 1.1; }
+    }
+    G.audio.play('cleave'); G.fx.shake(6);
+    b.recV = (b.recV || 0) + b.face * 2.2;
+    yield* tween(b, { x: G.clamp(b.x + b.face * 70, WL + 30, WR - 30) }, 0.16, E.outCubic);
+    b.pose = 'stuck'; b.exposed = true;
+    G.fx.dust(b.x, FLOOR, 4, { dir: b.face, speed: [60, 240], size: [6, 11], up: 24 });
+    yield* wait(1.0);
+    b.exposed = false;
   }
   function* atkKnives() {
     const b = B.body, P = G.player, T = K.T();
@@ -1077,6 +1198,660 @@
   }
 
 
+  // ------------------------------------------------------------------ v2.1a: from the boss study
+  // (docs/boss-study.md) An answer to a hero who rides over its head, a trap of threads, a chase of
+  // cuts, and a sky full of moonlit blades.
+
+  // A spring back off the hero (`h`: how high the arc goes).
+  function* hopBack(a, dist, dur, h) {
+    const P = G.player, away = a.x > P.x ? 1 : -1, x0 = a.x, tx = G.clamp(a.x + away * dist, WL + 50, WR - 50);
+    a.face = -away; a.pose = 'air';
+    G.fx.dust(a.x, FLOOR, 3, { dir: away, speed: [30, 140], size: [5, 9], up: 20 });
+    let e = 0;
+    while (e < dur && !a.gone) { e += yield; const k = Math.min(1, e / dur); a.x = G.lerp(x0, tx, E.outQuad(k)); a.y = FLOOR - 4 * h * k * (1 - k); }
+    a.y = FLOOR; a.pose = 'crouch';
+    G.fx.dust(a.x, FLOOR, 3, { speed: [30, 140], size: [5, 9], up: 20 });
+  }
+  // Down out of the air onto the floor, if it is up there.
+  function* comeDown(a, dur) {
+    if (a.y >= FLOOR - 1) { a.y = FLOOR; return; }
+    a.pose = 'air';
+    const y0 = a.y;
+    let e = 0;
+    while (e < dur && !a.gone) { e += yield; const k = Math.min(1, e / dur); a.y = G.lerp(y0, FLOOR, k * k); }
+    a.y = FLOOR;
+    G.fx.thud(a.x, FLOOR, 0.5, { noCrack: true }); G.audio.play('land');
+  }
+
+  // ---- Skyhook (B.antiAir). It looks up first, and a glint runs up its gaze to where the hero is.
+  //   gone in smoke that rises: it comes down out of the air onto that spot, heel first, and the
+  //   landing sends a ripple both ways along the floor (move off the spot, then jump the ripple)
+  //   sunk deep, both blades turned up: it goes straight up through that spot, cutting, and floats
+  //   down beside it (move off the spot; nothing follows along the floor)
+  // Phase II: its shadow does the same where the hero has gone. Phase III: it does it twice itself.
+  function* skyTell(a, rise, dur) {
+    const P = G.player;
+    if (Math.abs(P.x - a.x) > 6) a.face = P.x > a.x ? 1 : -1;
+    let e = 0, traced = false;
+    while (e < dur && !a.gone) {
+      e += yield;
+      const k = Math.min(1, e / dur);
+      // the head goes back first, whichever way it means to go
+      const look = E.outQuad(Math.min(1, k * 2.2));
+      if (!rise) {
+        const p = mixPose(a, POSES.idle, POSES.lookUp, look);
+        p[1] += 5 * E.inQuad(k); // it settles to spring
+      } else {
+        const p = mixPose(a, look < 1 ? POSES.idle : POSES.lookUp, POSES.coilUp, E.inOutQuad(G.clamp((k - 0.2) / 0.8, 0, 1)));
+        p[1] += 2 * k + Math.sin(B.t * 64) * 0.9 * Math.max(0, k - 0.7) / 0.3; // and trembles at the bottom of it
+      }
+      if (!traced && k > 0.4) {
+        traced = true;
+        const hx = a.x + a.face * 7, hy = a.y - 76, len = Math.max(40, G.dist(hx, hy, P.x, P.y - 26));
+        G.fx.cut((hx + P.x) / 2, (hy + P.y - 26) / 2, Math.atan2(P.y - 26 - hy, P.x - hx), len, 1.2, a.clone ? '120,110,160' : G.pal().boss, a.clone ? '200,195,230' : G.pal().hot, 0.32);
+        G.audio.play('glint');
+      }
+    }
+  }
+  // The column it means: drawn as a mark is (it comes from out of sight), fading in and out.
+  function skyMark(x, w) {
+    return H.add({
+      kind: 'mark', layer: 'under', x, w, k: 1, out: -1,
+      update() { if (this.out >= 0 && this.t - this.out > 0.16) this.dead = true; },
+      end() { if (this.out < 0) { this.out = this.t; this.kind = 'markfade'; } },
+      draw(ctx) {
+        const a = Math.min(1, this.t / 0.1) * (this.out >= 0 ? Math.max(0, 1 - (this.t - this.out) / 0.16) : 1);
+        if (a <= 0) return;
+        const l = this.x - this.w / 2, top = FLOOR - 330, late = this.out < 0 ? 0.5 + 0.5 * Math.sin(this.t * 55) : 0;
+        const g = ctx.createLinearGradient(0, top, 0, FLOOR);
+        g.addColorStop(0, G.rgba(DANGER, 0)); g.addColorStop(1, G.rgba(DANGER, (0.22 + 0.12 * late) * a));
+        ctx.fillStyle = g; ctx.fillRect(l, top, this.w, FLOOR - top);
+        ctx.fillStyle = G.rgba(DANGER, 0.36 * a);
+        ctx.beginPath(); ctx.ellipse(this.x, FLOOR - 1, this.w / 2 * Math.min(1, this.t / 0.2), 10 * Math.min(1, this.t / 0.2), 0, 0, G.TAU); ctx.fill();
+        ctx.strokeStyle = G.rgba(DANGER, 0.9 * a); ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.ellipse(this.x, FLOOR - 1, this.w / 2, 10, 0, 0, G.TAU); ctx.stroke();
+      },
+    });
+  }
+  // Where the strike goes: the spot the hero is over, a hair ahead of the way they are moving.
+  const skySpot = () => { const P = G.player; return G.clamp(P.x + P.vx * 0.06, WL + 40, WR - 40); };
+  // Heel first out of the air onto x. `a` is put in the air over it first (the Veil out of smoke, a
+  // shadow made there).
+  function* skyDrop(a, tele) {
+    const P = G.player, sh = !!a.clone, x = a.x;
+    const gy = groundAt(x, Math.min(P.y, FLOOR) - 2);
+    const m = skyMark(x, 96);
+    // it hangs a moment, turning over once, and the heel comes round to point down
+    const y0 = a.y;
+    let e = 0;
+    while (e < tele && !a.gone) {
+      e += yield;
+      const k = Math.min(1, e / tele);
+      const p = mixPose(a, POSES.air, POSES.heel, E.inQuad(G.clamp((k - 0.55) / 0.45, 0, 1)));
+      p[2] = -a.face * G.TAU * E.inOutQuad(Math.min(1, k / 0.75)); // (a full turn, eased in and out)
+      a.y = y0 - 14 * Math.sin(Math.PI * Math.min(1, k / 0.8)); // and rises a little with the turn
+      if (k > 0.8 && !a.glinted) { a.glinted = true; G.fx.glint(a.x, a.y - 8, sh ? 18 : 24, sh ? '170,160,210' : G.pal().hot, 0.18); }
+    }
+    a.glinted = false;
+    if (a.gone) { m.end(); return; }
+    a.p[2] = Math.atan2(Math.sin(a.p[2]), Math.cos(a.p[2])); // (the turn is done: no unwinding it)
+    a.pose = 'heel'; a.hurt = true;
+    G.audio.play('streak');
+    const y1 = a.y, dur = Math.max(0.1, (gy - y1) / 2600);
+    e = 0;
+    while (e < dur && !a.gone) {
+      e += yield;
+      const k = Math.min(1, e / dur);
+      a.y = G.lerp(y1, gy, k * k);
+      G.fx.spawn({ x: a.x + G.rand(-8, 8), y: a.y - G.rand(20, 70), vx: G.rand(-30, 30), vy: -G.rand(60, 200), life: 0.22, size: G.rand(4, 8), color: sh ? '20,16,34' : G.pal().boss });
+    }
+    a.y = gy; a.hurt = false; m.end();
+    if (a.gone) return;
+    K.crush(x, gy - 40, 44, 44, 1);
+    if (gy >= FLOOR - 1) {
+      if (sh) { G.fx.shake(6); G.audio.play('land'); G.fx.thud(x, FLOOR, 0.8, { noCrack: true }); } else K.impact(x, false);
+      // the ripple: low, so it is jumped
+      H.shockwave(x - 22, -1, 380, 30); H.shockwave(x + 22, 1, 380, 30);
+    } else {
+      G.fx.shake(5); G.audio.play('land');
+      G.fx.burst(x, gy - 4, { n: 8, color: sh ? '150,140,190' : G.pal().hot, speed: [100, 340], angle: -Math.PI / 2, spread: 2.4, life: [0.15, 0.35], kind: 'spark', size: [1.4, 2.6], grav: 900 });
+    }
+    // it lands crouched over the heel, the weight carried down into one knee
+    a.sq = 0.16; a.pose = 'stuck';
+  }
+  // Straight up through x from the floor: a deep crouch, then the cut, then a float down beside it.
+  function* skyRise(a, tele) {
+    const P = G.player, sh = !!a.clone, x = a.x;
+    const top = Math.max(70, Math.min(P.y - 170, FLOOR - 300));
+    const beam = cutLine(x, FLOOR - 6, -Math.PI / 2, FLOOR - 6 - top + 30, tele);
+    beam.layer = 'under';
+    let e = 0;
+    while (e < tele && !a.gone) {
+      e += yield;
+      const k = Math.min(1, e / tele);
+      const p = mixPose(a, POSES.coilUp, POSES.coilUp, 0);
+      p[1] += 2 + 2 * k + Math.sin(B.t * 70) * 0.8 * k;
+      if (!a.glinted && tele - e < 0.18) { a.glinted = true; G.fx.glint(a.x + a.face * 9, a.y - 40, sh ? 18 : 24, sh ? '170,160,210' : G.pal().hot, 0.18); G.audio.play('glint'); }
+    }
+    a.glinted = false;
+    if (a.gone) return;
+    // up the line, laid along it
+    POSES.streak = POSES.dash.slice(); POSES.streak[2] = -Math.PI / 2; // (the dash, turned to point up)
+    a.pose = 'streak';
+    G.audio.play('streak');
+    G.fx.dust(x, FLOOR, 5, { speed: [60, 260], size: [6, 12], up: 20 });
+    const y0 = a.y, ty = top + 60;
+    e = 0;
+    while (e < 0.12 && !a.gone) {
+      e += yield;
+      const k = Math.min(1, e / 0.12);
+      a.y = G.lerp(y0, ty, E.outQuad(k));
+      G.fx.spawn({ x: a.x + G.rand(-6, 6), y: a.y - G.rand(0, 40), vx: G.rand(-30, 30), vy: G.rand(80, 260), life: 0.22, size: G.rand(4, 8), color: sh ? '20,16,34' : G.pal().boss });
+    }
+    if (a.gone) return;
+    // over the top, a turn in the air, and down beside the line, light, away from the hero
+    a.pose = 'air';
+    const side = (G.sign(a.x - P.x) || a.face) * 1, x0 = a.x, x1 = G.clamp(a.x + side * 46, WL + 40, WR - 40), y1 = a.y;
+    e = 0;
+    const fall = 0.42;
+    while (e < fall && !a.gone) {
+      e += yield;
+      const k = Math.min(1, e / fall);
+      a.x = G.lerp(x0, x1, E.outQuad(k));
+      a.y = y1 - 26 * Math.sin(Math.PI * Math.min(1, k * 1.6)) * (1 - k) + (FLOOR - y1) * k * k;
+    }
+    a.y = FLOOR;
+    if (!sh) { G.fx.thud(a.x, FLOOR, 0.45, { noCrack: true }); G.audio.play('land'); }
+    a.pose = 'crouch';
+  }
+  // One skyhook by the Veil or a shadow, on where the hero is now.
+  function* skyStrike(a, rise, tele) {
+    const P = G.player, x = skySpot();
+    if (a === B.body) {
+      yield* vanish();
+      yield* wait(0.06);
+      if (rise) appear(x, FLOOR, 'coilUp');
+      else appear(x, G.clamp(Math.min(P.y, FLOOR) - 210, 60, FLOOR - 200), 'air');
+    } else {
+      a.x = x;
+      if (!rise) a.y = G.clamp(Math.min(P.y, FLOOR) - 210, 60, FLOOR - 200);
+      smoke(a.x, a.y - 40);
+    }
+    if (rise) yield* skyRise(a, tele); else yield* skyDrop(a, tele);
+  }
+  function* atkSkyhook() {
+    const b = B.body, P = G.player, T = K.T(), ph = B.phase;
+    yield* comeDown(b, 0.2);
+    const rise = K.chance(0.5, 'rise');
+    yield* skyTell(b, rise, (ph === 3 ? 0.42 : 0.5) * T);
+    yield* skyStrike(b, rise, (rise ? 0.4 : 0.46) * T);
+    if (ph === 2 || (ph === 3 && K.hard())) {
+      // its shadow, where the hero went (once the ripple has run on past)
+      yield* wait(0.3);
+      const r2 = K.chance(0.5, 'shadeRise');
+      const c = clone(skySpot(), r2 ? FLOOR : FLOOR - 220, b.face, r2 ? 'coilUp' : 'air');
+      c.hurt = false;
+      yield* skyStrike(c, r2, (r2 ? 0.44 : 0.5) * T);
+      yield* wait(0.1);
+      c.gone = true; smoke(c.x, c.y - 40);
+    }
+    if (ph === 3) {
+      // and again itself, where the hero went; it looks up for a moment first
+      const r3 = K.chance(0.5, 'rise2');
+      yield* wait(0.08);
+      yield* skyTell(b, r3, 0.3 * T);
+      yield* skyStrike(b, r3, (r3 ? 0.36 : 0.4) * T);
+    }
+    b.exposed = true;
+    if (b.pose !== 'stuck') b.pose = 'kneel';
+    yield* wait(ph === 1 ? 0.9 : ph === 2 ? 0.8 : 0.7);
+    b.exposed = false;
+  }
+
+  // ---- Snare. It flicks knives with a thread between them, and they pin where they land; the
+  // threads hang slack, then draw tight, and when it yanks its hand back they snap straight and cut.
+  //   underhand (the arm swung back low, then up through): the knives pin into the floor either side
+  //   of the hero and the thread lies across the floor at the ankles (jump as it snaps, or be off it)
+  //   overhand (the arm over the head): two threads from high on the walls, crossing over the hero
+  //   and pinned into the floor beyond them (stay down under where they cross, or get clear)
+  // Phase II: a second thread joins each (a high one over the low one, ankle threads outside the
+  // cross). Phase III: the threads snap one after another, then it throws again the other way.
+  const THREAD_LOW = FLOOR - 16;
+  function snareThread(ox, oy, ax, ay, bx, by, flyT, hold, sh) {
+    const P = G.player;
+    return H.add({
+      kind: 'snare', layer: 'over', ox, oy, ax, ay, bx, by, flyT, hold, sh, snapped: false, slashable: false,
+      x: (ax + bx) / 2, y: (ay + by) / 2,
+      get firing() { return this.snapped && this.t < this.flyT + this.hold + 0.1; },
+      update() {
+        if (this.t >= this.flyT && !this.pinned) {
+          this.pinned = true;
+          G.audio.play('tink');
+          for (const [x, y] of [[this.ax, this.ay], [this.bx, this.by]]) {
+            G.fx.burst(x, y, { n: 5, color: this.sh ? '150,140,190' : G.pal().hot, speed: [80, 300], angle: -Math.PI / 2, spread: 2.2, life: [0.1, 0.28], kind: 'spark', size: [1.2, 2.4], grav: 800 });
+            if (y > FLOOR - 4) G.fx.dust(x, FLOOR, 1, { speed: [10, 60], size: [4, 7], up: 14 });
+          }
+        }
+        if (this.t >= this.flyT + this.hold && !this.snapped) {
+          this.snapped = true;
+          G.audio.play('veilsnap'); G.fx.shake(4);
+          const mx = (this.ax + this.bx) / 2, my = (this.ay + this.by) / 2, ang = Math.atan2(this.by - this.ay, this.bx - this.ax);
+          G.fx.cut(mx, my, ang, G.dist(this.ax, this.ay, this.bx, this.by), 4, this.sh ? '60,50,96' : G.pal().boss, this.sh ? '200,195,230' : G.pal().hot, 0.3);
+        }
+        if (this.t >= this.flyT + this.hold + 0.45) this.dead = true;
+        this.srcX = P.x < this.x ? Math.max(this.ax, this.bx) : Math.min(this.ax, this.bx);
+        // (tests: a thread across the floor is jumped as it snaps, as a thrown cut along the floor is)
+        const left = this.flyT + this.hold - this.t, low = this.ay > FLOOR - 40 && this.by > FLOOR - 40;
+        const over = P.x > Math.min(this.ax, this.bx) - 30 && P.x < Math.max(this.ax, this.bx) + 30;
+        if (low && over && left < 0.14 && left > -0.05) { this.kind = 'flycut'; this.x = P.x - 10; this.vx = 1; this.y = FLOOR - 22; }
+        else { this.kind = 'snare'; this.x = (this.ax + this.bx) / 2; this.y = (this.ay + this.by) / 2; }
+      },
+      // (the thread between the knives cuts; the knives' own ends do not reach past them)
+      hits(Pl) {
+        if (!this.firing) return false;
+        const L = G.dist(this.ax, this.ay, this.bx, this.by) || 1, ux = (this.bx - this.ax) / L, uy = (this.by - this.ay) / L, m = Math.min(12, L / 4);
+        return G.distPointSeg(Pl.x, Pl.y - 22, this.ax + ux * m, this.ay + uy * m, this.bx - ux * m, this.by - uy * m) < 19;
+      },
+      // (tests) where the thread runs through the hero's height when it snaps
+      danger(Pl) {
+        if (this.snapped) return null;
+        const y0 = Pl.y - 44 - 18, y1 = Pl.y + 18, x0 = Math.min(this.ax, this.bx), x1 = Math.max(this.ax, this.bx);
+        let lo = 1e9, hi = -1e9;
+        for (let i = 0; i <= 24; i++) {
+          const q = i / 24, x = G.lerp(this.ax, this.bx, q), y = G.lerp(this.ay, this.by, q);
+          if (y >= y0 && y <= y1) { lo = Math.min(lo, x); hi = Math.max(hi, x); }
+        }
+        if (hi < lo) return null;
+        lo = Math.max(lo, x0); hi = Math.min(hi, x1);
+        return [(lo + hi) / 2, (hi - lo) / 2 + 30, this.flyT + this.hold - this.t];
+      },
+      draw(ctx) {
+        const pal = G.pal(), col = this.sh ? '120,110,160' : pal.boss, hot = this.sh ? '200,195,230' : pal.hot, t = this.t;
+        let ax = this.ax, ay = this.ay, bx = this.bx, by = this.by, sag = 0, al = 1;
+        if (t < this.flyT) {
+          // the two knives in flight from its hand, the thread paying out between them
+          const k = E.outQuad(t / this.flyT);
+          ax = G.lerp(this.ox, this.ax, k); ay = G.lerp(this.oy, this.ay, k);
+          bx = G.lerp(this.ox, this.bx, k); by = G.lerp(this.oy, this.by, k);
+          sag = 30 * k;
+        } else if (!this.snapped) {
+          // hanging slack, drawing tighter, and shivering at the end
+          const k = (t - this.flyT) / this.hold;
+          sag = 34 * (1 - E.inQuad(k)) + 2;
+          if (k > 0.7) sag += Math.sin(t * 95) * 1.6 * (k - 0.7) / 0.3;
+        } else al = Math.max(0, 1 - (t - this.flyT - this.hold) / 0.45);
+        const mx = (ax + bx) / 2, my = Math.min((ay + by) / 2 + sag, FLOOR - 2); // (slack lies on the floor, not through it)
+        ctx.save();
+        ctx.lineCap = 'round';
+        // its line, in the warning colour, stronger as it tightens (a thrown thing is marked)
+        if (t >= this.flyT && !this.snapped) {
+          const k = (t - this.flyT) / this.hold;
+          ctx.strokeStyle = G.rgba(DANGER, 0.12 + 0.3 * k); ctx.lineWidth = 6;
+          ctx.beginPath(); ctx.moveTo(ax, ay); ctx.quadraticCurveTo(mx, my, bx, by); ctx.stroke();
+        }
+        ctx.globalCompositeOperation = 'lighter';
+        if (this.snapped) {
+          ctx.strokeStyle = G.rgba(col, 0.5 * al); ctx.lineWidth = 5 * al;
+          ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.stroke();
+        }
+        ctx.strokeStyle = G.rgba(hot, (this.snapped ? 0.9 : 0.75) * al); ctx.lineWidth = 1.2;
+        ctx.beginPath(); ctx.moveTo(ax, ay); ctx.quadraticCurveTo(mx, my, bx, by); ctx.stroke();
+        // light running along it while it holds
+        if (t >= this.flyT && !this.snapped) {
+          const q = (t * 1.3) % 1;
+          D.glow(ctx, hot, G.lerp(ax, bx, q), G.lerp(ay, by, q) + 4 * q * (1 - q) * sag, 5, 0.6 * Math.sin(Math.PI * q));
+        }
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.globalAlpha = al;
+        // the knives: flying point first, then standing where they pinned
+        const angA = t < this.flyT ? Math.atan2(this.ay - this.oy, this.ax - this.ox) : (this.ay > FLOOR - 30 ? Math.PI / 2 - 0.35 * Math.sign(this.ax - this.ox || 1) : Math.atan2(this.ay - this.oy, this.ax - this.ox));
+        const angB = t < this.flyT ? Math.atan2(this.by - this.oy, this.bx - this.ox) : (this.by > FLOOR - 30 ? Math.PI / 2 - 0.35 * Math.sign(this.bx - this.ox || 1) : Math.atan2(this.by - this.oy, this.bx - this.ox));
+        dagger(ctx, ax - Math.cos(angA) * 22, ay - Math.sin(angA) * 22, angA, col, hot, false);
+        dagger(ctx, bx - Math.cos(angB) * 22, by - Math.sin(angB) * 22, angB, col, hot, false);
+        ctx.restore();
+      },
+    });
+  }
+  // One set: its wind-up, the flick, the knives in the air; then the threads hold, tighten and snap
+  // when it yanks. Returns when they have snapped.
+  function* snareSet(under, wind, hold, stagger) {
+    const b = B.body, P = G.player, ph = B.phase;
+    b.face = P.x > b.x ? 1 : -1;
+    const W = POSES[under ? 'windUnder' : 'windOver'];
+    let e = 0;
+    while (e < wind) {
+      e += yield;
+      const k = Math.min(1, e / wind);
+      if (k < 0.7 && Math.abs(P.x - b.x) > 20) b.face = P.x > b.x ? 1 : -1;
+      const p = mixPose(b, POSES.idle, W, 0.4 + 0.6 * E.inQuad(k));
+      if (k > 0.75) { p[1] += 2.5 * (k - 0.75) / 0.25; p[0] -= 0.06 * (k - 0.75) / 0.25; }
+      if (!b.glinted && wind - e < 0.15) { b.glinted = true; G.fx.glint(b.x + b.face * b.p[7], b.y + b.p[8], 22, G.pal().hot, 0.18); G.audio.play('glint'); }
+    }
+    b.glinted = false;
+    // the threads, laid out from where the hero stands now
+    const px = G.clamp(P.x, WL + 120, WR - 120), set = [];
+    if (under) {
+      const half = 185, l = Math.max(WL + 10, px - half), r = Math.min(WR - 10, px + half);
+      set.push([l, THREAD_LOW, r, THREAD_LOW]);
+      if (ph >= 2) set.push([px - half + 20, FLOOR - 112, px + half - 20, FLOOR - 112]); // and one over it, at a leaping height, a beat later
+    } else {
+      // two lines that cross high over the hero: each from a knife in a wall, down through the
+      // crossing, to a knife in the floor beyond the hero (the further the wall, the shallower the line)
+      const ay = FLOOR - 152, feet = [];
+      for (const s of [-1, 1]) {
+        const wx = s > 0 ? WL + 4 : WR - 4, dist = Math.abs(px - wx);
+        const wy = G.clamp(ay - 152 * dist / 250, 70, ay - 40);
+        const fx = G.clamp(px + s * dist * 152 / (ay - wy), WL + 8, WR - 8); // where it pins in the floor
+        feet.push(fx);
+        set.push([wx, wy, fx, FLOOR - 4]);
+      }
+      if (ph >= 2) for (let i = 0; i < 2; i++) {
+        const s = i ? 1 : -1, fx = feet[i], ox = G.clamp(fx + s * 210, WL + 8, WR - 8);
+        if (Math.abs(ox - fx) > 60) set.push([fx, THREAD_LOW, ox, THREAD_LOW]); // ankle threads outside the cross
+      }
+    }
+    b.pose = under ? 'flickUnder' : 'throwOver';
+    G.audio.play('arrowHeavy');
+    b.recV = (b.recV || 0) + b.face * 1.2;
+    const ox = b.x + b.face * 30, oy = b.y + (under ? -40 : -80), flyT = 0.2;
+    // (the high thread over a low one waits until a hero who jumped the low one is down again)
+    const gap = under ? 0.62 : stagger;
+    const threads = set.map((s, i) => snareThread(ox, oy, s[0], s[1], s[2], s[3], flyT + i * 0.03, hold + i * gap - i * 0.03, false));
+    yield* wait(flyT + 0.08);
+    // it holds the slack in its fingers, and draws it tighter
+    G.audio.play('veilstrain', { dur: hold - 0.1 });
+    b.pose = 'watch';
+    const first = Math.min(...threads.map((h) => h.flyT + h.hold)), last = Math.max(...threads.map((h) => h.flyT + h.hold));
+    e = flyT + 0.08;
+    while (e < first - 0.12) e += yield;
+    // the yank: its hand comes back hard as the threads go
+    b.pose = 'pull'; b.recV = (b.recV || 0) - b.face * 1.4;
+    while (e < last + 0.02) e += yield;
+    return threads;
+  }
+  function* atkSnare() {
+    const b = B.body, P = G.player, T = K.T(), ph = B.phase;
+    yield* comeDown(b, 0.2);
+    if (Math.abs(P.x - b.x) < 200) yield* hopBack(b, 190, 0.32, 80);
+    const under = K.chance(0.5, 'under');
+    const hold = (ph === 1 ? 0.95 : ph === 2 ? 0.9 : 0.82) * T;
+    yield* snareSet(under, (ph === 3 ? 0.42 : 0.5) * T, hold, ph === 3 ? 0.2 : 0);
+    if (ph === 3) {
+      // and again at once, the other way: the throw says which
+      yield* wait(0.12);
+      if (Math.abs(P.x - b.x) < 150) yield* hopBack(b, 150, 0.26, 60);
+      yield* snareSet(!under, 0.36 * T, 0.78 * T, 0.18);
+    }
+    // its hand still out where it yanked: open for a moment
+    b.exposed = true;
+    yield* wait(0.55);
+    b.exposed = false;
+  }
+
+  // ---- Dance. It lays one blade against the other at its chest, once for every cut to come; then it
+  // goes through the hero along a line, again and again, each cut from where the last one ended:
+  // along the floor if they keep to it, up after them if they jumped, down on them from the air.
+  // The lines show where (a cut). Then it drops to one knee, spent, and is open for a long moment.
+  // Phase I: two or three cuts; II: three or four; III: four or five, and quicker.
+  function* atkDance() {
+    const b = B.body, P = G.player, T = K.T(), ph = B.phase;
+    yield* comeDown(b, 0.2);
+    const n = (ph === 1 ? 2 : ph === 2 ? 3 : 4) + (K.chance(0.5, 'long') ? 1 : 0);
+    b.face = P.x > b.x ? 1 : -1;
+    // the taps: blade on blade, once per cut (a short breath between)
+    for (let i = 0; i < n; i++) {
+      let e = 0;
+      const dur = 0.24;
+      while (e < dur) {
+        e += yield;
+        const k = Math.min(1, e / dur);
+        // up, a hair of a pause, then down onto the other blade
+        mixPose(b, POSES.tapUp, POSES.tapDown, k < 0.5 ? 0 : E.inQuad((k - 0.5) / 0.5));
+        if (k >= 0.92 && !b.tapped) {
+          b.tapped = true;
+          G.audio.play('veiltap');
+          G.fx.burst(b.x + b.face * 8, b.y - 48, { n: 3, color: G.pal().hot, speed: [60, 200], life: [0.08, 0.2], kind: 'spark', size: [1, 2], grav: 400 });
+        }
+      }
+      b.tapped = false;
+    }
+    b.pose = 'crouch';
+    yield* wait(0.1);
+    for (let i = 0; i < n; i++) {
+      const tele = (i === 0 ? 0.46 : ph === 3 ? 0.28 : 0.32) * T;
+      yield* danceCut(tele, i === n - 1);
+    }
+    yield* comeDown(b, 0.22);
+    // spent
+    b.pose = 'kneel'; b.exposed = true;
+    G.fx.dust(b.x, FLOOR, 3, { speed: [20, 90], size: [5, 9], up: 16 });
+    yield* wait(ph === 1 ? 1.4 : ph === 2 ? 1.3 : 1.2);
+    b.exposed = false;
+  }
+  // One cut of the dance: aimed through where the hero is, from wherever it is; it ends past them.
+  // The last always comes down to the floor.
+  function* danceCut(tele, last) {
+    const b = B.body, P = G.player;
+    const tx = G.clamp(P.x + P.vx * 0.05, WL + 40, WR - 40), ty = Math.min(P.y, FLOOR) - 24;
+    const ox = b.x, oy = b.y - 40;
+    let ang = Math.atan2(ty - oy, tx - ox);
+    // never straight up or down: it crosses
+    const minFlat = 0.35;
+    if (Math.abs(Math.cos(ang)) < minFlat) {
+      const sx = Math.sign(Math.cos(ang)) || (tx >= ox ? 1 : -1), sy = Math.sign(Math.sin(ang)) || 1;
+      ang = Math.atan2(sy * Math.sqrt(1 - minFlat * minFlat), sx * minFlat);
+    }
+    const c = Math.cos(ang), s = Math.sin(ang);
+    // as far as 230 past the hero, a wall, the floor, or (for the last) on down to the floor
+    let len = G.dist(ox, oy, tx, ty) + 230;
+    if (c > 0.01) len = Math.min(len, (WR - 40 - ox) / c); else if (c < -0.01) len = Math.min(len, (WL + 40 - ox) / c);
+    if (s > 0.02) len = Math.min(len, (FLOOR - 2 - oy) / s);
+    if (s < -0.02) len = Math.min(len, (oy - 110) / -s);
+    len = Math.max(len, Math.min(G.dist(ox, oy, tx, ty) + 40, 900));
+    b.face = c >= 0 ? 1 : -1;
+    b.pose = b.y < FLOOR - 1 ? 'air' : 'crouch';
+    cutLine(ox, oy, ang, len, tele);
+    yield* wait(Math.max(0, tele - 0.16));
+    G.fx.glint(b.x + b.face * 18, b.y - 44, 22, G.pal().hot, 0.16); G.audio.play('glint');
+    yield* wait(Math.min(tele, 0.16));
+    const tilt = b.face > 0 ? ang : Math.PI - ang;
+    POSES.streak = POSES.dash.slice(); POSES.streak[2] = Math.atan2(Math.sin(tilt), Math.cos(tilt));
+    b.pose = 'streak'; G.audio.play('streak');
+    const x0 = b.x, y0 = b.y;
+    let x1 = ox + c * len, y1 = Math.min(FLOOR, oy + s * len + 40);
+    const dur = Math.max(0.08, len / 2500);
+    let e = 0;
+    while (e < dur) {
+      e += yield;
+      const k = Math.min(1, e / dur), q = E.outQuad(k);
+      b.x = G.lerp(x0, x1, q); b.y = G.lerp(y0, y1, q);
+      G.fx.spawn({ x: b.x - c * 20, y: b.y - G.rand(10, 60), vx: -c * G.rand(40, 200), vy: -s * G.rand(40, 200), life: 0.25, size: G.rand(4, 9), color: G.pal().boss });
+    }
+    G.fx.cut((x0 + x1) / 2, (y0 + y1) / 2 - 40, ang, len, 4, G.pal().boss, G.pal().hot, 0.3);
+    if (b.y >= FLOOR - 1) {
+      b.y = FLOOR; b.pose = 'skid';
+      G.fx.dust(b.x, FLOOR, 4, { dir: b.face, speed: [60, 240], size: [6, 11], up: 30 });
+    } else {
+      // it hangs where the cut ended, turning back towards the hero
+      b.pose = 'air';
+      if (last) yield* comeDown(b, 0.2);
+    }
+    yield* wait(0.06);
+  }
+
+  // ---- Moonfall. The light goes out of the arena, and it leaps up out of sight. Over a wall a pale
+  // crescent of blades gathers, falling into place one after another; then the whole crescent sweeps
+  // across the arena to the other wall. Its hollow is the one way through:
+  //   the hollow low, at the floor: keep to the ground as it passes (get down off a ledge)
+  //   the hollow high: be in the air or on a ledge as it passes
+  // Phase II: a second crescent from the other wall. Phase III: three, and the hollow of each drifts
+  // as it comes (watch where it is when it reaches you). It comes down where the last one ended and
+  // kneels in the dark, open.
+  const MOON_TOP = 40, MOON_BOW = 46;
+  const GAP_LO = [FLOOR - 74, FLOOR + 10], GAP_HI = [FLOOR - 196, FLOOR - 70];
+  function moonWall(dir, gap0, gap1, form, speed) {
+    const P = G.player, x0 = dir > 0 ? WL + 14 : WR - 14, x1 = dir > 0 ? WR - 14 : WL + 14;
+    const N = 17;
+    return H.add({
+      kind: 'moonwall', layer: 'over', dir, x: x0, fx: x0, end: -1, y: FLOOR - 40, vx: 0, form, speed, gap0, gap1, launched: false, blades: [],
+      gapAt(t) {
+        // the hollow: where it is, drifting from gap0 to gap1 as the crescent crosses (phase III)
+        const k = this.launched ? G.clamp((this.fx - x0) / (x1 - x0), 0, 1) : 0;
+        const kk = t == null ? k : G.clamp(k + (t * this.speed) / Math.abs(x1 - x0), 0, 1);
+        // (it drifts over the middle of the crossing, so most of the floor meets it one way or the other)
+        const q = E.inOutQuad(G.clamp((kk - 0.36) / 0.28, 0, 1));
+        return [G.lerp(this.gap0[0], this.gap1[0], q), G.lerp(this.gap0[1], this.gap1[1], q)];
+      },
+      xAt(y) { return this.fx + this.dir * MOON_BOW * Math.sin(Math.PI * G.clamp((y - MOON_TOP) / (FLOOR - MOON_TOP), 0, 1)); },
+      launch() {
+        this.launched = true; this.t0 = this.t;
+        G.audio.play('whoosh'); G.audio.play('veilwhirr', { dur: Math.abs(x1 - x0) / this.speed });
+        G.fx.shake(5);
+      },
+      update(dt) {
+        if (this.launched) {
+          const e = this.t - this.t0;
+          this.vx = this.dir * this.speed * G.lerp(0.4, 1, Math.min(1, e / 0.35));
+          if (this.end >= 0) { this.vx = 0; if (this.t - this.end > 0.24) this.dead = true; }
+          else this.fx += this.vx * dt;
+          if (this.end < 0 && (this.fx - x1) * this.dir >= 0) {
+            this.fx = x1; this.end = this.t;
+            G.audio.play('tink'); G.fx.shake(4);
+            for (let i = 0; i < 6; i++) {
+              const y = G.lerp(MOON_TOP + 30, FLOOR - 10, i / 5);
+              G.fx.burst(x1, y, { n: 3, color: G.pal().hot, speed: [80, 300], angle: this.dir > 0 ? Math.PI : 0, spread: 1.6, life: [0.12, 0.35], kind: 'spark', size: [1.2, 2.4], grav: 700 });
+            }
+          }
+          if (Math.random() < dt * 30) G.fx.dust(this.xAt(FLOOR) - this.dir * 10, FLOOR, 1, { dir: this.dir, speed: [40, 160], size: [5, 9], up: 16, a: 0.3 });
+        }
+        // (tests) the hollow low as it reaches the hero: stay down; high: jump it
+        // (the scripted dodger in tests: stays down for a low hollow; jumps a high one, as it is near)
+        const dx = P.x - this.fx, arrive = this.launched && dx * this.dir > 0 ? Math.abs(dx) / this.speed : null;
+        const g = this.gapAt(arrive || 0), lowGap = g[1] > FLOOR - 4;
+        this.kind = !this.launched || this.end >= 0 || dx * this.dir <= -30 ? 'moonwall' : lowGap ? 'crescent' : 'flycut';
+        this.x = this.kind === 'flycut' ? this.fx - this.dir * 80 : this.fx;
+        this.y = FLOOR - 40;
+        this.srcX = this.fx - this.dir * 30;
+      },
+      hits(Pl) {
+        if (!this.launched || this.end >= 0) return false;
+        const bx = Pl.box(), cy = bx.cy;
+        if (Math.abs(Pl.x - this.xAt(cy)) > 16 + bx.hw) return false;
+        const g = this.gapAt();
+        return !(cy - bx.hh >= g[0] && cy + bx.hh <= g[1]);
+      },
+      draw(ctx) {
+        const pal = G.pal(), col = pal.boss, hot = pal.hot, t = this.t;
+        const g = this.gapAt(), fade = this.end >= 0 ? Math.max(0, 1 - (t - this.end) / 0.24) : 1;
+        ctx.save();
+        ctx.globalAlpha = fade;
+        ctx.lineCap = 'round';
+        // a faint arc of moonlight along the whole crescent
+        ctx.globalCompositeOperation = 'lighter';
+        const form = this.launched ? 1 : Math.min(1, t / this.form);
+        ctx.strokeStyle = G.rgba(col, 0.16 * form); ctx.lineWidth = 16;
+        ctx.beginPath();
+        for (let i = 0; i <= 24; i++) { const y = G.lerp(MOON_TOP, FLOOR, i / 24), x = this.xAt(y); if (i) ctx.lineTo(x, y); else ctx.moveTo(x, y); }
+        ctx.stroke();
+        // the trail it leaves
+        if (this.launched) {
+          for (let j = 1; j <= 3; j++) {
+            ctx.strokeStyle = G.rgba(col, 0.07 / j); ctx.lineWidth = 10;
+            ctx.beginPath();
+            for (let i = 0; i <= 16; i++) { const y = G.lerp(MOON_TOP, FLOOR, i / 16), x = this.xAt(y) - this.dir * j * 26; if (i) ctx.lineTo(x, y); else ctx.moveTo(x, y); }
+            ctx.stroke();
+          }
+        }
+        ctx.globalCompositeOperation = 'source-over';
+        // the blades: each falls into its place, top first, while it gathers
+        for (let i = 0; i < N; i++) {
+          const y = G.lerp(MOON_TOP + 14, FLOOR - 10, i / (N - 1));
+          if (y + 8 > g[0] && y - 8 < g[1]) continue; // (the hollow)
+          const at = (i / N) * this.form * 0.8;
+          const k = this.launched ? 1 : G.clamp((t - at) / (this.form * 0.25), 0, 1);
+          if (k <= 0) continue;
+          const yy = y - (1 - E.outQuad(k)) * 220, x = this.xAt(y);
+          const ang = this.dir > 0 ? 0 : Math.PI;
+          // (against the far wall they break loose and drop away)
+          const br = this.end >= 0 ? t - this.end : 0;
+          ctx.globalAlpha = k * fade;
+          const bx2 = x - Math.cos(ang) * 20 - this.dir * br * 120, by2 = yy + br * br * 900 * (0.6 + 0.4 * ((i * 7) % 5) / 5);
+          ctx.save(); ctx.translate(bx2, by2); ctx.scale(1.5, 1.5);
+          dagger(ctx, 0, 0, ang + Math.sin(t * 9 + i) * 0.05 + br * 6 * ((i % 2) - 0.5), col, hot, false);
+          ctx.restore();
+        }
+        ctx.globalAlpha = fade;
+        // the lips of the hollow catch the light, in the warning colour (it is a thrown thing)
+        ctx.strokeStyle = G.rgba(DANGER, (0.6 + 0.3 * Math.sin(t * 8)) * fade); ctx.lineWidth = 3;
+        for (const [y, sgn] of [[g[0], 1], [g[1], -1]]) {
+          if (y > FLOOR) continue;
+          const x = this.xAt(y);
+          // a bracket at each lip, opening into the hollow
+          ctx.beginPath(); ctx.moveTo(x - this.dir * 14, y + sgn * 9); ctx.lineTo(x - this.dir * 14, y); ctx.lineTo(x + this.dir * 26, y); ctx.lineTo(x + this.dir * 26, y + sgn * 9); ctx.stroke();
+        }
+        ctx.restore();
+      },
+    });
+  }
+  function* atkMoonfall() {
+    const b = B.body, P = G.player, T = K.T(), ph = B.phase;
+    yield* comeDown(b, 0.2);
+    B.moon = true;
+    b.face = P.x > b.x ? 1 : -1;
+    // it sinks, and the dark comes in around it
+    G.audio.play('veilmoon', { dur: 1.8 });
+    let e = 0;
+    while (e < 0.42) {
+      e += yield;
+      const k = Math.min(1, e / 0.42);
+      B.dim = Math.max(B.dim || 0, E.inOutQuad(k));
+      const p = mixPose(b, POSES.crouch, POSES.coilUp, E.inQuad(k));
+      p[1] += 3 * k;
+    }
+    // and up out of sight
+    G.fx.dust(b.x, FLOOR, 6, { speed: [60, 260], size: [7, 13], up: 30 });
+    G.audio.play('whoosh');
+    b.pose = 'air';
+    const y0 = b.y;
+    e = 0;
+    while (e < 0.26) { e += yield; const k = Math.min(1, e / 0.26); b.y = G.lerp(y0, -160, E.outQuad(k)); }
+    b.hidden = true;
+    // the crescents: the first over the wall it is furthest from the hero on
+    const n = ph === 1 ? 1 : ph === 2 ? 2 : 3;
+    const speed = ph === 3 ? 470 : 430;
+    let dir = P.x < 640 ? -1 : 1, lastHigh = null, lastWall = null;
+    const walls = [];
+    for (let i = 0; i < n; i++) {
+      const high = i === 0 ? K.chance(0.5, 'high') : (ph === 3 ? K.chance(0.5, 'high' + i) : !lastHigh);
+      let g0 = high ? GAP_HI : GAP_LO, g1 = g0;
+      if (ph === 3 && i > 0) g1 = high ? GAP_LO : GAP_HI; // in the last phase the hollow drifts as it comes
+      const form = (i === 0 ? 0.95 : 0.75) * T;
+      const w = moonWall(dir, g0, g1, form, speed);
+      walls.push(w);
+      lastHigh = high; lastWall = w;
+      yield* wait(form);
+      w.launch();
+      if (i < n - 1) {
+        // the next gathers over the other wall once this one is well across
+        dir = -dir;
+        while (!w.dead && Math.abs(w.fx - (w.dir > 0 ? WL : WR)) < (WR - WL) * 0.5) yield;
+      }
+    }
+    while (!lastWall.dead && lastWall.end < 0) yield;
+    yield* wait(0.08);
+    // it comes down where the last one ended, and kneels in the dark
+    const lx = lastWall.dir > 0 ? WR - 90 : WL + 90;
+    appear(lx, -80, 'dive');
+    b.face = P.x > b.x ? 1 : -1;
+    G.audio.play('streak');
+    yield* tween(b, { y: FLOOR }, 0.2, E.inQuad);
+    G.fx.thud(b.x, FLOOR, 0.9, { noCrack: true }); G.audio.play('land'); G.fx.shake(6);
+    b.pose = 'kneel'; b.exposed = true;
+    B.moon = false;
+    yield* wait(ph === 1 ? 1.6 : ph === 2 ? 1.45 : 1.3);
+    b.exposed = false;
+  }
+
   // ------------------------------------------------------------------ corrupted (corrupt.js)
   // Two attacks only the corrupted Veil uses, in the void's black and crimson.
 
@@ -1550,7 +2325,7 @@
 
   // Back to rest. After a cut it flicks both blades clean; after a throw the arm comes home across
   // its waist; after an ambush it tears the blade out of the floor and springs back off it.
-  const THROWS = { knives: 1, rain: 1, hunt: 1, flurry: 1, pastself: 1, crescent: 1 };
+  const THROWS = { knives: 1, rain: 1, hunt: 1, flurry: 1, pastself: 1, crescent: 1, snare: 1 };
   B.recover = function* (name) {
     const b = B.body, P = G.player;
     if (b.hidden || b.y < FLOOR - 1) return;
@@ -1587,6 +2362,7 @@
     hunt: atkHunt,
     echo: atkEcho,
     stance: atkStance, crescent: atkCrescent,
+    skyhook: atkSkyhook, snare: atkSnare, dance: atkDance, moonfall: atkMoonfall,
     lunge: atkLunge, pincer: atkPincer, flurry: atkFlurry, knives: atkKnives, ambush: atkAmbush, backstab: atkBackstab,
     mirror: atkMirror, rain: atkRain, cross: atkCross, cuts: atkCuts, mark: atkMark,
     // corrupted only (corrupt.js)
@@ -1698,6 +2474,7 @@
     for (const c of B.clones) stepPose(c, dt);
     B.clones = B.clones.filter((c) => !c.gone);
     // the dark: full while the lights are out, thinner while it is staggered, gone when it dies
+    if (!B.moon) B.dim = G.damp(B.dim || 0, 0, 2.2, dt);
     const darkTo = B.lights || B.dying || B.dead ? 0 : B.staggered ? 0.25 : 1;
     B.dark = G.damp(B.dark, darkTo, darkTo > B.dark ? 2.2 : 5, dt);
     B.wireHit = Math.max(0, B.wireHit - dt * 3);
@@ -1887,14 +2664,16 @@
   }
   let darkCv = null;
   B.drawOver = function (ctx) {
-    if (B.dark < 0.01 || B.dead) return;
+    // (the moonfall's dark is the same dark, a little thinner)
+    const dk = Math.max(B.dark, (B.dim || 0) * 0.85);
+    if (dk < 0.01 || B.dead) return;
     const b = B.body, P = G.player, pal = G.pal();
     if (!darkCv) { darkCv = document.createElement('canvas'); darkCv.width = 720; darkCv.height = 440; }
     const d = darkCv.getContext('2d');
     d.setTransform(1, 0, 0, 1, 0, 0);
     d.globalCompositeOperation = 'source-over';
     d.clearRect(0, 0, 720, 440);
-    d.fillStyle = 'rgba(2,2,9,' + 0.94 * B.dark + ')';
+    d.fillStyle = 'rgba(2,2,9,' + 0.94 * dk + ')';
     d.fillRect(0, 0, 720, 440);
     // the hero's own light, and a little round anything that is burning
     d.globalCompositeOperation = 'destination-out';

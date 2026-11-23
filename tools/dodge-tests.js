@@ -386,6 +386,139 @@
   }
   G.debug.variant = 'plain';
 
+  // ---- v2.1a (docs/boss-study.md): the Corona, the Spears, the Charge, the Orbit, and the reworked Slam and Sweep
+  const FL = G.FLOOR;
+  // The Corona: the hero starts in the air over the core (as when it is cast: they have been riding
+  // over its head), and moves off sideways, away from the side the crown leans to, with one dash
+  for (const ph of [1, 2, 3]) {
+    for (const v of ph === 1 ? ['plain'] : ['plain', 'left,left2']) {
+      G.debug.variant = v;
+      out.push(run('corona (' + (v === 'plain' ? 'crown up/right' : 'crown left') + '): off the head sideways, phase ' + ph, ph, 'corona', 640, (t, st) => {
+        const c = B.core;
+        if (!st.init) { st.init = 1; P.x = c.x + 10; P.y = c.y - c.r - 50; P.vy = -200; P.onGround = false; }
+        // away from where the crown leans (the way a phase II fan sweeps), else the way it already is
+        if (!st.dir) st.dir = c.crA < -Math.PI / 2 - 0.1 ? 1 : c.crA > -Math.PI / 2 + 0.1 ? -1 : (P.x >= c.x ? 1 : -1);
+        // (in phase III a second fan comes at where the hero went: keep going, turn at a wall)
+        if ((P.x < 130 && st.dir < 0) || (P.x > 1150 && st.dir > 0)) { st.dir = -st.dir; I.pressed.dash = true; }
+        hold(st.dir < 0, st.dir > 0);
+        if (!st.d && t > 0.05) { st.d = 1; I.pressed.dash = true; }
+      }));
+    }
+  }
+  // The Spears: read the gap where the core is. Low: stay down. In the air: jump so as to be up in it as
+  // the heads pass. (Phase III: the gap bobs with the core, so read where it will be as they arrive.)
+  const spearsOf = () => G.hazards.list.find((h) => h.kind === 'spears' && !h.dead);
+  function spearsRead(t, st) {
+    const w = spearsOf();
+    hold(0, 0);
+    if (!w || !w.go) { if (P.onGround) I.down.jump = false; return; }
+    const dist = (P.x - w.x) * w.dir;
+    if (dist < -20) { st.done = w; if (P.onGround) I.down.jump = false; return; }
+    const v = Math.max(w.v, 300), tArr = (dist - 20) / v;
+    const cy = B.core.y + (B.core.vy || 0) * Math.min(0.35, tArr);
+    // (standing where it is already inside the gap, on a platform say, it stays put)
+    const safe = P.y - 43 >= cy - 76 && P.y - 1 <= cy + 102, low = cy >= FL - 104;
+    // a low gap with the hero up on a platform: step off it, down to the floor
+    if (!safe && low && P.plat) { const pl = P.plat, r = P.x - pl.x > pl.w / 2; hold(!r, r); return; }
+    if (!safe && st.jw !== w && tArr < 0.3 && P.onGround) { st.jw = w; jump(); }
+    if (P.onGround && st.jw !== w) I.down.jump = false;
+  }
+  function spearsDash(t, st) {
+    const w = spearsOf();
+    hold(0, 0);
+    if (!w || !w.go) return;
+    const dist = (P.x - w.x) * w.dir;
+    // (into them, back the way they came)
+    if (dist > 0 && dist < 34 + w.v * 0.03 && st.dw !== w && P.dashCd <= 0) { st.dw = w; hold(w.dir > 0, w.dir < 0); I.pressed.dash = true; }
+  }
+  for (const ph of [1, 2, 3]) {
+    for (const v of ['plain', 'high,high2', 'high']) {
+      if (ph === 1 && v === 'high') continue;
+      G.debug.variant = v;
+      const what = v === 'plain' ? 'low' : v === 'high' ? 'high, then low' : 'high';
+      out.push(run('spears (' + what + '): read the gap at the core, phase ' + ph, ph, 'spears', ph === 2 ? 400 : 900, spearsRead));
+      out.push(run('spears (' + what + '): dash through the heads, phase ' + ph, ph, 'spears', 640, spearsDash));
+    }
+  }
+  // The Charge: dash through each rush as it reaches the hero; or step out of its line once its aim
+  // holds (toward under it), and jump a crash's waves
+  function rushing() { const c = B.core; return c.hurt ? c : null; }
+  for (const ph of [1, 2, 3]) {
+    for (const v of ['plain', 'long']) {
+      G.debug.variant = v;
+      out.push(run('charge (' + (v === 'plain' ? 'count ' + [0, 2, 3, 4][ph] : 'one more') + '): dash through each rush, phase ' + ph, ph, 'charge', 900, (t, st) => {
+        const c = rushing();
+        if (P.dashT <= 0) hold(0, 0);
+        if (c && G.dist(c.x, c.y, P.x, P.y - 22) < c.r + 95 && P.dashCd <= 0 && P.dashT <= 0) { hold(c.x > P.x, c.x <= P.x); I.pressed.dash = true; }
+        jumpWaves();
+      }));
+      out.push(run('charge (' + (v === 'plain' ? 'count ' + [0, 2, 3, 4][ph] : 'one more') + '): step out of its line as the aim holds, phase ' + ph, ph, 'charge', 300, (t, st) => {
+        const c = B.core;
+        // (away from it, past where it is aimed: a rush stops a little past, and the crash lands short)
+        if (c.jit > 0 && !c.hurt && st.at == null && !c.embedded) { st.at = t; st.dir = Math.abs(c.x - P.x) < 50 ? (P.x < 640 ? 1 : -1) : c.x > P.x ? -1 : 1; if (P.x < 200) st.dir = 1; if (P.x > 1080) st.dir = -1; }
+        if (st.at != null && t - st.at < 0.42) hold(st.dir < 0, st.dir > 0); else { hold(0, 0); if (!c.jit) st.at = null; }
+        jumpWaves();
+      }));
+    }
+  }
+  // The Orbit: flung one by one, keep walking (turn at a wall); as a ring, stand in a gap
+  for (const ph of [1, 2, 3]) {
+    G.debug.variant = 'plain';
+    // (and turn back once nothing is in the air: in the beat between the two rings)
+    out.push(run('orbit (slow, flung one by one): keep walking, turn back in a lull, phase ' + ph, ph, 'orbit', 400, (t, st) => {
+      const orbs = G.hazards.list.filter((h) => h.kind === 'orb' && !h.dead), flying = orbs.length > 0;
+      if (orbs.length > (st.n || 0)) st.flung = t; // (when one was last thrown)
+      st.n = orbs.length;
+      // (it sets off once the first one is flung, the roomier way)
+      if (!st.dir) { if (!flying) { hold(0, 0); return; } st.dir = P.x < 640 ? 1 : -1; }
+      const nearWall = (st.dir < 0 && P.x < 420) || (st.dir > 0 && P.x > 860);
+      if (!flying && nearWall && B.orbit.length && st.lull !== B.orbit.length) { st.lull = B.orbit.length; st.dir = -st.dir; }
+      if ((P.x < 150 && st.dir < 0) || (P.x > 1130 && st.dir > 0)) {
+        // at a wall in a pause between throws: wait there for those in the air to land (they were aimed
+        // short of it), then go back
+        if (flying && t - (st.flung || 0) > 0.35) { hold(0, 0); return; }
+        st.dir = -st.dir; I.pressed.dash = true;
+      }
+      hold(st.dir < 0, st.dir > 0);
+    }));
+    G.debug.variant = 'burst';
+    for (const px of [640, 300]) {
+      out.push(run('orbit (a whirl, all at once): stand in a gap, phase ' + ph + ' from x=' + px, ph, 'orbit', px, (t, st) => {
+        stepClear(st, incoming(0.8), 60, 1220, 46);
+      }));
+    }
+  }
+  // The reworked Slam: the delayed blow is still answered by leaving the column on the flash
+  G.debug.variant = 'late';
+  out.push(run('slam (delayed, the fist hangs): walk out on the flash, jump the wave', 1, 'slam', 640, (t, st) => {
+    const m = mark();
+    hold(m && m.locked, 0);
+    jumpWaves();
+  }));
+  out.push(run('slam (delayed): dash out on the flash, jump the wave', 1, 'slam', 640, (t, st) => {
+    const m = mark();
+    if (m && m.locked && !st.d) { st.d = 1; I.pressed.dash = true; hold(1, 0); }
+    if (st.d && P.dashT <= 0) hold(0, 0);
+    jumpWaves();
+  }));
+  out.push(run('double slam (the last delayed): dash out on each flash, jump the waves', 2, 'slam2', 640, (t, st) => {
+    const m = mark();
+    if (m && m.locked && st.m !== m) { st.m = m; I.pressed.dash = true; st.dir = m.x < 640 ? 1 : -1; hold(st.dir < 0, st.dir > 0); }
+    if (P.dashT <= 0) hold(0, 0);
+    jumpWaves();
+  }));
+  // The reworked Sweep: jump it, and it comes back: jump again
+  G.debug.variant = 'return';
+  for (const px of [640, 200]) {
+    out.push(run('sweep (it comes back for a hero who jumped): double jump each pass, from x=' + px, 1, 'sweep', px, (t, st) => {
+      const lanes = G.hazards.list.filter((h) => h.kind === 'lane');
+      const lane = lanes[lanes.length - 1];
+      if (lane && lane !== st.lane) { st.lane = lane; st.j = 0; }
+      doubleJump(st, lane && lane.t / lane.dur > 0.8);
+    }));
+  }
+  G.debug.variant = 'plain';
+
   // ---- the corrupted Warden's own two (corrupt.js; forced on here)
   G.debug.corrupt = true;
   const prints = () => G.hazards.list.filter((h) => h.kind === 'afterhand');

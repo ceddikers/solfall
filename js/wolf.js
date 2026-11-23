@@ -28,12 +28,13 @@
     hudCols: [null, ['#ffaa46', '#ffe4b4'], ['#ff6e2e', '#ffd8b0'], ['#8cc8ff', '#ecf6ff']],
     BASE_HP: 3500, poise0: 420, w: 160, h: 112,
     answer: 'breath',
+    antiAir: 'skysnap', // (cast at a hero who rides over its head: see bosskit.js)
     finale: 'emberfall',
     gaps: [0, 0.95, 0.78, 0.62],
     bags: {
-      1: ['pounce', 'bite', 'sweep', 'howl', 'rake', 'breath', 'prowl', 'shake'],
-      2: ['pounce', 'bite', 'sweep', 'howl', 'rake', 'wallrun', 'breath', 'prowl', 'shake'],
-      3: ['frenzy', 'pounce', 'bite', 'sweep', 'howl', 'rake', 'wallrun', 'breath', 'prowl', 'shake'],
+      1: ['pounce', 'bite', 'sweep', 'howl', 'rake', 'breath', 'prowl', 'shake', 'harry', 'cinders', 'blaze'],
+      2: ['pounce', 'bite', 'sweep', 'howl', 'rake', 'wallrun', 'breath', 'prowl', 'shake', 'harry', 'cinders', 'blaze'],
+      3: ['frenzy', 'pounce', 'bite', 'sweep', 'howl', 'rake', 'wallrun', 'breath', 'prowl', 'shake', 'harry', 'cinders', 'blaze'],
     },
     cards: { 2: ['WILDFIRE', 'The forest takes the flame'], 3: ['EMBERBED', 'Nothing left to burn but you'] },
     first: { 1: 'pounce', 2: 'wallrun', 3: 'frenzy' },
@@ -236,6 +237,32 @@
     S().tone({ type: 'triangle', f0: 520, f1: 260, dur: 0.18, vol: 0.06 });
   });
 
+  // a dry, tearing cough that brings up a coal
+  AU.define('wolfHack', () => {
+    S().noise({ dur: 0.16, vol: 0.34, type: 'lowpass', f0: 1400, f1: 300, q: 1.1, attack: 0.01 });
+    S().tone({ type: 'sawtooth', f0: 150, f1: 82, dur: 0.14, vol: 0.12, detune: -12 });
+    S().noise({ dur: 0.07, vol: 0.14, type: 'highpass', f0: 2600, delay: 0.02 });
+  });
+  // a snort through the nostrils: a short blast of breath with a rumble under it
+  AU.define('wolfSnort', () => {
+    S().noise({ dur: 0.12, vol: 0.26, f0: 900, f1: 420, q: 1.6, attack: 0.01 });
+    S().tone({ type: 'sine', f0: 88, f1: 60, dur: 0.12, vol: 0.12 });
+  });
+  // spent: heavy breaths in and out
+  AU.define('wolfPant', (o) => {
+    const n = o.n || 3;
+    for (let i = 0; i < n; i++) {
+      S().noise({ dur: 0.18, vol: 0.16, f0: 700, f1: 1300, q: 1.2, attack: 0.08, delay: i * 0.36 });
+      S().noise({ dur: 0.16, vol: 0.13, f0: 1100, f1: 500, q: 1.2, attack: 0.02, delay: i * 0.36 + 0.18 });
+    }
+  });
+  // its jaws torn up out of the floor: stone ripping, and a grunt
+  AU.define('wolfTear', () => {
+    S().noise({ dur: 0.3, vol: 0.32, type: 'lowpass', f0: 600, f1: 160, q: 1.4, attack: 0.02 });
+    S().noise({ dur: 0.14, vol: 0.2, type: 'highpass', f0: 1800, f1: 900 });
+    S().tone({ type: 'sawtooth', f0: 110, f1: 70, dur: 0.24, vol: 0.1, detune: 8 });
+  });
+
   // ------------------------------------------------------------------ poses
   // (all in the wolf's own frame, facing right, feet on y = 0)
   // shoulder x y, hip x y, front-near paw, front-far paw, hind-near paw, hind-far paw,
@@ -281,6 +308,10 @@
     // curled into a ball: legs tucked, head down under the chest, tail wrapped over
     // (centred on its middle, b.y - 56 * size, which is what it turns about)
     curl: [22, -64, -26, -60, 34, -26, 24, -22, -4, -24, -18, -28, 1.45, 30, 0.0, 1.5, 1],
+    // (the harry's last bound) head driven down into the floor, haunches up behind it
+    buried: [62, -64, -42, -100, 108, 0, 92, 0, -24, 0, -48, 0, 1.2, 50, 0.25, 0.55, 1],
+    // spent: head low, jaws hanging open, flanks going
+    pant: [46, -88, -52, -86, 66, 0, 46, 0, -38, 0, -62, 0, 0.36, 44, 0.6, -0.4, 0.35],
   };
   const NP = 17;
   // how quickly each part follows its pose (JW) and how much it swings past (JZ, below 1 swings more):
@@ -641,19 +672,38 @@
   // ------------------------------------------------------------------ attacks
   // Pounce. Its haunches say how far: a shallow crouch is a short spring at you; when they drop low
   // and the tail goes up, it is coming the length of the arena, high, and lands like a falling tree.
+  // The held pounce (not in a Frenzy): from the start of the crouch its tail is clamped down low and
+  // still instead of lashing, and its fire sinks low; at the bottom of the crouch it holds, quite still, well past the
+  // moment it would have gone, and only then does the glint come and the fire flare back. A dodge on
+  // the usual beat lands in front of it.
   function* pounce(long, chain) {
     const b = B.body, P = G.player, T = K.T();
     facePlayer();
     b.fast = false; b.pose = long ? 'crouchDeep' : 'crouch';
     const tele = (long ? 0.72 : 0.46) * T * (chain ? 0.78 : 1);
+    const delay = !chain && K.chance(B.phase === 1 ? 0.25 : 0.35, 'delay'), deep = long ? 1.25 : 0.8;
+    if (delay) b.fireTo = 0.45;
     G.audio.play('snarl');
     let glinted = false;
+    const glint = () => { glinted = true; G.fx.glint(b.x + b.face * 78, FLOOR - 10, long ? 30 : 22, G.pal().hot); G.audio.play('glint'); };
     yield* hold(tele, (k, dt, e) => {
-      if (e < tele - 0.18) facePlayer();
-      coil(k, e, long ? 1.25 : 0.8, long ? 1 : 0.5);
+      if (e < tele - 0.18 || delay) facePlayer();
+      coil(k, e, deep, delay ? 0 : long ? 1 : 0.5);
+      // (the tail clamped down low and held there, not lashing: a raised tail is the long pounce's tell)
+      if (delay) A(15, -0.42 * outQ(Math.min(1, k * 1.5)));
       if (Math.random() < dt * (long ? 26 : 12)) G.fx.dust(b.x - b.face * 46, FLOOR, 1, { dir: -b.face, speed: [40, 200], size: [5, 10], life: [0.3, 0.6], up: 30, a: 0.36 });
-      if (!glinted && e >= tele - 0.2) { glinted = true; G.fx.glint(b.x + b.face * 78, FLOOR - 10, long ? 30 : 22, G.pal().hot); G.audio.play('glint'); }
+      if (!delay && !glinted && e >= tele - 0.2) glint();
     });
+    if (delay) {
+      // held: no tremble and no lash, only a slow breath let out through the teeth, then it goes
+      const hang = (long ? 0.5 : 0.42) * T;
+      yield* hold(hang, (k, dt, e) => {
+        if (e < hang - 0.18) facePlayer();
+        A(0, -7 * deep); A(2, -5 * deep); A(1, 5 * deep + Math.sin(e * 3.2) * 0.9); A(3, 11 * deep); A(12, 0.14); A(16, 0.35); A(15, -0.42);
+        A(14, 0.06 * Math.sin(Math.PI * k));
+        if (!glinted && e >= hang - 0.2) { glint(); b.fireTo = 1; }
+      });
+    }
     const dir = b.face;
     let tx;
     if (long) tx = clampX(P.x + P.vx * 0.16);
@@ -673,6 +723,26 @@
     thump(b, long ? 0.24 : 0.15, long ? 3.4 : 2.2);
     b.pose = 'land'; b.fast = false;
     if (long) b.exposed = true;
+    // Overshot: the hero went under it or through it and is behind it. Its weight carries it on in a
+    // skid, and it comes round slowly, head low: the time to hit it.
+    if (!chain && (P.x - b.x) * dir < -40) {
+      b.exposed = true; b.pose = 'skid';
+      G.audio.play('scrape');
+      G.fx.dust(b.x + dir * 40, FLOOR, 4, { dir, speed: [80, 280], size: [7, 13], up: 26, a: 0.42 });
+      let v = long ? 520 : 360;
+      while (v > 25) {
+        const dt = yield;
+        v = Math.max(0, v - 1650 * dt);
+        b.x = clampX(b.x + dir * v * dt, 90);
+        A(0, -7); A(12, 0.1); A(3, 5);
+        if (Math.random() < dt * 26) G.fx.dust(b.x + dir * 50, FLOOR, 1, { dir, speed: [40, 180], size: [5, 10], up: 18, a: 0.36 });
+      }
+      thump(b, 0.06, 1.2);
+      b.tfRate = 3.2; facePlayer(); b.pose = 'crouch';
+      yield* hold(0.46, (k) => { A(12, 0.22 * (1 - k)); A(16, 0.45 * (1 - k)); A(1, 3 * (1 - k)); });
+      b.tfRate = 9; b.exposed = false;
+      return;
+    }
     // it takes its own weight: the haunches give and come back up, the head lifts last
     yield* hold(long ? 0.55 : chain ? 0.16 : 0.3, (k) => { A(3, 9 * (1 - outQ(k))); A(1, 4 * (1 - outQ(k))); A(12, 0.18 * (1 - k)); });
     b.exposed = false;
@@ -692,15 +762,20 @@
   // Bite. Head low: it lunges along the floor and the jaws close at the end of it (jump, or back off).
   // Head high: it rears and snaps at the air in front of it (stay on the ground). From the second phase,
   // ears still flat after the first bite mean a second one.
+  // After the second it reads where you are: still in front of it and in reach, it stays low with its
+  // ears flat again and snaps a third time, quicker; out of reach or behind it, the head comes up.
   function* atkBite() {
-    const b = B.body, T = K.T();
+    const b = B.body, P = G.player, T = K.T();
     yield* approach(250, 330, 0.9);
     const high = K.chance(0.45, 'high');
     const twice = !high && B.phase >= 2 && K.chance(0.4, 'twice');
+    const inReach = () => (P.x - b.x) * b.face > 0 && Math.abs(P.x - b.x) < 300 && P.y > FLOOR - 110;
     yield* bite(high, T, twice);
     if (twice) {
       yield* wait(0.08);
-      yield* bite(false, T * 0.75, false);
+      let third = false;
+      yield* bite(false, T * 0.75, () => (third = inReach()));
+      if (third) { yield* wait(0.06); yield* bite(false, T * 0.62, false); }
     }
   }
   function* bite(high, T, more) {
@@ -727,7 +802,7 @@
       // jaws shut on it: a hard sideways shake of the head, tearing
       yield* hold(0.2, (k, dt, e) => { A(12, Math.sin(e * 34) * 0.22 * (1 - k)); A(16, 0.3); });
       // a second is coming: it stays coiled, head low and ears flat. Otherwise the head comes up.
-      if (more) { b.fast = false; b.pose = 'biteLowUp'; yield* hold(0.1, (k, dt, e) => coil(1, e, 0.7, 0)); }
+      if (typeof more === 'function' ? more() : more) { b.fast = false; b.pose = 'biteLowUp'; yield* hold(0.1, (k, dt, e) => coil(1, e, 0.7, 0)); }
       else b.pose = 'toss';
     } else {
       const tele = 0.62 * T, x1 = clampX(b.x + f * 60, 100);
@@ -1340,6 +1415,573 @@
     });
   }
 
+  // ------------------------------------------------------------------ skysnap: its answer to a hero over its head
+  // (B.antiAir: cast when the hero has ridden over its head for a while, on a ledge or hopping on it.)
+  // Its ears go up and it looks up, sinking onto its haunches, and shuffles under where you are. Then it
+  // goes straight up after you, jaws first, and its mane leaves a column of embers hanging behind it: get
+  // out from over it. A hero only just over its back (not up on a ledge) may instead see it drop a
+  // shoulder and tip onto its side: it throws itself over onto its back and rakes the air above it with
+  // all four legs, wider but not as high (drop down off it, or get clear). From the second phase the
+  // column burns for a moment and the floor under the rake catches; in the third it twists at the top of
+  // its leap and snaps again after you, and the rake goes over twice.
+  function* atkSkysnap() {
+    const b = B.body, P = G.player, T = K.T();
+    const roll = P.y > FLOOR - 250 && K.chance(0.45, 'roll');
+    const tele = (roll ? 0.5 : 0.56) * T * (B.phase >= 3 ? 0.88 : 1), lock = 0.2 * T;
+    b.fast = false; b.pose = roll ? 'crouch' : 'crouchDeep';
+    G.audio.play('snarl');
+    let tx = clampX(P.x, 110), glinted = false;
+    yield* hold(tele, (k, dt, e) => {
+      if (e < tele - lock) tx = clampX(P.x, 110);
+      // under where the hero is, in quick shuffling steps
+      b.x = G.damp(b.x, tx, 7, dt);
+      if (roll) {
+        // a shoulder dropped, the body tipping onto its side, the legs drawn in under it
+        const c = E.inOutQuad(k);
+        b.roll = 0.6 * c;
+        A(4, -16 * c); A(6, -12 * c); A(8, 12 * c); A(10, 14 * c); A(5, -8 * c); A(9, -8 * c);
+        A(12, 0.3 * c); A(16, 0.6 * c); A(15, Math.sin(e * 12) * 0.15);
+      } else {
+        // the ears go straight up and the head turns up to the sky, the haunches sinking under it
+        coil(k, e, 1.1, 0);
+        // (the look up comes first and goes far: the head leads the whole move)
+        A(16, -1.3 + Math.sin(e * 24) * 0.15 * (1 - k)); A(12, -1.5 * outQ(Math.min(1, k * 1.8))); A(13, 6 * k); A(14, 0.2 * k);
+        if (!glinted && e >= tele - 0.2) { glinted = true; const m = mouthAt(b); G.fx.glint(m.x, m.y - 10, 22, G.pal().hot); G.audio.play('glint'); }
+      }
+    });
+    if (roll) yield* skyRake();
+    else yield* skyLeap(tx);
+  }
+  // Straight up, jaws first: the body goes up through the column (and its centre stays over tx all the
+  // way: as it pitches nose-up it pivots about its middle), hangs, and comes down turning onto its feet.
+  function* skyLeap(tx) {
+    const b = B.body, P = G.player, S = B.size, tilt = 1.36;
+    const apex = G.clamp(P.y + 150, FLOOR - 430, FLOOR - 170);
+    const col = skyColumn(tx, B.phase >= 2 ? 0.9 : 0.3);
+    b.pose = 'leap'; b.fast = true; b.trail = true;
+    G.audio.play('whoosh');
+    G.fx.thud(tx, FLOOR, 1.0, { noCrack: true });
+    for (const d of [-1, 1]) G.fx.dust(tx + d * 30, FLOOR, 3, { dir: d, speed: [80, 300], size: [7, 12], up: 40, a: 0.4 });
+    b.sq = Math.max(b.sq || 0, 0.14);
+    const y0 = b.y, f = b.face, rise = 0.22 + (y0 - apex) / 3600;
+    const place = () => { b.x = tx - 56 * S * Math.sin(b.rot); };
+    col.body = true;
+    yield* hold(rise, (k) => {
+      b.rot = -f * tilt * E.outCubic(Math.min(1, k * 2.4));
+      b.y = G.lerp(y0, apex, E.outQuad(k));
+      place();
+      A(14, 0.85); A(16, 0.15); A(15, -0.6 * k); A(12, -0.2);
+    });
+    G.audio.play('chomp'); G.fx.shake(5);
+    if (B.phase >= 3) yield* skyTwist(tx, place);
+    else {
+      // the jaws shut on the air and it hangs there a breath, shaking its head
+      yield* hold(0.13, (k, dt, e) => { place(); A(12, Math.sin(e * 32) * 0.14); A(15, -0.6); });
+    }
+    // down it comes, turning to land on its feet
+    const ya = b.y, r0 = b.rot;
+    b.pose = 'dive';
+    yield* hold(0.3, (k) => { b.y = G.lerp(ya, FLOOR, E.inQuad(k)); b.rot = r0 * (1 - E.inOutQuad(k)); place(); A(15, -0.4 * (1 - k)); });
+    b.y = FLOOR; b.rot = 0; b.x = tx; b.trail = false; col.body = false; col.live = false;
+    landing(tx, false, false);
+    thump(b, 0.18, 2.4);
+    b.pose = 'land'; b.fast = false; b.exposed = true;
+    yield* hold(0.5, (k) => { A(3, 9 * (1 - outQ(k))); A(1, 4 * (1 - outQ(k))); A(12, 0.2 * (1 - k)); });
+    b.exposed = false;
+  }
+  // (phase III) at the top it twists round after wherever you went and snaps again
+  function* skyTwist(tx, place) {
+    const b = B.body, P = G.player, S = B.size;
+    const side = G.sign(P.x - tx) || b.face;
+    if (side !== b.face) { b.face = side; b.rot = -b.rot; place(); }
+    const jy = b.y - 150 * S;
+    const ang = (a) => (side > 0 ? a : Math.PI - a);
+    H.arc({ x: tx, y: jy + 30, r: 175, a0: ang(-1.45), a1: ang(0.4), tele: 0.22, active: 0.1, owner: b, onFire() { G.audio.play('chomp'); G.fx.shake(5); } });
+    yield* hold(0.34, (k, dt, e) => {
+      // the head whips round and down after you, the body swinging on under it
+      const s = Math.sin(Math.PI * Math.min(1, k * 1.6));
+      b.rot = -b.face * (1.36 - 0.5 * s); place();
+      A(12, 0.5 * s); A(14, k < 0.62 ? 0.85 : 0.1); A(15, -0.7 * s);
+    });
+  }
+  // The column it goes up through: its body, upright, while it rises, hangs and comes down, and the
+  // embers its mane leaves hanging behind it, which burn on for a moment (burn) after it has gone.
+  function skyColumn(tx, burn) {
+    const b = B.body, S = B.size;
+    return H.add({
+      kind: 'skycol', layer: 'under', x: tx, live: true, body: false, top: FLOOR, endT: -1,
+      update(dt) {
+        this.srcX = this.x;
+        if (this.live) this.top = Math.min(this.top, b.y - 175 * S);
+        if (!this.live && this.endT < 0) this.endT = this.t;
+        if (this.endT >= 0 && this.t > this.endT + burn + 0.45) this.dead = true;
+        const k = this.k();
+        if (this.top < FLOOR - 10 && Math.random() < dt * 50 * k) {
+          G.fx.spawn({ x: tx + G.rand(-24, 24), y: G.rand(this.top, FLOOR), vx: G.rand(-20, 20), vy: -G.rand(30, 120), life: G.rand(0.3, 0.7), size: G.rand(1.4, 3), color: G.pal().boss, wob: 50 });
+        }
+      },
+      k() { return this.endT < 0 ? 1 : Math.max(0, 1 - (this.t - this.endT) / (burn + 0.45)); },
+      hot() { return this.endT < 0 || this.t - this.endT < burn; },
+      hits(P) {
+        const box = P.box();
+        if (this.body) {
+          const c = centre(b);
+          if (G.rectsOverlap(box, { cx: c.x, cy: b.y - 62 * S, hw: 40 * S, hh: 112 * S })) return true;
+        }
+        return this.hot() && this.top < FLOOR - 40 && G.rectsOverlap(box, { cx: tx, cy: (this.top + FLOOR) / 2, hw: 24, hh: (FLOOR - this.top) / 2 });
+      },
+      danger(P) { return this.hot() ? [tx, 74, 0] : null; },
+      draw(ctx) {
+        if (this.top > FLOOR - 20) return;
+        const pal = G.pal(), k = this.k() * (this.hot() ? 1 : 0.6), top = this.top, h = FLOOR - top;
+        ctx.globalCompositeOperation = 'lighter';
+        const g = ctx.createLinearGradient(tx - 30, 0, tx + 30, 0);
+        g.addColorStop(0, G.rgba(pal.boss, 0)); g.addColorStop(0.5, G.rgba(pal.boss, 0.22 * k)); g.addColorStop(1, G.rgba(pal.boss, 0));
+        ctx.fillStyle = g; ctx.fillRect(tx - 30, top, 60, h);
+        // tongues licking up the column
+        ctx.fillStyle = G.rgba(pal.hot, 0.35 * k);
+        ctx.beginPath();
+        for (let y = FLOOR; y > top + 10; y -= 26) {
+          const sw = Math.sin(G.t * 9 + y * 0.05) * 7, w = 9 * (0.6 + 0.4 * Math.sin(G.t * 13 + y * 0.11));
+          ctx.moveTo(tx - w + sw * 0.3, y); ctx.quadraticCurveTo(tx + sw, y - 20, tx + w * 0.4 + sw, y - 30); ctx.quadraticCurveTo(tx + w, y - 10, tx + w + sw * 0.3, y);
+        }
+        ctx.fill();
+        ctx.globalCompositeOperation = 'source-over';
+      },
+    });
+  }
+  // Over onto its back, raking the air above it with all four legs, and back onto its feet.
+  function* skyRake() {
+    const b = B.body, n = B.phase >= 3 ? 2 : 1;
+    for (let i = 0; i < n; i++) {
+      // over it goes (its legs swap to the paws-up pose as it passes edge-on, where the change is unseen)
+      b.fast = true;
+      G.audio.play('whoosh');
+      const ra = b.roll;
+      yield* hold(i ? 0.16 : 0.13, (k) => { b.roll = G.lerp(ra, Math.PI, E.outCubic(k)); if (b.roll > Math.PI / 2) b.pose = 'belly'; });
+      b.roll = Math.PI; b.pose = 'belly';
+      G.fx.thud(b.x, FLOOR, 0.8, { noCrack: true });
+      G.fx.dust(b.x, FLOOR, 4, { speed: [40, 200], size: [7, 12], up: 30, a: 0.4 });
+      const zone = H.add({
+        kind: 'skyrake', layer: 'under', x: b.x, dur: 0.34,
+        update() { this.srcX = b.x; if (this.t > this.dur) this.dead = true; },
+        hits(P) { return G.rectsOverlap(P.box(), { cx: b.x, cy: FLOOR - 168, hw: 125, hh: 86 }); },
+        danger(P) { return P.y < FLOOR - 40 ? [b.x, 150, 0] : null; },
+      });
+      G.audio.play('sweep');
+      yield* hold(zone.dur, (k, dt, e) => {
+        // the legs thrash at the air (drawn upside down: down in its own frame is up)
+        const s = Math.sin(e * 34), c = Math.cos(e * 34);
+        A(5, 12 + s * 18); A(7, 12 - s * 18); A(9, 12 - c * 18); A(11, 12 + c * 18); A(4, s * 10); A(8, -c * 10);
+        A(12, -0.3); A(14, 0.6); A(15, Math.sin(e * 20) * 0.4);
+        if (Math.random() < dt * 40) G.fx.spawn({ kind: 'spark', x: b.x + G.rand(-110, 110), y: FLOOR - G.rand(90, 230), vx: G.rand(-200, 200), vy: -G.rand(60, 220), life: G.rand(0.15, 0.35), size: G.rand(1.4, 2.6), color: G.pal().hot, grav: 600 });
+      });
+      if (B.phase >= 2 && i === n - 1) blaze(b.x, 200);
+      // half back over (and over again, in the third phase), or right back onto its feet
+      const r0 = b.roll, r1 = i < n - 1 ? 0.5 : 0;
+      yield* hold(0.2, (k) => { b.roll = G.lerp(r0, r1, E.inOutQuad(k)); if (b.roll < Math.PI / 2) b.pose = 'crouch'; });
+      b.roll = r1;
+    }
+    b.roll = 0; b.pose = 'crouch'; b.fast = false; b.exposed = true;
+    thump(b, 0.1, 1);
+    G.audio.play('paw');
+    yield* hold(0.45, (k, dt, e) => { A(3, Math.sin(e * 30) * 1.5 * (1 - k)); A(16, 0.5 * (1 - k)); });
+    b.exposed = false;
+  }
+
+  // ------------------------------------------------------------------ harry
+  // Harry (every phase): it lowers its head and snorts, and the snorts are the bounds to come: short
+  // snapping hops after you, each one aimed again, three in the first phase, four in the second, five in
+  // the third (and now and then one fewer: count them). Then it gathers and dives head first where you
+  // are, drives its jaws into the floor, and is stuck there, tugging, for a long moment. Walking away
+  // only works while its bounds are slow (not in the third phase); going through it while it is down
+  // between bounds, over it, or a dash through, always does. (The ember bed holds its flare meanwhile.)
+  function* atkHarry() {
+    const b = B.body, T = K.T();
+    const n = 2 + B.phase - (K.chance(0.3, 'short') ? 1 : 0);
+    facePlayer();
+    b.fast = false; b.pose = 'stalk';
+    G.audio.play('snarl');
+    yield* hold(0.2 * T, (k) => { A(12, 0.22 * E.inOutQuad(k)); A(16, 0.55 * k); A(1, 3 * k); });
+    for (let i = 0; i < n; i++) yield* snort(i === n - 1);
+    const hopT = [0, 0.32, 0.3, 0.27][B.phase];
+    for (let i = 0; i < n; i++) yield* hop(hopT, i ? 0.08 : 0.14);
+    yield* plunge(T);
+  }
+  // one snort: the head jerks up, and two jets of smoke and sparks out of the nostrils
+  function* snort(last) {
+    const b = B.body;
+    let done = false;
+    yield* hold(0.18, (k, dt, e) => {
+      const s = Math.sin(Math.PI * Math.min(1, k * 1.7));
+      A(12, 0.22 - 0.2 * s); A(1, 3 - 3 * s); A(13, 3 * s); A(16, 0.55); A(15, Math.sin(e * 9) * 0.08);
+      if (!done && k > 0.3) {
+        done = true;
+        G.audio.play('wolfSnort');
+        const m = mouthAt(b), f = b.face;
+        for (const dy of [-4, 4]) G.fx.dust(m.x - f * 10, m.y + dy, 1, { dir: f, speed: [90, 180], size: [5, 9], life: [0.3, 0.55], up: 6, a: 0.5, color: '58,40,32' });
+        G.fx.burst(m.x, m.y, { n: 4, color: G.pal().hot, speed: [80, 200], angle: f > 0 ? 0.2 : Math.PI - 0.2, spread: 0.5, life: [0.12, 0.3], size: [1.2, 2.2], kind: 'spark', grav: 300 });
+      }
+    });
+    if (!last) yield* hold(0.08, () => { A(12, 0.22); A(16, 0.55); });
+  }
+  // one snapping bound after the hero, the jaws shutting as it lands
+  function* hop(dur, gather) {
+    const b = B.body, P = G.player;
+    facePlayer();
+    b.pose = 'crouch'; b.fast = true;
+    yield* hold(gather, (k, dt, e) => coil(0.4 + 0.6 * k, e, 0.6, 0.3));
+    const f = b.face, reach = G.clamp(Math.abs(P.x - b.x) - 60, 70, 220), tx = clampX(b.x + f * reach, 100);
+    H.arc({ x: tx + f * 70, y: FLOOR - 36, r: 100, a0: mir(-0.75), a1: mir(0.95), tele: dur, active: 0.1, owner: b, onFire() { G.audio.play('chomp'); } });
+    b.pose = 'leap'; b.air = true;
+    G.fx.dust(b.x - f * 40, FLOOR, 2, { dir: -f, speed: [60, 220], size: [6, 10], life: [0.3, 0.5], up: 24, a: 0.38 });
+    yield* arc(tx, FLOOR, dur, 46);
+    b.air = false; b.pose = 'biteLow';
+    thump(b, 0.1, 1.5);
+    G.audio.play('paw');
+    G.fx.dust(b.x + f * 40, FLOOR, 2, { dir: f, speed: [60, 200], size: [6, 10], up: 22, a: 0.36 });
+    yield* hold(0.1, (k, dt, e) => { A(12, Math.sin(e * 34) * 0.18 * (1 - k)); A(16, 0.4); });
+  }
+  // the last bound: a dive, head first, that buries its jaws in the floor where you were
+  function* plunge(T) {
+    const b = B.body, P = G.player;
+    facePlayer();
+    b.fast = false; b.pose = 'crouchDeep';
+    const tele = 0.36 * T, S = B.size;
+    let glinted = false, f = b.face, tx = 0, hx = 0, mark = null;
+    // (its aim is set as the glint comes: not drawn, watch the body. The mark covers where the body comes
+    // down as well as the jaws)
+    const aim = () => { f = b.face; tx = clampX(P.x + P.vx * 0.12 - f * 100 * S, 110); hx = tx + f * 100 * S; mark = K.columnMark((tx - f * 100 + hx + f * 80) / 2, 320, true); };
+    yield* hold(tele, (k, dt, e) => {
+      if (!mark) facePlayer();
+      coil(k, e, 1.1, 0.8); A(12, -0.25 * inQ(k));
+      if (!glinted && e >= tele - 0.2) { glinted = true; aim(); const m = mouthAt(b); G.fx.glint(m.x, m.y, 26, G.pal().hot); G.audio.play('glint'); }
+    });
+    if (!mark) aim();
+    b.pose = 'leap'; b.fast = true; b.air = true; b.trail = true;
+    G.audio.play('whoosh');
+    G.fx.thud(b.x - f * 40, FLOOR, 0.8, { noCrack: true });
+    yield* arc(tx, FLOOR, 0.5, 140);
+    mark.dead = true; b.air = false; b.trail = false;
+    K.crush(hx, FLOOR - 36, 80, 40, 1);
+    landing(tx, true);
+    G.fx.impact(hx, FLOOR - 40, 0.05);
+    thump(b, 0.24, 3.4);
+    b.pose = 'buried'; b.fast = true; b.exposed = true;
+    G.audio.play('chomp'); G.fx.shake(8);
+    G.fx.burst(hx, FLOOR - 6, { n: 12, color: G.pal().boss, speed: [100, 360], angle: -Math.PI / 2, spread: 2.2, life: [0.3, 0.7], size: [1.6, 3.2], kind: 'spark', grav: 700 });
+    G.fx.dust(hx, FLOOR, 4, { speed: [40, 200], size: [8, 14], up: 50, a: 0.45 });
+    const stuck = [0, 1.25, 1.1, 0.95][B.phase];
+    yield* hold(stuck, (k, dt, e) => {
+      // it hauls back on its forelegs, its hind paws scrabbling, the tail thrashing
+      const tug = Math.max(0, Math.sin(e * 7.5));
+      A(0, -9 * tug); A(2, -6 * tug); A(1, -3 * tug); A(3, 2 * tug); A(15, Math.sin(e * 11) * 0.35); A(16, 0.2);
+      if (Math.random() < dt * 14) G.fx.dust(b.x - f * 50 * S, FLOOR, 1, { dir: -f, speed: [60, 200], size: [5, 9], up: 20, a: 0.38 });
+      if (tug > 0.9 && Math.random() < dt * 30) G.fx.spawn({ kind: 'spark', x: hx + G.rand(-20, 20), y: FLOOR - 4, vx: G.rand(-120, 120), vy: -G.rand(80, 260), life: G.rand(0.15, 0.35), size: G.rand(1.4, 2.4), color: G.pal().hot, grav: 800 });
+    });
+    // and free: a toss of the head that throws the floor up with it
+    G.audio.play('wolfTear');
+    b.pose = 'toss';
+    G.fx.shards(hx, FLOOR - 10, 6, '60,44,36', { angle: -Math.PI / 2 - f * 0.4, spread: 1.4, speed: [160, 420], size: [2.5, 5] });
+    G.fx.dust(hx, FLOOR, 3, { speed: [40, 160], size: [8, 13], up: 60, a: 0.4 });
+    thump(b, 0.08, -1.6);
+    yield* hold(0.24, (k) => { A(12, -0.22 * Math.sin(Math.PI * k)); A(15, 0.3 * (1 - k)); });
+    b.exposed = false;
+  }
+
+  // ------------------------------------------------------------------ cinders
+  // Cinders (every phase): it hunches, its throat heaving, and coughs up burning coals. Head down by the
+  // floor: they drop and roll at you fast along it, and come back once off the far wall (jump them, both
+  // ways: they come up together in one gout, so one jump timed to the first clears them all). Head thrown up and
+  // back: they are tossed high, one at a time, and come down in bounces that carry them on (read where
+  // each bounce lands). From the second phase there are three and where each one bursts the floor burns
+  // for a moment; in the third it coughs again, the other way.
+  function* atkCinders() {
+    const T = K.T(), n = B.phase >= 3 ? 2 : 1;
+    let toss = K.chance(0.45, 'toss');
+    for (let i = 0; i < n; i++) {
+      if (i) toss = !toss;
+      yield* cough(toss, T, i > 0);
+    }
+    yield* wait(0.15);
+  }
+  function* cough(toss, T, again) {
+    const b = B.body, P = G.player;
+    facePlayer();
+    // too close to cough at you: a bound backwards first, still facing you, to get its room
+    if (Math.abs(P.x - b.x) < 260 && P.y > FLOOR - 160) {
+      // (and with its back to a wall, over the hero instead)
+      const back = clampX(P.x - b.face * 330, 100), over = clampX(P.x + b.face * 330, 100);
+      yield* boundBack(Math.abs(back - P.x) >= 280 ? back : over);
+      facePlayer();
+    }
+    b.fast = false; b.pose = toss ? 'inhale' : 'lowHead';
+    if (!again) G.audio.play('snarl');
+    const tele = (again ? 0.42 : 0.54) * T;
+    // the throat heaves: the head says where they will go
+    yield* hold(tele, (k, dt, e) => {
+      facePlayer();
+      const heave = Math.max(0, Math.sin(e * 14));
+      A(1, 5 * heave); A(3, 2 * heave); A(13, -3 * heave); A(14, 0.15 * heave);
+      if (toss) { A(12, -0.3 * inQ(k)); A(0, -3 * k); } else { A(12, 0.1 * inQ(k)); A(16, 0.25 * k); }
+      if (Math.random() < dt * 10) { const m = mouthAt(b); G.fx.spawn({ x: m.x, y: m.y, vx: G.rand(-20, 20), vy: -G.rand(20, 60), life: G.rand(0.2, 0.4), size: G.rand(1.2, 2.2), color: G.pal().hot, wob: 30 }); }
+    });
+    const count = B.phase >= 2 ? 3 : 2;
+    if (!toss) { yield* gout(count); b.fast = false; b.pose = 'push'; yield* hold(0.2, (k, dt, e) => { A(12, Math.sin(e * 26) * 0.08 * (1 - k)); }); return; }
+    // (tossed coals one at a time, a hack each)
+    const hack = 0.11, rest = 0.13;
+    for (let i = 0; i < count; i++) {
+      b.fast = true;
+      G.audio.play('wolfHack');
+      let spat = false;
+      yield* hold(hack, (k) => {
+        const s = Math.sin(Math.PI * k);
+        if (toss) { A(12, -0.45 * s); A(13, 5 * s); } else { A(12, 0.22 * s); A(13, 9 * s); }
+        A(1, -4 * s); A(14, 0.7 * s); A(16, 0.3 * s);
+        if (!spat && k > 0.45) { spat = true; spit(toss, i); }
+      });
+      yield* hold(rest, (k) => { A(14, 0.3 * (1 - k)); A(1, 2 * (1 - k)); });
+    }
+    b.fast = false; b.pose = toss ? 'toss' : 'push';
+    yield* hold(0.2, (k, dt, e) => { A(12, Math.sin(e * 26) * 0.08 * (1 - k)); });
+  }
+  // the rollers: one heaving retch, and they come up all together in a gout, a clump along the floor
+  // (one jump timed to the first clears them all, as does a dash through)
+  function* gout(count) {
+    const b = B.body;
+    b.fast = true;
+    G.audio.play('wolfHack');
+    let n = 0, e0 = 0;
+    yield* hold(0.26, (k, dt, e) => {
+      const s = Math.sin(Math.PI * Math.min(1, k * 1.3));
+      A(12, 0.26 * s); A(13, 10 * s); A(1, -5 * s); A(3, -3 * s); A(14, 0.8 * s); A(16, 0.3 * s);
+      // (spat out one after another, 0.035 s apart, from the moment the jaws open)
+      if (k > 0.3 && n < count && e - e0 >= 0.035) { e0 = e; spit(false, n++); }
+    });
+    while (n < count) spit(false, n++);
+    yield* hold(0.12, (k) => { A(14, 0.4 * (1 - k)); A(1, 2 * (1 - k)); });
+  }
+  // a bound backwards to x1, still facing the hero (or, x1 being on the hero's far side, a high bound
+  // over the hero's head, turning in the air)
+  function* boundBack(x1) {
+    const b = B.body, x0 = b.x, over = (x1 - x0) * b.face > 0, f = b.face;
+    b.pose = 'crouch'; b.fast = true;
+    yield* hold(0.1, (k, dt, e) => coil(k, e, over ? 1 : 0.7, 0.3));
+    b.pose = 'leap'; G.audio.play('paw');
+    G.fx.dust(b.x - f * 40, FLOOR, 2, { dir: over ? -f : f, speed: [40, 180], size: [6, 10], up: 22, a: 0.36 });
+    const dur = over ? 0.46 : 0.3, ap = over ? 190 : 42;
+    yield* hold(dur, (k) => {
+      b.x = G.lerp(x0, x1, over ? k : outQ(k)); b.y = FLOOR - 4 * ap * k * (1 - k);
+      b.rot = over ? f * 0.4 * (2 * k - 1) * Math.sin(Math.PI * k) : -f * 0.12 * Math.sin(Math.PI * k);
+      if (over && k > 0.55 && b.face === f) b.face = -f; // (it turns in the air to land facing the hero)
+    });
+    b.y = FLOOR; b.rot = 0; b.x = x1;
+    thump(b, 0.1, -1.2);
+    G.audio.play('paw'); G.fx.dust(b.x, FLOOR, 3, { speed: [30, 140], size: [6, 11], up: 22, a: 0.38 });
+    b.fast = false;
+  }
+  function spit(toss, i) {
+    const b = B.body, m = mouthAt(b), f = b.face, burn = B.phase >= 2;
+    G.fx.burst(m.x, m.y, { n: 5, color: G.pal().hot, speed: [80, 220], angle: toss ? -Math.PI / 2 + f * 0.6 : (f > 0 ? 0.4 : Math.PI - 0.4), spread: 0.6, life: [0.12, 0.3], size: [1.2, 2.4], kind: 'spark', grav: 500 });
+    if (toss) coal(m.x, m.y, f * (210 + 105 * i + G.rrand(-15, 15)), -(650 + 30 * i), true, burn);
+    else coal(m.x + f * 10, m.y, f * 500, 60, false, burn);
+  }
+  // One coughed-up coal, as an orb: a roller drops onto the floor and rolls,
+  // comes back once off a wall and bursts on the next; a bouncer comes down in two bounces that carry
+  // it on, and bursts on the second.
+  function coal(x, y, vx, vy, bouncer, burn) {
+    // (one cut down bursts clean: only a coal left to burst by itself sets the floor alight)
+    // (a rolling coal is too heavy to cut: it is jumped. One tossed in the air can be cut down)
+    const h = H.orb(x, y, vx, vy, { r: bouncer ? 14 : 13, grav: bouncer ? 1500 : 0, life: 6.5, slashable: bouncer, onPop: (o) => { if (burn && !o.cut) emberPatch(o.x); } });
+    h.walls = 0; h.bounces = 0; h.spin = 0; h.roller = !bouncer;
+    const pop0 = h.pop;
+    h.pop = function () { if (this.dead) return; pop0.call(this); G.audio.play('cinder'); };
+    h.slash = function () { this.cut = true; this.pop(); G.audio.play('orbPop'); };
+    h.steer = function (o, dt) {
+      if (bouncer) {
+        const nvy = o.vy + o.grav * dt;
+        if (o.y + o.r + nvy * dt >= FLOOR && nvy > 0) {
+          o.bounces++;
+          G.fx.burst(o.x, FLOOR - 4, { n: 6, color: G.pal().hot, speed: [60, 220], angle: -Math.PI / 2, spread: 2, life: [0.15, 0.35], size: [1.2, 2.4], kind: 'spark', grav: 700 });
+          G.fx.dust(o.x, FLOOR, 1, { speed: [10, 60], size: [6, 10], up: 20, a: 0.3 });
+          if (o.bounces >= 2) { o.y = FLOOR - o.r; o.vy = 0; o.pop(); return; }
+          G.audio.play('paw');
+          o.vy = -nvy * 0.64 - o.grav * dt;
+        }
+      } else if (o.y < FLOOR - o.r - 0.5) {
+        // out of its mouth and down onto the floor
+        o.vy += 2200 * dt;
+        if (o.y + o.r + o.vy * dt >= FLOOR) { o.y = FLOOR - o.r - 0.5; o.vy = 0; G.fx.dust(o.x, FLOOR, 1, { speed: [20, 80], size: [5, 8], up: 14, a: 0.3 }); }
+      } else { o.vy = 0; o.y = FLOOR - o.r - 0.5; } // (rolling on the floor, never in it)
+      if ((o.x < WL + o.r && o.vx < 0) || (o.x > WR - o.r && o.vx > 0)) {
+        o.walls++;
+        if (o.walls > 1 || bouncer && o.walls > 0 && o.bounces >= 2) { o.pop(); return; }
+        o.vx = -o.vx * 0.82;
+        G.audio.play('paw');
+        G.fx.burst(o.x, o.y, { n: 6, color: G.pal().hot, speed: [60, 200], angle: o.vx > 0 ? 0 : Math.PI, spread: 1.4, life: [0.15, 0.3], size: [1.2, 2.4], kind: 'spark', grav: 600 });
+      }
+      o.spin += o.vx * dt / o.r;
+      if (Math.random() < dt * 30) G.fx.spawn({ kind: 'spark', x: o.x, y: o.y + (bouncer ? 0 : o.r * 0.6), vx: -o.vx * 0.2 + G.rand(-30, 30), vy: -G.rand(20, 120), life: G.rand(0.15, 0.3), size: G.rand(1, 2), color: G.pal().hot, grav: 500 });
+    };
+    // a coal: a lump of black rock, split with fire, turning as it goes
+    h.draw = function (ctx) {
+      const pal = G.pal(), r = this.r;
+      ctx.save();
+      ctx.translate(this.x, this.y);
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.drawImage(G.fx.glow(pal.boss), -r * 2.3, -r * 2.3, r * 4.6, r * 4.6);
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.rotate(this.spin);
+      ctx.fillStyle = '#1b0e09';
+      ctx.beginPath();
+      for (let i = 0; i < 8; i++) { const a = i / 8 * G.TAU, rr = r * (0.84 + 0.16 * Math.sin(i * 2.7 + 1.3)); if (i) ctx.lineTo(Math.cos(a) * rr, Math.sin(a) * rr); else ctx.moveTo(Math.cos(a) * rr, Math.sin(a) * rr); }
+      ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = G.rgba(DANGER, 0.75); ctx.lineWidth = 2; ctx.stroke();
+      ctx.strokeStyle = G.rgba(pal.hot, 0.9); ctx.lineWidth = 1.6;
+      ctx.beginPath(); ctx.moveTo(-r * 0.6, -r * 0.2); ctx.lineTo(-r * 0.1, r * 0.1); ctx.lineTo(r * 0.5, -r * 0.35); ctx.moveTo(-r * 0.1, r * 0.1); ctx.lineTo(r * 0.05, r * 0.6); ctx.stroke();
+      ctx.restore();
+    };
+    return h;
+  }
+  // where a coal bursts, from the second phase: the floor burns for a moment (a pool, to the tests)
+  function emberPatch(x) {
+    x = G.clamp(x, WL + 40, WR - 40);
+    return H.add({
+      kind: 'pool', layer: 'under', x, w: 76, tele: 0.42, active: 1.0, fade: 0.35,
+      update() { this.srcX = this.x; if (this.t > this.tele + this.active + this.fade) this.dead = true; },
+      hits(P) { return this.t >= this.tele && this.t < this.tele + this.active && P.y > FLOOR - 34 && Math.abs(P.x - this.x) < this.w / 2 - 8; },
+      draw(ctx) {
+        const e = this.t - this.tele, k = e < 0 ? 0.35 * this.t / this.tele : e < this.active ? 0.35 + 0.65 * Math.min(1, e / 0.12) : Math.max(0, 1 - (e - this.active) / this.fade);
+        flames(ctx, this.x - this.w / 2, this.x + this.w / 2, 26, k, this.x * 0.02, G.pal());
+      },
+    });
+  }
+
+  // ------------------------------------------------------------------ blaze
+  // Blaze (every phase): it springs up onto the rock at the back of the forest, out of reach, and sets
+  // the floor alight. Sitting back and howling at the sky: fire runs in from both walls along the floor
+  // and closes on the stretch in front of it, where it stands, and stops short: that is the gap. Rearing
+  // and bringing its forepaws down on the rock: the fire bursts out from the floor in front of it and
+  // runs out towards both walls, stopping short of each: the gaps are at the walls. The fire is too
+  // tall to jump and the floor stays burning behind it; ledges are out of it. Then it comes down off the
+  // rock, well clear of you, and stands panting, open. The gaps narrow and the fire runs faster in each
+  // phase; in the third its landing throws fire along the floor both ways.
+  function* atkBlaze() {
+    const b = B.body, P = G.player, T = K.T();
+    const burst = K.chance(0.4, 'burst');
+    facePlayer();
+    b.fast = false; b.pose = 'crouch';
+    G.audio.play('snarl');
+    yield* hold(0.3 * T, (k, dt, e) => { coil(k, e, 0.9, 0.6); });
+    // where it stands on the rock is where the gap will be (or where the fire will start)
+    const gx = burst ? G.clamp(P.x, 520, 760) : G.clamp(P.x + G.rrand(-240, 240), 500, 780);
+    G.audio.play('whoosh'); G.fx.thud(b.x, FLOOR, 0.8, { noCrack: true });
+    yield* hopBack(gx, 1, 0.5, 130);
+    b.pose = 'land'; b.fast = false;
+    thump(b, 0.1, 1.4);
+    G.fx.dust(b.x, b.y, 3, { speed: [20, 80], size: [6, 10], up: 20, a: 0.3 });
+    yield* hold(0.12, () => {});
+    b.face = P.x >= b.x ? 1 : -1;
+    const gap = [0, 170, 150, 130][B.phase], ft = [0, 1.3, 1.15, 1.0][B.phase] * T, burnT = 0.75;
+    const fronts = [];
+    if (!burst) {
+      // it sits back and draws breath, and howls at the sky; the fire comes in from the walls
+      // (the fire is known from the moment it sits: it starts at the walls the instant the howl comes)
+      b.pose = 'sit';
+      const breath = 0.32 * T;
+      fronts.push(fireFront(WL + 4, gx - gap / 2, breath, ft, breath + ft + burnT));
+      fronts.push(fireFront(WR - 4, gx + gap / 2, breath, ft, breath + ft + burnT));
+      yield* hold(breath, (k) => { const c = E.inOutQuad(k); A(1, -5 * c); A(12, -0.25 * c); });
+      G.audio.play('howl'); G.audio.play('ignite');
+      G.fx.ripple(b.x + b.face * 30, b.y - 100, 360, 0.6, 0.9);
+      G.audio.play('flame', { dur: ft + burnT });
+      yield* hold(ft + burnT, (k, dt, e) => howling(e, Math.min(1, 1.6 - 1.6 * k)));
+    } else {
+      // up on its hind legs, pawing the air, and down on the rock; the fire starts in front of it
+      b.pose = 'rearHigh';
+      const tele = 0.55 * T, safe = [0, 170, 150, 130][B.phase];
+      // (the fire is known from the moment it rears: it starts the instant the paws come down)
+      fronts.push(fireFront(gx, WL + safe, tele, ft, tele + ft + burnT));
+      fronts.push(fireFront(gx, WR - safe, tele, ft, tele + ft + burnT));
+      G.audio.play('charge', { dur: tele });
+      yield* hold(tele, (k, dt, e) => {
+        const up = Math.min(1, k * 2.2);
+        A(5, Math.sin(e * 10.5) * 9 * up); A(7, -Math.sin(e * 10.5 + 0.8) * 9 * up);
+        A(0, -9 * inQ(k)); A(12, -0.22 * inQ(k));
+        if (k > 0.7) A(1, Math.sin(e * 55) * 2 * (k - 0.7) / 0.3);
+      });
+      b.pose = 'slam'; b.fast = true;
+      G.audio.play('cleave'); G.audio.play('ignite');
+      thump(b, 0.16, 2.4);
+      G.fx.shake(8); G.fx.kick(0, 3);
+      G.fx.ripple(gx, FLOOR - 20, 360, 0.4, 1);
+      G.audio.play('flame', { dur: ft + burnT });
+      yield* hold(ft + burnT, (k, dt, e) => { A(1, 6 * (1 - outQ(Math.min(1, k * 3)))); A(3, Math.sin(e * 6) * 1.5); });
+    }
+    // the fire sinks; it turns to where it will go, gathers and comes down off the rock, well clear of
+    // the hero
+    const x2 = clampX(P.x + (P.x < 640 ? 1 : -1) * 360, 120);
+    b.fast = false; b.pose = 'crouch';
+    if (Math.abs(x2 - b.x) > 10) b.face = x2 > b.x ? 1 : -1;
+    yield* hold(0.3, (k, dt, e) => coil(k, e, 0.7, 0.4));
+    G.audio.play('whoosh');
+    yield* hopBack(x2, 0, 0.5, 150);
+    b.pose = 'land'; b.fast = false;
+    G.audio.play('paw'); G.fx.thud(b.x, FLOOR, 1.0);
+    thump(b, 0.16, 2);
+    if (B.phase >= 3) {
+      const tint = { boss: G.pal().boss, hot: G.pal().hot };
+      H.shockwave(b.x - 40, -1, 460, 46, tint); H.shockwave(b.x + 40, 1, 460, 46, tint);
+      G.fx.ripple(b.x, FLOOR - 30, 300, 0.4, 0.8);
+    }
+    // spent: it stands panting, its fire low, open
+    b.pose = 'pant'; b.exposed = true; b.fireTo = 0.45;
+    const pant = [0, 1.15, 1.0, 0.85][B.phase];
+    G.audio.play('wolfPant', { n: Math.round(pant / 0.36) });
+    yield* hold(pant, (k, dt, e) => {
+      const br = Math.sin(e * 9);
+      A(1, 3.5 * br); A(3, 2 * br); A(14, 0.15 * Math.abs(br)); A(12, 0.06 * br);
+    });
+    b.fireTo = 1; b.exposed = false;
+  }
+  // One run of fire along the floor, from x0 to x1: it starts at t0 and the front reaches x1 at t0 + dur
+  // (the floor behind it burning), until endT; then it dies down. Too tall to jump; a ledge is out of it.
+  function fireFront(x0, x1, t0, dur, endT) {
+    const dir = G.sign(x1 - x0) || 1, H0 = 112;
+    return H.add({
+      kind: 'blazefront', layer: 'under', x: (x0 + x1) / 2, popVy: -620,
+      front() { return x0 + (x1 - x0) * G.clamp((this.t - t0) / dur, 0, 1); },
+      update(dt) {
+        const f = this.front();
+        this.srcX = f;
+        if (this.t >= t0 && this.t < t0 + dur) {
+          if (Math.random() < dt * 50) G.fx.spawn({ kind: 'spark', x: f, y: FLOOR - G.rand(4, 60), vx: dir * G.rand(100, 320), vy: -G.rand(100, 360), life: G.rand(0.2, 0.5), size: G.rand(1.5, 3), color: G.pal().hot, grav: 600 });
+          if (Math.random() < dt * 8) G.fx.dust(f, FLOOR, 1, { dir, speed: [40, 160], size: [8, 13], up: 50, a: 0.32, color: '34,22,18' });
+        }
+        if (this.t > endT + 0.5) this.dead = true;
+      },
+      lit(x) { const f = this.front(); return this.t >= t0 && this.t < endT && (x - x0) * dir >= -6 && (f - x) * dir >= 0; },
+      hits(P) { return P.y > FLOOR - 100 && this.lit(P.x); },
+      danger(P) {
+        if (this.t >= endT || P.y < FLOOR - 120) return null;
+        const lo = Math.min(x0, x1), hi = Math.max(x0, x1);
+        const reach = G.clamp((P.x - x0) * dir / Math.max(1, Math.abs(x1 - x0)), 0, 1);
+        return [(lo + hi) / 2, (hi - lo) / 2 + 18, Math.max(0, t0 + dur * reach - this.t)];
+      },
+      draw(ctx) {
+        if (this.t < t0) return;
+        const f = this.front(), pal = G.pal();
+        const die = this.t < endT ? 1 : Math.max(0, 1 - (this.t - endT) / 0.5);
+        const up = Math.min(1, (this.t - t0) / 0.12);
+        // the burnt floor behind the front, burning low; the front itself standing tall
+        const lo = Math.min(x0, f), hi = Math.max(x0, f);
+        flames(ctx, lo, hi, H0 * 0.85 * die, 0.8 * die * up, x0 * 0.01, pal);
+        const fl = dir > 0 ? Math.max(lo, f - 90) : f, fh = dir > 0 ? f : Math.min(hi, f + 90);
+        if (this.t < t0 + dur) flames(ctx, fl, fh + 6 * dir, H0 * 1.25, up, x0 * 0.02 + 3, pal);
+      },
+    });
+  }
+
   // Emberfall (phase III, once, when it is nearly spent): it springs out of sight, the arena goes dark,
   // and it comes down on you like a falling star. The blast of its landing runs out in a ring of fire
   // that only a dash will pass.
@@ -1850,6 +2492,8 @@
     breath: atkBreath,
     pounce: atkPounce, frenzy: atkFrenzy, bite: atkBite, sweep: atkSweep, howl: atkHowl, rake: atkRake,
     wallrun: atkWallrun, emberfall: atkEmberfall, prowl: atkProwl, shake: atkShake,
+    harry: atkHarry, cinders: atkCinders, blaze: atkBlaze,
+    skysnap: atkSkysnap, // (only as its answer to a hero over its head: B.antiAir)
     pack: atkPack, ricochet: atkRicochet, // (corrupted only)
   };
 
@@ -2108,7 +2752,7 @@
   function tickEmbers(dt) {
     if (!B.embersOn) { B.flaring = false; B.warnK = 0; return; }
     // (they hold their breath for its Emberfall, and for its corrupted pack and comet: one set piece at a time)
-    const held = B.attackName === 'emberfall' || B.attackName === 'pack' || B.attackName === 'ricochet';
+    const held = B.attackName === 'emberfall' || B.attackName === 'pack' || B.attackName === 'ricochet' || B.attackName === 'blaze' || B.attackName === 'harry';
     const live = B.phase === 3 && B.active && !B.invuln && !B.dying && !B.dead && !B.staggered && !held && G.state === 'fight';
     const per = FL_PERIOD(), on = per - FL_BURN;
     const was = B.flaring, wasWarn = B.ft >= on - FL_WARN;

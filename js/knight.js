@@ -26,9 +26,9 @@
     answer: 'sever',
     gaps: [0, 1.0, 0.8, 0.6],
     bags: {
-      1: ['cleave', 'overhead', 'charge', 'grip', 'graves', 'hurl', 'sever', 'heel', 'thrust'],
-      2: ['cleave2', 'overhead', 'charge', 'grip', 'graves', 'wraiths', 'desecrate', 'whirl', 'rend', 'hurl', 'sever', 'heel', 'thrust'],
-      3: ['reap', 'overhead', 'charge', 'grip', 'wraiths', 'desecrate', 'whirl', 'rend', 'leap', 'hurl', 'sever', 'heel', 'thrust'],
+      1: ['cleave', 'overhead', 'charge', 'grip', 'graves', 'hurl', 'sever', 'heel', 'thrust', 'march', 'souls', 'tolling'],
+      2: ['cleave2', 'overhead', 'charge', 'grip', 'graves', 'wraiths', 'desecrate', 'whirl', 'rend', 'hurl', 'sever', 'heel', 'thrust', 'march', 'souls', 'tolling'],
+      3: ['reap', 'overhead', 'charge', 'grip', 'wraiths', 'desecrate', 'whirl', 'rend', 'leap', 'hurl', 'sever', 'heel', 'thrust', 'march', 'souls', 'tolling'],
     },
     cards: { 2: ['THE HOST', 'The dead answer the call'], 3: ['BLOOD OATH', 'It will not fall alone'] },
     first: { 1: 'cleave', 2: 'wraiths', 3: 'leap' },
@@ -82,6 +82,28 @@
     heelHighDeep: [0.22, -52, 20, 0, -24, 0, -8, -100, -3.02, 999, 0],
     drawLowDeep: [-0.3, -48, 32, 0, -32, 0, -36, -48, 0.02, 20, -52],
     drawHighDeep: [-0.26, -50, 30, 0, -32, 0, -32, -92, 0.03, 20, -96],
+    // (v2.1a) Skyward: hunched, the sword let down low in front with its point on the floor, then the
+    // rising cut that ends with the blade straight up over the helm
+    skyLow: [0.3, -46, 26, 0, -24, 0, 30, -54, 0.34, 999, 0],
+    skyLowDeep: [0.4, -40, 28, 0, -27, 0, 24, -50, 0.3, 999, 0],
+    skyCut: [-0.16, -62, 18, 0, -16, 0, 10, -140, -1.62, 999, 0],
+    // the overhead held back too long: higher, further behind the helm, leaning back on its heels
+    overHold: [-0.2, -62, 14, 0, -20, 0, -4, -126, -2.05, 999, 0],
+    overHoldDeep: [-0.26, -63, 13, 0, -21, 0, -10, -128, -2.2, 999, 0],
+    // the March's finisher: feet set wide, the sword hoisted over the helm in both hands, then buried
+    hoist: [-0.1, -52, 30, 0, -30, 0, 4, -124, -1.85, 999, 0],
+    hoistDeep: [-0.18, -48, 32, 0, -32, 0, -4, -128, -2.05, 999, 0],
+    bury: [0.6, -40, 30, 0, -28, 0, 36, -66, 1.36, 999, 0],
+    // the Souls: the sword stays on its shoulder; the off hand cupped low (one great soul) or raised
+    // with the fingers spread (many small), then thrust out to let them go
+    cupLow: [0.1, -56, 18, 0, -18, 0, 22, -84, -2.24, 42, -70],
+    cupLowDeep: [0.14, -54, 19, 0, -19, 0, 22, -83, -2.22, 46, -64],
+    spread: [-0.06, -58, 18, 0, -18, 0, 22, -84, -2.24, 30, -126],
+    spreadDeep: [-0.1, -59, 17, 0, -18, 0, 21, -85, -2.26, 28, -134],
+    release: [0.18, -56, 24, 0, -18, 0, 22, -84, -2.24, 62, -98],
+    // the Tolling: lifted in both hands point down, and driven into the floor
+    tollRaise: [-0.08, -61, 16, 0, -18, 0, 16, -172, 1.5708, 999, 0],
+    tollRaiseDeep: [-0.12, -63, 15, 0, -18, 0, 16, -180, 1.5708, 999, 0],
   };
   // A tell is not a pose held still: it keeps building (POSES.dyn, written by the attack each frame,
   // from where it starts towards how deep it goes)
@@ -116,7 +138,7 @@
     if (b.hush && G.state === 'fight' && !G.player.dead && !G.paused) G.audio.duck(1);
     b.hush = false;
   }
-  B.onRelease = function () { const b = B.body; b.hurt = false; b.pose = 'idle'; b.spinning = false; b.fast = false; b.unarmed = false; b.blaze = 0; b.voidOn = false; b.lookT = 0; unhush(); };
+  B.onRelease = function () { const b = B.body; b.hurt = false; b.pose = 'idle'; b.spinning = false; b.fast = false; b.unarmed = false; b.blaze = 0; b.voidOn = false; b.lookT = 0; b.gazeT = 0; b.burn = 0; b.jit = 0; unhush(); };
   B.onStagger = function () { B.body.pose = 'kneel'; };
   B.onInterrupt = function () { B.lost = null; unhush(); };
   B.staggerWord = 'DISARMED';
@@ -277,7 +299,18 @@
   function* drag() {
     const b = B.body;
     b.fast = false; b.pose = 'low';
-    yield* wait(0.8);
+    // (v2.1a) the point drags on the floor and it is open the whole time: a window worth taking
+    b.exposed = true;
+    let e = 0;
+    while (e < 0.8) {
+      const dt = yield;
+      e += dt;
+      if (e < 0.5 && Math.random() < dt * 14) {
+        const L = bladeLine(b);
+        if (L.py > FLOOR - 24) G.fx.spawn({ kind: 'spark', x: L.px, y: FLOOR - 2, vx: b.face * G.rand(30, 160), vy: -G.rand(40, 160), life: G.rand(0.1, 0.25), size: G.rand(1.2, 2.2), color: G.pal().hot, drag: 2, grav: 900 });
+      }
+    }
+    b.exposed = false;
   }
   function* atkCleave() {
     const T = K.T();
@@ -285,14 +318,27 @@
     yield* approach(150, 300, 0.7);
     const blaze = K.chance(BLAZE[1], 'blaze');
     yield* cut(true, (blaze ? 0.92 : 0.78) * T, null, blaze);
+    if (yield* turned(0.6)) return;
     if (K.hard() || K.chance(0.35, 'follow')) { yield* stamp(); yield* cut(false, 0.5 * T); }
     yield* drag();
+  }
+  // (v2.1a) The branch: a hero who went through it to its back as the cleave fell is answered. The
+  // helm snaps round first (the same tell as the Heel), the blade stays low, and it pivots and sweeps
+  // round along the floor behind it (jump). Then it drags, open.
+  function* turned(p) {
+    const b = B.body, P = G.player;
+    if (!((P.x - b.x) * b.face < -14 && Math.abs(P.x - b.x) < 250 && P.y > FLOOR - 170)) return false;
+    if (!K.chance(p, 'turn')) return false;
+    yield* turnCut(0.46 * K.T());
+    yield* drag();
+    return true;
   }
   function* atkCleave2() {
     const T = K.T();
     yield* approach(150, 320, 0.7);
     const blaze = K.chance(BLAZE[2], 'blaze');
     yield* cut(true, (blaze ? 0.86 : 0.72) * T, null, blaze);
+    if (yield* turned(0.75)) return;
     if (K.chance(0.7, 'follow')) {
       yield* stamp(); yield* cut(false, 0.48 * T);
       if (K.hard() || K.chance(0.4, 'follow')) { yield* stamp(); yield* cut(true, 0.46 * T); }
@@ -301,10 +347,13 @@
   }
 
   // The sword comes down on a marked spot and sticks there.
-  function* overhead(track, lock, stuck) {
+  // (v2.1a) delay: it holds the blade at the top a breath too long. The tell is in the body: it lifts
+  // the sword higher and further back, leans back on its heels, and the slit of its visor burns.
+  function* overhead(track, lock, stuck, delay) {
     const b = B.body, P = G.player;
     facePlayer();
-    b.fast = false; b.pose = 'overRaise';
+    b.fast = false; b.pose = delay ? 'overHold' : 'overRaise';
+    if (delay) b.burn = 1;
     const reach = 138;
     const m = K.columnMark(b.x + b.face * reach, 132, true); // where the blade will land (not drawn: watch the sword)
     G.audio.play('charge', { dur: track + lock });
@@ -321,21 +370,48 @@
     G.fx.glint(b.x - b.face * 8, b.y - 212, 34, DANGER, 0.3); G.audio.play('glint');
     e = 0;
     while (e < lock) { e += yield; m.k = 0.7 + 0.3 * Math.min(1, e / lock); }
-    b.fast = true; b.pose = 'slam';
+    if (delay) {
+      // ...and it does not come. The weight creeps further back and the arms tremble with holding it.
+      e = 0;
+      while (e < delay) {
+        const dt = yield;
+        e += dt;
+        b.pose = building('overHold', 'overHoldDeep', e / delay);
+        b.jit = 0.5 + 0.7 * (e / delay);
+      }
+      b.jit = 0;
+    }
+    b.fast = true; b.pose = 'slam'; b.burn = 0;
     yield* wait(0.07);
     m.dead = true;
     K.crush(m.x, FLOOR - 70, 60, 80, 2);
     K.impact(m.x, true);
     H.shockwave(m.x - 50, -1, 450, 46);
     H.shockwave(m.x + 50, 1, 450, 46);
+    yield* stuckFast(stuck + (delay ? 0.25 : 0), m.x);
+  }
+  // Stuck: the blade is in the floor and it is open; towards the end it strains to pull it free (the
+  // body shakes, grit spits from round the blade, the steel creaks), so the end of the window shows.
+  function* stuckFast(dur, x) {
+    const b = B.body;
     b.exposed = true;
-    yield* wait(stuck);
+    let e = 0, creaked = false;
+    while (e < dur) {
+      const dt = yield;
+      e += dt;
+      const k = e / dur;
+      b.jit = k > 0.55 ? (k - 0.55) * 2.4 : 0;
+      if (k > 0.55 && Math.random() < dt * 16) G.fx.burst(x + G.rand(-10, 10), FLOOR - 3, { n: 1, color: '22,18,32', speed: [60, 220], angle: -Math.PI / 2, spread: 1.2, life: [0.3, 0.6], size: [2, 4], kind: 'chunk', grav: 1400 });
+      if (!creaked && k > 0.6) { creaked = true; G.audio.play('knightCreak'); }
+    }
+    b.jit = 0;
     b.exposed = false;
   }
   function* atkOverhead() {
     const T = K.T();
     yield* approach(260, 300, 0.6);
-    yield* overhead(0.62 * T, 0.3 * T, B.phase === 3 ? 1.05 : 1.3);
+    const delay = K.chance([0, 0.3, 0.4, 0.45][B.phase], 'delay') ? (B.phase === 3 ? 0.32 : 0.38) : 0;
+    yield* overhead(0.62 * T, 0.3 * T, B.phase === 3 ? 1.2 : 1.45, delay);
   }
 
   // A charge from wall to wall. It cannot stop, and the wall stuns it.
@@ -800,10 +876,29 @@
       }
     }
     // the whip: it pivots on its front foot and the blade comes round with the whole body behind it
+    b.pose = o.pose;
+    const s = yield* pivot(back, SPIN, 12);
+    if (low) G.fx.dust(b.x + back * 120, FLOOR, 4, { dir: back, speed: [80, 300], size: [6, 11], up: 30, a: 0.36 });
+    while (e + s < tele + 0.02) { e += yield; }
+    yield* wait(0.12);
+    if (B.phase === 3) {
+      // the Blood Oath: no pause between them, the cut carries straight up into the overhead
+      yield* overhead(0.4 * T, 0.26 * T, 1.05);
+    } else {
+      // it stands into the follow-through, then lets the blade's weight settle
+      yield* tween(b, { x: G.clamp(b.x + back * 10, WL + 50, WR - 50) }, 0.18, E.outCubic);
+      yield* wait(B.phase === 2 ? 0.55 : 0.45);
+    }
+  }
+
+  // A pivot on the front foot, the blade coming round with the whole body behind it (the Heel, and
+  // the cleave's branch). Returns the time it took.
+  function* pivot(back, SPIN, step) {
+    const b = B.body;
     b.jit = 0;
-    b.spinning = true; b.spin = 0; b.fast = true; b.pose = o.pose;
+    b.spinning = true; b.spin = 0; b.fast = true;
     G.audio.play('whoosh');
-    const x0 = b.x, x1 = G.clamp(b.x + back * 12, WL + 50, WR - 50); // (a pivot, not a step in)
+    const x0 = b.x, x1 = G.clamp(b.x + back * step, WL + 50, WR - 50); // (a pivot, not a step in)
     let s = 0;
     while (s < SPIN) {
       const dt = yield;
@@ -817,17 +912,42 @@
     b.face = back; b.tqf = back; b.tqP = 1; // (the turn is the spin itself: K.turn must not turn it again)
     b.lookT = 0; b.look = 0; b.lookV = 0;   // (the helm already faced this way)
     if (b.pv) b.pv[1] += 30;
-    if (low) G.fx.dust(b.x + back * 120, FLOOR, 4, { dir: back, speed: [80, 300], size: [6, 11], up: 30, a: 0.36 });
-    while (e + s < tele + 0.02) { e += yield; }
-    yield* wait(0.12);
-    if (B.phase === 3) {
-      // the Blood Oath: no pause between them, the cut carries straight up into the overhead
-      yield* overhead(0.4 * T, 0.26 * T, 1.05);
-    } else {
-      // it stands into the follow-through, then lets the blade's weight settle
-      yield* tween(b, { x: G.clamp(b.x + back * 10, WL + 50, WR - 50) }, 0.18, E.outCubic);
-      yield* wait(B.phase === 2 ? 0.55 : 0.45);
+    return s;
+  }
+  // The cleave's branch: a low sweep round behind it, told by the helm turning first.
+  function* turnCut(tele) {
+    const b = B.body, back = -b.face, SPIN = 0.16;
+    b.lookT = 1;
+    G.audio.play('bladeGrind');
+    yield* wait(0.1);
+    b.fast = false; b.pose = 'heelLow';
+    const m = (ang) => (back > 0 ? ang : Math.PI - ang);
+    H.arc({
+      x: b.x + back * 10, y: b.y - 50, r: 192, a0: m(1.5), a1: m(0.2), tele: tele - 0.05, active: 0.15, owner: b,
+      follow(h) { if (!h.fired) { h.x = b.x + back * 10; h.y = b.y - 50; } },
+      onFire() {
+        G.audio.play('cleave'); G.fx.shake(7);
+        G.fx.cut(b.x + back * 105, FLOOR - 20, back > 0 ? 0 : Math.PI, 220, 7, G.pal().boss, G.pal().hot, 0.18);
+        if (B.phase >= 2) echo(b.x, back, { a0: 1.5, a1: 0.2, r: 192, cy: 50, pose: 'heelLowCut' }, 'heelLow');
+      },
+    });
+    let e = 0;
+    while (e < tele - SPIN) {
+      const dt = yield;
+      e += dt;
+      const k = e / (tele - SPIN);
+      b.pose = building('heelLow', 'heelLowDeep', k);
+      b.jit = k > 0.7 ? 0.8 : 0;
+      if (Math.random() < dt * 18) {
+        const L = bladeLine(b);
+        G.fx.spawn({ kind: 'spark', x: L.px, y: FLOOR - 2, vx: -b.face * G.rand(40, 200), vy: -G.rand(60, 220), life: G.rand(0.12, 0.3), size: G.rand(1.4, 2.6), color: G.pal().hot, drag: 2, grav: 900 });
+      }
     }
+    b.pose = 'heelLowCut';
+    const s = yield* pivot(back, SPIN, 12);
+    G.fx.dust(b.x + back * 120, FLOOR, 4, { dir: back, speed: [80, 300], size: [6, 11], up: 30, a: 0.36 });
+    while (e + s < tele + 0.02) { e += yield; }
+    yield* wait(0.1);
   }
 
   // The thrust's spectral lance (from the second phase): the point's line goes on to the wall.
@@ -949,6 +1069,606 @@
     }
     // stretched out at the end of it: a moment open before it can haul the blade back
     yield* wait(B.phase === 3 ? 0.42 : 0.55);
+  }
+
+  // ------------------------------------------------------------------ from the study (v2.1a)
+  // docs/boss-study.md: an answer to a hero who rides over its head (Skyward, B.antiAir), a string that
+  // carries on while the hero stays in reach and ends with the blade buried (the March), something
+  // thrown that hunts and splits (the Souls), and a set-piece that asks one thing (the Tolling).
+  B.antiAir = 'skyward';
+  G.audio.define('knightToll', () => {
+    // a great cracked bell under the floor: lower and longer than the Host's
+    G.audio.synth.tone({ type: 'sine', f0: 82, f1: 80, dur: 2.4, vol: 0.34, attack: 0.01 });
+    G.audio.synth.tone({ type: 'triangle', f0: 207, f1: 203, dur: 1.5, vol: 0.1, attack: 0.01 });
+    G.audio.synth.tone({ type: 'sine', f0: 331, f1: 327, dur: 0.9, vol: 0.05, attack: 0.01 });
+    G.audio.synth.noise({ type: 'lowpass', f0: 500, f1: 120, q: 1, dur: 0.5, vol: 0.12 });
+  });
+  G.audio.define('graveRise', () => {
+    // blades grinding up out of the stone
+    G.audio.synth.noise({ type: 'bandpass', f0: 900, f1: 2600, q: 2.5, dur: 0.32, vol: 0.16, attack: 0.02 });
+    G.audio.synth.tone({ type: 'sawtooth', f0: 70, f1: 140, dur: 0.26, vol: 0.06, attack: 0.02 });
+  });
+  G.audio.define('soulWail', () => {
+    // a soul let go: a breath that falls away
+    G.audio.synth.noise({ type: 'bandpass', f0: 1400, f1: 500, q: 5, dur: 0.6, vol: 0.07, attack: 0.08 });
+    G.audio.synth.tone({ type: 'sine', f0: 620, f1: 410, dur: 0.55, vol: 0.05, attack: 0.1 });
+  });
+  G.audio.define('soulSplit', () => {
+    G.audio.synth.noise({ type: 'highpass', f0: 3000, f1: 1800, q: 1, dur: 0.14, vol: 0.12 });
+    G.audio.synth.tone({ type: 'triangle', f0: 900, f1: 300, dur: 0.16, vol: 0.08 });
+  });
+  G.audio.define('knightCreak', () => {
+    // steel bound in stone, straining
+    G.audio.synth.tone({ type: 'sawtooth', f0: 150, f1: 118, dur: 0.32, vol: 0.035, attack: 0.05 });
+    G.audio.synth.noise({ type: 'bandpass', f0: 1800, f1: 1350, q: 9, dur: 0.3, vol: 0.05, attack: 0.05 });
+  });
+
+  // One ghostly greatsword standing point up, its hand at (x, y): the grave-blades of Skyward and the
+  // Tolling. Dark steel, a lit edge, and only the edge bright.
+  function graveBlade(ctx, x, y, len, w, tint, a) {
+    if (a <= 0.01) return;
+    // (a corrupted fight: black steel edged in blood, like the rest of it)
+    const C = G.corrupt.on() ? G.corrupt.COL : null;
+    ctx.save();
+    ctx.globalAlpha *= a;
+    ctx.fillStyle = C ? C.dark : '#131a22';
+    D.poly(ctx, [x - w, y, x - w * 0.85, y - len * 0.82, x, y - len, x + w * 0.85, y - len * 0.82, x + w, y]); ctx.fill();
+    ctx.fillStyle = C ? 'rgba(40,4,16,0.9)' : G.rgba(tint.boss, 0.55);
+    D.poly(ctx, [x - w, y, x - w * 0.85, y - len * 0.82, x, y - len, x - w * 0.2, y - len * 0.8, x - w * 0.35, y]); ctx.fill();
+    ctx.strokeStyle = C ? G.rgba(C.blood, 0.9) : G.rgba(tint.hot, 0.85); ctx.lineWidth = 1.2;
+    ctx.beginPath(); ctx.moveTo(x + w, y); ctx.lineTo(x + w * 0.85, y - len * 0.82); ctx.lineTo(x, y - len); ctx.stroke();
+    // the crossguard just out of the floor
+    ctx.fillStyle = '#1c2630';
+    D.poly(ctx, [x - w * 2.2, y + 4, x + w * 2.2, y + 4, x + w * 1.8, y + 10, x - w * 1.8, y + 10]); ctx.fill();
+    ctx.restore();
+  }
+
+  // The rising cut's ghost: the line of the blade goes on up the column, to the top of the screen.
+  function skyBlade(x) {
+    const tint = tintNow(), speed = 1250;
+    return H.add({
+      kind: 'skycut', x, y: FLOOR - 236, tint,
+      // (for the tests' scripted hero: the column over it is no place to be)
+      danger() { return this.t < 0.35 ? [this.x, 60, 0] : null; },
+      update(dt) {
+        this.y -= speed * dt; this.srcX = this.x;
+        if (Math.random() < 0.7) G.fx.spawn({ x: this.x + G.rand(-8, 8), y: this.y + G.rand(20, 160), vx: G.rand(-14, 14), vy: G.rand(20, 90), life: G.rand(0.15, 0.4), size: G.rand(2, 4), color: tint.boss });
+        if (this.y < -320) this.dead = true;
+      },
+      hits(Pl) { const pd = Pl.pad || 0; return G.rectsOverlap(Pl.box(), { cx: this.x, cy: this.y + 80, hw: 30 + pd, hh: 80 + pd }); },
+      draw(ctx) {
+        const x = this.x, y = this.y, a = Math.min(1, this.t / 0.06);
+        ctx.save();
+        ctx.globalAlpha *= a;
+        ctx.globalCompositeOperation = 'lighter';
+        D.glow(ctx, tint.boss, x, y + 60, 70, 0.4);
+        for (const [col, w, al] of [[tint.boss, 11, 0.5], [DANGER, 6, 0.7], [tint.hot, 2, 0.95]]) {
+          ctx.fillStyle = G.rgba(col, al);
+          D.poly(ctx, [x, y, x - w, y + 34, x - w * 0.35, y + 170, x + w * 0.35, y + 170, x + w, y + 34]); ctx.fill();
+        }
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.restore();
+      },
+    });
+  }
+
+  // Grave-blades up out of the floor under the hero, to the top of the screen. A seam of ghost-light
+  // opens under them and follows them (the hero cannot see what is under the floor, so it shows), then
+  // holds still for lockT, then the blades come.
+  function graveColumn(tele, lockT, hw) {
+    const P = G.player, tint = tintNow(), lo = WL + 40, hi = WR - 40;
+    const blades = [[-0.62, 0.82, 0.06], [0, 1, 0], [0.6, 0.88, 0.04]];
+    return H.add({
+      kind: 'gravecol', layer: 'under', x: G.clamp(P.x, lo, hi), hw, tele, active: 0.38, fired: false, tint,
+      danger() { return this.t < this.tele + this.active ? [this.x, this.hw + 18, this.tele - this.t] : null; },
+      update(dt) {
+        if (this.t < this.tele - lockT) this.x = G.damp(this.x, G.clamp(P.x, lo, hi), 7, dt);
+        this.srcX = this.x;
+        if (this.t < this.tele && Math.random() < dt * 22) G.fx.spawn({ x: this.x + G.rand(-this.hw, this.hw), y: FLOOR - 2, vx: G.rand(-10, 10), vy: -G.rand(40, 120), life: G.rand(0.3, 0.6), size: G.rand(2, 4), color: tint.boss, wob: 20 });
+        if (!this.fired && this.t >= this.tele) {
+          this.fired = true;
+          G.audio.play('graveRise'); G.audio.play('boom'); G.fx.shake(7); G.fx.kick(0, -3);
+          G.fx.burst(this.x, FLOOR - 4, { n: 10, color: '22,18,32', speed: [160, 520], angle: -Math.PI / 2, spread: 1.0, life: [0.5, 1], size: [4, 9], kind: 'chunk', grav: 1400 });
+          G.fx.burst(this.x, FLOOR - 40, { n: 16, color: tint.boss, speed: [200, 700], angle: -Math.PI / 2, spread: 0.5, life: [0.25, 0.6], kind: 'spark', size: [2, 4] });
+          G.fx.dust(this.x, FLOOR, 4, { speed: [40, 200], size: [7, 12], up: 50, a: 0.4 });
+        }
+        if (this.t > this.tele + this.active + 0.4) this.dead = true;
+      },
+      hits(Pl) { return this.t >= this.tele && this.t < this.tele + this.active && G.rectsOverlap(Pl.box(), { cx: this.x, cy: FLOOR / 2 - 60, hw: this.hw, hh: FLOOR / 2 + 60 }); },
+      draw(ctx) {
+        const x = this.x;
+        if (this.t < this.tele) {
+          // the seam: dark first, then the ghost-light seeping up through it; it shivers once it holds
+          const k = Math.min(1, this.t / (this.tele - lockT)), held = this.t >= this.tele - lockT;
+          const j = held ? Math.sin(this.t * 60) * 1.5 : 0, w = this.hw * (0.4 + 0.6 * E.outCubic(k));
+          ctx.fillStyle = 'rgba(4,3,8,0.55)';
+          ctx.beginPath(); ctx.ellipse(x + j, FLOOR - 1, w, 6, 0, 0, G.TAU); ctx.fill();
+          const g = ctx.createLinearGradient(0, FLOOR - 70, 0, FLOOR);
+          g.addColorStop(0, G.rgba(DANGER, 0)); g.addColorStop(1, G.rgba(DANGER, 0.1 + 0.16 * k + (held ? 0.1 : 0)));
+          ctx.fillStyle = g; ctx.fillRect(x - w, FLOOR - 70, w * 2, 70);
+          ctx.strokeStyle = G.rgba(DANGER, 0.45 + 0.4 * k); ctx.lineWidth = 2;
+          ctx.beginPath(); ctx.moveTo(x - w + j, FLOOR - 1);
+          for (let i = 1; i <= 6; i++) ctx.lineTo(x - w + (2 * w * i) / 6 + j, FLOOR - 1 - (i % 2 ? 2.5 : 0) * k);
+          ctx.stroke();
+          return;
+        }
+        // the blades: up out of the floor, point first, then a moment, then down again
+        const e = this.t - this.tele, out = e < this.active ? E.outCubic(Math.min(1, e / 0.09)) : Math.max(0, 1 - (e - this.active) / 0.3);
+        const col = Math.max(0, 1 - e / (this.active + 0.3));
+        // a column of the dead's light, dim, to the top (where it reaches)
+        const g = ctx.createLinearGradient(0, 0, 0, FLOOR);
+        g.addColorStop(0, G.rgba(this.tint.boss, 0)); g.addColorStop(1, G.rgba(this.tint.boss, 0.22 * col));
+        ctx.fillStyle = g; ctx.fillRect(x - this.hw * 0.8, 0, this.hw * 1.6, FLOOR);
+        ctx.save();
+        ctx.beginPath(); ctx.rect(x - 200, -400, 400, FLOOR + 400); ctx.clip();
+        for (const [dx, s, lag] of blades) {
+          const q = Math.max(0, Math.min(1, (e - lag) / 0.09));
+          const up = (e < this.active ? E.outCubic(q) : out) * 330 * s;
+          graveBlade(ctx, x + dx * this.hw, FLOOR + 40 - up + 40 * (1 - s), 300 * s, 9 * s, this.tint, Math.min(1, out * 1.4));
+        }
+        ctx.restore();
+      },
+    });
+  }
+
+  // Skyward: its answer to a hero who rides over its head (the kit casts B.antiAir once they have
+  // stayed there long enough: on it, hopping on it, or on a ledge above).
+  //   Its tell: the shoulders hunch and the visor tilts up to look at whoever is there.
+  //   The sword let down low in front, its point on the floor: a rising cut up through all the air
+  //   over it, and the blade's ghost flies on up the column to the top of the screen. Get off its
+  //   head before it comes (out to the side, not up).
+  //   The sword lifted and driven into the floor: grave-blades burst up under the hero, following
+  //   them until a moment before. Keep moving; on a ledge, leave it.
+  //   The Host's ghost makes the cut again; under the Blood Oath it cuts, then plants.
+  function* atkSkyward() {
+    const b = B.body, T = K.T();
+    facePlayer();
+    const plant = K.chance(0.5, 'plant');
+    b.gazeT = 1;
+    G.audio.play('stepHeavy'); G.fx.kick(0, 1);
+    if (B.phase === 3 || !plant) yield* risingCut([0, 0.66, 0.6, 0.54][B.phase] * T);
+    if (B.phase === 3 || plant) yield* gravesUnder(B.phase === 1 ? 1 : 2, B.phase === 3 ? 0.84 : 1);
+    b.gazeT = 0;
+  }
+  function* risingCut(tele) {
+    const b = B.body;
+    b.fast = false; b.pose = 'skyLow';
+    G.audio.play('charge', { dur: tele }); G.audio.play('bladeGrind');
+    const m = (ang) => (b.face > 0 ? ang : Math.PI - ang);
+    const o = { a0: -0.1, a1: -2.25, r: 236, cy: 70, pose: 'skyCut' };
+    H.arc({
+      x: b.x + b.face * 6, y: b.y - 70, r: o.r, a0: m(o.a0), a1: m(o.a1), tele, active: 0.14, owner: b,
+      follow(h) { if (!h.fired) { h.x = b.x + b.face * 6; h.y = b.y - 70; h.a0 = m(o.a0); h.a1 = m(o.a1); } },
+      onFire() {
+        G.audio.play('cleave'); G.audio.play('streak'); G.fx.shake(8); G.fx.kick(0, -4);
+        skyBlade(b.x + b.face * 14);
+        if (B.phase >= 2) echo(b.x, b.face, o, 'skyLowDeep');
+      },
+    });
+    let e = 0;
+    while (e < tele) {
+      const dt = yield;
+      e += dt;
+      const k = e / tele;
+      b.pose = building('skyLow', 'skyLowDeep', k);
+      b.jit = k > 0.75 ? 0.8 : 0;
+      if (Math.random() < dt * 10) {
+        const L = bladeLine(b);
+        G.fx.spawn({ kind: 'spark', x: L.px, y: FLOOR - 2, vx: G.rand(-90, 90), vy: -G.rand(40, 160), life: G.rand(0.1, 0.25), size: G.rand(1.2, 2.2), color: G.pal().hot, drag: 2, grav: 900 });
+      }
+    }
+    // up through everything over it, the whole body rising behind the blade
+    b.jit = 0; b.fast = true; b.pose = 'skyCut';
+    if (b.pv) b.pv[1] -= 60;
+    G.fx.dust(b.x, FLOOR, 3, { speed: [40, 180], size: [6, 10], up: 30, a: 0.34 });
+    yield* wait(0.3);
+    // the blade's weight at the top: it lets it come back over onto the shoulder, open for a moment
+    b.fast = false; b.pose = 'heft';
+    b.exposed = true;
+    yield* wait(0.45);
+    b.exposed = false;
+  }
+  function* gravesUnder(n, pace) {
+    const b = B.body, T = K.T();
+    // it lifts the sword point down and drives it into the floor
+    b.fast = false; b.pose = 'tollRaise';
+    yield* wait(0.32 * T * pace);
+    b.fast = true; b.pose = 'plant';
+    yield* wait(0.07);
+    G.audio.play('tink'); G.audio.play('stomp'); G.fx.shake(6);
+    G.fx.thud(b.x + b.face * 24, FLOOR, 0.9, { col: G.pal().boss });
+    b.exposed = true;
+    const tele = 0.95 * T * pace, lockT = 0.3 * T;
+    let last = null;
+    for (let i = 0; i < n; i++) {
+      last = graveColumn(tele, lockT, 50);
+      yield* wait(0.62 * pace);
+    }
+    while (last && !last.fired) yield;
+    yield* wait(0.5);
+    b.exposed = false;
+  }
+
+  // ---- the March
+  // A string of cuts that goes on while the hero stays in its reach, each a different swing out of
+  // the last (down off the shoulder, up off the floor, across at chest height), and that ends with a
+  // blow that buries the blade. Two at least; three, four or five by phase.
+  //   The read is in the footwork. Another cut is coming when it drives off its back foot into a long
+  //   stride. When it stops striding, sets its feet wide and hoists the sword in both hands, the
+  //   finisher comes: two health, and a wave both ways under the Blood Oath.
+  //   Then the blade is stuck in the floor and it strains to pull it free: the longest opening it gives.
+  const MARCH = [
+    { wind: 'raise', pose: 'cleave', a0: -2.5, a1: 0.78 },   // down off the shoulder
+    { wind: 'low', pose: 'rise', a0: 0.78, a1: -2.5 },       // up off the floor
+    { wind: 'heelHigh', pose: 'heelHighCut', a0: -0.95, a1: 0.38, r: 205 }, // across, at chest height
+  ];
+  function* atkMarch() {
+    const b = B.body, P = G.player, T = K.T();
+    yield* approach(170, 320, 0.7);
+    facePlayer();
+    const max = [0, 3, 4, 5][B.phase];
+    let n = 0;
+    for (;;) {
+      const s = MARCH[n % 3], tele = (n ? [0, 0.46, 0.42, 0.38][B.phase] : [0, 0.66, 0.6, 0.56][B.phase]) * T;
+      b.fast = false; b.pose = s.wind;
+      const o = { a0: s.a0, a1: s.a1, r: s.r, tele, pose: s.pose };
+      if (B.phase >= 2) o.wind = s.wind;
+      swing(o);
+      yield* wait(tele);
+      yield* wait(0.1);
+      n++;
+      const near = Math.abs(P.x - b.x) < 340 && P.y > FLOOR - 260;
+      if (!(n < 2 || (n < max && near && K.chance(0.85, 'on')))) break;
+      yield* marchStep();
+    }
+    yield* marchFinish();
+  }
+  // Off the back foot into a long stride after the hero (turning with it if they went round it).
+  function* marchStep() {
+    const b = B.body, P = G.player;
+    facePlayer();
+    const d = POSES.dyn, from = b.pose === 'dyn' ? POSES.dyn.slice() : (POSES[b.pose] || POSES.idle).slice();
+    for (let i = 0; i < NP; i++) d[i] = from[i];
+    d[2] = 42; d[3] = -6; d[4] = -24; d[1] = from[1] + 4; d[0] = from[0] + 0.1; // (the front foot reaching out)
+    b.fast = false; b.pose = 'dyn';
+    const x0 = b.x, x1 = G.clamp(b.x + b.face * Math.min(90, Math.max(30, Math.abs(P.x - b.x) - 150)), WL + 50, WR - 50);
+    G.fx.dust(b.x - b.face * 18, FLOOR, 2, { dir: -b.face, speed: [40, 160], size: [5, 9], up: 20, a: 0.32 });
+    let e = 0;
+    const D0 = 0.2;
+    while (e < D0) {
+      const dt = yield;
+      e += dt;
+      b.x = G.lerp(x0, x1, E.inOutQuad(Math.min(1, e / D0)));
+    }
+    G.audio.play('stepHeavy'); G.fx.kick(0, 1.4); G.fx.shake(2);
+    G.fx.dust(b.x + b.face * 30, FLOOR, 2, { speed: [20, 110], size: [5, 9], up: 22, a: 0.34 });
+    if (b.pv) b.pv[1] += 24;
+  }
+  function* marchFinish() {
+    const b = B.body, T = K.T();
+    facePlayer();
+    // it stops: the feet go wide and set, and the sword comes up over the helm in both hands
+    b.fast = false; b.pose = 'hoist';
+    G.audio.play('stomp'); G.fx.shake(3);
+    G.fx.dust(b.x, FLOOR, 3, { speed: [30, 140], size: [6, 10], up: 22, a: 0.34 });
+    const tele = [0, 0.74, 0.68, 0.6][B.phase] * T, reach = 132;
+    const m = K.columnMark(b.x + b.face * reach, 132, true); // (not drawn: watch the sword)
+    G.audio.play('charge', { dur: tele });
+    let e = 0, glinted = false;
+    while (e < tele) {
+      const dt = yield;
+      e += dt;
+      const k = e / tele;
+      b.pose = building('hoist', 'hoistDeep', k);
+      b.jit = k > 0.7 ? 0.7 : 0;
+      m.x = b.x + b.face * reach; m.k = k;
+      if (!glinted && e >= tele - 0.22) { glinted = true; G.fx.glint(b.x - b.face * 4, b.y - 270, 34, DANGER, 0.3); G.audio.play('glint'); }
+    }
+    b.jit = 0; b.fast = true; b.pose = 'bury';
+    yield* wait(0.08);
+    m.dead = true;
+    const x = G.clamp(b.x + b.face * reach, WL + 30, WR - 30);
+    K.crush(x, FLOOR - 80, 64, 92, 2);
+    K.impact(x, true);
+    G.fx.impact(x, FLOOR - 60, 0.06);
+    if (b.pv) b.pv[1] += 40;
+    if (B.phase === 3) { H.shockwave(x - 50, -1, 470, 46); H.shockwave(x + 50, 1, 470, 46); }
+    // buried: open, and straining to get it back
+    yield* stuckFast([0, 1.7, 1.5, 1.3][B.phase], x);
+    b.pose = 'wrench';
+  }
+
+  // ---- the Souls
+  // It lifts its off hand and the dead it keeps come out of it: pale souls that drift after the hero
+  // and hang over their head. Cut one and it bursts away from the blade that cut it; leave it, and in
+  // a few seconds it stops, draws in, and splits into shards thrown down at where the hero is. The
+  // lines of the shards show for a moment before (they are things thrown).
+  //   Its tell: the hand cupped low, something swelling in it: one great soul (three shards). The hand
+  //   raised, fingers spread, motes spilling: many small ones (two shards each).
+  //   The Host brings more; under the Blood Oath every shard that meets the floor splits again.
+  G.audio.define('soulCut', () => {
+    G.audio.synth.noise({ type: 'bandpass', f0: 2400, f1: 900, q: 3, dur: 0.18, vol: 0.12 });
+  });
+  function shard(x, y, ang, speed, tint) {
+    const o = H.orb(x, y, Math.cos(ang) * speed, Math.sin(ang) * speed, { r: 7, blade: true, life: 2.2, tint });
+    // (its own kind, so the tests' scripted hero steps out of its line rather than jumping into it;
+    // danger says where the line crosses the hero's height)
+    o.kind = 'soulshard';
+    o.danger = shardDanger;
+    o.onPop = (ob) => {
+      // (the Blood Oath) a shard that meets the floor splits again into two that leap and fall
+      if (B.phase === 3 && !ob.fleck && ob.y + ob.r > FLOOR - 8) {
+        for (const s of [-1, 1]) {
+          const f = H.orb(ob.x, FLOOR - 12, s * G.rrand(170, 240), -G.rrand(380, 460), { r: 6, blade: true, grav: 1500, life: 1.4, tint });
+          f.fleck = true; f.kind = 'soulshard'; f.danger = shardDanger;
+        }
+      }
+    };
+    return o;
+  }
+  function shardDanger(Pl) {
+    const g = this.grav || 0, ty = Pl.y - 24, dy = ty - this.y;
+    // when it reaches the hero's height (on its way down)
+    let t;
+    if (g) { const disc = this.vy * this.vy + 2 * g * dy; if (disc < 0) return null; t = (-this.vy + Math.sqrt(disc)) / g; }
+    else { if (Math.abs(this.vy) < 1 || dy / this.vy < 0) return null; t = dy / this.vy; }
+    if (t > 1.2) return null;
+    return [this.x + this.vx * t, 30, t];
+  }
+  function soul(x, y, big, fuse, tint) {
+    const P = G.player, b = B.body, R = big ? 19 : 10, n = big ? 3 : 2, spread = big ? 0.34 : 0.17;
+    const speed = big ? 118 : 150, lead = 0.42;
+    const s = H.add({
+      kind: 'soul', x, y, vx: b.face * G.rrand(90, 200), vy: -G.rrand(120, 240), r: R, big, fuse, tint,
+      slashable: true, aim: 0, aimed: false, cut: false, srcX: x, side: G.sign(x - P.x) || 1,
+      danger(Pl) {
+        // where the shards will come down, once it has drawn in
+        if (this.t < this.fuse - lead) return null;
+        const c = Math.cos(this.aim), sn = Math.sin(this.aim);
+        if (sn <= 0.1) return null;
+        const t = (Pl.y - 24 - this.y) / (sn * 540);
+        return [this.x + c * 540 * t, 34 + (big ? 30 : 10), this.fuse - this.t + t];
+      },
+      update(dt) {
+        const k = this.t;
+        if (k < 0.55) { this.vx *= Math.exp(-3 * dt); this.vy *= Math.exp(-3 * dt); }
+        else if (k < this.fuse - lead) {
+          // it drifts after the hero and hangs a little over their head, bobbing
+          const tx = P.x + this.side * 70, ty = P.y - 104 + Math.sin(this.t * 3 + R) * 8;
+          const dx = tx - this.x, dy = ty - this.y, d = Math.hypot(dx, dy) || 1, v = Math.min(speed, d * 2.2);
+          this.vx = G.damp(this.vx, dx / d * v, 1.8, dt); this.vy = G.damp(this.vy, dy / d * v, 1.8, dt);
+        } else {
+          // it stops and draws in; the aim follows the hero, then holds
+          this.vx *= Math.exp(-9 * dt); this.vy *= Math.exp(-9 * dt);
+          if (k < this.fuse - 0.28 || !this.aimed) { this.aim = Math.atan2(P.y - 24 - this.y, P.x - this.x); this.aimed = k >= this.fuse - 0.28; }
+        }
+        this.x += this.vx * dt; this.y += this.vy * dt; this.srcX = this.x;
+        this.y = Math.min(this.y, FLOOR - R - 30);
+        if (Math.random() < dt * 30) G.fx.spawn({ x: this.x + G.rand(-R, R) * 0.5, y: this.y + G.rand(-R, R) * 0.5, vx: -this.vx * 0.3 + G.rand(-10, 10), vy: -this.vy * 0.3 - G.rand(10, 40), life: G.rand(0.3, 0.6), size: G.rand(R * 0.25, R * 0.5), color: tint.boss, wob: 20 });
+        if (k >= this.fuse) this.burst(this.aim);
+      },
+      burst(ang) {
+        this.dead = true;
+        G.audio.play('soulSplit'); G.fx.shake(big ? 4 : 2);
+        G.fx.burst(this.x, this.y, { n: big ? 14 : 8, color: tint.boss, speed: [60, 260], life: [0.2, 0.5], size: [2, 4] });
+        G.fx.ring(this.x, this.y, { r0: 4, r1: R * 3, life: 0.25, color: tint.boss, width: 3 });
+        for (let i = 0; i < n; i++) shard(this.x, this.y, ang + (n === 1 ? 0 : G.lerp(-spread, spread, i / (n - 1))), 540, tint);
+      },
+      // cut: it bursts away from the blade, so the shards fly on, away from whoever cut it
+      slash() { this.cut = true; G.audio.play('soulCut'); this.burst(Math.atan2(-0.25, G.sign(this.x - P.x) || 1)); },
+      hits(Pl) { return G.circleRect(this.x, this.y, R * 0.7, Pl.box()); },
+      draw(ctx) {
+        const x = this.x, y = this.y, a = Math.min(1, this.t / 0.2);
+        const lateK = Math.max(0, (this.t - (this.fuse - lead)) / lead);
+        const j = lateK > 0 ? Math.sin(this.t * 70) * 1.2 * lateK : 0;
+        const r = R * (1 - 0.22 * lateK) * (1 + 0.06 * Math.sin(this.t * 6));
+        ctx.save();
+        ctx.globalAlpha *= a;
+        // the lines the shards will take (things thrown: they may be shown)
+        if (lateK > 0) {
+          const al = this.aimed ? 0.55 + 0.35 * Math.sin(this.t * 50) : 0.3 * lateK;
+          ctx.strokeStyle = G.rgba(DANGER, al); ctx.lineWidth = 1.5; ctx.setLineDash([8, 8]); ctx.lineDashOffset = -this.t * 120;
+          for (let i = 0; i < n; i++) {
+            const an = this.aim + (n === 1 ? 0 : G.lerp(-spread, spread, i / (n - 1)));
+            ctx.beginPath(); ctx.moveTo(x + Math.cos(an) * r, y + Math.sin(an) * r); ctx.lineTo(x + Math.cos(an) * 380, y + Math.sin(an) * 380); ctx.stroke();
+          }
+          ctx.setLineDash([]);
+        }
+        // a pale wisp with its tail streaming behind it, and a face that is mostly holes
+        const sp = Math.hypot(this.vx, this.vy), ta = sp > 5 ? Math.atan2(-this.vy, -this.vx) : Math.PI / 2;
+        ctx.globalCompositeOperation = 'lighter';
+        D.glow(ctx, tint.boss, x, y, r * 3, 0.45);
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.fillStyle = G.rgba(tint.boss, 0.55);
+        const tl = r * (1.6 + Math.min(1.4, sp / 90));
+        ctx.beginPath();
+        ctx.moveTo(x + Math.cos(ta + 1.4) * r * 0.8 + j, y + Math.sin(ta + 1.4) * r * 0.8);
+        ctx.quadraticCurveTo(x + Math.cos(ta) * tl * 0.6 + Math.sin(this.t * 9) * 4, y + Math.sin(ta) * tl * 0.6 + Math.cos(this.t * 9) * 4, x + Math.cos(ta) * tl, y + Math.sin(ta) * tl);
+        ctx.quadraticCurveTo(x + Math.cos(ta) * tl * 0.5, y + Math.sin(ta) * tl * 0.5, x + Math.cos(ta - 1.4) * r * 0.8 + j, y + Math.sin(ta - 1.4) * r * 0.8);
+        ctx.closePath(); ctx.fill();
+        // the head: a skull-shaped flame, narrow at the jaw, its crown guttering upward
+        const cx = x + j, fl = Math.sin(this.t * 11 + R) * 0.12;
+        ctx.fillStyle = G.rgba(tint.boss, 0.85);
+        ctx.beginPath();
+        ctx.moveTo(cx - r * 0.95, y - r * 0.05);
+        ctx.quadraticCurveTo(cx - r * 0.9, y - r * 0.95, cx - r * 0.3, y - r * (1.25 + fl));
+        ctx.lineTo(cx - r * 0.05, y - r * 0.85);
+        ctx.lineTo(cx + r * 0.25, y - r * (1.45 - fl));
+        ctx.quadraticCurveTo(cx + r * 0.95, y - r * 0.85, cx + r * 0.95, y - r * 0.05);
+        ctx.quadraticCurveTo(cx + r * 0.8, y + r * 0.7, cx, y + r * 0.95);
+        ctx.quadraticCurveTo(cx - r * 0.8, y + r * 0.7, cx - r * 0.95, y - r * 0.05);
+        ctx.closePath(); ctx.fill();
+        ctx.fillStyle = G.rgba(tint.hot, 0.85);
+        ctx.beginPath(); ctx.ellipse(cx, y - r * 0.1, r * 0.62, r * 0.55, 0, 0, G.TAU); ctx.fill();
+        // hollow eyes slanting down to the brow, narrowing as it draws in; no mouth, only a split jaw
+        ctx.fillStyle = '#05070a';
+        const ew = 1 - 0.35 * lateK;
+        for (const s of [-1, 1]) {
+          ctx.beginPath();
+          ctx.moveTo(cx + s * r * 0.08, y - r * 0.02);
+          ctx.lineTo(cx + s * r * 0.62, y - r * (0.38 * ew));
+          ctx.lineTo(cx + s * r * 0.58, y + r * 0.08 * ew);
+          ctx.lineTo(cx + s * r * 0.16, y + r * 0.16 * ew);
+          ctx.closePath(); ctx.fill();
+        }
+        ctx.strokeStyle = '#05070a'; ctx.lineWidth = Math.max(1, r * 0.09);
+        ctx.beginPath(); ctx.moveTo(cx, y + r * 0.4); ctx.lineTo(cx - r * 0.06, y + r * (0.62 + 0.2 * lateK)); ctx.stroke();
+        ctx.restore();
+      },
+    });
+    return s;
+  }
+  function* atkSouls() {
+    const b = B.body, P = G.player, T = K.T();
+    facePlayer();
+    const many = K.chance(0.5, 'many'), tint = tintNow();
+    const tele = [0, 0.78, 0.7, 0.62][B.phase] * T;
+    const from = many ? 'spread' : 'cupLow', to = many ? 'spreadDeep' : 'cupLowDeep';
+    b.fast = false; b.pose = from;
+    G.audio.play('charge', { dur: tele });
+    // the hand: what gathers in it says how many
+    const hand = () => ({ x: b.x + b.face * b.p[9], y: b.y + b.p[10] });
+    let e = 0;
+    while (e < tele) {
+      const dt = yield;
+      e += dt;
+      const k = e / tele;
+      b.pose = building(from, to, k);
+      const h = hand();
+      if (many) {
+        if (Math.random() < dt * 26) G.fx.spawn({ x: h.x + G.rand(-12, 12), y: h.y + G.rand(-6, 6), vx: G.rand(-20, 20), vy: G.rand(10, 60), life: G.rand(0.3, 0.6), size: G.rand(2, 3.5), color: tint.boss, wob: 20 });
+      } else if (Math.random() < dt * 30) {
+        // drawn in to the cupped hand from round it
+        const a = G.rand(0, G.TAU), d = G.rand(30, 60);
+        G.fx.spawn({ x: h.x + Math.cos(a) * d, y: h.y + Math.sin(a) * d, vx: -Math.cos(a) * d * 2.4, vy: -Math.sin(a) * d * 2.4, life: 0.4, size: G.rand(2, 4) * (0.5 + k), color: tint.boss });
+      }
+    }
+    // the hand thrust out, and they go
+    b.fast = true; b.pose = 'release';
+    G.audio.play('soulWail'); G.fx.kick(b.face * 2, 0);
+    if (b.pv) b.pv[0] += 0.4;
+    const h = hand(), out = [];
+    const count = many ? [0, 3, 4, 5][B.phase] : [0, 1, 2, 2][B.phase];
+    for (let i = 0; i < count; i++) {
+      const fuse = many ? 2.3 + i * 0.42 : 3.0 + i * 0.9;
+      out.push(soul(h.x + G.rrand(-8, 8), h.y + G.rrand(-6, 6), !many, fuse, tint));
+      if (!many && i < count - 1) yield* wait(0.25);
+    }
+    yield* wait(0.3);
+    // it watches them go, the hand still out, following them; then lets it fall
+    b.fast = false;
+    e = 0;
+    const until = Math.max(...out.map((s) => s.fuse)) - 0.6;
+    while (e < until && out.some((s) => !s.dead)) {
+      const dt = yield;
+      e += dt;
+      facePlayer();
+    }
+    b.pose = 'idle';
+    yield* wait(0.35);
+  }
+
+  // ---- the Tolling
+  // It lifts the greatsword point down in both hands and drives it into the floor, and a bell tolls
+  // under the ground. Grave-blades burst up across the arena in rows, rippling in from both walls,
+  // with one gap in each row: the only place to stand. The next row's gap is somewhere else. The
+  // seams in the floor show where each row will come, and where it will not.
+  // Then it pulls the sword free, and for a moment it is open.
+  function graveRow(x0, x1, fromL, tele, tint) {
+    const xs = [];
+    for (let x = x0 + 14; x < x1 - 6; x += 30) xs.push({ x, len: G.rand(260, 320), w: G.rand(7, 10), lean: G.rand(-0.05, 0.05) });
+    const span = Math.max(1, x1 - x0), RIP = 0.16, active = 0.34;
+    const off = (x) => (fromL ? (x - x0) / span : (x1 - x) / span) * RIP;
+    return H.add({
+      kind: 'graverow', layer: 'over', x: (x0 + x1) / 2, x0, x1, tele, active, tint, played: false,
+      danger() { return this.t < this.tele + RIP + this.active ? [(x0 + x1) / 2, (x1 - x0) / 2 + 16, this.tele - this.t] : null; },
+      update() {
+        this.srcX = G.clamp(G.player.x, x0, x1);
+        if (!this.played && this.t >= this.tele) { this.played = true; G.audio.play('graveRise'); G.fx.shake(5); }
+        if (this.t >= this.tele && this.t < this.tele + RIP + 0.02 && Math.random() < 0.6) {
+          const x = fromL ? x0 + span * (this.t - this.tele) / RIP : x1 - span * (this.t - this.tele) / RIP;
+          G.fx.burst(G.clamp(x, x0, x1), FLOOR - 4, { n: 2, color: '22,18,32', speed: [120, 380], angle: -Math.PI / 2, spread: 1.0, life: [0.4, 0.8], size: [3, 7], kind: 'chunk', grav: 1400 });
+        }
+        if (this.t > this.tele + RIP + this.active + 0.35) this.dead = true;
+      },
+      hits(Pl) {
+        if (Pl.x < x0 - 2 || Pl.x > x1 + 2) return false;
+        const at = this.tele + off(G.clamp(Pl.x, x0, x1));
+        return this.t >= at && this.t < at + this.active && Pl.y > FLOOR - 300;
+      },
+      draw(ctx) {
+        if (this.t < this.tele) {
+          // the seam runs in from the wall, then pulses
+          const k = Math.min(1, this.t / (this.tele * 0.55)), late = this.t > this.tele * 0.7 ? 0.5 + 0.5 * Math.sin(this.t * 50) : 0;
+          const a = fromL ? x0 : x1, z = fromL ? x0 + span * E.outCubic(k) : x1 - span * E.outCubic(k);
+          const l = Math.min(a, z), r = Math.max(a, z);
+          const g = ctx.createLinearGradient(0, FLOOR - 46, 0, FLOOR);
+          g.addColorStop(0, G.rgba(DANGER, 0)); g.addColorStop(1, G.rgba(DANGER, 0.1 + 0.1 * k + 0.1 * late));
+          ctx.fillStyle = g; ctx.fillRect(l, FLOOR - 46, r - l, 46);
+          ctx.strokeStyle = G.rgba(DANGER, 0.4 + 0.35 * k + 0.2 * late); ctx.lineWidth = 2;
+          ctx.beginPath(); ctx.moveTo(l, FLOOR - 1);
+          for (let x = l; x <= r; x += 15) ctx.lineTo(x, FLOOR - 1 - ((x / 15) % 2 < 1 ? 2 : 0));
+          ctx.stroke();
+          return;
+        }
+        ctx.save();
+        ctx.beginPath(); ctx.rect(x0 - 30, -400, span + 60, FLOOR + 400); ctx.clip();
+        for (const bl of xs) {
+          const e = this.t - this.tele - off(bl.x);
+          if (e < 0) continue;
+          const up = e < this.active ? E.outCubic(Math.min(1, e / 0.08)) : Math.max(0, 1 - (e - this.active) / 0.3);
+          if (up <= 0) continue;
+          ctx.save(); ctx.translate(bl.x, FLOOR); ctx.rotate(bl.lean);
+          graveBlade(ctx, 0, 30 - (bl.len + 30) * up + bl.len, bl.len, bl.w, tint, Math.min(1, up * 1.5));
+          ctx.restore();
+        }
+        ctx.restore();
+      },
+    });
+  }
+  function* atkTolling() {
+    const b = B.body, P = G.player, T = K.T(), tint = tintNow();
+    facePlayer();
+    b.fast = false; b.pose = 'tollRaise';
+    G.audio.play('charge', { dur: 0.5 * T });
+    let e = 0;
+    while (e < 0.5 * T) {
+      const dt = yield;
+      e += dt;
+      b.pose = building('tollRaise', 'tollRaiseDeep', e / (0.5 * T));
+    }
+    b.fast = true; b.pose = 'plant';
+    yield* wait(0.08);
+    G.audio.play('knightToll'); G.audio.play('tink');
+    K.impact(b.x + b.face * 24, false);
+    if (b.pv) b.pv[1] += 36;
+    const lo = WL + 26, hi = WR - 26;
+    const rows = [0, 3, 4, 5][B.phase], gapW = [0, 176, 160, 144][B.phase];
+    // the next row's seams show while the last is still up; once it goes down there is a fixed moment
+    // to cross to the new gap (not scaled by difficulty: it is the time it takes to get there)
+    const win = [0, 0.78, 0.68, 0.6][B.phase], tele = [0, 0.95, 0.88, 0.8][B.phase] * T;
+    const step = 0.16 + 0.34 + win, far = [0, 230, 240, 250][B.phase];
+    // the first gap within reach; each after it a long step away from the last
+    let gap = G.clamp(P.x + G.rrand(-200, 200), lo + gapW / 2, hi - gapW / 2), last = null;
+    for (let i = 0; i < rows; i++) {
+      if (i) {
+        let g = gap, tries = 0;
+        do {
+          g = gap + (G.rng() < 0.5 ? -1 : 1) * G.rrand(160, far);
+          tries++;
+        } while ((g < lo + gapW / 2 || g > hi - gapW / 2) && tries < 20);
+        gap = G.clamp(g, lo + gapW / 2, hi - gapW / 2);
+      }
+      const gl = gap - gapW / 2, gr = gap + gapW / 2;
+      if (gl - lo > 20) last = graveRow(lo, gl, true, tele, tint);
+      if (hi - gr > 20) last = graveRow(gr, hi, false, tele, tint);
+      if (i) G.audio.play('bell');
+      yield* wait(step);
+    }
+    while (last && !last.dead && last.t < last.tele + 0.6) yield;
+    // it hauls the sword out of the floor: open while it does
+    b.pose = 'wrench';
+    yield* stuckFast(0.9, b.x + b.face * 30);
   }
 
   // ------------------------------------------------------------------ corrupted
@@ -1380,7 +2100,7 @@
     const b = B.body, at = b.pose;
     if (b.unarmed || b.y < FLOOR - 1) return;
     b.fast = false; b.spinning = false;
-    if (at === 'slam' || at === 'plant' || at === 'kneel') {
+    if (at === 'slam' || at === 'plant' || at === 'kneel' || at === 'bury' || at === 'wrench') {
       b.pose = 'wrench';
       yield* wait(0.14);
       G.audio.play('tink'); G.fx.shake(3);
@@ -1412,6 +2132,7 @@
     cleave: atkCleave, cleave2: atkCleave2, overhead: atkOverhead, charge: atkCharge, grip: atkGrip, graves: atkGraves,
     wraiths: atkWraiths, desecrate: atkDesecrate, whirl: atkWhirl, rend: atkRend, leap: atkLeap, reap: atkReap,
     heel: atkHeel, thrust: atkThrust,
+    march: atkMarch, souls: atkSouls, tolling: atkTolling, skyward: atkSkyward, // (v2.1a; skyward is B.antiAir)
     requiem: atkRequiem, colossus: atkColossus, // (corrupted only: B.corruptBags)
   };
 
@@ -1539,6 +2260,9 @@
     // the helm turns on its own spring, a little ahead of the body (the Heel's first tell)
     b.lookV = (b.lookV || 0) + (((b.lookT || 0) - (b.look || 0)) * 380 - (b.lookV || 0) * 30) * dt;
     b.look = (b.look || 0) + b.lookV * dt;
+    // and tilts up to look at whoever is over it (Skyward's tell)
+    b.gazeV = (b.gazeV || 0) + (((b.gazeT || 0) - (b.gaze || 0)) * 300 - (b.gazeV || 0) * 26) * dt;
+    b.gaze = (b.gaze || 0) + b.gazeV * dt;
     // how long the hero has kept to its back, close in and on the ground (the Heel answers it)
     const behind = B.active && !b.spinning && (P.x - b.x) * b.face < -14 && Math.abs(P.x - b.x) < 300 && P.y > FLOOR - 170;
     b.behindT = G.clamp((b.behindT || 0) + (behind ? dt : -dt * 1.5), 0, 4);
@@ -1791,6 +2515,7 @@
       ctx.rotate(0.14 * Math.sin(G.clamp(b.look, 0, 1) * Math.PI));
       ctx.scale(c < 0 ? Math.min(-0.3, c) : Math.max(0.3, c), 1);
     }
+    if (b.gaze) ctx.rotate(-0.42 * b.gaze);
     ctx.fillStyle = trim;
     D.poly(ctx, [-7, -9, -17, -17, -27, -34, -15, -25, -4, -14]); ctx.fill();
     D.poly(ctx, [3, -12, 6, -22, 17, -37, 13, -22, 9, -11]); ctx.fill();
@@ -1801,9 +2526,11 @@
     D.poly(ctx, [-9, -12, -7, -21, -3, -14, 1, -24, 4, -15, 8, -21, 10, -12]); ctx.fill();
     ctx.fillStyle = '#020305';
     D.poly(ctx, [0, -6, 13, -5, 12.5, 1, 1, 0]); ctx.fill();
-    D.glow(ctx, col, 8, -2.6, 15, 1);
-    ctx.fillStyle = G.rgba(hot, 1);
-    D.poly(ctx, [2.5, -4.4, 12, -4, 11.6, -1, 3, -1.6]); ctx.fill();
+    // (the delayed overhead's tell: the slit burns, a little wider and flickering, not brighter)
+    const burn = b.burn || 0, fl = burn ? 0.6 + 0.4 * Math.sin(G.t * 47) : 0;
+    D.glow(ctx, burn ? DANGER : col, 8, -2.6, 15 + 4 * burn, 1);
+    ctx.fillStyle = G.rgba(burn ? DANGER : hot, 1);
+    D.poly(ctx, [2.5, -4.4 - 1.2 * burn * fl, 12, -4 - 1.6 * burn * fl, 11.6, -1 + 1.2 * burn * fl, 3, -1.6 + 1 * burn * fl]); ctx.fill();
     ctx.strokeStyle = '#020305'; ctx.lineWidth = 1.4;
     for (const vx of [3, 6.5, 10]) D.line(ctx, vx, 3, vx, 10);
     ctx.restore();

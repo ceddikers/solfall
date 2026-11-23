@@ -6,6 +6,7 @@
   const { wait, tween } = G.seq;
   const E = G.ease, FLOOR = G.FLOOR, H = G.hazards;
   const KITE_T = 2.6; // seconds of keeping away before a boss answers at range
+  const ABOVE_T = 1.4; // seconds of riding over its head (on it, hopping on it, or on a ledge above) before it answers
 
   // the bosses a run is drawn from. A boss file loaded later adds itself (G.BOSS_IDS.push), so a
   // missing or broken file simply leaves it out.
@@ -154,7 +155,7 @@
       B.phase = 1; B.poise = 0; B.poiseMax = B.poise0; B.staggered = false;
       B.invuln = true; B.active = false; B.dead = false; B.dying = false; B.toppled = false; B.down = false;
       B.script = null; B.attackName = ''; B.bag = []; B.lastAtk = ''; B.forceNext = G.corrupt.opener(B, 1) || (B.first && B.first[1]) || '';
-      B.t = 0; B.lastStand = false; B.kite = 0;
+      B.t = 0; B.lastStand = false; B.kite = 0; B.above = 0;
       B.body = { x: 900, y: FLOOR, face: -1, flash: 0, kick: 0, kx: 0, ctrl: true, hidden: false, exposed: false, jit: 0 };
       B.core = { x: 900, y: FLOOR - B.h * 0.55, r: B.w * 0.5 };
       G.bounds = null; G.wind = 0;
@@ -320,7 +321,7 @@
       G.ui.card('', B.cards[n][0], '');
       if (B.phaseOut) yield* B.phaseOut(n);
       G.ui.letterbox(false);
-      B.poiseMax = B.poise0 + 60 * (n - 1); B.invuln = false; B.kite = 0;
+      B.poiseMax = B.poise0 + 60 * (n - 1); B.invuln = false; B.kite = 0; B.above = 0;
       release();
     }
 
@@ -462,6 +463,10 @@
       if (name === 'none') return; // tests: stand idle
       if (!name && low && B.finale && !B.lastStand) { B.lastStand = true; name = B.finale; }
       if (!name && B.reckons && G.moments.due(B)) name = 'reckoning';
+      // a hero who keeps riding over its head (hopping on it, standing on it, or on a ledge just above)
+      // is answered from below: each boss's B.antiAir, cast on where the hero is (before the keep-away
+      // answer: it is the more particular of the two)
+      if (!name && !B.forceNext && B.antiAir && B.above >= ABOVE_T && B.lastAtk !== B.antiAir && B.ATTACKS[B.antiAir]) { name = B.antiAir; B.lastAtk = name; B.above = 0; }
       // a hero who keeps away for too long is answered at range
       if (!name && !B.forceNext && B.answer && B.kite >= KITE_T && B.lastAtk !== B.answer) { name = B.answer; B.lastAtk = name; B.kite = 0; }
       if (!name) name = nextAttack();
@@ -501,6 +506,10 @@
       if (B.active && !B.invuln && !B.staggered && !P.dead && G.state === 'fight') {
         const away = B.kiting ? B.kiting(P, b) : (Math.abs(P.x - b.x) > 330 || (!P.onGround && P.y < FLOOR - 120 && Math.abs(P.x - b.x) > 140));
         B.kite = G.clamp(B.kite + (away ? dt : -dt * 0.7), 0, KITE_T + 1.5);
+        // over its head: within its width (plus a little) and higher than its top. B.overhead(P, b) for a
+        // boss whose body is not a box at b.x
+        const over = B.overhead ? B.overhead(P, b) : (Math.abs(P.x - b.x) < B.w / 2 + 70 && P.y < b.y - B.h * 0.85 && P.y > b.y - B.h - 330);
+        B.above = G.clamp(B.above + (over ? dt : -dt * 0.5), 0, ABOVE_T + 1);
       }
       B.tick(dt);
       K.turn(b, dt);
