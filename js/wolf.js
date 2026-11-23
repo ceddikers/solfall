@@ -284,6 +284,8 @@
     const decay = Math.exp(-22 * dt);
     const finish = () => {
       for (let k = 0; k < 8; k++) { off[k] *= decay; if (Math.abs(off[k]) < 0.05) off[k] = 0; pd[4 + k] += off[k]; last[4 + k] = pd[4 + k]; }
+      // standing on the floor, no paw goes through it (a diving pose meeting the ground, for one)
+      if (b.y >= FLOOR - 1 && !b.wall && b.roll < 0.3 && !b.hidden) for (let k = 5; k <= 11; k += 2) pd[k] = Math.min(pd[k], 0);
     };
     const release = (k) => { off[k * 2] = last[4 + k * 2] - b.p[4 + k * 2]; off[k * 2 + 1] = last[5 + k * 2] - b.p[5 + k * 2]; };
     const loco = b.pose === 'walk' || b.pose === 'run';
@@ -355,7 +357,7 @@
   B.setup = function () {
     const b = B.body;
     b.x = 900; b.y = FLOOR; b.face = -1; b.lf = -1; b.tf = 1; b.tfRate = 9;
-    b.pose = 'idle'; b.p = POSES.idle.slice(); b.pv = new Array(NP).fill(0); b.walkT = 0; b.stepN = 0;
+    b.pose = 'idle'; b.p = POSES.idle.slice(); b.pv = new Array(NP).fill(0); b.walkT = 0; b.stepN = 0; b.add = new Array(NP).fill(0);
     b.air = false; b.fast = false; b.rot = 0; b.roll = 0; b.wall = 0; b.trail = false;
     b.fire = 1; b.fireTo = 1; b.throat = 0; b.flick = 0; b.shakeT = 0; b.lx = b.x; b.ly = b.y; b.vx = 0; b.vy = 0;
     // (it starts unseen in the dark: see B.enter)
@@ -454,6 +456,27 @@
   }
 
   // ------------------------------------------------------------------ building blocks
+  // A held moment that is still alive: fn(k, dt, e) runs every frame for dur seconds (k from 0 to 1)
+  // and adds to the pose through b.add, so a wind-up builds and trembles instead of standing still.
+  function* hold(dur, fn) {
+    let e = 0;
+    while (e < dur) { const dt = yield; e += dt; fn(Math.min(1, e / dur), dt, e); }
+  }
+  const A = (i, v) => { B.body.add[i] += v; };
+  const inQ = (k) => k * k, outQ = (k) => 1 - (1 - k) * (1 - k);
+  // A coil gathering in the haunches: the shoulders draw back, the hindquarters sink, the head drops
+  // and the ears go flat, deeper as k grows, and in the last part a tremble runs through it and the
+  // tail lashes.
+  function coil(k, e, deep, lash) {
+    const c = inQ(k);
+    A(0, -7 * c * deep); A(2, -5 * c * deep); A(1, 5 * c * deep); A(3, 11 * c * deep);
+    A(12, 0.14 * c); A(16, 0.35 * c);
+    if (k > 0.55) { const q = (k - 0.55) / 0.45; A(3, Math.sin(e * 58) * 1.6 * q); A(1, Math.sin(e * 47) * 1.1 * q); }
+    if (lash) A(15, Math.sin(e * 13) * 0.3 * lash * (0.4 + 0.6 * k));
+  }
+  // Weight arriving: the body squashes and pitches nose-down, then springs back past level (K.recoil).
+  function thump(b, sq, pitch) { b.sq = Math.max(b.sq || 0, sq); b.recV = (b.recV || 0) + b.face * pitch * 0.65; }
+
   // Moving in on the hero: a trot, or a run when it is far off.
   // (It builds up to its speed from whatever it was doing, rather than being at it in one frame;
   // past a fast walk it breaks into a gallop.)
@@ -466,6 +489,20 @@
       v = Math.min(speed, v + 4200 * dt);
       b.pose = v > 240 ? 'run' : 'walk';
       b.x = clampX(b.x + b.face * v * dt, 80);
+      // it starts to pull up a stride early, so it skids to a stop about where it used to stop dead
+      if (Math.abs(P.x - b.x) < dist + v * v / 5200) break;
+    }
+    // the skid: forepaws braced, weight thrown back, dust off the paws
+    if (v > 120) {
+      b.pose = 'skid';
+      const f = b.face;
+      G.fx.dust(b.x + f * 40, FLOOR, 3, { dir: f, speed: [60, 220], size: [6, 11], up: 24, a: 0.36 });
+      while (v > 20) {
+        const dt = yield;
+        v = Math.max(0, v - 2600 * dt);
+        b.x = clampX(b.x + f * v * dt, 80);
+        A(0, -6); A(12, -0.08);
+      }
     }
     facePlayer();
   }
@@ -474,6 +511,7 @@
   function* arc(x1, y1, dur, apex, onAir) {
     const b = B.body, x0 = b.x, y0 = b.y;
     if (Math.abs(x1 - x0) > 10) b.face = x1 > x0 ? 1 : -1;
+    b.sq = Math.max(b.sq || 0, 0.1); // (thrown long off its hind legs)
     let e = 0, py = y0;
     while (e < dur) {
       const dt = yield;
@@ -583,14 +621,13 @@
     b.fast = false; b.pose = long ? 'crouchDeep' : 'crouch';
     const tele = (long ? 0.72 : 0.46) * T * (chain ? 0.78 : 1);
     G.audio.play('snarl');
-    let e = 0, glinted = false;
-    while (e < tele) {
-      const dt = yield;
-      e += dt;
+    let glinted = false;
+    yield* hold(tele, (k, dt, e) => {
       if (e < tele - 0.18) facePlayer();
+      coil(k, e, long ? 1.25 : 0.8, long ? 1 : 0.5);
       if (Math.random() < dt * (long ? 26 : 12)) G.fx.dust(b.x - b.face * 46, FLOOR, 1, { dir: -b.face, speed: [40, 200], size: [5, 10], life: [0.3, 0.6], up: 30, a: 0.36 });
       if (!glinted && e >= tele - 0.2) { glinted = true; G.fx.glint(b.x + b.face * 78, FLOOR - 10, long ? 30 : 22, G.pal().hot); G.audio.play('glint'); }
-    }
+    });
     const dir = b.face;
     let tx;
     if (long) tx = clampX(P.x + P.vx * 0.16);
@@ -607,9 +644,11 @@
     mark.dead = true; b.air = false; b.trail = false;
     if (long) G.fx.impact(tx, FLOOR - 60, 0.06);
     landing(tx, long);
+    thump(b, long ? 0.24 : 0.15, long ? 3.4 : 2.2);
     b.pose = 'land'; b.fast = false;
     if (long) b.exposed = true;
-    yield* wait(long ? 0.55 : chain ? 0.16 : 0.3);
+    // it takes its own weight: the haunches give and come back up, the head lifts last
+    yield* hold(long ? 0.55 : chain ? 0.16 : 0.3, (k) => { A(3, 9 * (1 - outQ(k))); A(1, 4 * (1 - outQ(k))); A(12, 0.18 * (1 - k)); });
     b.exposed = false;
   }
   function* atkPounce() {
@@ -650,13 +689,19 @@
         x: x1 + f * 92, y: FLOOR - 36, r: 112, a0: mir(-0.75), a1: mir(0.95), tele, active: 0.12, owner: b,
         onFire() { b.pose = 'biteLow'; G.audio.play('chomp'); G.fx.shake(6); },
       });
-      yield* wait(tele - 0.16);
+      // it rocks back onto its haunches, head low and jaws parting, and holds there trembling
+      yield* hold(tele - 0.16, (k, dt, e) => { coil(k, e, 0.9, 0.3); A(0, -6 * outQ(k)); A(14, 0.12 * k + Math.abs(Math.sin(e * 21)) * 0.05 * k); });
       b.fast = true; b.pose = 'biteLow';
-      yield* tween(b, { x: x1 }, 0.16, E.outCubic);
+      // the head goes first and the body follows it in
+      const xs = b.x;
+      yield* hold(0.16, (k) => { b.x = G.lerp(xs, x1, E.outCubic(k)); A(13, 10 * Math.sin(Math.PI * Math.min(1, k * 1.4))); A(0, 6 * (1 - k)); });
+      b.x = x1;
+      thump(b, 0.07, 1.4);
       G.fx.dust(b.x + f * 40, FLOOR, 3, { dir: f, speed: [60, 240], size: [6, 11], up: 30 });
-      yield* wait(0.2);
+      // jaws shut on it: a hard sideways shake of the head, tearing
+      yield* hold(0.2, (k, dt, e) => { A(12, Math.sin(e * 34) * 0.22 * (1 - k)); A(16, 0.3); });
       // a second is coming: it stays coiled, head low and ears flat. Otherwise the head comes up.
-      if (more) { b.fast = false; b.pose = 'biteLowUp'; yield* wait(0.1); }
+      if (more) { b.fast = false; b.pose = 'biteLowUp'; yield* hold(0.1, (k, dt, e) => coil(1, e, 0.7, 0)); }
       else b.pose = 'toss';
     } else {
       const tele = 0.62 * T, x1 = clampX(b.x + f * 60, 100);
@@ -664,10 +709,13 @@
         x: x1 + f * 70, y: FLOOR - 118, r: 150, a0: mir(-2.1), a1: mir(0.55), tele, active: 0.13, owner: b,
         onFire() { b.pose = 'biteHigh'; G.audio.play('chomp'); G.fx.shake(6); },
       });
-      yield* wait(tele - 0.14);
+      // up on its haunches, head cocked back, rising as the moment comes
+      yield* hold(tele - 0.14, (k, dt, e) => { const c = inQ(k); A(1, -9 * c); A(12, -0.16 * c); A(3, 5 * c); if (k > 0.6) A(1, Math.sin(e * 50) * 1.2 * (k - 0.6) / 0.4); A(15, Math.sin(e * 9) * 0.15); });
       b.fast = true; b.pose = 'biteHigh';
       yield* tween(b, { x: x1 }, 0.14, E.outCubic);
-      yield* wait(0.3);
+      // the snap jerks its head down, then the forepaws come back to earth
+      yield* hold(0.3, (k) => { A(12, 0.25 * Math.sin(Math.PI * Math.min(1, k * 2.5))); });
+      thump(b, 0.08, 1.2);
     }
   }
 
@@ -683,13 +731,20 @@
       const tele = (i ? 0.44 : 0.62) * T;
       tailRing(tele);
       G.audio.play(i ? 'snarl' : 'charge', { dur: tele });
-      yield* wait(tele);
+      yield* hold(tele, (k, dt, e) => {
+        const c = inQ(k);
+        A(0, 7 * c); A(1, 7 * c); A(3, -6 * c); A(15, 0.25 * c + Math.sin(e * (twice && !i ? 0 : 11)) * 0.2 * k); A(16, 0.3 * c);
+        if (k > 0.6) A(3, Math.sin(e * 52) * 1.5 * (k - 0.6) / 0.4);
+      });
       // round it goes
       b.fast = true; b.pose = 'sweep'; b.tfRate = 26; b.face = -b.face; b.flick = 0;
       G.audio.play('sweep'); G.audio.play('whoosh');
       G.fx.kick(b.face * 4, 0); G.fx.shake(6);
       for (const d of [-1, 1]) for (let k = 0; k < 3; k++) G.fx.dust(b.x + d * (60 + k * 60), FLOOR, 1, { dir: d, speed: [80, 260], size: [6, 11], up: 24, a: 0.4 });
-      yield* wait(0.3);
+      b.recV = (b.recV || 0) + b.face * 1.6;
+      // the hindquarters swing up and round on the forelegs, and land
+      yield* hold(0.3, (k) => { A(3, -16 * Math.sin(Math.PI * Math.min(1, k * 1.5))); A(1, 5 * (1 - k)); A(15, 0.4 * (1 - k)); });
+      thump(b, 0.08, -1.2);
     }
     b.tfRate = 9;
     yield* wait(0.25);
@@ -741,7 +796,8 @@
     facePlayer();
     const march = K.chance(0.4, 'march');
     b.fast = false; b.pose = march ? 'sitMarch' : 'sit';
-    yield* wait(0.42 * T);
+    // the breath before it: chest filling, head lifting
+    yield* hold(0.42 * T, (k) => { const c = E.inOutQuad(k); A(1, -5 * c); A(0, -2 * c); A(12, -0.22 * c); A(14, -0.3 * (1 - k)); });
     G.audio.play('howl');
     b.exposed = true;
     const m = mouthAt(b);
@@ -754,7 +810,7 @@
         const x = b.x + f * (150 + i * 116);
         if (x < WL + 30 || x > WR - 30) break;
         H.meteor({ x, tele: 0.72 * T, blastR: 58 });
-        yield* wait(0.15);
+        yield* hold(0.15, (k, dt, t) => howling(e + t));
         e += 0.15;
       }
     } else {
@@ -762,12 +818,18 @@
       for (let i = 0; i < n; i++) {
         H.meteor({ x: clampX(P.x + P.vx * 0.25 + G.rrand(-30, 30), 50), tele: 0.8 * T, blastR: 56 });
         if (i % 2 === 0) { const mm = mouthAt(b); G.fx.ripple(mm.x, mm.y, 200, 0.4, 0.5); }
-        yield* wait(0.34);
+        yield* hold(0.34, (k, dt, t) => howling(e + t));
         e += 0.34;
       }
     }
-    yield* wait(0.75 * T);
+    // the cry runs out: the head sinks and the chest heaves
+    yield* hold(0.75 * T, (k, dt, t) => { const q = 1 - k; howling(e + t, q); A(12, 0.3 * outQ(k)); A(1, Math.sin(t * 7) * 2.2 * k); });
     b.exposed = false;
+  }
+  // holding the howl: the head thrown up a little further and quivering, the jaw working, ears back
+  function howling(t, k) {
+    k = k == null ? 1 : k;
+    A(12, (-0.24 + Math.sin(t * 31) * 0.035) * k); A(14, (0.08 + Math.sin(t * 4.3) * 0.08) * k); A(1, (-5 + Math.sin(t * 2.2)) * k); A(16, 0.2 * k);
   }
 
   // Rake: it rears up on its hind legs, twice its height, and brings both forepaws down in front of it.
@@ -780,13 +842,22 @@
     b.fast = false; b.pose = wave ? 'rearHigh' : 'rear';
     const tele = (wave ? 0.86 : 0.68) * T;
     G.audio.play('snarl'); G.audio.play('charge', { dur: tele });
+    const rearing = hold(tele + 0.06, (k, dt, e) => {
+      if (b.pose !== 'rear' && b.pose !== 'rearHigh') return; // (the slam has begun)
+      const up = Math.min(1, k * 2.2), c = inQ(k);
+      A(5, Math.sin(e * 10.5) * 9 * up); A(7, -Math.sin(e * 10.5 + 0.8) * 9 * up); // the forepaws paw at the air
+      A(4, Math.cos(e * 10.5) * 5 * up); A(6, -Math.cos(e * 10.5 + 0.8) * 5 * up);
+      A(0, -9 * c + Math.sin(e * 3.1) * 2.5); A(12, -0.22 * c); A(15, Math.sin(e * 8) * 0.2);
+      if (k > 0.7) A(1, Math.sin(e * 55) * 2 * (k - 0.7) / 0.3);
+    });
     H.arc({
       x: b.x + b.face * 24, y: FLOOR - 150, r: 205, a0: mir(-1.95), a1: mir(0.95), tele, active: 0.13, heavy: wave, owner: b,
       follow(h) { if (!h.fired) h.x = b.x + b.face * 24; },
       onFire() { b.fast = true; b.pose = 'slam'; G.audio.play('cleave'); },
     });
-    yield* wait(tele + 0.06);
+    yield* rearing;
     const px = b.x + b.face * 112;
+    thump(b, wave ? 0.2 : 0.14, wave ? 3 : 2.2);
     K.crush(px, FLOOR - 34, 70, 34, 1);
     K.impact(px, wave);
     if (wave) {
@@ -796,7 +867,8 @@
     }
     blaze(px, 180);
     b.exposed = true;
-    yield* wait(0.75);
+    // it leans on the forepaws it drove in, shoulders heaving, and draws itself back up
+    yield* hold(0.75, (k, dt, e) => { A(1, 8 * (1 - outQ(k))); A(12, 0.2 * (1 - k)); A(3, Math.sin(e * 6) * 1.5 * (1 - k)); });
     b.exposed = false;
   }
 
@@ -807,16 +879,19 @@
     const dir = G.sign(b.x - P.x) || 1, wallX = dir > 0 ? WR : WL;
     b.face = dir; b.pose = 'run'; b.trail = true;
     G.audio.play('snarl');
+    let sv = Math.max(0, b.vx * dir);
     while (Math.abs(wallX - b.x) > 80) {
       const dt = yield;
-      b.x += dir * 860 * dt;
+      sv = Math.min(860, sv + 7000 * dt); // (it digs in and builds to a sprint)
+      b.x += dir * sv * dt;
       if (Math.random() < dt * 30) G.fx.dust(b.x - dir * 50, FLOOR, 1, { dir: -dir, speed: [60, 240], size: [6, 11], life: [0.3, 0.6], up: 30, a: 0.4 });
     }
     const high = K.chance(0.5, 'high');
     // onto the wall: the world turns a quarter under it
     G.audio.play('paw'); G.fx.shake(4);
-    b.x = wallX; b.wall = dir; b.y = FLOOR - 70;
-    yield* tween(b, { rot: -dir * Math.PI / 2 }, 0.1, E.outQuad);
+    // it springs onto the wall (rather than appearing on it): up and across in the same moment it turns
+    b.wall = dir;
+    yield* tween(b, { x: wallX, y: FLOOR - 70, rot: -dir * Math.PI / 2 }, 0.1, E.outQuad);
     const top = high ? 150 : FLOOR - 196;
     while (b.y > top) {
       const dt = yield;
@@ -826,20 +901,24 @@
     b.pose = 'wall'; b.trail = false;
     // it hangs there and looks down
     if (high) B.gloomTo = 0.55;
-    const hold = (high ? 0.46 : 0.34) * T;
+    const holdT = (high ? 0.46 : 0.34) * T;
     G.fx.glint(wallX - dir * 30, b.y - 10, 30, G.pal().hot); G.audio.play('glint');
-    yield* wait(hold);
+    // clinging there, it gathers itself against the wall
+    yield* hold(holdT, (k, dt, e) => coil(k, e, 0.9, 0.8));
     if (high) {
       // a dive at the hero, from near the top of the screen
       const tx = clampX(P.x + P.vx * 0.15, 100);
       const mark = K.columnMark(tx, 240, true);
-      b.wall = 0; b.pose = 'dive'; b.air = true; b.trail = true; b.face = -dir;
-      b.x = wallX - dir * 70;
+      // it kicks off the wall, turning out of the climb as it leaves (not in one frame)
+      b.pose = 'dive'; b.air = true; b.trail = true; b.face = -dir;
       G.audio.play('streak'); G.audio.play('whoosh');
+      yield* tween(b, { x: wallX - dir * 70, rot: -dir * 0.35 }, 0.08, E.outQuad);
+      b.wall = 0;
       yield* arc(tx, FLOOR, 0.5, 30, () => { b.pose = 'dive'; });
       mark.dead = true; b.air = false; b.trail = false; B.gloomTo = 0;
       G.fx.impact(tx, FLOOR - 60, 0.07);
       landing(tx, true, false);
+      thump(b, 0.24, 3.2);
       if (B.phase >= 2) { blaze(tx - 110, 160); blaze(tx + 110, 160); }
       b.pose = 'land'; b.exposed = true;
       yield* wait(0.6);
@@ -847,9 +926,11 @@
     } else {
       // flat across, at a height that passes over anyone standing
       const far = dir > 0 ? WL + 90 : WR - 90, fy = FLOOR - 92;
-      b.wall = 0; b.rot = 0; b.face = -dir; b.pose = 'leap'; b.air = true; b.trail = true;
-      b.x = wallX - dir * 80; b.y = fy;
+      // it kicks off the wall and levels out as it goes
+      b.face = -dir; b.pose = 'leap'; b.air = true; b.trail = true;
       G.audio.play('streak'); G.audio.play('whoosh');
+      yield* tween(b, { x: wallX - dir * 80, y: fy, rot: 0 }, 0.08, E.outQuad);
+      b.wall = 0; b.rot = 0;
       while ((far - b.x) * -dir > 0) {
         const dt = yield;
         b.x -= dir * 1500 * dt;
@@ -862,6 +943,7 @@
       G.fx.dust(far - dir * 60, fy - 50, 5, { dir, speed: [40, 200], size: [8, 14], up: 30 });
       b.pose = 'dive';
       yield* tween(b, { y: FLOOR }, 0.24, E.inQuad);
+      thump(b, 0.2, -2.4);
       G.fx.thud(b.x, FLOOR, 1.1);
       G.audio.play('boom');
       blaze(b.x, 160);
@@ -880,13 +962,15 @@
     b.fast = false; b.pose = 'inhale';
     const tele = 0.9 * T;
     G.audio.play('inhale', { dur: tele });
-    let e = 0;
-    while (e < tele) {
-      const dt = yield;
-      e += dt; b.throat = Math.min(1, e / tele);
+    yield* hold(tele, (k, dt, e) => {
+      b.throat = k;
+      // the chest fills and lifts, the haunches set, the head draws back to throw it
+      const c = E.inOutQuad(k);
+      A(1, -7 * c); A(0, -4 * c); A(3, 4 * c); A(12, -0.2 * c); A(16, 0.3 * c);
+      if (k > 0.7) A(1, Math.sin(e * 40) * 1.3 * (k - 0.7) / 0.3);
       const m = mouthAt(b);
       if (Math.random() < dt * 20) G.fx.spawn({ x: m.x, y: m.y, vx: b.face * G.rand(10, 50), vy: -G.rand(30, 90), life: G.rand(0.3, 0.6), size: G.rand(1.5, 3), color: G.pal().hot, wob: 40 });
-    }
+    });
     b.fast = true; b.pose = 'breath'; b.exposed = true;
     const f = b.face, speed = (K.gentle() ? 470 : 560) + (K.hard() ? 60 : 0), end = f > 0 ? WR - 10 : WL + 10;
     G.audio.play('flame', { dur: Math.abs(end - b.x) / speed + 0.3 });
@@ -933,7 +1017,16 @@
         flames(ctx, ex - 46, ex + 46, 56, fade, this.t, pal);
       },
     });
-    while (!st.dead) yield;
+    // it pours it out: pushed back on its legs, shuddering, its head following the fire down the floor
+    let be = 0;
+    while (!st.dead) {
+      const dt = yield;
+      be += dt;
+      const S = B.size, nx = b.x + f * (b.p[0] + 18) * S, ny = b.y + (b.p[1] - 8) * S;
+      const want = Math.atan2(FLOOR - ny, Math.max(40, (st.ix - nx) * f)) * 0.9;
+      A(12, G.clamp(want - POSES.breath[12], -0.5, 0.6));
+      A(0, -5); A(3, 3); A(1, Math.sin(be * 37) * 1.2);
+    }
     b.exposed = false;
     blaze(st.end - f * 80, 160);
     yield* wait(0.3);
@@ -947,8 +1040,7 @@
     facePlayer();
     b.fast = false; b.pose = 'crouchDeep';
     G.audio.play('roar'); G.audio.play('charge', { dur: 0.6 });
-    let e = 0;
-    while (e < 0.6) { const dt = yield; e += dt; K.aura(b.x, b.y - 30, G.pal().boss, 70, 100, 2); G.fx.shake(3); }
+    yield* hold(0.6, (k, dt, e) => { coil(k, e, 1.4, 1); K.aura(b.x, b.y - 30, G.pal().boss, 70, 100, 2); G.fx.shake(3); });
     b.fast = true; b.pose = 'leap'; b.trail = true;
     G.fx.thud(b.x, FLOOR, 1.4); G.audio.play('whoosh');
     yield* tween(b, { y: -320 }, 0.34, E.outQuad);
@@ -964,6 +1056,7 @@
     G.audio.play('streak');
     yield* tween(b, { y: FLOOR }, 0.14, E.inQuad);
     b.rot = 0; b.trail = false;
+    thump(b, 0.3, 3.6);
     G.fx.impact(b.x, FLOOR - 60, 0.1); G.fx.stop(0.08);
     K.impact(b.x, true);
     G.fx.ripple(b.x, FLOOR - 40, 520, 0.6, 1.4);
@@ -1597,7 +1690,7 @@
     // pose
     // the legs keep time with the ground: a stance sweeps a paw back 44 (walk) or 92 (gallop) units,
     // so the cycle runs at the speed the body actually covers and no paw skates
-    const gsp = Math.abs(b.vx);
+    const gsp = b.wall ? Math.abs(b.vy) : Math.abs(b.vx); // (on a wall it is climbing)
     if (b.pose === 'walk') b.walkT += Math.max(dt * 2, gsp * dt * Math.PI / (44 * B.size));
     else if (b.pose === 'run') b.walkT += Math.max(dt * 5, gsp * dt * Math.PI / (92 * B.size));
     if ((b.pose === 'walk' || b.pose === 'run') && !b.wall) {
@@ -1612,6 +1705,8 @@
       }
     }
     let target = b.pose === 'walk' ? walkPose(b.walkT) : b.pose === 'run' ? runPose(b.walkT) : (POSES[b.pose] || POSES.idle);
+    // what the attack in hand adds this frame (a coil that deepens, a tremble, a lashing tail: see hold)
+    if (b.add && b.add.some((v) => v)) { target = target.slice(); for (let i = 0; i < NP; i++) { target[i] += b.add[i]; b.add[i] = 0; } }
     if (b.shakeT > 0 || b.flick || b.roll > 2) {
       target = target.slice();
       if (b.shakeT > 0) { b.shakeT -= dt; target[12] += Math.sin(B.t * 42) * 0.28 * Math.min(1, b.shakeT * 4); target[16] = 0.6 + 0.4 * Math.sin(B.t * 42); }
@@ -2024,7 +2119,12 @@
     ctx.lineJoin = 'round'; ctx.lineCap = 'round';
     ctx.translate(w.x + (w.kx || 0) + jx, w.y);
     if (w.rot) ctx.rotate(w.rot);
-    if (real) K.recoil(ctx, w);
+    if (real) {
+      // its weight rocks over the paws that take it: nose-down over the forepaws, tail-down over the
+      // hind paws (a rock about its middle would sink one end into the floor)
+      const pv = (w.rec || 0) * w.face > 0 ? 62 : -54, px = w.face * pv * S * (w.rec ? 1 : 0);
+      ctx.translate(px, 0); K.recoil(ctx, w); ctx.translate(-px, 0);
+    }
     ctx.scale(w.face * sx * S, S);
     FLIP = !!w.roll && Math.cos(w.roll) < 0;
     if (w.roll) { ctx.translate(0, -54); ctx.scale(1, Math.cos(w.roll)); ctx.translate(0, 54); }

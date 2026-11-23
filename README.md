@@ -2,7 +2,7 @@
 
 A side-on boss rush for the browser: four heroes, four three-phase bosses, played as a run of
 ever-harder trials. You pick a hero and a relic before the run and win a boon after each victory.
-Version 1.9c.
+Version 1.9d.
 
 This is an early slice of a planned boss-rush roguelite (short runs, a boon after each boss,
 bosses drawn from a pool). A run meets the four bosses in a shuffled order, then meets them again, harder.
@@ -112,6 +112,35 @@ hero (`tools/feel-check.js`).
 - Settings, Reset progress erases Sunshards, upgrades, trophies and records (it has to be chosen twice).
 
 Not done: touch controls, a colour-blind alternative to red-orange warnings, gamepad rebinding.
+
+## The Wolf fights like an animal (v1.9d)
+
+v1.9c gave the Cinder Wolf a living walk and stance, but its attacks were still poses held stock-still
+through their warning and then snapped to, or a body slid at an even speed. Now every attack moves
+through the body (`js/wolf.js`: an attack adds to its pose each frame through `hold`, `coil` and `thump`):
+
+- **Wind-ups build.** Through a warning the haunches keep sinking, the shoulders draw back, the head drops
+  and the ears flatten, and in the last part a tremble runs through it and the tail lashes. A long
+  pounce coils deeper than a short one, so the tell is still the depth of the crouch.
+- **Weight arrives.** It leaves the ground stretched long off its hind legs; it lands with a squash and
+  rocks nose-down over the forepaws that took the weight, then back past level. Landing from a wall
+  dive or the Emberfall hits hardest.
+- **Bite.** It rocks back onto its haunches with its jaws parting, drives in head-first with the body
+  following, and shakes its head hard as the jaws close. The high bite rises on its haunches, head
+  cocked back, and the snap jerks its head down.
+- **Sweep.** Its weight pours onto the forelegs and the tail climbs; the hindquarters swing up and round
+  and come down.
+- **Rake.** Up on its hind legs it paws at the air, swaying and leaning further back as it gathers; the
+  slam lands with its weight, and it heaves itself back up.
+- **Howl.** It draws the breath first, holds the cry with its head quivering and jaw working, then lets
+  its head sink while its chest heaves.
+- **Breath.** Its chest fills and its head draws back; then, pushed back on its legs and shuddering, its
+  head follows its own fire down the floor and out to the wall.
+- **Moving.** It skids to a stop out of a gallop (braced forepaws, dust) instead of halting dead, ending
+  about where it used to stop. Its sprint at the wall builds up, it springs onto the wall and kicks off it (it used to
+  appear on it, and leave it, in one frame), and its legs keep time with its climb.
+
+Every hit area and timing is as it was: `tools/boss-tests.js` loses the same on the Wolf as before.
 
 ## Motion that turns, rolls and fades (v1.9c)
 
