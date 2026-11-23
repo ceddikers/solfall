@@ -2,7 +2,9 @@
 // Run in the page console:
 //   fetch('/tools/boss-tests.js').then(r => r.text()).then(t => (0, eval)(t)).then(console.log)
 // Options, set before running: window.TEST_BOSSES = ['mage'], window.TEST_HERO = 'aster',
-// window.TEST_SEED = 2, window.TEST_ATTACK = true (the scripted player also fights back).
+// window.TEST_SEED = 2, window.TEST_ATTACK = true (the scripted player also fights back),
+// window.TEST_ONLY = ['name', ...] (only those attacks). A corrupted boss's own attacks are marked *.
+// The Warden is not covered here (tools/dodge-tests.js is its own), but can be named in TEST_BOSSES.
 //
 // Every attack of every boss is run in each phase that uses it, against one scripted player that
 // follows a few plain rules: step off marked ground, jump low things, stay down for high things,
@@ -12,7 +14,7 @@
 (function () {
   'use strict';
   const I = G.input, P = G.player, D = 1 / 120, FLOOR = G.FLOOR, WL = G.WALL_L + 20, WR = G.WALL_R - 20;
-  const bosses = window.TEST_BOSSES || ['mage', 'assassin', 'knight'];
+  const bosses = window.TEST_BOSSES || G.BOSS_IDS.filter((id) => id !== 'warden');
   const fight = !!window.TEST_ATTACK;
 
   function hold(l, r) { I.down.left = !!l; I.down.right = !!r; }
@@ -57,7 +59,9 @@
           if (Math.abs(h.y - py) < 46 && Math.abs(dx) < 150 && dx * h.vx > 0 && Math.abs(h.vx) > 120) out.push([P.x, 24, 0]);
           break;
         }
-        default: break;
+        // a boss's own kind of hazard can say where it is unsafe: h.danger(P) returns
+        // [centre x, half width, seconds until it hurts], or nothing when it is no threat now
+        default: if (h.danger) { const d = h.danger(P); if (d) out.push(d); } break;
       }
     }
     return out;
@@ -238,8 +242,11 @@
     const names = Object.keys(def.ATTACKS);
     for (const name of names) {
       for (let phase = 1; phase <= 3; phase++) {
-        const inBag = def.bags[phase].includes(name) || (phase === 3 && def.finale === name);
+        const corrupt = !!(def.corruptBags && (def.corruptBags[phase] || []).includes(name));
+        const inBag = def.bags[phase].includes(name) || (phase === 3 && def.finale === name) || corrupt;
         if (!inBag) continue;
+        if (window.TEST_ONLY && !window.TEST_ONLY.includes(name)) continue;
+        G.debug.corrupt = corrupt; // (its own attacks are tested in a corrupted fight, at that pace)
         let lost = 0, runs = 0, len = 0, stuck = false;
         causes.cur = '';
         for (const px of [330, 950]) {
@@ -264,7 +271,8 @@
           lost += hp0 - P.hp; runs++;
           G.debug.forceAttack = '';
         }
-        out.push({ boss: id, attack: name, phase, lost, runs, len: len.toFixed(1), stuck, by: causes.cur });
+        G.debug.corrupt = false;
+        out.push({ boss: id, attack: name + (corrupt ? '*' : ''), phase, lost, runs, len: len.toFixed(1), stuck, by: causes.cur });
       }
     }
   }

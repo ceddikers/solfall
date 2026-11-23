@@ -35,8 +35,8 @@
     B.maxHp = Math.round(B.BASE_HP * G.diff().bossHp);
     B.hp = B.maxHp;
     B.phase = 1; B.poise = 0; B.poiseMax = 440; B.staggered = false;
-    B.invuln = true; B.active = false; B.dead = false; B.dying = false;
-    B.script = null; B.attackName = ''; B.bag = []; B.lastAtk = ''; B.forceNext = 'slam';
+    B.invuln = true; B.active = false; B.dead = false; B.dying = false; B.toppled = false; B.down = false;
+    B.script = null; B.attackName = ''; B.bag = []; B.lastAtk = ''; B.forceNext = G.corrupt.opener(B, 1) || 'slam';
     B.t = 0; B.spread = 318; B.rays = []; B.shardR = 900; B.shardsOut = false; B.hasShards = false;
     B.core = {
       x: 640, y: -200, r: 84, ctrl: true, open: 1, charge: 0, flash: 0,
@@ -48,6 +48,7 @@
     B.shardA = 0; B.shardSpin = 0.9; B.haloR = 0; B.haloHurt = false;
     B.campT = 0; B.campPlat = null; B.lastStand = false; B.airT = 0;
     B.halo = { kind: 'blade' };
+    B.chain = null; B.shardPose = null; B.shardPoseK = 0; B.shardHold = false;
     G.bounds = null;
   };
 
@@ -75,11 +76,11 @@
 
   B.targets = function () {
     const out = [];
-    if (!B.active || B.dead || B.dying) return out;
+    if (!B.active || B.dead || (B.dying && !B.toppled)) return out;
     const c = B.core;
     out.push({ id: 'core', kind: 'core', cx: c.x, cy: c.y, r: c.r * 0.96 });
     for (const h of B.hands) {
-      if (!usable(h)) continue;
+      if (!usable(h) || h.sunk >= 1) continue; // (a hand sunk into the floor, the Afterhands, cannot be reached)
       const b = handBox(h);
       out.push({ id: h.id, kind: 'hand', ref: h, cx: b.cx, cy: b.cy, hw: b.hw, hh: b.hh });
     }
@@ -87,6 +88,9 @@
   };
 
   B.damage = function (amount, t, info) {
+    // toppled at nothing: any blow ends it, plainly (E is the finishing blow, see finish.js)
+    // (blows still in the air as it goes down pass through: the choice comes once it is down)
+    if (B.toppled) { if (!B.down) return false; B.core.flash = 1; B.finishOff(false); return true; }
     if (!B.active || B.dead || B.dying || B.invuln) return false;
     // a Reckoning's ward takes the blow; the one that breaks it throws the Warden down
     if (B.ward) {
@@ -161,6 +165,10 @@
     for (const h of B.hands) { h.ctrl = false; h.hurt = false; h.stuck = false; h.hot = 0; }
     B.shardsOut = false; B.shardSpin = 0.9; B.haloR = 0; B.haloHurt = false;
     G.wind = 0; G.bounds = null;
+    // the corrupted attacks' pieces: a chain still showing is let go and fades (see drawChain);
+    // shards held in a pose drift back to their circle (see drawShards)
+    if (B.chain && !B.chain.snap) B.chain.snap = 0.001;
+    B.shardHold = false;
   }
   function interrupt() {
     B.script = null; B.attackName = '';
@@ -189,6 +197,10 @@
     G.ui.callout('STAGGERED', 'Strike the core');
     B.script = staggerScript();
   }
+  // thrown down from outside the fight (the Dying Light pair)
+  B.forceStagger = function () {
+    if (B.active && !B.dead && !B.dying && !B.invuln && !B.staggered && !B.ward) stagger();
+  };
 
   function* staggerScript() {
     const c = B.core, dur = G.diff().stagger + (G.relic('sunstone') ? 1.5 : 0);
@@ -228,9 +240,10 @@
   // Totality: the Warden drives both hands into the floor and tears two slabs of it up into the air.
   // The platforms are its doing, and the floor it has broken open is what burns next.
   function* toPhase2() {
-    const c = B.core, [L, R] = B.hands, plats = G.arena.platforms;
+    G.arena.layout('warden', 2, { hold: true }); // they stay in the floor until its hands haul them up
+    const c = B.core, [L, R] = B.hands, plats = G.arena.platforms.filter((p) => !p.gone);
     c.ctrl = L.ctrl = R.ctrl = true;
-    B.forceNext = 'tide';
+    B.forceNext = G.corrupt.opener(B, 2) || 'tide';
     G.ui.letterbox(true);
     G.fx.impact(c.x, c.y, 0.09); G.fx.shake(16); G.fx.slow(0.25, 0.7);
     G.audio.play('stagger');
@@ -307,6 +320,7 @@
     G.audio.play('shatter');
     G.fx.flash(G.COL.white, 0.9, 0.9); G.fx.shake(24); G.fx.stop(0.12);
     G.arena.setPhase(3, 1.8);
+    G.arena.layout('warden', 3); // the wings fall away; three steps rise towards the black sun
     G.audio.setIntensity(3);
     G.audio.play('roar'); G.audio.play('card');
     G.ui.card('', 'BLACK SUN', '');
@@ -330,19 +344,52 @@
     release();
   }
 
+  // At nothing it does not die yet: the eclipse sinks to the floor with its hands either side, and
+  // stays there until it is finished (see finish.js).
   function die() {
     interrupt();
     B.dying = true; B.invuln = true; B.hp = 0; B.staggered = false; B.poise = 0;
-    G.onBossDying();
+    // a Dawnbreak that empties the bar is the ending itself: no topple, it dies when the Dawnbreak is done
+    if (G.state !== 'fight' || G.player.ulting) { G.onBossDying(false); B.script = deathScript(); return; }
+    B.toppled = true; B.down = false;
+    G.onBossToppled();
+    B.script = toppleScript();
+  }
+  // fin: the hero's finishing blow (E); otherwise a plain blow ended it
+  B.finishOff = function (fin) {
+    if (!B.toppled) return false;
+    B.toppled = false; B.down = false;
+    G.onBossDying(fin);
     B.script = deathScript();
+    return true;
+  };
+  function* toppleScript() {
+    const c = B.core, cx = G.clamp(c.x, 300, 980);
+    c.ctrl = true;
+    G.audio.play('stagger'); G.fx.stop(0.14); G.fx.shake(16); G.fx.punch(0.03);
+    G.fx.impact(c.x, c.y, 0.08);
+    G.fx.shatter(c.x, c.y, G.pal().boss, 20, { hot: G.pal().hot, r: 340, jitter: 30, r0: 60 });
+    const drops = [tween(c, { x: cx, y: FLOOR - 112, open: 0.06 }, 0.5, E.inCubic)];
+    for (const h of B.hands) {
+      if (!h.alive) continue;
+      h.ctrl = true;
+      drops.push(tween(h, { x: G.clamp(cx + h.side * 310, 110, 1170), y: FLOOR - 56, rot: h.side * 0.55, curl: 0.35 }, 0.56, E.inCubic));
+    }
+    yield* par(...drops);
+    G.fx.shake(12); G.audio.play('boom');
+    G.fx.burst(c.x, FLOOR - 6, { n: 16, color: '190,190,210', speed: [60, 300], angle: -Math.PI / 2, spread: 3, life: [0.3, 0.7], size: [3, 7] });
+    yield* wait(0.15);
+    B.down = true;
+    while (B.toppled) { yield; c.jit = 0.6; }
   }
 
   function* deathScript() {
     const c = B.core;
     c.ctrl = true; c.open = 0.1;
     B.shardsOut = true;
-    G.fx.slow(0.12, 1.3); G.fx.flash(G.COL.white, 0.8, 0.7); G.fx.shake(22); G.fx.stop(0.2);
-    G.fx.impact(c.x, c.y, 0.1);
+    while (G.finish.busy || G.player.ulting) yield; // the hero's finishing blow (or Dawnbreak) first
+    G.fx.slow(0.12, 1.3); G.fx.shake(22);
+    if (!G.finish.played) { G.fx.flash(G.COL.white, 0.8, 0.7); G.fx.stop(0.2); G.fx.impact(c.x, c.y, 0.1); }
     G.audio.play('bossDie');
     yield* tween(c, { x: G.clamp(c.x, 300, 980), y: 290 }, 0.9, E.outCubic);
     let e = 0, next = 0;
@@ -405,11 +452,15 @@
   const NEEDS = {
     sunburst: 1, slam: 1, sweep: 1, clap: 2, slam2: 1, sweep2: 1, comb: 2, rocket: 1,
     flick: 1, crossfire: 2, cage: 2, swat: 1, duet: 1, duetSlam: 1, duetSweep: 1,
+    // the corrupted two need none: with no hand left (phase III, or both broken) the shards do the hands' part
+    afterhands: 0, pendulum: 0,
   };
+  // A corrupted Warden's own two (corrupt.js): the Afterhands in every phase, the Pendulum from phase II.
+  B.corruptBags = { 1: ['afterhands'], 2: ['afterhands', 'pendulum'], 3: ['afterhands', 'pendulum'] };
   const canUse = (name) => (NEEDS[name] || 0) <= usableHands().length;
 
   function refillBag() {
-    const src = BAGS[B.phase];
+    const src = BAGS[B.phase].concat(G.corrupt.extra(B, B.phase)); // (a corrupted Warden's own two, corrupt.js)
     for (let tries = 0; tries < 8; tries++) {
       B.bag = G.shuffle(src.slice());
       let ok = B.bag[B.bag.length - 1] !== B.lastAtk;
@@ -424,7 +475,7 @@
       if (canUse(f)) { B.lastAtk = f; return f; }
     }
     // resting on a platform for too long gets it knocked down
-    if (B.phase === 2 && B.campT > 2.4 && B.lastAtk !== 'swat' && canUse('swat') && G.arena.platforms.every((p) => p.rise >= 1)) {
+    if (B.phase === 2 && B.campT > 2.4 && B.lastAtk !== 'swat' && canUse('swat') && G.arena.platforms.length && G.arena.platforms.every((p) => p.rise >= 1)) {
       B.campT = 0; B.lastAtk = 'swat';
       return 'swat';
     }
@@ -1330,6 +1381,7 @@
   }
 
   // Reckoning: the core comes down within reach, wards itself and gathers a blast (moments.js).
+  // It is not left alone to be struck (v1.7b): while it gathers, its hands guard it (see guarding).
   function* reckoning() {
     const c = B.core;
     c.ctrl = true;
@@ -1340,9 +1392,422 @@
       moves.push(tween(h, { x: 640 + h.side * 480, y: 190, rot: h.side * 0.3, curl: 1 }, 0.8));
     }
     yield* par(...moves);
-    yield* G.moments.gather(B, () => ({ x: c.x, y: c.y, r: c.r + 24 }));
-    // only reached when the ward held
+    const gather = G.moments.gather(B, () => ({ x: c.x, y: c.y, r: c.r + 24 })), guard = guarding();
+    let done = false;
+    while (!done) { const dt = yield; done = gather.next(dt).done; guard.next(dt); }
+    // only reached when the ward held: whichever hand is in the middle of a blow finishes it
+    while (!guard.next(yield).done) { /* until it is back at its post */ }
     yield* tween(c, { y: HOME_Y[B.phase] }, 0.6, E.outBack);
+  }
+
+  // The Eclipse is guarded. While the core gathers, its hands come down in turn on wherever the hero
+  // stands: step out from under the fist, jump the wave it sends along the floor, and get back to
+  // work. A hand lies where it fell for a moment, and a blow to it is a blow to the ward, so the
+  // hand that just missed is the easiest thing to hit. With no hand left to guard it, the gathering
+  // light itself falls on the hero instead. (Breaking the ward ends all of this from outside.)
+  function* guarding() {
+    const P = G.player;
+    // a hand that has come down lies where it fell for a moment (the easiest thing to hit), then goes back to its post
+    function* lie(h) {
+      h.stuck = true;
+      yield* wait(0.5);
+      h.stuck = false;
+      yield* tween(h, { x: 640 + h.side * 480, y: 190, rot: h.side * 0.3, curl: 1 }, 0.4);
+    }
+    let turn = P.x < 640 ? -1 : 1, down = null; // the hand on the hero's side comes first
+    yield* wait(0.3);
+    while (B.ward) {
+      const hands = usableHands();
+      if (!hands.length) {
+        H.meteor({ x: G.clamp(P.x + G.rrand(-20, 20), WL + 50, WR - 50), tele: 0.8 * G.diff().tele });
+        yield* wait(1.1);
+        continue;
+      }
+      const h = hands.find((q) => q.side === turn && q !== down) || hands.find((q) => q !== down) || hands[0];
+      turn = -turn;
+      const blow = slam(h, { track: B.phase >= 2 ? 0.5 : 0.6, stuck: 0, wave: 400 });
+      if (down && down !== h) yield* par(lie(down), blow);        // one gets up as the other comes down
+      else {
+        // only one hand left: while it gets up, the gathering light falls on the hero instead
+        if (down) { H.meteor({ x: G.clamp(P.x + G.rrand(-20, 20), WL + 50, WR - 50), tele: 0.8 * G.diff().tele }); yield* lie(down); }
+        yield* blow;
+      }
+      down = h; h.stuck = true;
+      yield* wait(0.2 * G.diff().tele);
+    }
+    if (down) yield* lie(down);
+  }
+
+  // ------------------------------------------------------------------ corrupted only (corrupt.js)
+  // The void bleeding through: two attacks only a corrupted Warden uses, drawn in black and blood.
+  const VCOL = () => G.corrupt.COL;
+
+  // Afterhands: the eye shuts and both hands sink flat into the floor, as if listening. Void handprints
+  // bloom along the path the hero has just walked, laid one by one as they follow; then fists punch up
+  // out of the floor from each print, in the order they were laid. Keep moving, never double back.
+  // (A print warns of a blow from something under the floor that cannot be seen, so it is drawn.)
+  const FIST = { alive: true, x: 0, y: 0, rot: 0, curl: 1, side: 1, hurt: false, hot: 0, broken: 0, stuck: false, flash: 0, kx: 0, hp: 1, maxHp: 1, sunk: 0 };
+  function drawPrint(ctx, x, k, glow, a, side) {
+    if (k <= 0 || a <= 0) return;
+    ctx.save();
+    ctx.translate(x, FLOOR + 1); ctx.scale(side * k * 1.12, 0.3 * k);
+    // seen from above, then laid flat on the floor: a palm, four long fingers spread and reaching away, a thumb
+    ctx.beginPath();
+    ctx.ellipse(0, 4, 32, 30, 0, 0, G.TAU);
+    for (const [fx, fl, fa] of [[-22, 46, -0.3], [-8, 58, -0.1], [8, 56, 0.1], [22, 42, 0.3]]) {
+      const cx = fx + Math.sin(fa) * fl / 2, cy = -18 - Math.cos(fa) * fl / 2;
+      ctx.moveTo(cx + 7 * Math.cos(fa), cy + 7 * Math.sin(fa)); ctx.ellipse(cx, cy, 7, fl / 2, fa, 0, G.TAU);
+    }
+    ctx.moveTo(-40 + 7 * Math.cos(-1.1), 2 + 7 * Math.sin(-1.1)); ctx.ellipse(-40, 2, 7, 20, -1.1, 0, G.TAU);
+    ctx.fillStyle = 'rgba(5,0,3,' + (0.88 * a) + ')'; ctx.fill();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.strokeStyle = G.rgba(VCOL().blood, (0.4 + 0.5 * glow) * a); ctx.lineWidth = 4; ctx.stroke();
+    if (glow > 0) { ctx.fillStyle = G.rgba(DANGER, (0.1 + 0.22 * glow) * a); ctx.fill(); }
+    ctx.restore();
+  }
+
+  // One print and the fist that comes up out of it. fireAt: seconds from being laid to the blow.
+  function afterhand(x, fireAt, side, last) {
+    const RISE = 0.08, HOLD = 0.16, DROP = 0.22, FADE = 0.45;
+    return H.add({
+      kind: 'afterhand', layer: 'under', x, fireAt, side, last, hw: 40, reach: 360, rise: 0, fired: false, srcX: x,
+      get live() { return this.t >= this.fireAt && this.t < this.fireAt + RISE + HOLD; },
+      update(dt) {
+        const e = this.t - this.fireAt, VC = VCOL();
+        if (e < 0) {
+          // the print gathers as its moment comes: void welling up out of it
+          if (e > -0.35 && Math.random() < dt * 30) G.fx.spawn({ x: this.x + G.rand(-30, 30), y: FLOOR - 2, vx: G.rand(-10, 10), vy: -G.rand(60, 170), life: G.rand(0.3, 0.6), size: G.rand(3, 6), color: VC.void, wob: 30 });
+          return;
+        }
+        if (!this.fired) {
+          this.fired = true;
+          G.audio.play('stomp'); if (this.last) G.audio.play('slam');
+          G.fx.shake(this.last ? 10 : 6); G.fx.kick(0, -2.5);
+          G.fx.crack(this.x, 0.9, VC.blood);
+          G.fx.burst(this.x, FLOOR - 4, { n: 7, color: '14,4,10', speed: [200, 560], angle: -Math.PI / 2, spread: 1.3, life: [0.5, 1], size: [4, 9], kind: 'chunk', grav: 1500 });
+          G.fx.burst(this.x, FLOOR - 8, { n: 10, color: VC.blood, speed: [200, 700], angle: -Math.PI / 2, spread: 0.9, life: [0.15, 0.4], kind: 'spark', size: [2, 4], grav: 600 });
+          for (const d of [-1, 1]) G.fx.dust(this.x + d * 26, FLOOR, 2, { dir: d, speed: [60, 200], size: [7, 12], life: [0.4, 0.8], up: 40, a: 0.34, color: '40,10,24' });
+          G.fx.ripple(this.x, FLOOR - 170, 190, 0.3, 0.7);
+          // the rush of the punch: streaks running up the arm
+          for (let i = 0; i < 6; i++) G.fx.spawn({ kind: 'spark', x: this.x + G.rand(-30, 30), y: FLOOR - G.rand(10, 120), vx: G.rand(-30, 30), vy: -G.rand(900, 1500), life: G.rand(0.12, 0.22), size: G.rand(1.4, 2.4), color: VC.blood, len: 0.05, drag: 3 });
+        }
+        // up fast with a little overshoot, held at the top, then down slower than it came
+        this.rise = e < RISE ? E.outBack(e / RISE) : e < RISE + HOLD ? 1 : Math.max(0, 1 - E.inQuad(Math.min(1, (e - RISE - HOLD) / DROP)));
+        if (e > RISE + HOLD + DROP + FADE) this.dead = true;
+      },
+      hits(P) {
+        if (!this.live) return false;
+        const top = FLOOR - this.reach * Math.min(1, this.rise);
+        return G.rectsOverlap(P.box(), { cx: this.x, cy: (top + FLOOR) / 2, hw: this.hw, hh: (FLOOR - top) / 2 });
+      },
+      danger() { return this.t < this.fireAt + RISE + HOLD ? [this.x, this.hw + 16, this.fireAt - this.t] : null; },
+      draw(ctx) {
+        const e = this.t - this.fireAt, VC = VCOL();
+        const bloom = E.outBack(Math.min(1, this.t / 0.2));
+        const glow = e < 0 ? G.clamp(1 + e / 0.35, 0, 1) * (0.8 + 0.2 * Math.sin(this.t * 40)) : 1;
+        const fade = e < RISE + HOLD + DROP ? 1 : Math.max(0, 1 - (e - RISE - HOLD - DROP) / FADE);
+        drawPrint(ctx, this.x, bloom, glow * fade, fade, this.side);
+        if (this.rise <= 0) return;
+        const top = FLOOR - this.reach * this.rise, fy = top + 42;
+        ctx.save();
+        ctx.beginPath(); ctx.rect(this.x - 150, -400, 300, FLOOR + 401); ctx.clip();
+        // the forearm: void, edged in blood, coming up out of the print
+        if (fy + 24 < FLOOR) {
+          const g = ctx.createLinearGradient(0, fy, 0, FLOOR);
+          g.addColorStop(0, '#14050c'); g.addColorStop(1, '#020001');
+          ctx.fillStyle = g;
+          ctx.beginPath(); ctx.moveTo(this.x - 33, FLOOR + 2); ctx.lineTo(this.x - 25, fy + 24); ctx.lineTo(this.x + 25, fy + 24); ctx.lineTo(this.x + 33, FLOOR + 2); ctx.closePath(); ctx.fill();
+          ctx.globalCompositeOperation = 'lighter';
+          ctx.strokeStyle = G.rgba(VC.blood, 0.55); ctx.lineWidth = 2;
+          ctx.beginPath(); ctx.moveTo(this.x - 33, FLOOR); ctx.lineTo(this.x - 25, fy + 24); ctx.moveTo(this.x + 33, FLOOR); ctx.lineTo(this.x + 25, fy + 24); ctx.stroke();
+          ctx.globalCompositeOperation = 'source-over';
+        }
+        // and the fist: the Warden's own, clenched, knuckles up, leaning into the blow
+        ctx.translate(this.x, fy); ctx.rotate(this.side * 0.1 * this.rise); ctx.scale(0.7, 0.7);
+        FIST.side = this.side;
+        drawHand(ctx, FIST);
+        ctx.restore();
+      },
+    });
+  }
+
+  function* atkAfterhands() {
+    const c = B.core, T = G.diff().tele, P = G.player;
+    const hands = usableHands(), shards = !hands.length && B.hasShards;
+    const n = [0, 5, 6, 7][B.phase], gap = [0, 0.2, 0.18, 0.16][B.phase], lag = 0.3, beat = 0.42 * T, roll = 0.11;
+    const home = HOME_Y[B.phase];
+    c.ctrl = true;
+    // where the hero has been: each print goes where they were a moment ago
+    const hist = [];
+    const track = () => { hist.push(B.t, P.x); };
+    const pastX = (t) => { for (let i = hist.length - 2; i >= 0; i -= 2) if (hist[i] <= t) return hist[i + 1]; return hist.length ? hist[1] : P.x; };
+    // the tell: the eye shuts, and the hands lay themselves down on the floor ...
+    G.audio.play('charge', { dur: 0.9 * T });
+    const lay = [tween(c, { y: home + 26, open: 0.05 }, 0.55)];
+    for (const h of hands) {
+      h.ctrl = true; h.stuck = false;
+      h.sunk = 0.5; // (lying on the floor: drawn cut off at it, still within reach)
+      lay.push(tween(h, { x: G.clamp(c.x + h.side * 290, 110, 1170), y: FLOOR - 56, rot: -h.side * Math.PI / 2, curl: 0.05 }, 0.55));
+    }
+    if (shards) {
+      // (with no hands left, its shards come down point first and go in instead)
+      B.shardSink = 0; B.shardHold = true;
+      B.shardPose = (i) => ({ x: c.x + (i - 2.5) * 96, y: G.lerp(FLOOR - 64, FLOOR + 50, B.shardSink), a: 0 });
+      lay.push(tween(B, { shardPoseK: 1 }, 0.55));
+    }
+    yield* par(...lay);
+    for (const h of hands) G.fx.thud(h.x, FLOOR, 0.6, { noCrack: true });
+    yield* wait(0.1 * T); // a breath, palms on the stone
+    // ... and sink into it, as if listening for footsteps
+    for (const h of hands) h.sunk = 1;
+    G.audio.play('pull');
+    const holes = hands.map((h) => h.x).concat(shards ? [c.x] : []);
+    const pool = sketch(function (ctx) {
+      // where they went in, the floor is a hole of void
+      if (this.out && this.t0 == null) this.t0 = this.t;
+      const k = Math.min(1, this.t / 0.3) * (this.t0 == null ? 1 : Math.max(0, 1 - (this.t - this.t0) / 0.5));
+      if (k <= 0) return;
+      for (const x of holes) {
+        const w = (shards ? 300 : 80) * (0.94 + 0.06 * Math.sin(this.t * 5 + x));
+        ctx.fillStyle = 'rgba(4,0,2,' + (0.75 * k) + ')';
+        ctx.beginPath(); ctx.ellipse(x, FLOOR + 1, w, 8, 0, 0, G.TAU); ctx.fill();
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.strokeStyle = G.rgba(VCOL().blood, 0.4 * k); ctx.lineWidth = 2; ctx.stroke();
+        ctx.globalCompositeOperation = 'source-over';
+      }
+    });
+    const sinkT = 0.4 * T;
+    const sink = [tween(c, { y: home + 40 }, sinkT)];
+    for (const h of hands) sink.push(tween(h, { y: FLOOR + 100 }, sinkT, E.inCubic));
+    if (shards) sink.push(tween(B, { shardSink: 1 }, sinkT, E.inCubic));
+    sink.push((function* () {
+      let e = 0;
+      while (e < sinkT) {
+        const dt = yield;
+        e += dt; track();
+        for (const x of holes) if (Math.random() < dt * 30) G.fx.spawn({ x: x + G.rand(-60, 60), y: FLOOR - 2, vx: G.rand(-20, 20), vy: -G.rand(40, 120), life: G.rand(0.4, 0.8), size: G.rand(4, 8), color: VCOL().void, wob: 30 });
+      }
+    })());
+    yield* par(...sink);
+    G.fx.shake(5);
+    for (const x of holes) G.fx.dust(x, FLOOR, 3, { speed: [30, 120], size: [8, 13], life: [0.5, 0.9], up: 40, a: 0.3, color: '40,10,24', jitter: 40 });
+    // listening: the shut eye trembles while the prints follow the hero
+    c.jit = 0.7;
+    for (let i = 0; i < n; i++) {
+      track();
+      afterhand(G.clamp(pastX(B.t - lag), WL + 44, WR - 44), (n - 1 - i) * gap + beat + i * roll, i % 2 ? 1 : -1, i === n - 1);
+      G.audio.play('blink');
+      let w = 0;
+      while (w < gap) { w += yield; track(); }
+    }
+    // the eye flies open as the first fist comes (quick, but a tween, not a cut)
+    yield* wait(Math.max(0, beat - gap - 0.2));
+    c.jit = 0;
+    yield* tween(c, { open: 1 }, 0.2, E.inOutQuad);
+    c.charge = 1;
+    yield* wait((n - 1) * roll + 0.3);
+    // back to rest: the hands climb back out of the floor, and the core rises to its place
+    c.charge = 0;
+    pool.out = true;
+    B.shardHold = false;
+    const up = [tween(c, { y: home }, 0.65)];
+    for (const h of hands) {
+      // up out of the floor to its place beside the core, a little past it, and settling back
+      const hx = G.clamp(c.x + h.side * B.spread, 90, 1190), hy = home + 128;
+      up.push((function* () { yield* tween(h, { x: hx, y: hy - 22, rot: h.side * 0.1, curl: 0.3 }, 0.55); yield* tween(h, { y: hy, curl: 0.15 }, 0.22, E.inOutQuad); })());
+    }
+    yield* par(...up);
+    pool.dead = true;
+  }
+
+  // Pendulum: the core is torn loose on a chain of void and swings across the arena like a bell's
+  // clapper, lowest (hero height) in the middle, three or four swings each faster than the last,
+  // throwing embers off the floor at each pass; then it hangs at one end until the chain gives, and
+  // comes down. Go through it at the bottom (a jump, or a dash). High up is no shelter: the arc rises
+  // to the sides, and the slabs in its way are knocked down. Nor are the ends: the embers land there,
+  // and the last blow falls on the end the hero was hugging.
+  // (at the bottom the disc gouges the floor: low enough that nothing on the ground is under it,
+  // and a double jump clears it with room to spare)
+  const PIV_X = 640, PIV_Y = -700, CHAIN = FLOOR - 66 - PIV_Y, SWING = 0.43;
+  const swingAt = (th, R) => ({ x: PIV_X + Math.sin(th) * (R || CHAIN), y: PIV_Y + Math.cos(th) * (R || CHAIN) });
+  // A point on the chain d above the core's centre, set off to one side of it, and the chain's lean.
+  function onChain(d, off) {
+    const c = B.core, dx = PIV_X - c.x, dy = PIV_Y - c.y, L = Math.hypot(dx, dy) || 1, ux = dx / L, uy = dy / L;
+    return { x: c.x + ux * d - uy * off, y: c.y + uy * d + ux * off, lean: Math.atan2(uy, ux) + Math.PI / 2 };
+  }
+  // Where a hand holds the chain: j = 0 just above the core, 1 further up; the palm beside the chain,
+  // the curled fingers over it.
+  function grip(j, side) {
+    const q = onChain(B.core.r + 62 + j * 104, side * 44);
+    return { x: q.x, y: q.y, rot: -side * Math.PI / 2 + q.lean };
+  }
+
+  // The swinging core: contact, and the slabs it (or its chain) knocks out of the sky.
+  function pendulumBody() {
+    return H.add({
+      kind: 'pendulum', layer: 'under', dmg: 1, x: 640, srcX: 640,
+      update() {
+        const c = B.core;
+        this.x = this.srcX = c.x;
+        for (const p of G.arena.platforms) {
+          if (p.gone || p.rise < 0.6 || p.downT > 0) continue;
+          const byCore = G.circleRect(c.x, c.y, c.r * 0.9, { cx: p.x + p.w / 2, cy: p.y + 8, hw: p.w / 2, hh: 10 });
+          const t = (p.y - PIV_Y) / (c.y - PIV_Y), cx = PIV_X + (c.x - PIV_X) * t;
+          const byChain = B.chain && !B.chain.snap && t > 0 && t < 1 && cx > p.x && cx < p.x + p.w;
+          if (!byCore && !byChain) continue;
+          G.arena.dropPlatform(p, 4.5);
+          const px = byCore ? G.clamp(c.x, p.x, p.x + p.w) : cx;
+          G.audio.play('boom'); G.fx.shake(8);
+          G.fx.burst(px, p.y + 6, { n: 12, color: '22,10,18', speed: [150, 520], life: [0.6, 1.2], size: [5, 11], kind: 'chunk', grav: 1500 });
+          G.fx.burst(px, p.y + 6, { n: 10, color: VCOL().blood, speed: [150, 520], life: [0.15, 0.4], kind: 'spark', size: [2, 4], grav: 700 });
+          G.fx.dust(px, p.y, 5, { speed: [40, 220], size: [8, 14], life: [0.5, 1], up: 50, jitter: 40 });
+        }
+      },
+      hits(P) { const c = B.core; return G.circleRect(c.x, c.y, c.r * 0.86, P.box()); },
+      // dangerous at the hero's height only where its arc comes down that far
+      danger(P) { const c = B.core, b = P.box(); return Math.abs(c.y - b.cy) < c.r + b.hh + 12 ? [c.x, c.r + 24, 0] : null; },
+    });
+  }
+
+  function* atkPendulum() {
+    const c = B.core, T = G.diff().tele, P = G.player;
+    const hands = usableHands(), shards = !hands.length && B.hasShards;
+    const n = B.phase === 3 ? 4 : 3, slow = gentle() ? 1.15 : 1, durs = [1.2, 1.0, 0.86, 0.74];
+    const end = P.x < 640 ? -1 : 1;    // it will come down at the end the hero is at now,
+    const s0 = n % 2 ? -end : end;      // so it is hauled back to whichever side makes that so
+    c.ctrl = true;
+    const ch = B.chain = { k: 0, strain: 0, snap: 0, trail: [] };
+    // a chain of void comes down out of the dark and takes the core
+    G.audio.play('pull');
+    const order = hands.slice().sort((a, b) => b.side - a.side); // the right hand lower, the left above it
+    const settle = [tween(ch, { k: 1 }, 0.55, E.inCubic), tween(c, { x: 640, y: HOME_Y[B.phase] - 16 }, 0.55)];
+    for (const h of order) { h.ctrl = true; h.stuck = false; settle.push(tween(h, { y: h.y - 30, curl: 0.5 }, 0.55)); }
+    yield* par(...settle);
+    // torn loose
+    G.audio.play('boom'); G.fx.shake(9); G.fx.ripple(c.x, c.y, 300, 0.35, 0.9);
+    G.fx.burst(c.x, c.y - c.r, { n: 14, color: VCOL().void, speed: [60, 260], life: [0.5, 1], size: [4, 9] });
+    G.fx.burst(c.x, c.y - c.r, { n: 10, color: VCOL().blood, speed: [150, 500], life: [0.15, 0.4], kind: 'spark', size: [2, 4] });
+    c.kick = 1; c.jit = 2.5;
+    // the tell: torn loose, the core sags down on the chain, and both hands catch hold of it above the core ...
+    if (shards) {
+      // (with no hands left, its shards clamp on the chain in pairs instead)
+      B.shardHold = true;
+      B.shardPose = (i) => { const q = onChain(c.r + 46 + Math.floor(i / 2) * 58, i % 2 ? 22 : -22); return { x: q.x, y: q.y, a: q.lean }; };
+    }
+    const from = order.map((h) => ({ x: h.x, y: h.y, rot: h.rot, curl: h.curl })), cy0 = c.y, takeT = 0.55;
+    let e = 0, caught = false;
+    while (e < takeT) {
+      const dt = yield;
+      e += dt;
+      const k = Math.min(1, e / takeT), kh = E.inOutCubic(k);
+      // a heavy thing dropping until the chain catches it short: it falls, dips past, and settles
+      const fall = k < 0.55 ? 1.1 * (k / 0.55) * (k / 0.55) : 1 + 0.1 * (1 - E.inOutCubic((k - 0.55) / 0.45));
+      c.y = G.lerp(cy0, 350, fall);
+      if (k >= 0.55 && !caught) { caught = true; G.audio.play('stomp'); G.fx.shake(5); c.kick = 0.6; }
+      c.jit = 2.5 * (1 - k);
+      // the hands home in on a grip that is itself still moving, and are on it exactly at the end
+      order.forEach((h, j) => { const g = grip(j, h.side), f = from[j]; h.x = G.lerp(f.x, g.x, kh); h.y = G.lerp(f.y, g.y, kh); h.rot = G.lerp(f.rot, g.rot, kh); h.curl = G.lerp(f.curl, 1, kh); });
+      if (shards) B.shardPoseK = kh;
+    }
+    c.jit = 0;
+    // ... and haul it back, the chain paying out, with a creak
+    G.audio.play('pull');
+    const R0 = Math.hypot(c.x - PIV_X, c.y - PIV_Y), haulT = 0.85 * T;
+    e = 0;
+    while (e < haulT) {
+      const dt = yield;
+      e += dt;
+      const k = E.inOutCubic(Math.min(1, e / haulT));
+      const p = swingAt(s0 * SWING * k, G.lerp(R0, CHAIN, k));
+      c.x = p.x; c.y = p.y;
+      order.forEach((h, j) => { const g = grip(j, h.side); h.x = g.x; h.y = g.y; h.rot = g.rot; });
+      ch.strain = k * 0.6;
+    }
+    // held at full draw: the chain strains and the hands tremble on it
+    G.audio.play('charge', { dur: 0.32 * T });
+    e = 0;
+    while (e < 0.32 * T) {
+      const dt = yield;
+      e += dt;
+      c.jit = 1.2; ch.strain = 0.6 + 0.4 * Math.min(1, e / (0.32 * T));
+      for (const h of order) h.kx = G.rand(-3, 3);
+      if (Math.random() < dt * 24) { const q = onChain(c.r + G.rand(20, 320), 0); G.fx.spawn({ kind: 'spark', x: q.x, y: q.y, vx: G.rand(-120, 120), vy: G.rand(-120, 40), life: G.rand(0.1, 0.25), size: G.rand(1.2, 2.2), color: VCOL().blood, len: 0.05 }); }
+    }
+    c.jit = 0; ch.strain = 0.35;
+    // let go: the hands throw it, open, and pull back up into the dark out of its way; it falls
+    B.shardHold = false;
+    const clearing = par(...order.map((h) => tween(h, { x: h.x + h.side * 90, y: -190, rot: h.side * 0.5, curl: 0.05 }, 0.6, E.inOutCubic)));
+    let cleared = !order.length;
+    const body = pendulumBody();
+    let th0 = s0 * SWING;
+    for (let i = 0; i < n; i++) {
+      const d = durs[i] * slow, dir = -Math.sign(th0);
+      G.audio.play('whoosh');
+      let passed = false;
+      e = 0;
+      while (e < d) {
+        const dt = yield;
+        e += dt;
+        // a pendulum's own motion: slow at the ends, fastest through the bottom
+        const p = swingAt(th0 * Math.cos(Math.PI * Math.min(1, e / d)));
+        c.x = p.x; c.y = p.y;
+        ch.trail.push({ x: c.x, y: c.y, t: B.t });
+        while (ch.trail.length && ch.trail[0].t < B.t - 0.22) ch.trail.shift();
+        if (!cleared) cleared = clearing.next(dt).done;
+        if (Math.random() < dt * 40) G.fx.spawn({ x: c.x + G.rand(-60, 60), y: c.y + G.rand(-60, 60), vx: -dir * G.rand(20, 80), vy: -G.rand(10, 60), life: G.rand(0.4, 0.8), size: G.rand(4, 8), color: VCOL().void, wob: 30 });
+        if (!passed && e >= d / 2) { passed = true; scrape(dir, i === n - 1); }
+      }
+      th0 = -th0;
+      // at the top of each swing it hangs for a breath, and tolls
+      G.audio.play('bell'); G.fx.shake(3);
+      if (i < n - 1) yield* wait(0.05);
+    }
+    // the end: it hangs at the top of its last swing, the chain draws it up as it strains ... and gives
+    const m = columnMark(c.x, 236), hangT = 0.65 * T, y0 = c.y;
+    G.audio.play('charge', { dur: hangT });
+    e = 0;
+    while (e < hangT) {
+      const dt = yield;
+      e += dt;
+      const k = Math.min(1, e / hangT);
+      m.k = k; m.locked = k > 0.7; ch.strain = 0.35 + 0.65 * k; c.jit = 2.2 * k;
+      c.y = y0 - 40 * E.outCubic(k);
+    }
+    c.jit = 0;
+    ch.snap = 0.001; // (it falls apart and fades: see drawChain)
+    G.audio.play('shatter');
+    body.dmg = 2;
+    yield* tween(c, { y: FLOOR - c.r + 16 }, 0.17, E.inQuad);
+    m.dead = true; body.dead = true;
+    impactFx(c.x, true);
+    crush(c.x, FLOOR - 70, 112, 80, 2);
+    G.fx.impact(c.x, FLOOR - 60, 0.07);
+    G.fx.crack(c.x, 2, VCOL().blood);
+    yield* wait(0.08);
+    c.embedded = true;
+    yield* tween(c, { open: 0.25 }, 0.2);
+    yield* wait(hard() ? 0.9 : 1.2); // spent and stuck in the floor: the opening
+    // back to rest: it works itself loose of the floor, then rises to its place; the hands come home with it
+    yield* tween(c, { y: c.y + 8, open: 0.5 }, 0.16, E.inOutQuad);
+    c.embedded = false;
+    G.fx.dust(c.x, FLOOR, 4, { speed: [30, 140], size: [8, 14], life: [0.5, 1], up: 50, a: 0.36, jitter: 50 });
+    // (to where its idle drift will be when it gets there, so the drift takes over without a jolt)
+    const hx = 640 + Math.sin((B.t + 0.8) * 0.45) * (B.phase === 3 ? 190 : 70);
+    const home = [tween(c, { x: hx, y: HOME_Y[B.phase], open: 1 }, 0.8, E.inOutCubic)];
+    for (const h of order) home.push(tween(h, { x: G.clamp(hx + h.side * B.spread, 90, 1190), y: HOME_Y[B.phase] + 128, rot: h.side * 0.1, curl: 0.15 }, 0.8, E.inOutCubic));
+    yield* par(...home);
+
+    // the bottom of a pass: it scrapes the floor and throws embers on ahead, to land at the end it is
+    // swinging to (not on the last pass: what lands on that end is the core itself)
+    function scrape(dir, last) {
+      const VC = VCOL();
+      G.audio.play('streak'); G.fx.shake(6); G.fx.kick(dir * 3, 0);
+      G.fx.scorch(c.x, 80, VC.blood);
+      G.fx.burst(c.x, FLOOR - 4, { n: 18, color: VC.blood, speed: [200, 700], angle: dir > 0 ? -Math.PI + 0.45 : -0.45, spread: 0.8, life: [0.15, 0.45], kind: 'spark', size: [2, 4], grav: 900 });
+      G.fx.dust(c.x, FLOOR, 4, { dir: -dir, speed: [60, 240], size: [8, 14], life: [0.4, 0.9], up: 40, a: 0.36, color: '40,10,24' });
+      const cnt = last ? 0 : (B.phase === 3 ? 4 : 3) + (hard() ? 1 : 0);
+      for (let k = 0; k < cnt; k++) H.orb(c.x + dir * 40, FLOOR - 50, dir * G.rrand(240, 520), -G.rrand(460, 700), { grav: 1100, r: 11 });
+    }
   }
 
   const ATTACKS = B.ATTACKS = {
@@ -1354,6 +1819,7 @@
     fan: atkFan, cage: atkCage, swat: atkSwat, duet: atkDuet, duetSlam: atkDuetSlam, duetSweep: atkDuetSweep,
     dive: atkDive, storm: atkStorm, wheel: atkWheel, singularity: atkSingularity,
     halo: atkHalo, supernova: atkSupernova,
+    afterhands: atkAfterhands, pendulum: atkPendulum,
   };
 
   // ------------------------------------------------------------------ update
@@ -1391,6 +1857,8 @@
         }
         continue;
       }
+      // a hand that sank into the floor (the Afterhands) is drawn cut off at the floor until it is clear of it
+      if (h.sunk && !h.ctrl && h.y < FLOOR - 60) h.sunk = 0;
       if (h.ctrl) continue;
       const tx = G.clamp(c.x + h.side * (B.spread + Math.sin(B.t * 0.8 + h.side) * 16), 90, 1190);
       const ty = c.y + 128 + Math.cos(B.t * 1.1 + h.side * 2) * 18;
@@ -1420,6 +1888,10 @@
 
     // shards circle the core in phase 3; the halo attack widens the circle into a ring of blades
     B.shardA += B.shardSpin * dt;
+    // shards a script held in a pose (the corrupted attacks) drift back to their circle once let go
+    if (!B.shardHold && B.shardPoseK > 0) B.shardPoseK = Math.max(0, B.shardPoseK - dt * 2.2 * (0.4 + B.shardPoseK));
+    // a chain of void that has been let go or has snapped falls apart and fades
+    if (B.chain && B.chain.snap) { B.chain.snap += dt; if (B.chain.snap > 0.6) B.chain = null; }
     if (B.hasShards) B.shardR = G.damp(B.shardR, B.shardsOut ? 1100 : (B.haloR || c.r + 74), B.shardsOut ? 3 : 5, dt);
 
     // contact damage while a part is mid-attack
@@ -1627,16 +2099,73 @@
     ctx.restore();
   }
 
+  // The Pendulum's chain of void, from the dark above down to the core, and the smear the core leaves
+  // as it swings. Once it snaps (or is let go) its links fly apart, fall and fade.
+  function drawChain(ctx) {
+    const ch = B.chain;
+    if (!ch || B.dead) return;
+    const c = B.core, VC = VCOL(), sn = ch.snap || 0, fade = sn ? Math.max(0, 1 - sn / 0.6) : 1;
+    // the smear: void, edged in blood, gone in a fifth of a second
+    for (const q of ch.trail) {
+      const k = 1 - (B.t - q.t) / 0.22;
+      if (k <= 0) continue;
+      ctx.fillStyle = 'rgba(6,0,4,' + (0.2 * k * fade) + ')';
+      ctx.beginPath(); ctx.arc(q.x, q.y, c.r * (0.55 + 0.4 * k), 0, G.TAU); ctx.fill();
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.strokeStyle = G.rgba(VC.blood, 0.07 * k * fade); ctx.lineWidth = 2; ctx.stroke();
+      ctx.globalCompositeOperation = 'source-over';
+    }
+    const dx = PIV_X - c.x, dy = PIV_Y - c.y, L = Math.hypot(dx, dy) || 1, ux = dx / L, uy = dy / L;
+    const ax = c.x + ux * c.r * 0.92, ay = c.y + uy * c.r * 0.92, lean = Math.atan2(uy, ux) + Math.PI / 2;
+    const sTop = uy < -0.05 ? Math.min(L, (-60 - ay) / uy) : L; // where it leaves the top of the picture
+    const s0 = sTop * (1 - ch.k), strain = ch.strain || 0;      // while it comes down, its end is up the line
+    ctx.save();
+    ctx.globalAlpha = fade;
+    for (let s = s0, j = 0; s < sTop + 40; s += 19, j++) {
+      let x = ax + ux * s, y = ay + uy * s, rot = lean;
+      if (sn) {
+        // snapped: each link flies off its own way and falls
+        const r = Math.abs(Math.sin(j * 12.9898) * 43758.5453) % 1;
+        x += (r - 0.5) * 220 * sn; y += (0.4 + r) * 1100 * sn * sn - 60 * sn * r; rot += (r - 0.5) * 14 * sn;
+      } else if (strain > 0.6) x += G.rand(-1, 1) * (strain - 0.6) * 5;
+      ctx.save();
+      ctx.translate(x, y); ctx.rotate(rot);
+      if (j % 2 === 0) {
+        // a link seen face on ...
+        ctx.beginPath(); ctx.ellipse(0, 0, 7, 13, 0, 0, G.TAU);
+        ctx.strokeStyle = '#090206'; ctx.lineWidth = 5; ctx.stroke();
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.strokeStyle = G.rgba(VC.blood, 0.3 + 0.5 * strain); ctx.lineWidth = 1.6; ctx.stroke();
+      } else {
+        // ... and the next, edge on
+        G.roundRect(ctx, -2.5, -14, 5, 28, 2.5);
+        ctx.fillStyle = '#090206'; ctx.fill();
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.strokeStyle = G.rgba(VC.blood, 0.22 + 0.4 * strain); ctx.lineWidth = 1.2; ctx.stroke();
+      }
+      ctx.restore();
+    }
+    ctx.restore();
+  }
+
   function drawShards(ctx) {
     if (!B.hasShards) return;
     const P = G.pal(), c = B.core;
+    const pk = B.shardPose ? B.shardPoseK : 0;
     for (let i = 0; i < 6; i++) {
       const a = B.shardA + i * G.TAU / 6;
-      const x = c.x + Math.cos(a) * B.shardR, y = c.y + Math.sin(a) * B.shardR;
+      let x = c.x + Math.cos(a) * B.shardR, y = c.y + Math.sin(a) * B.shardR;
+      let rot = a + Math.PI / 2 + (B.shardsOut ? Math.PI / 2 : 0);
+      if (pk > 0) {
+        // held in a pose by a corrupted attack: sunk into the floor, or clamped on the chain
+        const q = B.shardPose(i), k = E.inOutCubic(Math.min(1, pk));
+        x = G.lerp(x, q.x, k); y = G.lerp(y, q.y, k); rot += G.angDiff(rot, q.a) * k;
+      }
       if (x < -80 || x > G.W + 80 || y < -80 || y > G.H + 80) continue;
       if (B.haloR && y > FLOOR + 12) continue; // a blade passing under the floor
       ctx.save();
-      ctx.translate(x, y); ctx.rotate(a + Math.PI / 2 + (B.shardsOut ? Math.PI / 2 : 0));
+      if (pk > 0) { ctx.beginPath(); ctx.rect(-200, -2000, G.W + 400, FLOOR + 2002); ctx.clip(); }
+      ctx.translate(x, y); ctx.rotate(rot);
       if (B.haloR) {
         // blades: larger, and lit in the warning colour
         ctx.scale(1.5, 1.5);
@@ -1666,6 +2195,8 @@
     const dimK = h.broken > 0 ? 0.2 : h.stuck ? 0.4 : 1;
     const j = h.hot > 0 && !h.hurt ? 1.6 : 0;
     ctx.save();
+    // sunk into the floor (the Afterhands): only what is above the floor shows
+    if (h.sunk) { ctx.beginPath(); ctx.rect(-200, -2000, G.W + 400, FLOOR + 2002); ctx.clip(); }
     ctx.translate(h.x + (h.kx || 0) + (j ? G.rand(-j, j) : 0), h.y + (j ? G.rand(-j, j) : 0));
     ctx.rotate(h.rot);
     ctx.scale(h.side, 1);
@@ -1763,6 +2294,7 @@
   };
 
   B.draw = function (ctx) {
+    drawChain(ctx);
     drawCore(ctx);
     if (!B.dead) {
       drawShards(ctx);

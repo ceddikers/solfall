@@ -2,7 +2,7 @@
 
 A side-on boss rush for the browser: four heroes, four three-phase bosses, played as a run of
 ever-harder trials. You pick a hero and a relic before the run and win a boon after each victory.
-Version 1.7a.
+Version 1.9b.
 
 This is an early slice of a planned boss-rush roguelite (short runs, a boon after each boss,
 bosses drawn from a pool). A run meets the four bosses in a shuffled order, then meets them again, harder.
@@ -59,8 +59,7 @@ menu options are places in it, left to right:
 | The campfire | nothing: it is where you arrive from the title screen |
 | The training yard | nothing to press: hit the sparring post. It shows the damage of your last flurry, cannot be destroyed, and charges Dawnbreak three times as fast, so every move can be tried here. Starlight starts full. |
 | The brazier | step the difficulty: Gentle, Standard, Merciless. The flame grows and changes colour with it. |
-| The banners | choose the first foe. One banner for each boss hangs on the rail; the lit one comes first, and all four lit means whoever comes. |
-| The proving ring | practise against the foe the banners show (or one at random), starting from phase I, II or III. No relic, no omen, no reward, nothing lost; R tries again. |
+| The proving ring | practise against any boss, starting from phase I, II or III. The first row of its menu chooses the foe (left / right; *Random* picks one). No relic, no omen, no reward, nothing lost; R tries again. (The banners that once stood before it went in v1.8c.) |
 | The reliquary | take the relic for your run. Each relic on offer (three, or four with the Shrine's Fourth Relic) turns over its own plinth; walk up to one to read it and press E to take it. You can change your mind until you go through the gate. The relic works at once, so it can be tried on the sparring post. |
 | The gate | begin the run with the relic you took. If you have not taken one, it asks you to choose from the same relics as a menu. You come back out of it when a run ends. |
 
@@ -106,13 +105,273 @@ hero (`tools/feel-check.js`).
 
 **Also new**
 
-- Your fastest first-trial win against each boss is kept per difficulty and shown at the banners, with how often you have beaten it.
+- Your fastest win against each boss is kept per difficulty and shown at the proving ring (for the foe last chosen there), with how often you have beaten it.
 - A welcome line the first time you arrive in the camp each session.
 - Dawnbreak in the camp only fires within reach of the sparring post.
 - The pause menu lists the trial's omen.
 - Settings, Reset progress erases Sunshards, upgrades, trophies and records (it has to be chosen twice).
 
 Not done: touch controls, a colour-blind alternative to red-orange warnings, gamepad rebinding.
+
+## Corrupted for real: twelve new attacks, a pitch-black look, and corrupted boons (v1.9b)
+
+**A corrupted boss is pitch black.** It is drawn as a black shape of itself with a thin, flickering
+crimson edge, and only its brightest parts burn through it in crimson: the Warden's dark sun and
+the eyes in its hands, the Magus's staff, the Leviathan's lure and teeth, a hit's flash. Crimson
+lightning crackles off it all the time, now and then striking the ground or (on the Warden) jumping
+between its core and hands. The dark aura, the black motes, the two torn shadows and the sideways
+tear are kept. Nothing in it is bright except thin lines. A boss can keep scenery out of the black
+shape (`B.corruptBehind` / `B.corruptFront`, used by the Leviathan for its flotsam, wave and surge) and
+draw other parts of itself black with `G.corrupt.silhouette` (its coils far out in the sea).
+
+**Each boss has two attacks only its corrupted self uses**, none of them a mechanic the game had before.
+The first is in every phase and opens the fight; the second joins in phase II and opens it.
+
+| Boss | From phase I | From phase II |
+|---|---|---|
+| The Warden | **Afterhands**: its eye shuts and its hands sink flat into the floor; void handprints bloom where you stood a moment ago, following you, and then fists punch up from each in the order they were laid. Keep moving; never double back. | **Pendulum**: a void chain takes the core, the hands haul it back with a creak, and it swings across the arena three or four times, faster each time, low at the bottom and high at the ends, throwing embers; then it hangs over one end and slams down. Dash or double-jump through it at the bottom. |
+| The Magus | **Black Sun**: staff raised in both hands, its three lights going out; a black sun rises and void pours down in columns over the whole floor but one gap of light, which slides and turns (the corona swells before a turn). Walk with the light. | **Foresight**: its head tracks you and its eyes narrow to a slit; a crimson thread runs to where you *will* be, then a black spear flies down it. Stop, turn or dash the other way. |
+| The Veil | **Past Self**: she pins your shadow with her blade and it tears loose as a black copy of you that repeats everything you did 1.2 seconds ago, swings included (two copies in phase III), while she lobs knives. Don't go back the way you came. | **Threads**: hands drawn back with strings between the fingers; a pin is thrown into the floor and its thread ties you to it, and she cuts across the circle it allows. Cut the pin (it throws her down, open), dash as the thread lashes, or dodge inside the circle. |
+| The Knight | **Requiem**: the music drops out and his blade goes black; he makes four to six silent cuts through empty air, each leaving a crimson tear hanging, then all open at once (sword planted) or one by one, last first (sword shouldered). | **Colossus**: he kneels, sword raised point up; a giant void sword gathers above, follows you, plunges into the floor, then creaks over and falls like a felled tree. Dodge the plunge, then get to the side it is not leaning toward. |
+| The Wolf | **Pack**: its fire goes black and it leaps to a crag at the back to howl; crimson eyes open at the arena's edges (low for a runner, high for a leaper) and shadow wolves run across one after another. Jump or dash runners, stay under leapers. | **Ricochet**: it crouches, spine arched, and spins once as its fire goes black, then becomes a void comet bouncing off floor, walls and sky in straight lines, the next line drawn faintly before it is travelled. Be off the next line. |
+| The Leviathan | **Hydra**: its throat swells black and a crimson crack beats in the floor; a second head of void tears up on your other side and the two bite in turn, then both at once, stopping a stride apart. Step into the ground the last bite left; for the last, stand between. | **Undertow**: head flat at the wall, jaw unhinged, gills pumping: the floor floods black and runs toward it, dragging you, with void mines riding the current; then it rears and its jaws close over the near side. Walk against it, cut the mines, be clear when it closes. |
+
+Every one was stepped through frame by frame for clean motion (no popping, snapping or sliding; tells,
+wind-ups and returns to rest in each boss's own manner), and passes the scripted player in
+`tools/boss-tests.js` (the Warden's in `tools/dodge-tests.js`, now 52 tests) without losing health.
+
+**Corrupted boons.** Eight crimson boons, far stronger than the rest, each with a drawback written under
+it ("But: ..."). Once a boss has fallen, a corrupted boon takes one card's place on two offers in five.
+It does not show itself at first: each is a twisted form of an ordinary boon (Bloodied Edge of Keen
+Edge, Hollow Crown of Steady Heart, Void Step of Twin Dash, Starving Star of Bright Vein, Whispering Dark
+of Long Reach, Borrowed Time of Second Dawn, Feral Rhythm of Quick Hands, Ravenous Light of Swift Mend),
+and it stands on its plinth looking like that boon. When you come near the offering (or after a few
+seconds on the road) the corruption takes it: its light stutters, crimson cracks run out from the stone,
+its white heart darkens and it shakes harder, and then
+it breaks with a crack and re-forms crimson and black-hearted, with lightning round it. Nothing can be
+taken from it while it turns, and its card only appears once it has. A redrawn offering hides its
+corrupted boon again. The plinths carry no names: a boon is read on its card, by standing at it.
+
+| Boon | What it gives | Its drawback |
+|---|---|---|
+| Bloodied Edge | Weapon damage +60% | Every blow you take costs one more health |
+| Hollow Crown | Three more health | You cannot mend |
+| Void Step | Dashes recover twice as fast; a dash through the boss cuts it for 40 | Where a dash begins, the floor tears and bursts a moment later |
+| Starving Star | Starlight fills twice as fast | Land no blow for three seconds and your Starlight drains |
+| Whispering Dark | Everything you do deals 30% more | Every 16 to 26 seconds the ground under you is marked, and bursts |
+| Borrowed Time | Once per trial, a killing blow leaves you on 2 health and throws the boss down | After two minutes in a fight, the void takes a health every eight seconds (never the last) |
+| Feral Rhythm | Attack 35% faster | A blow you take empties your Starlight |
+| Ravenous Light | Every twelfth blow you land mends one health | Each blow you take gives the boss back 4% of its health (never past the top of its phase) |
+
+**The Cleansing Fountain** stands at the crossroads, between the offering and the portals: a stone basin
+of pale water under a hooded figure, with crimson threads in the water while you carry a drawback.
+Press E at it to choose a corrupted boon and purge its drawback, keeping the rest. It costs Sunshards:
+40 the first time in a run, then 80, 160 and so on. A cleansed boon shows pale in the HUD and
+"(cleansed)" in the pause menu.
+
+## Portals, and corruption (v1.9a)
+
+**You choose the road.** The first trial of a run is still drawn at random, but after that the road
+between trials ends at **the crossroads**: a portal for every boss, standing in a row past the
+offering. Take a boon from the offering, then walk into the portal of the boss you want to fight next
+and press E. A beaten boss's portal is stopped with a cracked slab. The victory screen still never
+names the next foe, because you pick it.
+
+**The seventh portal** stands at the far end, taller than the others, with six sockets round its
+arch that light as you beat each boss. It is dormant: the final fight is still to come. Once all six
+are beaten it stirs, with a pale light behind a crack in it, but it does not open (not yet).
+
+**Corrupted portals.** After a normal victory there is a 30% chance that the portal of a boss you
+have already beaten turns **corrupted** (never the one just beaten, at most two waiting at once, each
+boss at most once a run, and only once two are beaten). The victory screen says so. A corrupted portal
+is a hole of void rimmed in blood, its rings turning the wrong way, with a red eye in it that blinks.
+
+A corrupted fight is **optional** and does not count as a trial: a run is won with or without it, and
+the portals stay open after trial VI if you want them. The boss is far stronger: half again the
+health, warnings 15% shorter, 22% less rest, its Merciless patterns, and always two omens. It also
+looks plainly wrong: its arena and colours are drained to void and crimson, a dark aura with a
+crimson edge that will not settle surrounds it, black motes bleed off it, two torn afterimages (one
+cold, one blood-red) drift off its outline, and every second or two the whole figure jerks sideways.
+Its bar reads *Corrupted* in crimson.
+
+Winning it **cleanses** the portal (sealed for good) and pays **three times the Sunshards** and a
+**second relic**: the plinths on the road offer three relics you do not hold instead of boons. The
+second relic shows beside the first in the fight and the pause menu. Falling in a corrupted fight
+ends the run like any other fall: that is the price.
+
+Once the run is won, the broken arch you came in by glows gold: walk back to it for **the way home**.
+
+## No banners (v1.8c)
+
+The row of boss banners before the gate is gone. Who you practise against is now the first row of the
+Proving Ring's own menu (left / right to change it), and the ring's label shows your record against
+that foe.
+
+## The road between, pairs you can read, and two new bosses (v1.8b)
+
+**Six bosses.** The Cinder Wolf (`js/wolf.js`) and the Drowned Leviathan (`js/leviathan.js`) join the
+four, so every run now meets each of the six once, in an order you never know (see "The bosses" below).
+Each has a feat on the Tally (*Floored*, *Hold fast*) and a trophy relic: **Cinder Pelt** (a dash fills
+Starlight as a hit does, and dashes recover 20% faster) and **Drowned Pearl** (one more health, and
+Starlight fills 25% faster). A boss file now brings its own palette,
+skyline painter (`G.SCENES`), weather, platform layouts and sounds (`G.audio.define`), and adds itself
+to `G.BOSS_IDS`, so a boss can be added without touching the shared files.
+
+
+**A rest between trials, instead of a menu.** After a victory the result screen shows your grade and
+then *Rest, and choose a boon*, which takes you out onto **the road between** (`js/rest.js`): a short
+night road with a fire, the boons on offer turning over their plinths, and a gate onward.
+
+- Walk up to a plinth and its boon appears as a card at the top of the view; **E** takes it. It
+  works at once, so you feel it before the next fight. One boon per rest.
+- **Second Thoughts** (the Shrine's redraw) is a standing stone on the road, there while you have
+  redraws left and have not yet taken a boon.
+- **The road on** stays dark until you have taken a boon, then opens onto the next trial. It never
+  says who waits there.
+- Nothing on the road can hurt you; Esc pauses as anywhere else, and *Return to camp* ends the run.
+- The Dawnbreak meter carries over through the rest, as it did before.
+
+**Pairs, underlined.** Every boon that belongs to a pair names it in its text, underlined in gold:
+*"Pairs with Comet Step: Shooting Star"*, or, once you hold the other half, *"With your Twin Dash, it
+opens the pair Shooting Star"*. Hover the name for a tooltip with the pair's effect (with a gamepad the
+tooltip shows on the focused card). The same notes appear on the road's cards and in the pause menu's
+list of what you carry.
+
+## A run with a shape, and boons that pair (v1.8a)
+
+**A run is six fights, and you never know the order.** The bosses are drawn at random when the run
+starts and you meet each one when the gate opens on it: the victory screen no longer names who is
+next, and you choose who to practise against only in the Proving Ring's menu. A seventh
+fight, always the same final one, is planned and not built yet, so for now **winning the sixth fight
+wins the run**: the victory screen says *The run is won*, offers no boon, and sends you back to camp.
+The gate counts the runs you have won on each difficulty.
+
+There are only four bosses so far, so fights five and six are two of them met a second time (never the
+one you just beat), in their Merciless form as before. Once there are six bosses, each run will meet
+all six once.
+
+**Pairs.** Six gold boons are offered only once you hold both of the two boons each one joins. When
+one is open to you, it takes the place of one card on half the offers. A card that would open a pair
+with a boon you already hold says so, so a build can be steered towards one.
+
+| Pair | Joins | Effect |
+|---|---|---|
+| Shooting Star | Twin Dash + Comet Step | Comet Step cuts twice as hard, and a dash that cuts has no wait after it and gives your air dashes back |
+| Tidecutter | Crescent + Long Reach | Crescent waves fly twice as far and hit twice as hard |
+| Wellspring | Bright Vein + Fourth Star | a perfect dodge fills a whole segment of Starlight |
+| Ember Ward | Swift Mend + Steady Heart | mending also wards you: the next blow within 4 seconds is turned aside |
+| Dying Light | Second Dawn + Glass Star | when Second Dawn saves you, the boss is thrown down at once |
+| Edge of Day | Keen Edge + Quick Hands | finishers deal 60% more |
+
+Measured: each pair was taken and its effect checked in the running game (Comet Step 24 to 48, Crescent
+wave 16 to 32 and twice the flight, finisher 42 to 84 with Keen Edge and Edge of Day together).
+
+## The last blow, and a relic you keep (v1.7d)
+
+**At nothing, the boss topples, and the ending is yours.** When a boss's health runs out it does not
+die yet: it goes down in its own way (the Warden's eclipse sinks to the floor with its hands either
+side, the Magus falls out of the air, the Veil is thrown into a wall, the Knight is disarmed) and stays
+down. Blows still in the air as it falls pass through. Once it is down:
+
+- **Press E (the heal button; LB on a gamepad) within reach of it** for your hero's finishing blow. A key
+  cap floats over the boss, faint while you are too far away and lit when you are close enough.
+- **Hit it any other way** and the fight ends plainly, with the old single cut and no finisher.
+
+The fight's timer stops when it topples, so taking your time costs nothing; it cannot hurt you while down.
+
+**Every hero finishes it their own way.** The arena goes dark, and the boss's own death, the shaking
+apart and the burst, waits until the hero is done (`js/finish.js`).
+
+| Hero | The finishing blow |
+|---|---|
+| Vesper | Three passes through it, too fast to follow, each leaving a thin line hanging in the air. She lands on the far side with her back to it, flicks the blade, and the lines flare one after another into a star. |
+| Aster | She sinks, leaps off the top of the screen, and for a moment there is only a star over the boss. Then she comes down through it into the floor, and the floor splits from wall to wall. |
+| Lune | She springs back to the far side, kneels, and draws while the light of the arena runs into the arrow. One point of light crosses the arena and pins it; a beat later it comes apart around the arrow. |
+| Eos | His marks come up one by one in the dark. He never seems to move: there is a line through the boss and he is on the other side of it. The blade goes home slowly, and on the click the picture splits along the line. |
+
+A Dawnbreak that empties the bar is its own finishing blow: the boss does not topple, the Dawnbreak
+plays out, and the boss's death follows its last strike. Each finisher takes 2 to 2.7 seconds.
+
+**Falling no longer costs your relic.** *Again, with (relic)* (or R) on the defeat screen, and Restart
+run in the pause menu, start a new first trial straight away with the same hero and relic; boons, omens
+and the Dawnbreak meter start over as before. The relic is given up only by going back to the camp,
+where the reliquary offers new ones (the defeat screen's camp button says so).
+
+## Three more from play (v1.7c)
+
+**The Knight's Graves reach the top of the screen.** The four to six columns that come down where you
+stand used to stop 200 pixels up, so a double jump cleared them. They now run from above the view to
+the floor. The only way out of one is sideways. Measured: a hero who only jumps on the spot loses 2
+health to it; one who keeps walking loses none.
+
+**Every phase has its own arena.** There used to be one pair of platforms, and a boss either had it or
+did not. Now each boss lays the arena out anew for each phase (`A.LAYOUTS` in `js/arena.js`); what
+stood before sinks into the floor and the new platforms rise out of it. No two are alike.
+
+| Boss | Phase I | Phase II | Phase III |
+|---|---|---|---|
+| Warden | bare floor | two wide wings, torn up by its hands (as before) | three steps: low, high in the middle, low |
+| Magus | one dais in the middle of the hall | four small floes at two heights, on the frozen floor | two low stones, under the storm |
+| Veil | bare floor | three narrow perches in the dark, the middle one higher | a ledge at each wall, under the wires |
+| Knight | bare floor | what is left of a stair by the west wall: two steps | one stone inside the ring of blades |
+
+The Magus still blinks to above whatever platforms are up, and the Veil's high lane runs at the height
+of the platform you are on.
+
+**Eos has a second way to play.** He was one idea (hold your ground, charge, draw) with a ranged
+special bolted on that did what Vesper's lance does. His special is now **Still Point**, a parry:
+
+- Press it and he sets the sheath across his body and stands still for 0.45 s.
+- **A blow that lands in that time is turned.** It does no harm, a melee swing is stopped and its
+  owner rocked, and all three marks on the sheath light at once.
+- **The marks stay lit for 2.5 s with no button held**, and the next press of attack is the full
+  draw (100) straight away. If you were already holding a stance, it is simply full.
+- **If nothing lands, the Starlight is spent for nothing**, and he was standing still for it.
+
+So there are two ways to reach a full draw: wait for an opening and hold for a second and a half, or
+ask for the blow and take it on the sheath. A turned blow is not a perfect dodge, so the draw after
+it is 100, not the 200 of a draw through a blow; that stays the harder and better play. The
+**Second Light** boon now answers a turned blow with the old crescent of light (40).
+
+Eos is "he" in the game's text now.
+
+Measured: dodge tests unchanged (37 lose 0). Boss tests lose 6 in 166 runs, one more than before: the
+scripted hero takes a hit from the Veil's Cuts in phase III, where the new ledges are. Random-input
+fights, four heroes against four bosses through every phase, ran without errors.
+
+## After a playtest (v1.7b)
+
+Three things from a player who took every hero through a Standard run.
+
+| They said | What I found | What changed |
+|---|---|---|
+| "Hammer guy prob needs tune up, charge is weak" | Aster's base kit was fine (the scripted hero clears fights a little faster with her than with Vesper), but holding the smash dealt **less** per second than not holding it: 1.05 s for +50% and a wave of 14. | The charge takes **0.9 s** and adds **80%** (40 becomes 72), the wave is **20**, and the shaken ground reaches a little further. Measured on a boss that cannot die: 56.1 damage a second never charging, 58.7 charging every smash. So charging is now slightly ahead, and still gives what it always did: she cannot be moved, and the blow reaches further. |
+| "Bow right click prob gives too much meter ... spam right clicking ... things blew up in a few seconds" | Moon Volley was the only special that earned Starlight back. Point blank it returned 30 of its 100, and **86 of 100** with two Bright Veins and Full Quiver, for 128 damage a cast. | The volley's arrows **earn no Starlight** (they still build Flow and Dawnbreak like any special). Its damage is unchanged: 80 point blank, 128 with Full Quiver. It just cannot pay for the next one. |
+| "Every boss having a free stagger check seemed off" | The Reckoning: the boss goes to the middle, a ring closes, and breaking its ward staggers it. Every boss did it twice a fight, and the ward always broke in 0.5 to 4.5 of the 6.5 seconds allowed. | **Only the Warden does it now** (its Eclipse), and its hands guard it while it does (see below). The Magus, the Veil and the Knight no longer do it; their staggers come only from their own bars. |
+
+**The Warden's Eclipse is guarded.** Left as it was, it was still a non-mechanic: the eye came down, the
+hands went to the sides, and you hit it. Now, while the eye gathers:
+
+- **Its hands come down in turn on wherever you stand**, about once a second. Each is the ordinary
+  slam: the fist follows you, stops, draws back and falls, and sends a wave along the floor both ways.
+  So: step out from under it, jump the wave, get back to work.
+- **A hand lies where it fell for half a second, and a blow to it is a blow to the ward.** The fist
+  that just missed you is the easiest thing in the arena to hit, which matters most to heroes who
+  cannot easily reach the eye.
+- One gets up as the other comes down. With **one hand** left, a meteor falls on you while it gets
+  up. With **none**, meteors fall on you throughout.
+- The ward's strength and the 6.5 seconds are unchanged; the time now goes on dodging.
+
+Measured with the ward forced (`boss.js`, `guarding`): a hero who stands and swings loses 2 to 3 health
+before the ward breaks. A scripted hero who steps out from under each fist and jumps each wave breaks
+it in 3.1 s as Aster, 4.2 s as Lune, 4.8 s as Vesper and 5.8 s as Eos (flicks only), having faced two
+to four slams; three of the four took no damage, and the Vesper script, which is a crude dodger, took 1.
+
+Scripted full fights after these changes (seconds, Warden / Magus / Veil / Knight): Vesper 69 / 79 / 79 /
+63, Aster 56 / 71 / 70 / 53, Lune 82 / 117 / 98 / 83, Eos 68 / 81 / 74 / 60. Against the three duelling
+bosses most fights are a little longer than before, because two free staggers are gone. Lune is the
+slowest by a clear margin, as she was meant to be before the volley loop hid it; the Magus figure
+swings a lot from run to run because it blinks out of the way of arrows.
 
 ## Every second of a fight (new in v1.7a)
 
@@ -197,7 +456,7 @@ A fourth hero, built around one idea: **the blade stays in its sheath, and patie
 | Attack, pressed | **A flick.** The blade is out, across and home again: 11. It comes out the moment you press. |
 | Attack, held | **The stance.** She sets her feet and Focus gathers while she stands on the ground: one band on the sheath lights at 0.45 s, a second at 0.95 s, the third (gold) at 1.5 s. She walks at 45% speed while she holds it. |
 | Attack, let go | **The draw.** She is carried 170, 230 or 300 pixels along the line you aim down (the mouse, or a held direction; straight up works) and cuts everything she passes through for 18, 46 or 100. The cut does not land yet: a thin line hangs in the air, she feeds the blade home, and the damage arrives on the click, 0.2 to 0.46 s later. |
-| Special | **Dawn Arc.** A cut thrown across the whole arena as a crescent of light: 40, through everything in its path. Her only reach. |
+| Special | **Still Point** (since v1.7c; it was the Dawn Arc, a ranged crescent too like Vesper's lance). He sets the sheath across his body and waits, for 0.45 s. A blow that lands in that time is turned: no harm, the swing is stopped, and all three marks light at once and stay lit for 2.5 s, so the next press is a full draw. If nothing lands, the Starlight is gone. |
 | Dawnbreak | **Horizon.** Every light in the arena runs to the mouth of the sheath; she is then on the far side of the boss with a hair of light lying across the arena. When the blade is home the cut arrives for 250 (110 to anything else the boss has out), and the picture itself is cut in two along the line for half a second. |
 
 What makes her worth learning:
@@ -218,7 +477,7 @@ Her way back to rest is the move itself: every flick ends with the blade finding
 long sheathing after a draw is the wait before the cut lands.
 
 Also in this build: the Hall of Echoes has a fourth alcove (the hall is the same width; its bays are
-narrower), the hero screen has a fourth card, a new boon (**Second Light**, Eos only: the Dawn Arc is
+narrower), the hero screen has a fourth card, a new boon (**Second Light**, Eos only; in this build: the Dawn Arc is
 followed by a second at 60%), and `tools/feel-check.js` can play her.
 
 Measured with the scripted hero (never hit, never dodging, so no Ripostes): Eos clears the Warden in
@@ -502,7 +761,7 @@ All four share movement, the dash, Starlight and mending. Weapon and special dif
 | | Vesper, the Starblade | Aster, the Starmaul | Lune, the Moonbow |
 |---|---|---|---|
 | Health (Standard) | 5 | 6 | 4 |
-| Weapon | sword: 10 down, 12 back up, then a 26 finisher | maul: a wide sweep in front (20), then a smash that shakes the ground (40). Hold the smash to charge it, up to 60; fully charged it also throws a wave along the floor (14) | bow: arrows of 4, 5, then a piercing 10, in any direction; up to 60% stronger within 120px, up to 30% weaker past 240px |
+| Weapon | sword: 10 down, 12 back up, then a 26 finisher | maul: a wide sweep in front (20), then a smash that shakes the ground (40). Hold the smash to charge it, up to 72; fully charged it also throws a wave along the floor (20) | bow: arrows of 4, 5, then a piercing 10, in any direction; up to 60% stronger within 120px, up to 30% weaker past 240px |
 | Special | Star Lance: a piercing shot at any range | Starfall: a blast around her; from the air she plunges first and passes through attacks | Moon Volley: a fan of five arrows and a leap backwards |
 | Extra | a slash out of a dash is a thrust | fills the stagger bar 35% faster; a little slower on foot | triple jump; firing downward in the air lifts her; moves at 60% speed while firing; arrows give less Starlight than melee hits |
 
@@ -521,14 +780,20 @@ Heroes are defined in `G.HEROES` in `js/run.js` (numbers, colours, text); the we
 ## The run
 
 - A run starts in the camp: choose a **hero** at the Hall of Echoes, take **one of three relics** at the reliquary
-  (drawn from nine, up to thirteen once trophies are won), and step through the gate. The relic lasts the whole run.
-- Each trial is one boss. The four come in a shuffled order, and when all are beaten the order is
-  shuffled again. The **banner** in the camp fixes who comes first (handy for practising one boss).
-- Beating a boss offers **three boons; you keep one** and go straight into the next trial. The victory
-  screen names the boss that is next.
+  (drawn from nine, up to thirteen once trophies are won), and step through the gate. The relic lasts the whole run,
+  and since v1.7d it stays with you when you fall and go again; only going back to the camp gives it up.
+- A run is **six trials**, each against a different boss. The first is drawn at random; after that you
+  choose each one at its portal at the crossroads (since v1.9a). A seventh, final fight is planned (its
+  portal stands dormant); until it exists, winning trial VI wins the run.
+- Beating a boss offers **three boons; you keep one**, chosen on the road between trials (since v1.8b)
+  before you go on to the next. Once you hold both halves of a **pair**, a gold pair boon can take one
+  card's place.
+- A beaten boss's portal can turn **corrupted** (v1.9a): an optional, far harder fight for a second
+  relic and triple Sunshards.
 - Each trial after the first gives the boss 15% more health, 4% shorter warnings and 6% less rest.
-  From trial V (the second time round) the bosses also use their Merciless patterns.
-- Health is restored between trials. Falling ends the run; the gate in the camp shows the deepest trial reached.
+  From trial V the bosses also use their Merciless patterns (with six bosses, the last two you meet).
+- Health is restored between trials. Falling ends the run; the gate in the camp shows the runs won, or
+  the deepest trial reached.
 - From trial II each trial carries an **omen** (two from trial VI), shown at the top right of the fight.
 - Every fight pays **Sunshards**, which buy permanent upgrades at the **Shrine** in the camp.
 
@@ -559,7 +824,7 @@ Set pieces and rewards that punctuate a fight. All of them are in `js/moments.js
 
 | Moment | When | What happens |
 |---|---|---|
-| **Reckoning** | once in phase I (below five sixths of the boss's health) and once in phase II (below half) | The boss goes to the middle of the arena, wraps itself in a ward and gathers a blast while a red ring closes on it for 6.5 seconds. Hits go to the ward, shown as a gold arc. Break it and the boss is thrown down staggered, Dawnbreak gains a quarter of its bar and the fight pays 6 more Sunshards. Let the ring close and two blast rings go out: dash through each. |
+| **Reckoning** (the Warden only, since v1.7b) | once in phase I (below five sixths of the boss's health) and once in phase II (below half) | The boss goes to the middle of the arena, wraps itself in a ward and gathers a blast while a red ring closes on it for 6.5 seconds. Hits go to the ward, shown as a gold arc. Break it and the boss is thrown down staggered, Dawnbreak gains a quarter of its bar and the fight pays 6 more Sunshards. Let the ring close and two blast rings go out: dash through each. |
 | **Riposte** | the first weapon hit within 1.5 seconds of a perfect dodge | double damage, with a freeze and a gold cut |
 | **Sunder** | the first finisher on a staggered boss | 2.2 times damage, a longer freeze and a cracked floor. One per stagger. |
 | **Clash** | a finisher, a dash thrust or a heavy arrow lands on the Veil or the Knight in the 0.3 seconds before its weapon swing lands, with you inside the swing | the swing is stopped dead; you are pushed back unharmed with 20 Starlight |
@@ -567,8 +832,9 @@ Set pieces and rewards that punctuate a fight. All of them are in `js/moments.js
 | **One last push** | the boss drops below a tenth of its health | a call-out; the boss bleeds light and the screen pulses until it falls |
 
 The ward's strength is sized to the hero: about 3.3 seconds of steady attacking (158 for Vesper, 165 for
-Aster, 86 for Lune on Standard), more in later trials. A Dawnbreak breaks it outright. Each boss names
-its own Reckoning: Eclipse, Convergence, Death Mark, Dirge. A Reckoning is skipped if the boss leaves
+Aster, 86 for Lune on Standard), more in later trials. A Dawnbreak breaks it outright. The Warden calls
+its Reckoning Eclipse. (Until v1.7b the Magus, the Veil and the Knight each had one too: Convergence,
+Death Mark, Dirge. The code is still in `bosskit.js` behind `B.reckons`.) A Reckoning is skipped if the boss leaves
 the phase before it gets the chance, and forced attacks in the tests never trigger one.
 
 ## Omens (new in v0.7a)
@@ -641,12 +907,14 @@ machine; clearing site data resets it. Defined in `js/meta.js`.
 | Split Lance | Starlight | Vesper only: the lance fires three at once, each at 60% | 1 |
 | Aftershock | Starlight | Aster only: Starfall strikes a second time at half strength | 1 |
 | Full Quiver | Starlight | Lune only: Moon Volley fires eight arrows | 1 |
-| Second Light | Starlight | Eos only: the Dawn Arc is followed by a second at 60% strength | 1 |
+| Second Light | Starlight | Eos only: a blow turned by Still Point is answered with a crescent of light across the arena, for 40 | 1 |
 | Swift Mend | Starlight | mending takes half as long | 1 |
 | Mirror Step | Starlight | Vesper and Lune: a perfect dodge fires a free shot at the core | 1 |
 | Steady Heart | Survival | one more health | 3 |
 | Second Dawn | Survival | once per trial, a killing blow leaves you on 1 health | 1 |
 | Glass Star | Risk | all damage +35%, one less health | 1 |
+
+The six gold **pairs** (v1.8a) are listed in "A run with a shape, and boons that pair" above.
 
 Relics and boons are defined in `G.RELICS` and `G.BOONS` in `js/run.js`; their effects are applied in `js/player.js` and `js/boss.js` (search for `G.relic(` and `G.boon(`).
 
@@ -737,6 +1005,38 @@ for a moment afterwards.
 | III Execution | Cuts: seven lines, each through where you are when it is drawn | step off each; jump the flat ones. Then it kneels, spent |
 | | Mark: a circle closes on you and everything inside is cut | dash as it shuts |
 
+### The Cinder Wolf (v1.8b)
+
+A huge, lean wolf on all fours with a mane of living fire: a pure read-and-dodge fight, every attack told
+by its body. 3,500 health. It enters out of the dark: two eyes open, it drops with a shockwave and fire
+runs to both walls.
+
+| Phase | What it does | The tells |
+|---|---|---|
+| I · Cinder (bare floor) | Pounce, bite, tail sweep, howl, rake; fire breath along the floor if you keep away | Haunches low and tail up: the long, high pounce (short spring otherwise). Head low: a lunge along the floor; reared: a snap at the air. A tail that curls first: two sweeps. Muzzle straight up: embers fall on you from the top of the screen; tilted forward: a line of embers marching away. Rearing higher before the rake: fire waves both ways |
+| II · Wildfire (three burnt trees) | Its howl sets the arena alight. Wherever it lands or slams, the floor catches and burns for about 4 s. New: the wall-run | High on the wall: the arena darkens and it dives on you. Low on the wall: it flies flat across, just over a standing hero |
+| III · Emberbed (two ledges and three stone islands) | It rises burning blue-white. Every 6 s the floor brightens, roars and flares: only the stones, the ledges and the air are safe. New: Frenzy (three pounces) and, once below 12%, Emberfall (it leaps out of sight and comes down like a comet; the ring of fire it throws out is passed by a dash) | The haunches before Frenzy's third pounce tell long from short |
+
+Stagger (*FLOORED*): it rolls onto its back, its fire collapses into smoke and a burning heart shows on its
+belly; 1.6x damage. Measured: boss tests lose 1 over 44 runs (a tail sweep the scripted dodger never
+jumps); Vesper wins in 57-68 s, Aster in 44-50 s.
+
+### The Drowned Leviathan (v1.8b)
+
+A sea serpent lying out at sea behind the arena; only its head and neck come over the shore, and the head
+is the only target. 2,900 health (it is often out of reach). It enters when the sea goes still, a shadow
+with lights passes under the water, and it breaches.
+
+| Phase | What it does | The tells |
+|---|---|---|
+| I (bare shore) | Lunge the length of the shore, snapping bites, the tail coming down from above the screen, spouts bursting from the floor to the top of the screen; a bubble volley or a lobbed brine bomb if you keep away | Rearing low with the snout down: a low lunge (jump it); tall with the snout up: a high one (stay down). A chattering jaw: a second bite. One slap of the tail on the water: one heavy blow; three shakes: three lighter ones that follow you. Rolling as it dives: two rows of spouts; rearing straight up and sinking: spouts under you. Three gulps: bubbles; one long swell: the bomb |
+| II · High Water (three pieces of wreckage) | A surge breaks over the arena and the floor stays flooded: walking is 36% slower, dashing is not. New: the coil sweep along the floor | Spines standing up and rattling on the loop: it bounces back off the far wall. Lunges sometimes come back the other way |
+| III · Maelstrom (two rocks by the walls) | A whirlpool opens and pulls you towards its eye on the floor (weaker in the air, none on the rocks). New: the Maw, its jaws erupting from the eye past the top of the screen; the eye then moves | The fin circling once: one eruption; twice: a second under you |
+
+Stagger (*BEACHED*): thrown up and slammed down on the shore, gasping, head on the floor; 1.5x damage.
+Measured: boss tests lose 1-2 over 36 runs (phase III spouts, where the current drags the scripted dodger
+into a column); Vesper wins in 66-77 s, Aster 56-61 s, Lune 90-105 s.
+
 ### The Unburied Knight
 
 A death knight with a greatsword. Slow and very wide: its swings cover everything in front of and above
@@ -748,7 +1048,7 @@ it, and nothing behind it. **Hits on its back deal 30% more.**
 | | Overhead: it strides after you with the blade up, then brings it down (2 damage, two waves) | leave the column, jump the wave, hit it while the sword is stuck |
 | | Charge: wall to wall, too tall for one jump | dash through it or jump twice; the wall stuns it |
 | | Grip: it drags you in with a cleave already coming | dash past it before the blade lands |
-| | Graves: spikes erupt where you stand, one after another | keep walking |
+| | Graves: columns come down where you stand, one after another, from the top of the screen to the floor (v1.7c: a jump no longer clears them) | keep walking |
 | II The Host | Wraiths: skulls that drift after you | cut them down |
 | | Desecrate: patches of ground rot for five seconds | fight on what is left |
 | | Whirl: it spins towards you for a couple of seconds | run, take a platform, or jump twice over it; then it is dizzy |
@@ -804,6 +1104,11 @@ To use these in a new attack, call the ready-made mixes in `js/fx.js`: `G.fx.hit
 | `js/meta.js` | what lasts between runs: Sunshards, the Shrine (`G.SHRINE`), trophy relics |
 | `js/feats.js` | the feats: what each asks, the counters a fight keeps for them, and what they pay |
 | `js/flow.js` | the Flow rank and each hero's Dawnbreak |
+| `js/finish.js` | each hero's finishing blow at the end of a fight |
+| `js/rest.js` | the road between trials, where the boon is chosen, and the crossroads of portals |
+| `js/corrupt.js` | corrupted bosses: their drained palette, the pitch-black shape, lightning, aura and tearing; the hook for their own two attacks |
+| `js/hexes.js` | the drawbacks of corrupted boons that live in a fight (floor tears, draining, the clock, the boss's hunger) |
+| `tools/corrupt-compare.html` | every boss as itself and corrupted, side by side, in the same moment (open it while serve.js runs) |
 | `js/omens.js` | the omens (`G.OMENS`) and what each one does during a fight |
 | `js/moments.js` | Reckoning, Riposte, Sunder, Clash, Last Light and the last push |
 | `js/hub.js` | the Vigil: the camp between runs, its places, the sparring post, the bell and the lantern |
@@ -818,6 +1123,7 @@ To use these in a new attack, call the ready-made mixes in `js/fx.js`: `G.fx.hit
 | `js/boss.js` | the Warden; each attack is one generator function, attack pools are in `BAGS` |
 | `js/bosskit.js` | the frame the other bosses share (`G.makeBoss`), and `G.setBoss` |
 | `js/mage.js`, `js/assassin.js`, `js/knight.js` | the Magus, the Veil and the Knight |
+| `js/wolf.js`, `js/leviathan.js` | the Cinder Wolf and the Drowned Leviathan, each bringing its own backdrop, weather, platforms and sounds |
 | `js/ui.js` | menus, health bars, result screens |
 | `js/game.js` | main loop, game states, draw order |
 
@@ -830,15 +1136,20 @@ Open the browser console on the running game.
 
 - **Dodge tests:** `fetch('/tools/dodge-tests.js').then(r => r.text()).then(t => console.log((0, eval)(t)))`
   runs each of the Warden's attacks against a simple scripted player and reports health lost. There are
-  37 tests and all lose 0 as of v1.2a. Set `window.TEST_HERO = 'aster'` (or `'lune'`) to test another hero
+  52 tests (15 of them for the corrupted Warden's two attacks, since v1.9b) and all lose 0. Set `window.TEST_HERO = 'aster'` (or `'lune'`) to test another hero
   and `window.TEST_SEED = 2` for a different, repeatable set of boss choices.
 - **Tests for the other three bosses:** `fetch('/tools/boss-tests.js').then(r => r.text()).then(t => console.log((0, eval)(t)))`
   runs every attack of the Magus, the Veil and the Knight in every phase that uses it (158 runs since v1.2a) against one
   scripted player that follows plain rules: step off marked ground, jump low things, leave a swing's reach,
   dash when there is no time to walk. As of v0.6a it loses 0 health as Vesper on seed 1. Across three
   heroes and three seeds it lost between 0 and 6 in 134 runs when last measured (v0.5a), in the Veil's Cuts, the Knight's Whirl and,
-  as Lune, things it should cut down but cannot aim at. `window.TEST_BOSSES = ['knight']` limits it to one boss.
+  as Lune, things it should cut down but cannot aim at. `window.TEST_BOSSES = ['knight']` limits it to one boss,
+  `window.TEST_ONLY = ['requiem']` to some attacks. Since v1.9b it also runs each boss's two corrupted
+  attacks (marked `*`), in a corrupted fight. As of v1.9b, as Vesper on seed 1: 8 lost over 296 runs, all in
+  old attacks (the Magus's Firewall and Crystals, the Veil's Cuts, the Knight's Whirl, the Wolf's tail
+  sweep, the Leviathan's Spouts); the 25 corrupted runs lose 0.
   Run the matching test after changing any attack.
+- `G.debug.corrupt = true` makes every fight a corrupted one (its look, its pace and its two attacks).
 - `G.debug.god = true` makes the hero invulnerable. `G.debug.boxes = true` (or `?boxes` in the address)
   draws every hitbox.
 - `G.debug.boss = 'knight'` makes every fight that boss (`'warden'`, `'mage'`, `'assassin'`, `'knight'`; `''` to stop).
@@ -869,8 +1180,8 @@ Open the browser console on the running game.
   health) in 88 s as Vesper and 76 s as Aster, the Veil (3,000) in 76 s and 61 s, and the Knight (4,300) in
   68 s and 64 s. A real fight should be about 3 to 4 minutes.
   Boss health, hero balance, relic and boon strength and the per-trial scaling are first guesses.
-- **Fastest first trial** on the title screen compares times against whichever boss came first, so it is
-  only a fair record when the camp's banner is set to one boss.
+- **Fastest first trial** on the title screen compares times against whichever boss came first, and
+  since v1.8a that is always random, so it is a rough record at best.
 - **Nothing in v0.7a has been played.** The Dawnbreaks, the Shrine, the reward screens and each omen
   were run and looked at in captures, and the numbers above were checked in the running game. Whether
   Flow climbs at a satisfying rate, how often Dawnbreak fills in a real fight (the aim was two to four

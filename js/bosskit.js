@@ -7,6 +7,8 @@
   const E = G.ease, FLOOR = G.FLOOR, H = G.hazards;
   const KITE_T = 2.6; // seconds of keeping away before a boss answers at range
 
+  // the bosses a run is drawn from. A boss file loaded later adds itself (G.BOSS_IDS.push), so a
+  // missing or broken file simply leaves it out.
   G.BOSS_IDS = ['warden', 'mage', 'assassin', 'knight'];
   G.setBoss = function (id) {
     G.boss = G.bosses[id] || G.bosses.warden;
@@ -126,13 +128,13 @@
       B.maxHp = Math.round(B.BASE_HP * G.diff().bossHp);
       B.hp = B.maxHp;
       B.phase = 1; B.poise = 0; B.poiseMax = B.poise0; B.staggered = false;
-      B.invuln = true; B.active = false; B.dead = false; B.dying = false;
-      B.script = null; B.attackName = ''; B.bag = []; B.lastAtk = ''; B.forceNext = (B.first && B.first[1]) || '';
+      B.invuln = true; B.active = false; B.dead = false; B.dying = false; B.toppled = false; B.down = false;
+      B.script = null; B.attackName = ''; B.bag = []; B.lastAtk = ''; B.forceNext = G.corrupt.opener(B, 1) || (B.first && B.first[1]) || '';
       B.t = 0; B.lastStand = false; B.kite = 0;
       B.body = { x: 900, y: FLOOR, face: -1, flash: 0, kick: 0, kx: 0, ctrl: true, hidden: false, exposed: false, jit: 0 };
       B.core = { x: 900, y: FLOOR - B.h * 0.55, r: B.w * 0.5 };
       G.bounds = null; G.wind = 0;
-      if (B.platformsFrom === 1) G.arena.raisePlatforms();
+      G.arena.layout(B.id, 1); // (most have nothing in phase I)
       B.setup();
     };
     B.attract = function () { B.reset(); };
@@ -144,7 +146,7 @@
     };
     B.targets = function () {
       const out = [];
-      if (!B.active || B.dead || B.dying) return out;
+      if (!B.active || B.dead || (B.dying && !B.toppled)) return out;
       if (!B.body.hidden) {
         const bb = B.bodyBox();
         out.push({ id: 'body', kind: 'body', ref: B.body, cx: bb.cx, cy: bb.cy, hw: bb.hw, hh: bb.hh });
@@ -154,6 +156,9 @@
     };
 
     B.damage = function (amount, t, info) {
+      // toppled at nothing: any blow ends it, plainly (E is the finishing blow, see finish.js)
+      // (blows still in the air as it goes down pass through: the choice comes once it is down)
+      if (B.toppled) { if (!B.down) return false; B.body.flash = 1; B.finishOff(false); return true; }
       if (!B.active || B.dead || B.dying || B.invuln) return false;
       // crystals, clones and the like take the blow themselves
       if (t.kind === 'extra') return t.ref.onHit(amount, info, t);
@@ -229,8 +234,13 @@
       G.fx.shatter(b.x, cy, G.pal().boss, 18, { hot: G.pal().hot, r: 300, jitter: B.w * 0.4 });
       G.fx.punch(0.022);
       G.ui.callout(B.staggerWord || 'STAGGERED');
+      G.feats.bump('stagger');
       B.script = staggerScript();
     }
+    // thrown down from outside the fight (the Dying Light pair)
+    B.forceStagger = function () {
+      if (B.active && !B.dead && !B.dying && !B.invuln && !B.staggered && !B.ward) stagger();
+    };
     // What a full stagger bar does is each boss's own: staggerIn (how it goes down), staggerOut (how
     // it gets up), staggerMult (damage taken while down, 1.4 unless given) and staggerDur (a scale on
     // how long it lasts). The Knight is disarmed, the Veil is thrown into a wall, the Magus is grounded.
@@ -273,13 +283,14 @@
     function* phaseScript(n) {
       const b = B.body;
       b.ctrl = true; b.hidden = false;
-      B.forceNext = (B.first && B.first[n]) || '';
+      B.forceNext = G.corrupt.opener(B, n) || (B.first && B.first[n]) || '';
       G.ui.letterbox(true);
       G.fx.impact(b.x, b.y - B.h / 2, 0.09); G.fx.shake(16); G.fx.slow(0.25, 0.7);
       G.audio.play('stagger');
       B.pushPlayer();
       if (B.phaseIn) yield* B.phaseIn(n);
       G.arena.setPhase(n, 1.8);
+      G.arena.layout(B.id, n); // the arena is laid out anew for each phase
       G.audio.setIntensity(n);
       G.audio.play('roar'); G.audio.play('card');
       G.ui.card('', B.cards[n][0], '');
@@ -289,17 +300,50 @@
       release();
     }
 
+    // At nothing it does not die yet: it goes down in its own way and stays down (see finish.js).
     function die() {
       interrupt();
       B.dying = true; B.invuln = true; B.hp = 0; B.staggered = false; B.poise = 0;
-      G.onBossDying();
+      // a Dawnbreak that empties the bar is the ending itself: no topple, it dies when the Dawnbreak is done
+      if (G.state !== 'fight' || G.player.ulting) { G.onBossDying(false); B.script = deathScript(); return; }
+      B.toppled = true; B.down = false;
+      G.onBossToppled();
+      B.script = toppleScript();
+    }
+    // fin: the hero's finishing blow (E); otherwise a plain blow ended it
+    B.finishOff = function (fin) {
+      if (!B.toppled) return false;
+      B.toppled = false; B.down = false;
+      G.onBossDying(fin);
       B.script = deathScript();
+      return true;
+    };
+    function* toppleScript() {
+      const b = B.body;
+      b.ctrl = true; b.hidden = false;
+      G.audio.play('stagger'); G.fx.stop(0.14); G.fx.shake(16); G.fx.punch(0.03);
+      G.fx.impact(b.x, b.y - B.h / 2, 0.08);
+      G.fx.shatter(b.x, b.y - B.h / 2, G.pal().boss, 18, { hot: G.pal().hot, r: 300, jitter: B.w * 0.4 });
+      if (B.onStagger) B.onStagger();
+      if (B.dying0) B.dying0();
+      b.x = G.clamp(b.x, G.WALL_L + 90, G.WALL_R - 90);
+      if (B.staggerIn) yield* B.staggerIn();
+      else if (b.y < FLOOR - 1) {
+        yield* tween(b, { y: FLOOR }, 0.3, E.inCubic);
+        G.fx.shake(8); G.audio.play('boom');
+        G.fx.thud(b.x, FLOOR, 1.2);
+      }
+      yield* wait(0.15);
+      // down, breathing hard, until it is finished
+      B.down = true;
+      while (B.toppled) { yield; b.jit = 0.4; }
     }
     function* deathScript() {
       const b = B.body;
       b.ctrl = true; b.hidden = false;
-      G.fx.slow(0.12, 1.3); G.fx.flash(G.COL.white, 0.8, 0.7); G.fx.shake(22); G.fx.stop(0.2);
-      G.fx.impact(b.x, b.y - B.h / 2, 0.1);
+      while (G.finish.busy || G.player.ulting) yield; // the hero's finishing blow (or Dawnbreak) first
+      G.fx.slow(0.12, 1.3); G.fx.shake(22);
+      if (!G.finish.played) { G.fx.flash(G.COL.white, 0.8, 0.7); G.fx.stop(0.2); G.fx.impact(b.x, b.y - B.h / 2, 0.1); }
       G.audio.play('bossDie');
       if (B.dying0) B.dying0();
       if (b.y < FLOOR - 1) yield* tween(b, { y: FLOOR }, 0.5, E.inCubic);
@@ -335,6 +379,8 @@
     }
 
     // Reckoning: it goes to the middle of the arena, wards itself and gathers a blast (moments.js).
+    // (v1.7b: not every boss needs it. It is the Warden's own moment now; a duelling boss only does
+    // it if it sets B.reckons, and none of the three does.)
     B.ATTACKS.reckoning = function* () {
       const b = B.body, P = G.player;
       b.hidden = false; b.exposed = false;
@@ -368,7 +414,7 @@
 
     // ---------------------------------------------------------------- attack selection
     function refillBag() {
-      const src = B.bags[B.phase];
+      const src = B.bags[B.phase].concat(G.corrupt.extra(B, B.phase)); // (a corrupted boss's own two, corrupt.js)
       for (let tries = 0; tries < 8; tries++) {
         B.bag = G.shuffle(src.slice());
         let ok = B.bag[B.bag.length - 1] !== B.lastAtk;
@@ -391,7 +437,7 @@
       let name = G.debug.forceAttack || '';
       if (name === 'none') return; // tests: stand idle
       if (!name && low && B.finale && !B.lastStand) { B.lastStand = true; name = B.finale; }
-      if (!name && G.moments.due(B)) name = 'reckoning';
+      if (!name && B.reckons && G.moments.due(B)) name = 'reckoning';
       // a hero who keeps away for too long is answered at range
       if (!name && !B.forceNext && B.answer && B.kite >= KITE_T && B.lastAtk !== B.answer) { name = B.answer; B.lastAtk = name; B.kite = 0; }
       if (!name) name = nextAttack();

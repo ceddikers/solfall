@@ -9,7 +9,10 @@
   const FIRE = { boss: '255,120,50', hot: '255,236,190' };
   const BOLT = { boss: '190,140,255', hot: '255,252,200' };
   const ELEMS = [ICE, FIRE, BOLT];
-  const HOVER = 26, GY = FLOOR - HOVER, PY = 490 - 18;
+  // the void: what answers the staff when the Magus is corrupted and its three elements go out
+  // (the same colours as G.corrupt.COL; corrupt.js loads after this file)
+  const VOID = { boss: '235,30,80', hot: '255,206,220', dark: '16,3,10', isVoid: true };
+  const HOVER = 26, GY = FLOOR - HOVER;
 
   const B = {
     id: 'mage', name: 'THE THREEFOLD MAGUS', short: 'The Magus', theme: 'mage',
@@ -37,6 +40,8 @@
     cards: { 2: ['CONFLUENCE', 'The spells begin to overlap'], 3: ['TRINITY', 'Every element answers'] },
     first: { 1: 'shards', 2: 'crystals', 3: 'blizzard' },
     finale: 'cataclysm',
+    // corrupted only (corrupt.js): the Black Sun from the start, Foresight from the second phase
+    corruptBags: { 1: ['blacksun'], 2: ['blacksun', 'foresight'], 3: ['blacksun', 'foresight'] },
   };
 
   // ------------------------------------------------------------------ state
@@ -45,6 +50,7 @@
     b.x = 900; b.y = GY; b.homeY = GY; b.alpha = 0; b.cast = 0; b.want = 0; b.elem = null; b.spent = false; b.charge = 0;
     B.crystals = []; B.shards = []; B.spin = 1; B.blizz = 0; B.serial = 0;
     B.iceK = 0; B.storm = 0; B.zap = 0; B.skyBolts = []; b.aflame = false;
+    b.dark = 0; b.dk = [0, 0, 0]; b.track = 0; b.slit = 0; b.readTilt = 1.6; B.readAim = null;
     B.cape = D.chain(9, b.x, b.y - 92);
   };
   const setElem = (el) => { B.body.elem = el; };
@@ -53,9 +59,12 @@
   // The staff is also the Magus's tell. For an Invocation it is held one of three ways through the
   // cast, and each way says where the lightning will come from: straight up overhead (from the sky),
   // levelled at the hero (along the ground), or driven into the floor (through the floor).
-  const GEST = { high: { hx: 12, hy: -112, tilt: -0.24 }, level: { hx: 34, hy: -56, tilt: 1.45 }, plant: { hx: 40, hy: -34, tilt: 0 } };
+  // Corrupted, two more: 'sun', the staff raised flat overhead in both hands (the Black Sun), and
+  // 'read', the staff pointed a little ahead of the hero, following where they are going (Foresight).
+  const GEST = { high: { hx: 12, hy: -112, tilt: -0.24 }, level: { hx: 34, hy: -56, tilt: 1.45 }, plant: { hx: 40, hy: -34, tilt: 0 }, sun: { hx: 6, hy: -150, tilt: 1.5 } };
   const staff = (c) => {
-    const b = B.body, k = b.gk || 0, g = GEST[b.gest || b.gestWas];
+    const b = B.body, k = b.gk || 0, gn = b.gest || b.gestWas;
+    const g = gn === 'read' ? { hx: 30, hy: -70, tilt: b.readTilt } : GEST[gn];
     const s = { hx: 23 + 9 * c, hy: -62 - 18 * c, tilt: 0.07 + 0.42 * c };
     return g && k > 0.001 ? { hx: G.lerp(s.hx, g.hx, k), hy: G.lerp(s.hy, g.hy, k), tilt: G.lerp(s.tilt, g.tilt, k) } : s;
   };
@@ -64,7 +73,7 @@
     return { x: b.x + b.face * (s.hx + Math.sin(s.tilt) * 96), y: b.y + s.hy - Math.cos(s.tilt) * 96 };
   };
 
-  B.onRelease = function () { const b = B.body; b.want = 0; b.spent = false; b.charge = 0; b.hidden = false; b.alpha = 1; B.blizz = 0; b.gest = null; b.merge = 0; };
+  B.onRelease = function () { const b = B.body; b.want = 0; b.spent = false; b.charge = 0; b.hidden = false; b.alpha = 1; B.blizz = 0; b.gest = null; b.merge = 0; b.dark = 0; b.track = 0; b.slit = 0; B.readAim = null; };
   B.onInterrupt = function () { B.shards.length = 0; };
   B.onStagger = function () { const b = B.body; b.alpha = 1; b.elem = null; };
   B.staggerWord = 'SILENCED'; B.staggerMult = 1.2; B.staggerDur = 1.15;
@@ -99,9 +108,9 @@
   }
   function spot(minDist) {
     const P = G.player, b = B.body;
-    const up = G.arena.platforms.every((p) => p.rise >= 1);
     const all = [[170, GY], [430, GY], [640, GY], [850, GY], [1110, GY]];
-    if (up) all.push([312, PY], [968, PY]);
+    // and above whatever platforms this phase has
+    for (const p of G.arena.platforms) if (!p.gone && p.rise >= 1) all.push([p.x + p.w / 2, p.top - 18]);
     const ok = all.filter(([x]) => Math.abs(x - P.x) > (minDist || 270) && Math.abs(x - b.x) > 110);
     return ok.length ? G.rpick(ok) : [P.x < 640 ? 1110 : 170, GY];
   }
@@ -676,10 +685,341 @@
     yield* wait(0.5);
   }
 
+  // ------------------------------------------------------------------ corrupted: the void's own two
+  // Only its corrupted self casts these (B.corruptBags). Its three lights go out and the void answers
+  // the staff instead: black, with blood at the edges.
+
+  // does a circle of radius r at (x, y) touch the hero's box?
+  function touches(P, x, y, r) {
+    const q = P.box(), dx = Math.max(0, Math.abs(x - q.cx) - q.hw), dy = Math.max(0, Math.abs(y - q.cy) - q.hh);
+    return dx * dx + dy * dy < r * r;
+  }
+
+  // The Black Sun. A black sun rises behind the Magus and its shadow comes down on the arena as tall
+  // columns of void, everywhere but one gap of light. The columns slide sideways together and the
+  // gap goes with them: walk with the light. They turn heavily, slowing, stopping and coming back,
+  // never snapping: at the walls, and later in the fight in the middle of the floor too, with the
+  // sun's corona flaring as they do. Only the void hurts, and only once it has poured all the way down.
+  const SUN_X = 640, SUN_Y = FLOOR - 440, SUN_R = 86, PW = 94, SEAM = 7, TURN = 2.6;
+  function blacksun(rise, form, dur, o) {
+    const P = G.player, gw = o.gw, on = rise + form, end = on + dur;
+    return H.add({
+      kind: 'blacksun', layer: 'under', tint: VOID, rise, form, dur, gw, fall: 0.6, swell: 0,
+      g: G.clamp(P.x, WL + gw / 2 + 60, WR - gw / 2 - 60), v: 0, dir: P.x < 640 ? 1 : -1,
+      speed: o.speed, turns: o.turns.slice(), lastTurn: -9, due: 0,
+      update(dt) {
+        const t = this.t;
+        // the light moves: slowly while the void is pouring, at full pace once it is down; it has weight
+        if (t >= rise) {
+          const want = t > end ? 0 : this.dir * this.speed * (t < on ? 0.35 : 1);
+          this.v = G.damp(this.v, want, TURN, dt);
+          this.g += this.v * dt;
+          const room = this.dir > 0 ? WR - (this.g + gw / 2) : (this.g - gw / 2) - WL;
+          // it starts to turn early enough at a wall for its slowing to stop it there
+          if (room < Math.abs(this.v) / TURN + 4 && t - this.lastTurn > 0.5) { this.turn(); this.due = 0; }
+          // a turn in the open floor is foretold: the sun's corona swells for a moment before it comes
+          else if (this.turns.length && t >= on + this.turns[0] - 0.45) { this.turns.shift(); if (t - this.lastTurn > 1.1 && room > 230) this.due = t + 0.45; }
+          if (this.due && t >= this.due) { this.due = 0; this.turn(); }
+          this.g = G.clamp(this.g, WL + gw / 2, WR - gw / 2);
+        }
+        this.swell = G.damp(this.swell, this.due || t - this.lastTurn < 0.25 ? 1 : 0, this.due ? 7 : 3, dt);
+        this.srcX = P.x - (G.sign(this.g - P.x) || 1) * 40; // anyone caught in it is knocked towards the light
+        // the void sheds black motes off its edges, and dust drifts in the light
+        const k = this.k();
+        if (k > 0.2 && t < end) {
+          for (const s of [-1, 1]) {
+            const ex = this.g + s * gw / 2;
+            if (Math.random() < dt * 14 * k) G.fx.spawn({ kind: 'smoke', color: VOID.dark, a: 0.55, x: ex + s * G.rand(2, 16), y: G.rand(60, FLOOR), vx: s * G.rand(5, 30), vy: -G.rand(20, 70), life: G.rand(0.5, 1), size: G.rand(5, 10), grow: 8, drag: 1 });
+            if (Math.random() < dt * 5 * k) G.fx.spawn({ kind: 'spark', x: ex, y: G.rand(40, FLOOR), vx: s * G.rand(20, 120), vy: -G.rand(60, 260), life: G.rand(0.12, 0.3), size: G.rand(1.2, 2), color: VOID.boss, len: 0.05 });
+          }
+          if (Math.random() < dt * 6) G.fx.spawn({ x: this.g + G.rand(-gw / 2.4, gw / 2.4), y: G.rand(120, FLOOR - 20), vx: G.rand(-8, 8) + this.v * 0.6, vy: G.rand(-14, 14), life: G.rand(1, 1.8), size: G.rand(1.2, 2.4), color: VOID.hot, a: 0.5 });
+        }
+        if (t > end + this.fall) this.dead = true;
+      },
+      turn() { this.dir = -this.dir; this.lastTurn = this.t; if (this.t > rise) G.audio.play('sweep'); },
+      // how far the void has come down (0 to 1), then how much of it is left as it lifts away (1 to 0)
+      k() { const t = this.t; if (t < rise) return 0; if (t < on) return (t - rise) / form; if (t < end) return 1; return Math.max(0, 1 - (t - end) / this.fall); },
+      live() { return this.t >= on && this.t < end; },
+      hits(Pl) { return this.live() && Math.abs(Pl.x - this.g) + Pl.box().hw - 6 > gw / 2; },
+      danger(Pl) {
+        if (this.t < rise || this.t >= end) return null;
+        // the void on the side of the light nearest the hero, taken a little ahead of where the light is going
+        // (and with a wider berth on the frozen floor, where a hero cannot stop short)
+        const g = this.g + this.v * 0.2, side = Pl.x < g ? -1 : 1;
+        const edge = g + side * gw / 2, far = side < 0 ? WL - 300 : WR + 300;
+        // when it hurts: as it lands, or, for a hero still just inside the light, when its edge reaches them
+        const inside = gw / 2 - 5 - Math.abs(Pl.x - this.g);
+        const soon = Math.max(on - this.t, inside > 0 ? inside / Math.max(60, Math.abs(this.v)) : 0);
+        return [(edge + far) / 2, Math.abs(far - edge) / 2 + 16 + 14 * G.slick, soon];
+      },
+      draw(ctx) { drawBlackSun(ctx, this); },
+    });
+  }
+
+  function drawBlackSun(ctx, h) {
+    const t = h.t, k = h.k(), gw = h.gw, g = h.g, end = h.rise + h.form + h.dur, ending = t >= end;
+    // the sun: it rises slowing, as anything heavy does, and at the end sinks a little as it fades
+    const up = E.outCubic(Math.min(1, t / h.rise)), sa = Math.min(1, t / 0.25) * (ending ? k : 1);
+    if (sa > 0.01) {
+      const x = SUN_X, y = G.lerp(FLOOR - 180, SUN_Y, up) + (ending ? (1 - k) * 40 : 0), R = SUN_R * (0.7 + 0.3 * up);
+      ctx.save();
+      ctx.globalAlpha = sa;
+      // it eats the light around it
+      let gr = ctx.createRadialGradient(x, y, R * 0.8, x, y, R * 3.4);
+      gr.addColorStop(0, 'rgba(4,0,3,0.62)'); gr.addColorStop(1, 'rgba(4,0,3,0)');
+      ctx.fillStyle = gr; ctx.fillRect(x - R * 3.4, y - R * 3.4, R * 6.8, R * 6.8);
+      // a corona of thin crimson rays, turning slowly; it flares when the columns turn
+      ctx.globalCompositeOperation = 'lighter';
+      const sw = 1 + 0.4 * E.outCubic(h.swell);
+      ctx.fillStyle = G.rgba(VOID.boss, 0.15 + 0.1 * h.swell);
+      ctx.beginPath();
+      for (let i = 0; i < 22; i++) {
+        const a = i / 22 * G.TAU + t * 0.16, L = R * (1.32 + 0.3 * Math.sin(i * 2.7 + t * 1.3)) * sw, w = 0.05;
+        ctx.moveTo(x + Math.cos(a - w) * R, y + Math.sin(a - w) * R);
+        ctx.lineTo(x + Math.cos(a) * L, y + Math.sin(a) * L);
+        ctx.lineTo(x + Math.cos(a + w) * R, y + Math.sin(a + w) * R);
+      }
+      ctx.fill();
+      gr = ctx.createRadialGradient(x, y, R * 0.94, x, y, R * 1.32);
+      gr.addColorStop(0, G.rgba(VOID.boss, 0.5)); gr.addColorStop(1, G.rgba(VOID.boss, 0));
+      ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(x, y, R * 1.32, 0, G.TAU); ctx.fill();
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.fillStyle = '#050003'; ctx.beginPath(); ctx.arc(x, y, R, 0, G.TAU); ctx.fill();
+      ctx.strokeStyle = G.rgba(VOID.hot, 0.4); ctx.lineWidth = 1.5; ctx.stroke();
+      ctx.restore();
+    }
+    if (k < 0.002) return;
+    const top = -70, bot = FLOOR + 6, a = ending ? k : 1;
+    // the gap: a shaft of pale light, faint, from the sky to the floor
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    let gr = ctx.createLinearGradient(0, top, 0, FLOOR);
+    gr.addColorStop(0, G.rgba(VOID.hot, 0)); gr.addColorStop(1, G.rgba(VOID.hot, 0.075 * k));
+    ctx.fillStyle = gr; ctx.fillRect(g - gw / 2, top, gw, FLOOR - top);
+    ctx.fillStyle = G.rgba(VOID.hot, 0.1 * k);
+    ctx.beginPath(); ctx.ellipse(g, FLOOR, gw / 2, 7, 0, 0, G.TAU); ctx.fill();
+    ctx.restore();
+    // the columns, on both sides of the light; the ones by the gap pour last
+    for (const s of [-1, 1]) {
+      for (let j = 0; j < 16; j++) {
+        const p = g + s * (gw / 2 + j * PW), q = g + s * (gw / 2 + (j + 1) * PW - SEAM);
+        const x0 = Math.min(p, q), x1 = Math.max(p, q);
+        if (x1 < -80 || x0 > G.W + 80) break;
+        const delay = 0.3 * Math.max(0, 1 - j * 0.3);
+        const kj = ending ? 1 : G.clamp((k - delay) / (1 - delay), 0, 1);
+        if (kj <= 0) continue;
+        // pouring, it falls faster as it comes; leaving, it lifts back into the sky from the floor up
+        const yt = top, yb = ending ? bot - (bot - top) * E.inCubic(1 - k) : top + (bot - top) * (0.4 * kj + 0.6 * kj * kj);
+        gr = ctx.createLinearGradient(0, top, 0, bot);
+        gr.addColorStop(0, 'rgba(5,0,3,' + 0.4 * a + ')'); gr.addColorStop(0.55, 'rgba(8,0,5,' + 0.8 * a + ')'); gr.addColorStop(1, 'rgba(12,0,6,' + 0.9 * a + ')');
+        ctx.fillStyle = gr; ctx.fillRect(x0, yt, x1 - x0, yb - yt);
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        // threads of blood running up through it
+        ctx.strokeStyle = G.rgba(VOID.boss, 0.13 * a); ctx.lineWidth = 1.5;
+        ctx.setLineDash([16, 50]); ctx.lineDashOffset = t * 90 + j * 23;
+        for (const f of [0.3, 0.72]) { const lx = G.lerp(x0, x1, f); D.line(ctx, lx, yt, lx, yb); }
+        ctx.setLineDash([]);
+        // its seams, faint
+        ctx.strokeStyle = G.rgba(VOID.boss, 0.2 * a); ctx.lineWidth = 1;
+        D.line(ctx, x0, yt, x0, yb); D.line(ctx, x1, yt, x1, yb);
+        // the falling front, a ragged lip of crimson
+        if (!ending && kj < 1) { ctx.strokeStyle = G.rgba(VOID.boss, 0.7); ctx.lineWidth = 2; D.line(ctx, x0, yb, x1, yb); }
+        ctx.restore();
+      }
+      // the edge facing the light is drawn hard, so the gap reads at a glance; while the void is still
+      // pouring, a thin line down to the floor already shows where the light will be
+      const ex = g + s * gw / 2, kin = G.clamp((k - 0.3) / 0.7, 0, 1);
+      const yb = ending ? bot - (bot - top) * E.inCubic(1 - k) : top + (bot - top) * (0.4 * kin + 0.6 * kin * kin);
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      if (!ending && kin < 1) { ctx.strokeStyle = G.rgba(VOID.boss, 0.45 * Math.min(1, k * 4)); ctx.lineWidth = 1.2; D.line(ctx, ex, top, ex, FLOOR); }
+      if (yb > top) {
+        gr = ctx.createLinearGradient(ex, 0, ex + s * 22, 0);
+        gr.addColorStop(0, G.rgba(VOID.boss, 0.4 * a)); gr.addColorStop(1, G.rgba(VOID.boss, 0));
+        ctx.fillStyle = gr; ctx.fillRect(Math.min(ex, ex + s * 22), top, 22, yb - top);
+        const fl = Math.min(1.25, (0.8 + 0.2 * Math.sin(t * 23 + s)) * (1 + 0.45 * h.swell)); // (the edges quicken too before a turn)
+        ctx.strokeStyle = G.rgba(VOID.boss, 0.9 * a * fl); ctx.lineWidth = 2.4; D.line(ctx, ex, top, ex, yb);
+        ctx.strokeStyle = G.rgba(VOID.hot, 0.4 * a * fl); ctx.lineWidth = 1; D.line(ctx, ex, top, ex, yb);
+      }
+      ctx.restore();
+    }
+  }
+
+  function* atkBlacksun() {
+    const b = B.body, T = K.T(), ph = B.phase;
+    yield* blink(SUN_X, FLOOR - 200);
+    const rise = 0.95 * T, form = 1.0 * T, dur = [0, 4.4, 5.0, 5.6][ph];
+    const turns = ph === 1 ? [] : ph === 2 ? [G.rand(1.6, 2.6)] : [G.rand(1.2, 1.8), G.rand(3.2, 3.9)];
+    // the tell: the staff goes up flat overhead in both hands, and the three lights go out one by one
+    b.gest = 'sun'; b.want = 1; setElem(VOID);
+    const h = blacksun(rise, form, dur, { gw: ph === 3 ? 206 : 214, speed: [0, 118, 136, 150][ph], turns });
+    G.audio.play('charge', { dur: rise });
+    for (let i = 0; i < 3; i++) {
+      yield* wait(rise / 3);
+      b.dark = i + 1;
+      // where that mote is circling now (see the motes in B.draw)
+      const a = B.t * 1.5 * B.spin + i * G.TAU / 3, mx = b.x + b.face * Math.cos(a) * 56, my = b.y - 62 + Math.sin(a) * 15;
+      G.audio.play('orb');
+      G.fx.dust(mx, my, 3, { speed: [10, 50], size: [5, 9], life: [0.5, 0.9], up: 60, a: 0.5, color: VOID.dark });
+      G.fx.burst(mx, my, { n: 5, color: ELEMS[i].boss, speed: [30, 120], life: [0.2, 0.45], size: [1.5, 3], kind: 'spark' });
+    }
+    // the void pours down out of the sun
+    G.audio.play('tide'); G.fx.shake(5);
+    yield* wait(form);
+    // and lands: everything but the light is void
+    G.audio.play('clap'); G.fx.shake(12); G.fx.kick(0, 3);
+    G.fx.ripple(b.x, b.y - 150, 520, 0.45, 1.1);
+    for (const s of [-1, 1]) G.fx.dust(h.g + s * (h.gw / 2 + 30), FLOOR, 4, { dir: s, speed: [60, 260], size: [7, 13], up: 40, a: 0.5, color: VOID.dark });
+    // held: the Magus bears the sun up for as long as it stands
+    yield* wait(dur);
+    // it lets go: the void lifts back into the sun, the sun goes down, and the Magus comes down with it
+    G.audio.play('pull');
+    b.gest = null; b.want = 0.4;
+    yield* wait(h.fall * 0.5);
+    yield* tween(b, { y: GY }, 0.8, E.inOutQuad);
+    b.homeY = GY; b.want = 0;
+  }
+
+  // Foresight. The Magus reads where the hero is going. A crimson thread runs from its staff to the
+  // place the hero will be a moment from now if they keep on as they are, and follows them while it
+  // reads. Then the thread pulls taut and holds, and a bolt of void flies down it and bursts at its
+  // end. Keep running and you meet it; stop, turn back or dash the other way and it bursts on empty
+  // ground. Standing still is read too: then the end of the thread is on you, and any step will do.
+  // They come in threes, each read afresh.
+  const FLY = 0.26, BURST_R = 35;
+  function foresee(read, lock) {
+    const P = G.player, lead = lock + FLY, fire = read + lock;
+    // where the hero will be after the lead: straight on along the ground, or along their arc in the air
+    const where = () => {
+      const fy = P.onGround ? P.y : Math.min(FLOOR, P.y + P.vy * lead + 0.5 * 2500 * lead * lead);
+      return [G.clamp(P.x + P.vx * lead, WL + 20, WR - 20), fy - 22];
+    };
+    const w0 = where(), o0 = tip();
+    return H.add({
+      kind: 'foresight', layer: 'over', tint: VOID, ax: w0[0], ay: w0[1], ox: o0.x, oy: o0.y, hx: o0.x, hy: o0.y, fired: false, burst: false,
+      update(dt) {
+        const t = this.t;
+        if (t < read) {
+          const w = where();
+          this.ax = G.damp(this.ax, w[0], 16, dt); this.ay = G.damp(this.ay, w[1], 16, dt);
+          if (t + dt >= read) G.audio.play('tink'); // the thread pulls taut
+        }
+        if (t < fire) { const o = tip(); this.ox = o.x; this.oy = o.y; B.readAim = this; } else if (!this.fired) {
+          this.fired = true;
+          const b = B.body;
+          G.audio.play('streak');
+          b.kx -= b.face * 5; // the staff kicks back as it lets go
+          G.fx.burst(this.ox, this.oy, { n: 7, color: VOID.boss, speed: [60, 240], life: [0.12, 0.3], kind: 'spark', size: [1.4, 2.4] });
+          G.fx.dust(this.ox, this.oy, 2, { speed: [10, 40], size: [5, 8], life: [0.4, 0.7], up: 30, a: 0.45, color: VOID.dark });
+        }
+        if (this.fired && !this.burst) {
+          const q = Math.min(1, (t - fire) / FLY);
+          this.hx = G.lerp(this.ox, this.ax, q); this.hy = G.lerp(this.oy, this.ay, q);
+          if (q >= 1) { this.burst = true; voidBurst(this.ax, this.ay); }
+        }
+        this.srcX = this.burst ? this.ax : this.hx;
+        if (t > fire + FLY + 0.4) this.dead = true;
+      },
+      hits(Pl) {
+        if (this.fired && !this.burst) return touches(Pl, this.hx, this.hy, 9);
+        return this.burst && this.t < fire + FLY + 0.1 && touches(Pl, this.ax, this.ay, BURST_R);
+      },
+      danger(Pl) {
+        const t = this.t;
+        // while it is still reading it will follow wherever the hero goes; once taut, step off its end
+        if (t < read || t > fire + FLY + 0.1 || Math.abs(this.ay - (Pl.y - 22)) > BURST_R + 50) return null;
+        return [this.ax, BURST_R + 26, fire + FLY - t];
+      },
+      draw(ctx) {
+        const t = this.t;
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter'; ctx.lineCap = 'round';
+        if (!this.fired) {
+          // the thread: slack and wavering while it reads, pulled straight and bright when it holds
+          const taut = t < read ? 0 : E.outCubic(Math.min(1, (t - read) / (lock * 0.6))), fa = Math.min(1, t / 0.15);
+          const mx = (this.ox + this.ax) / 2, my = (this.oy + this.ay) / 2 + (1 - taut) * (16 + 6 * Math.sin(t * 9));
+          ctx.strokeStyle = G.rgba(VOID.boss, (0.28 + 0.55 * taut) * fa); ctx.lineWidth = 1.1 + 0.9 * taut;
+          ctx.beginPath(); ctx.moveTo(this.ox, this.oy); ctx.quadraticCurveTo(mx, my, this.ax, this.ay); ctx.stroke();
+          // its end: a small ring that closes on the point as the bolt comes
+          const close = t < read ? 0 : Math.min(1, (t - read) / lock);
+          ctx.strokeStyle = G.rgba(VOID.boss, (0.45 + 0.45 * taut) * fa); ctx.lineWidth = 1.5;
+          ctx.beginPath(); ctx.arc(this.ax, this.ay, 18 - 11 * close, 0, G.TAU); ctx.stroke();
+          ctx.fillStyle = G.rgba(VOID.hot, 0.6 * taut * fa);
+          ctx.beginPath(); ctx.arc(this.ax, this.ay, 1.8, 0, G.TAU); ctx.fill();
+        } else if (!this.burst) {
+          // the bolt: a black spear edged in blood, the rest of the thread still ahead of it
+          const dx = this.ax - this.ox, dy = this.ay - this.oy, L = Math.hypot(dx, dy) || 1, ux = dx / L, uy = dy / L, tl = 70;
+          ctx.strokeStyle = G.rgba(VOID.boss, 0.6); ctx.lineWidth = 1.5; D.line(ctx, this.hx, this.hy, this.ax, this.ay);
+          ctx.strokeStyle = G.rgba(VOID.boss, 0.6); ctx.lineWidth = 15; D.line(ctx, this.hx - ux * tl, this.hy - uy * tl, this.hx, this.hy);
+          D.glow(ctx, VOID.boss, this.hx, this.hy, 26, 0.7);
+          ctx.globalCompositeOperation = 'source-over';
+          ctx.strokeStyle = '#050003'; ctx.lineWidth = 6; D.line(ctx, this.hx - ux * tl * 0.85, this.hy - uy * tl * 0.85, this.hx, this.hy);
+        } else {
+          // a sphere of black that swells out, holds, and closes
+          const e = t - fire - FLY, f = Math.max(0, 1 - e / 0.36), r = BURST_R * (0.35 + 0.65 * E.outCubic(Math.min(1, e / 0.07))) * (0.55 + 0.45 * f);
+          const x = this.ax, y = this.ay;
+          ctx.globalCompositeOperation = 'source-over';
+          const gr = ctx.createRadialGradient(x, y, r * 0.2, x, y, r);
+          gr.addColorStop(0, 'rgba(4,0,2,' + 0.95 * f + ')'); gr.addColorStop(0.7, 'rgba(10,0,5,' + 0.9 * f + ')'); gr.addColorStop(1, G.rgba(VOID.boss, 0.55 * f));
+          ctx.fillStyle = gr;
+          ctx.beginPath(); ctx.arc(x, y, r, 0, G.TAU); ctx.fill();
+          // torn edges: thorns of black thrown out of it
+          ctx.fillStyle = 'rgba(5,0,3,' + 0.9 * f + ')';
+          ctx.beginPath();
+          for (let i = 0; i < 7; i++) {
+            const a = i / 7 * G.TAU + this.ox * 0.01, L = r * (1.25 + 0.3 * ((i * 5) % 3)) * (0.6 + 0.4 * f), w = 0.2;
+            ctx.moveTo(x + Math.cos(a - w) * r * 0.9, y + Math.sin(a - w) * r * 0.9); ctx.lineTo(x + Math.cos(a) * L, y + Math.sin(a) * L); ctx.lineTo(x + Math.cos(a + w) * r * 0.9, y + Math.sin(a + w) * r * 0.9);
+          }
+          ctx.fill();
+          ctx.globalCompositeOperation = 'lighter';
+          ctx.strokeStyle = G.rgba(VOID.boss, 0.9 * f); ctx.lineWidth = 2.5;
+          ctx.beginPath(); ctx.arc(x, y, r, 0, G.TAU); ctx.stroke();
+        }
+        ctx.restore();
+      },
+    });
+  }
+  function voidBurst(x, y) {
+    G.audio.play('clap'); G.fx.shake(5);
+    G.fx.ripple(x, y, 170, 0.3, 0.8);
+    G.fx.ring(x, y, { r0: 12, r1: BURST_R * 1.7, life: 0.3, color: VOID.boss, width: 4 });
+    G.fx.burst(x, y, { n: 12, color: VOID.boss, speed: [120, 480], life: [0.15, 0.35], kind: 'spark', size: [1.5, 2.8], grav: 600 });
+    G.fx.dust(x, y + 10, 5, { speed: [40, 160], size: [8, 14], life: [0.5, 0.9], up: 50, a: 0.55, color: VOID.dark });
+    if (y > FLOOR - 60) {
+      G.fx.scorch(x, 70, VOID.boss);
+      G.fx.burst(x, FLOOR - 4, { n: 5, color: VOID.dark, speed: [120, 320], angle: -Math.PI / 2, spread: 2.2, life: [0.5, 1], size: [3, 6], kind: 'chunk', grav: 1500 });
+    }
+  }
+
+  function* atkForesight() {
+    const b = B.body, P = G.player, T = K.T();
+    // (the hold is what a hero has to change course in; on the frozen floor of the later phases that
+    // takes longer, so it is kept generous, and a dash always beats it)
+    const bursts = B.phase >= 3 ? 2 : 1, read = 0.55 * T, lock = 0.27 * T, gap = 0.48 * T;
+    for (let r = 0; r < bursts; r++) {
+      // up and well away, where it can see the whole floor
+      const side = P.x < 640 ? 1 : -1;
+      yield* blink(G.clamp(P.x + side * G.rand(380, 460), 200, 1080), FLOOR - 250);
+      // the tell: its head turns to the hero, the glow of its hood narrows to a slit, and the staff
+      // comes round to point a little ahead of them
+      b.track = 1; b.slit = 1; b.gest = 'read'; b.want = 0.6; setElem(VOID);
+      G.audio.play('charge', { dur: 0.3 * T + read });
+      yield* wait(0.3 * T); // the look, before the first thread
+      for (let i = 0; i < 3; i++) { foresee(read, lock); if (i < 2) yield* wait(gap); }
+      yield* wait(read + lock + FLY + 0.25); // a held beat after the last bolt
+      b.track = 0; b.slit = 0; b.gest = null;
+      if (r < bursts - 1) yield* wait(0.3);
+    }
+    b.want = 0;
+    yield* tween(b, { y: GY }, 0.8, E.inOutQuad);
+    b.homeY = GY;
+  }
+
   // Back to rest. The staff comes down and what is left of the spell leaves it in its element's own
   // way: ice drops off the head of the staff in splinters, fire goes out in smoke, lightning crawls
   // down the wood and earths itself. Then the Magus sinks a little in the air and floats back up.
-  const ELEM_OF = { shards: ICE, rime: ICE, crystals: ICE, blizzard: ICE, fireball: FIRE, firewall: FIRE, comet: FIRE, cataclysm: FIRE, bolts: BOLT, spheres: BOLT, storm: BOLT, invoke: BOLT };
+  const ELEM_OF = { shards: ICE, rime: ICE, crystals: ICE, blizzard: ICE, fireball: FIRE, firewall: FIRE, comet: FIRE, cataclysm: FIRE, bolts: BOLT, spheres: BOLT, storm: BOLT, invoke: BOLT, blacksun: VOID, foresight: VOID };
   B.recover = function* (name) {
     const b = B.body, el = ELEM_OF[name] || ICE;
     if (b.hidden || b.spent) return;
@@ -692,14 +1032,24 @@
     } else if (el === FIRE) {
       G.fx.dust(o.x, o.y, 5, { speed: [10, 60], size: [8, 15], life: [0.6, 1.1], up: 110, a: 0.42, color: '70,62,66' });
       G.fx.burst(o.x, o.y, { n: 6, color: FIRE.boss, speed: [20, 110], life: [0.4, 0.9], size: [1.6, 3], grav: -120, wob: 80 });
+    } else if (el === VOID) {
+      // the void drips off the head of the staff, and its three lights come back on one by one
+      G.fx.dust(o.x, o.y, 3, { speed: [10, 40], size: [6, 11], life: [0.5, 0.9], up: 40, a: 0.5, color: VOID.dark });
+      G.fx.burst(o.x, o.y, { n: 5, color: VOID.dark, speed: [10, 60], angle: Math.PI / 2, spread: 1, life: [0.4, 0.8], size: [2, 3.5], kind: 'chunk', grav: 700 });
     } else G.audio.play('zap');
-    const y0 = b.y;
+    const y0 = b.y, dur = el === VOID ? 0.55 : 0.34;
     let e = 0;
-    while (e < 0.34) {
+    while (e < dur) {
       const dt = yield;
       e += dt;
-      const k = Math.min(1, e / 0.34);
+      const k = Math.min(1, e / dur);
       b.y = y0 + Math.sin(k * Math.PI) * 9; // sinks, and floats back
+      if (el === VOID && b.dark > 0 && k > 0.25 + (3 - b.dark) * 0.22) {
+        const i = b.dark - 1, a = B.t * 1.5 * B.spin + i * G.TAU / 3;
+        b.dark--;
+        G.audio.play('orb');
+        G.fx.burst(b.x + b.face * Math.cos(a) * 56, b.y - 62 + Math.sin(a) * 15, { n: 5, color: ELEMS[i].boss, speed: [30, 120], life: [0.2, 0.45], size: [1.5, 3], kind: 'spark' });
+      }
       if (el === BOLT && Math.random() < dt * 60) {
         // it runs down the staff to the hand
         const q = Math.random(), hx = b.x + b.face * 26, hy = b.y - 62;
@@ -715,6 +1065,7 @@
     shards: coda(atkShards, ICE), rime: coda(atkRime, ICE), fireball: coda(atkFireball, FIRE), bolts: coda(atkBolts, BOLT),
     spheres: coda(atkSpheres, BOLT), firewall: coda(atkFirewall, FIRE), crystals: coda(atkCrystals, ICE), storm: coda(atkStorm, BOLT),
     blizzard: atkBlizzard, cataclysm: atkCataclysm,
+    blacksun: atkBlacksun, foresight: atkForesight, // corrupted only
   };
 
   // ------------------------------------------------------------------ scenes
@@ -804,6 +1155,18 @@
     if (b.gest) b.gestWas = b.gest;
     b.gk = G.damp(b.gk || 0, b.gest ? 1 : 0, b.gest ? 14 : 9, dt);
     b.mk = G.damp(b.mk || 0, b.merge ? 1 : 0, 6, dt);
+    // the corrupted tells, eased in and out: its lights going out (the Black Sun); its head following
+    // the hero, the glow of its hood narrowing and the staff leading the hero (Foresight)
+    if (b.dk) for (let i = 0; i < 3; i++) b.dk[i] = G.damp(b.dk[i], i < b.dark ? 1 : 0, 9, dt);
+    b.sl = G.damp(b.sl || 0, b.slit ? 1 : 0, 9, dt);
+    const lx = (P.x - b.x) * b.face, ly = (P.y - 30) - (b.y - 108);
+    b.hd = G.damp(b.hd || 0, b.track ? G.clamp(Math.atan2(ly, Math.max(40, lx)), -0.4, 0.55) * 0.75 : 0, 7, dt);
+    if (B.readAim && b.gest === 'read') {
+      // it turns to keep the place it reads in front of it, as it turns to face the hero anywhere else
+      if ((B.readAim.ax - b.x) * b.face < -40) { b.face = -b.face; b.readTilt = -b.readTilt; } // (the staff stays where it was in the world, then swings round)
+      const dx = (B.readAim.ax - (b.x + b.face * 30)) * b.face, dy = B.readAim.ay - (b.y - 70);
+      b.readTilt = G.damp(b.readTilt, G.clamp(Math.atan2(dx, -dy), 0.4, 2.9), 10, dt);
+    }
     D.chainStep(B.cape, b.x - b.face * 12, b.y - 92, dt, { seg: 13, grav: 50, drift: 24, face: b.face, wave: 10, rate: 5 });
     for (const s of B.shards) s.life -= dt;
     B.shards = B.shards.filter((s) => s.life > 0);
@@ -861,15 +1224,28 @@
   };
 
   // ------------------------------------------------------------------ drawing
-  function mote(ctx, el, x, y, s, a) {
-    D.glow(ctx, el.boss, x, y, 15 * s, 0.9 * a);
-    ctx.globalAlpha *= a;
-    ctx.fillStyle = G.rgba(el.hot, 1);
+  function moteShape(ctx, el, x, y, s) {
     if (el === ICE) D.poly(ctx, [x, y - 6 * s, x + 3.6 * s, y, x, y + 6 * s, x - 3.6 * s, y]);
     else if (el === FIRE) { ctx.beginPath(); ctx.moveTo(x, y - 7 * s); ctx.quadraticCurveTo(x + 6 * s, y + 1 * s, x, y + 5 * s); ctx.quadraticCurveTo(x - 6 * s, y + 1 * s, x, y - 7 * s); ctx.closePath(); }
+    else if (el.isVoid) { ctx.beginPath(); ctx.arc(x, y, 5 * s, 0, G.TAU); } // a black sun in little
     else D.poly(ctx, [x, y - 6.5 * s, x + 1.6 * s, y - 1.6 * s, x + 6.5 * s, y, x + 1.6 * s, y + 1.6 * s, x, y + 6.5 * s, x - 1.6 * s, y + 1.6 * s, x - 6.5 * s, y, x - 1.6 * s, y - 1.6 * s]);
-    ctx.fill();
-    ctx.globalAlpha /= a;
+  }
+  // dk: how far this mote has gone out (corrupted, the Black Sun): a black cinder rimmed in blood
+  function mote(ctx, el, x, y, s, a, dk) {
+    const lit = a * (1 - (dk || 0)), out = a * (dk || 0), ga = ctx.globalAlpha;
+    if (lit > 0.01) {
+      D.glow(ctx, el.boss, x, y, 15 * s, (el.isVoid ? 0.55 : 0.9) * lit);
+      ctx.globalAlpha = ga * lit;
+      ctx.fillStyle = el.isVoid ? '#050003' : G.rgba(el.hot, 1);
+      moteShape(ctx, el, x, y, s); ctx.fill();
+      if (el.isVoid) { ctx.strokeStyle = G.rgba(VOID.hot, 0.8); ctx.lineWidth = 1.3; ctx.stroke(); }
+    }
+    if (out > 0.01) {
+      ctx.globalAlpha = ga * out;
+      ctx.fillStyle = '#060104'; moteShape(ctx, el, x, y, s); ctx.fill();
+      ctx.strokeStyle = G.rgba(VOID.boss, 0.75); ctx.lineWidth = 1; ctx.stroke();
+    }
+    ctx.globalAlpha = ga;
   }
 
   function drawCrystals(ctx) {
@@ -981,10 +1357,10 @@
     const motes = ELEMS.map((e, i) => {
       const a = B.t * 1.5 * B.spin + i * G.TAU / 3, mk = b.mk || 0, S0 = staff(c);
       const tx = S0.hx + Math.sin(S0.tilt) * 96, ty = S0.hy - Math.cos(S0.tilt) * 96; // the staff's head
-      return { e, x: G.lerp(Math.cos(a) * 56, tx, mk), y: G.lerp(-62 + Math.sin(a) * 15, ty, mk), back: Math.sin(a) < 0 && mk < 0.5 };
+      return { e, x: G.lerp(Math.cos(a) * 56, tx, mk), y: G.lerp(-62 + Math.sin(a) * 15, ty, mk), back: Math.sin(a) < 0 && mk < 0.5, dk: (b.dk && b.dk[i]) || 0 };
     });
     const dim = down ? 0.35 : 1;
-    for (const m of motes) if (m.back && (m.e !== el || b.mk > 0.05)) mote(ctx, m.e, m.x, m.y, 0.8, 0.7 * dim);
+    for (const m of motes) if (m.back && (m.e !== el || b.mk > 0.05)) mote(ctx, m.e, m.x, m.y, 0.8, 0.7 * dim, m.dk);
 
     // robe: narrow at the waist, wide at the hem and torn into wisps
     const g = ctx.createLinearGradient(0, -96, 0, 6);
@@ -1028,13 +1404,24 @@
     [[33, -78], [19, -83], [12, -76], [0, -85], [-12, -76], [-19, -83], [-33, -78]].forEach((p, i) => (i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1])));
     ctx.stroke();
 
-    // a face of nothing but two burning eyes
+    // (Foresight: the head turns on the neck to follow the hero)
+    ctx.save();
+    if (b.hd) { ctx.translate(2, -100); ctx.rotate(b.hd); ctx.translate(-2, 100); }
+    // a face of nothing but two burning eyes; reading the hero, they narrow to one slit of light
+    const sl = b.sl || 0;
     ctx.fillStyle = '#020308';
     ctx.beginPath(); ctx.ellipse(2, -108, 8.5, 9.5, 0, 0, G.TAU); ctx.fill();
-    D.glow(ctx, col, 6.5, -108, 13, 1);
+    D.glow(ctx, col, 6.5, -108, 13 * (1 - 0.35 * sl), 1);
+    ctx.save();
+    ctx.translate(6.5, -108.8); ctx.scale(1 + 0.15 * sl, 1 - 0.75 * sl); ctx.translate(-6.5, 108.8);
     ctx.fillStyle = G.rgba(hot, 1);
     D.poly(ctx, [1.6, -110.4, 5.6, -108.6, 2.2, -107]); ctx.fill();
     D.poly(ctx, [7.6, -108.8, 11.4, -110.8, 10.6, -107.2]); ctx.fill();
+    ctx.restore();
+    if (sl > 0.02) {
+      ctx.save(); ctx.translate(7, -109); ctx.scale(1.9, 0.38); D.glow(ctx, col, 0, 0, 16, 0.9 * sl); ctx.restore();
+      ctx.strokeStyle = G.rgba(hot, sl); ctx.lineWidth = 1.6; D.line(ctx, 0, -108.7, 13, -109.3);
+    }
     // hat: a tall crooked crown over a wide brim
     ctx.fillStyle = '#202a78';
     D.poly(ctx, [-14, -119, -12, -137, -17, -151, -28, -164, -38, -160, -24, -155, -11, -157, 2, -143, 13, -119]); ctx.fill();
@@ -1049,9 +1436,22 @@
     ctx.strokeStyle = G.rgba(col, 0.6); ctx.lineWidth = 1; D.line(ctx, -38, -160, -39 - sw, -148);
     D.glow(ctx, col, -39 - sw, -146, 9, 0.9);
     ctx.fillStyle = G.rgba(hot, 1); ctx.beginPath(); ctx.arc(-39 - sw, -146, 2.2, 0, G.TAU); ctx.fill();
+    ctx.restore();
 
     // the staff, taller than its bearer, and the arm that holds it
     const S = staff(c);
+    // raised flat overhead (the Black Sun) it is held in both hands, arms at full stretch
+    const sunK = (b.gest || b.gestWas) === 'sun' ? (b.gk || 0) : 0, reach = 18 + 11 * sunK;
+    if (sunK > 0.02) {
+      const gx = S.hx - Math.sin(S.tilt) * 38, gy = S.hy + Math.cos(S.tilt) * 38;
+      const k2 = D.ik(-11, -92, gx, gy, reach, reach, -1);
+      ctx.globalAlpha = b.alpha * Math.min(1, sunK * 1.5);
+      ctx.fillStyle = '#1a2160';
+      D.limb(ctx, -11, -92, k2.jx, k2.jy, 9, 8); ctx.fill();
+      D.limb(ctx, k2.jx, k2.jy, k2.ex, k2.ey, 8, 6); ctx.fill();
+      ctx.fillStyle = '#03040a'; ctx.beginPath(); ctx.arc(k2.ex, k2.ey, 3.4, 0, G.TAU); ctx.fill();
+      ctx.globalAlpha = b.alpha;
+    }
     ctx.save();
     ctx.translate(S.hx, S.hy); ctx.rotate(S.tilt);
     ctx.strokeStyle = '#04050c'; ctx.lineWidth = 5.5; D.line(ctx, 0, 66, 0, -82);
@@ -1078,7 +1478,7 @@
       ctx.beginPath(); ctx.ellipse(0, 74, 38 * gk, 7 * gk, 0, 0, G.TAU); ctx.stroke();
     }
     ctx.restore();
-    const k = D.ik(13, -92, S.hx, S.hy, 18, 18, 1);
+    const k = D.ik(13, -92, S.hx, S.hy, reach, reach, 1);
     ctx.fillStyle = '#28338c';
     D.limb(ctx, 13, -92, k.jx, k.jy, 10, 9); ctx.fill();
     D.limb(ctx, k.jx, k.jy, k.ex, k.ey, 9, 7); ctx.fill();
@@ -1090,7 +1490,7 @@
     ctx.fillStyle = '#03040a'; ctx.beginPath(); ctx.arc(k.ex, k.ey, 3.6, 0, G.TAU); ctx.fill();
     if (c > 0.3) D.glow(ctx, col, k.ex, k.ey, 14 + 10 * b.charge, c * 0.8);
 
-    for (const m of motes) if (!m.back && (m.e !== el || b.mk > 0.05)) mote(ctx, m.e, m.x, m.y, 1 + 0.5 * (b.mk || 0), dim);
+    for (const m of motes) if (!m.back && (m.e !== el || b.mk > 0.05)) mote(ctx, m.e, m.x, m.y, 1 + 0.5 * (b.mk || 0), dim, m.dk);
     if (b.mk > 0.3) { const S1 = staff(c); D.glow(ctx, '255,255,255', S1.hx + Math.sin(S1.tilt) * 96, S1.hy - Math.cos(S1.tilt) * 96, 70 * b.mk, 0.8 * b.mk); }
 
     if (b.flash > 0) D.glow(ctx, '255,255,255', 0, -70, 80, b.flash * 0.3); // (v1.6d: a tint, not a white dome)

@@ -368,6 +368,12 @@
     },
   };
 
+  // A boss file adds its own sounds: G.audio.define('howl', (o) => { G.audio.synth.tone({...}); }),
+  // and optionally G.audio.vary.howl = 1 (semitones of random pitch each time it plays).
+  A.define = function (name, fn) { S[name] = fn; };
+  A.synth = { tone: (o) => tone(o), noise: (o) => noise(o) };
+  A.vary = VARY;
+
   A.play = function (name, opts) {
     if (!A.ready || A.ctx.state !== 'running') return;
     const now = A.ctx.currentTime;

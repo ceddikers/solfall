@@ -25,7 +25,7 @@
     if (forced) { R.omens = String(forced).split(',').filter((id) => byId[id]); }
     else if (G.practice) { R.omens = []; }
     else {
-      const n = R.trial >= 6 ? 2 : R.trial >= 2 ? 1 : 0;
+      const n = R.corrupt || R.trial >= 6 ? 2 : R.trial >= 2 ? 1 : 0; // a corrupted boss always brings two
       // never the same omen two trials running
       const pool = G.shuffle(G.OMENS.map((o) => o.id).filter((id) => !(R.lastOmens || []).includes(id)));
       R.omens = pool.slice(0, n);

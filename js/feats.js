@@ -14,12 +14,14 @@
     mage: { k: 'own', name: 'Return to sender', desc: 'Send two Comets back into it', pay: 20, ok: (c) => (c.comet || 0) >= 2 },
     assassin: { k: 'own', name: 'Faster than silence', desc: 'Reach Flow rank S', pay: 20, ok: () => G.flow.peak >= 4 },
     knight: { k: 'own', name: 'Disarmed', desc: 'Strike it eight times while its sword is away', pay: 20, ok: (c) => (c.unarmed || 0) >= 8 },
+    wolf: { k: 'own', name: 'Floored', desc: 'Throw it onto its back three times in one fight', pay: 20, ok: (c) => (c.stagger || 0) >= 3 },
+    leviathan: { k: 'own', name: 'Hold fast', desc: 'Win without using Dawnbreak', pay: 20, ok: (c) => !c.ult },
   };
   const CAMP = [
     { id: 'camp.bell', name: 'Bellringer', desc: 'Ring the old bell five times without letting it fall quiet', pay: 10 },
     { id: 'camp.keep', name: 'Lamplighter', desc: 'Keep the lantern off the ground for ten blows', pay: 10 },
   ];
-  const BOSSES = ['warden', 'mage', 'assassin', 'knight'];
+  const BOSSES = ['warden', 'mage', 'assassin', 'knight', 'wolf', 'leviathan'];
 
   const FE = G.feats = { c: {} };
   FE.BOSSES = BOSSES; FE.CAMP = CAMP;
@@ -27,7 +29,7 @@
   FE.done = (id) => !!M.feats[id];
   FE.count = () => Object.keys(M.feats).filter((k) => M.feats[k]).length;
   FE.total = BOSSES.length * (EVERY.length + 1) + CAMP.length;
-  // counters for the fight in hand: hurt, brazen, riposte, comet, unarmed
+  // counters for the fight in hand: hurt, brazen, riposte, comet, unarmed, stagger, ult
   FE.reset = function () { FE.c = {}; };
   FE.bump = function (k) { FE.c[k] = (FE.c[k] || 0) + 1; };
 

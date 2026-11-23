@@ -124,10 +124,9 @@
 
   const PAD = 48; // backdrop bleed so screen shake never shows an edge
   const A = G.arena = {
+    WEATHER: null, BIRDS: null, // (set below)
     phase: 1, prevPhase: 1, fade: 1, fadeDur: 1,
-    platforms: [
-      { x: 214, w: 196, y: 0, top: 490, rise: 0, target: 0, bob: 0, bv: 0 },
-      { x: 870, w: 196, y: 0, top: 490, rise: 0, target: 0, bob: 0, bv: 0 },
+    platforms: [ // (filled in by A.layout, per boss and phase)
     ],
     bgs: [], theme: 'warden', cache: {},
     moteT: 0,
@@ -146,6 +145,12 @@
   };
   const DENSITY = [0, 0.55, 0.8, 1, 0.3]; // by phase: the weather closes in as the fight goes on, and clears at dawn
   const BIRDS = { assassin: 'bat', knight: 'crow' };
+  // a boss file adds its own: G.SCENES[name] = function (x, P, F, lcg) paints the skyline on the
+  // backdrop canvas x (P is the phase's palette, F the floor's y); G.arena.WEATHER[id] = { kind, n }
+  // with kind one of ember, snow, rain, ash; G.arena.BIRDS[id] = 'bat' or 'crow'.
+  G.SCENES = G.SCENES || {};
+
+  A.WEATHER = WEATHER; A.BIRDS = BIRDS;
 
   function seedFlake(f, kind, anywhere) {
     f.z = Math.random(); f.ph = rnd(0, 6.28); f.ix = 0; f.iy = 0;
@@ -449,6 +454,7 @@
     else if (P.scene === 'city') city(x, P, F);
     else if (P.scene === 'graves') graves(x, P, F);
     else if (P.scene === 'camp') camp(x, P, F);
+    else if (G.SCENES[P.scene]) G.SCENES[P.scene](x, P, F, lcg); // painted by the boss's own file
     else colonnade(x, P, F);
 
     // air between here and there: everything far away stands in haze up to its knees, so the
@@ -545,9 +551,43 @@
     buildLife();
   };
 
+  // Every boss's arena is laid out anew for each phase (v1.7c): it is never just the same two
+  // platforms. Each entry is [left edge, width, height of the standing surface]. The floor is at 612;
+  // one jump reaches about 474, two about 360.
+  A.LAYOUTS = {
+    warden: {
+      2: [[214, 196, 490], [870, 196, 490]],                                    // two wide wings, torn up by its hands
+      3: [[130, 150, 505], [565, 150, 410], [1000, 150, 505]],                  // three steps up to the black sun
+    },
+    mage: {
+      1: [[490, 300, 490]],                                                     // one dais in the middle of the hall
+      2: [[110, 120, 510], [400, 120, 455], [760, 120, 455], [1050, 120, 510]], // four floes on the frozen floor
+      3: [[300, 104, 530], [876, 104, 530]],                                    // two low stones under the storm
+    },
+    assassin: {
+      2: [[230, 84, 500], [598, 84, 436], [966, 84, 500]],                      // three narrow perches in the dark
+      3: [[44, 120, 508], [1116, 120, 508]],                                    // a ledge at each wall, under the wires
+    },
+    knight: {
+      2: [[110, 130, 512], [286, 130, 446]],                                    // what is left of a stair by the west wall
+      3: [[585, 110, 486]],                                                     // one stone inside the ring of blades
+    },
+  };
+  // Lay the arena out for a boss's phase: what stands now sinks back into the floor, and the new
+  // platforms come up out of it. o.hold leaves them in the floor until A.raisePlatforms is called
+  // (the Warden hauls its own up); o.instant puts them up at once.
+  A.layout = function (boss, phase, o) {
+    o = o || {};
+    const spec = (A.LAYOUTS[boss] || {})[phase] || [];
+    for (const p of A.platforms) { p.gone = true; p.target = 0; p.downT = 0; }
+    for (const [x, w, top] of spec) {
+      A.platforms.push({ x, w, y: o.instant ? top : G.FLOOR + 40, top, rise: o.instant ? 1 : 0, target: o.hold ? 0 : 1, bob: 0, bv: 0, downT: 0 });
+    }
+  };
+
   A.reset = function () {
     A.phase = 1; A.prevPhase = 1; A.fade = 1;
-    for (const p of A.platforms) { p.rise = 0; p.target = 0; p.downT = 0; p.y = G.FLOOR + 40; p.bob = 0; p.bv = 0; }
+    A.platforms.length = 0;
     A.birds.length = 0; A.birdT = rnd(3, 8); A.startleCd = 0;
   };
 
@@ -558,16 +598,18 @@
   };
 
   A.raisePlatforms = function (instant) {
-    for (const p of A.platforms) { p.target = 1; if (instant) p.rise = 1; }
+    for (const p of A.platforms) { if (p.gone) continue; p.target = 1; if (instant) p.rise = 1; }
   };
 
   A.dropPlatform = function (p, secs) { p.target = 0; p.downT = secs; };
 
   A.update = function (dt) {
     if (A.fade < 1) A.fade = Math.min(1, A.fade + dt / A.fadeDur);
+    // a platform that belongs to a phase that is over goes once it has sunk
+    for (let i = A.platforms.length - 1; i >= 0; i--) if (A.platforms[i].gone && A.platforms[i].rise <= 0) A.platforms.splice(i, 1);
     for (const p of A.platforms) {
-      // a platform knocked down by the swat attack sinks, waits, then rises again
-      if (p.rise > p.target) p.rise = Math.max(p.target, p.rise - dt / 0.35);
+      // a platform knocked down by the swat attack sinks, waits, then rises again (one that is going for good sinks slowly)
+      if (p.rise > p.target) p.rise = Math.max(p.target, p.rise - dt / (p.gone ? 0.9 : 0.35));
       if (p.downT > 0) { p.downT -= dt; if (p.downT <= 0) p.target = 1; }
       if (p.rise < p.target) {
         p.rise = Math.min(p.target, p.rise + dt / 1.6);

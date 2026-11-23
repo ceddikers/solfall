@@ -45,6 +45,8 @@
     <div id="callout"><div class="big"></div><div class="small"></div></div>
     <div id="hint"></div>
   </div>
+  <!-- the rest between trials: the boon you stand at, as a card (rest.js) -->
+  <div id="restCard" class="item card"><span class="ctag"></span><b class="cname"></b><span class="cdesc"></span><span class="cuse"></span></div>
 
   <!-- menus -->
   <div id="screens">
@@ -88,6 +90,25 @@
           <div class="item card t-relic" data-act="relic3"><span class="ctag">Relic</span><b class="cname"></b><span class="cdesc"></span></div>
         </nav>
         <nav class="row"><div class="item" data-act="back">Back</div></nav>
+      </div>
+    </section>
+
+    <section id="s-fountain" class="screen panelscreen">
+      <div class="panel shrine fountain">
+        <p class="over">Sunshards</p>
+        <h2>The Cleansing Fountain</h2>
+        <p class="lead" id="fountainLead"></p>
+        <nav id="fountainList">
+          <div class="item up" data-act="cleanse0"><b class="uname"></b><span class="udesc"></span><span class="ucost"></span></div>
+          <div class="item up" data-act="cleanse1"><b class="uname"></b><span class="udesc"></span><span class="ucost"></span></div>
+          <div class="item up" data-act="cleanse2"><b class="uname"></b><span class="udesc"></span><span class="ucost"></span></div>
+          <div class="item up" data-act="cleanse3"><b class="uname"></b><span class="udesc"></span><span class="ucost"></span></div>
+          <div class="item up" data-act="cleanse4"><b class="uname"></b><span class="udesc"></span><span class="ucost"></span></div>
+          <div class="item up" data-act="cleanse5"><b class="uname"></b><span class="udesc"></span><span class="ucost"></span></div>
+          <div class="item up" data-act="cleanse6"><b class="uname"></b><span class="udesc"></span><span class="ucost"></span></div>
+          <div class="item up" data-act="cleanse7"><b class="uname"></b><span class="udesc"></span><span class="ucost"></span></div>
+        </nav>
+        <nav class="row"><div class="item" data-act="back">Leave</div></nav>
       </div>
     </section>
 
@@ -239,6 +260,7 @@
         <h2>Practise</h2>
         <p class="lead">No relic, no omen, no reward, and nothing lost if you fall. <kbd>R</kbd> tries again.</p>
         <nav>
+          <div class="item opt" data-opt="firstFoe"><span class="k">Against</span><span class="v"></span></div>
           <div class="item" data-act="practice1">From phase I</div>
           <div class="item" data-act="practice2">From phase II</div>
           <div class="item" data-act="practice3">From phase III</div>
@@ -295,6 +317,7 @@
           <div class="item card" data-act="boon3"><span class="ctag"></span><b class="cname"></b><span class="cdesc"></span></div>
         </nav>
         <nav class="row">
+          <div class="item" data-act="rest" id="restItem">Rest, and choose a boon</div>
           <div class="item" data-act="reroll" id="rerollItem">Redraw boons</div>
           <div class="item" data-act="endrun">End the run, return to camp</div>
         </nav>
@@ -316,15 +339,21 @@
 <script src="js/hazards.js"></script>
 <script src="js/player.js"></script>
 <script src="js/flow.js"></script>
+<script src="js/finish.js"></script>
 <script src="js/post.js"></script>
 <script src="js/boss.js"></script>
 <script src="js/bosskit.js"></script>
 <script src="js/mage.js"></script>
 <script src="js/assassin.js"></script>
 <script src="js/knight.js"></script>
+<script src="js/wolf.js"></script>
+<script src="js/leviathan.js"></script>
 <script src="js/omens.js"></script>
 <script src="js/moments.js"></script>
 <script src="js/hub.js"></script>
+<script src="js/rest.js"></script>
+<script src="js/corrupt.js"></script>
+<script src="js/hexes.js"></script>
 <script src="js/ui.js"></script>
 <script src="js/game.js"></script>
 </body>

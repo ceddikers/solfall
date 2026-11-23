@@ -30,6 +30,7 @@
   FL.reset = function () {
     FL.v = 0; FL.rank = 0; FL.peak = 0; FL.idle = 0; FL.pop = 0; FL.dark = 0; FL.script = null; FL.moon = null; FL.cutin = null; FL.split = null;
     P.ult = G.run.ult || 0; P.ulting = false; P.vanish = false; P.shroudT = 0;
+    if (G.finish) G.finish.reset();
     FL.ready = P.ult >= 100;
   };
 
@@ -63,7 +64,7 @@
     if (P.shroudT > 0) P.shroudT -= dt;
     FL.pop = Math.max(0, FL.pop - dt * 2.5);
     // (Eos's counter dims the arena too, a little less, while its cut is on the way: see hush in player.js)
-    const dk = P.ulting ? 1 : P.hush && !P.dead ? 0.66 : 0;
+    const dk = P.ulting || P.finishing ? 1 : P.hush && !P.dead ? 0.66 : 0;
     FL.dark = G.damp(FL.dark, dk, dk ? 14 : 5, dt);
     // Flow only runs down while there is a boss to hit
     if (G.state === 'fight' && B.active && !B.invuln && !B.dying && !P.ulting) {
@@ -197,8 +198,9 @@
     const H = P.hero;
     aim = { x: t.cx, y: t.cy };
     P.ult = 0; FL.ready = false;
+    if (G.state === 'fight') G.feats.bump('ult');
     P.ulting = true; P.atk = null; P.cast = null; P.dashT = 0; P.plunge = false; P.healT = 0; P.flT = 0; P.vx = 0; P.vy = 0; P.stun = 0;
-    P.hold = null; P.focus = 0; P.drawT = 0; P.recov = null;
+    P.hold = null; P.focus = 0; P.drawT = 0; P.recov = null; P.edge = 0;
     P.facing = G.sign(t.cx - P.x) || P.facing;
     G.audio.play('ult');
     FL.cutin = { t0: performance.now(), hero: H, name: FL.NAMES[H.id] };

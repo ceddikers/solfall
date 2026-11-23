@@ -17,8 +17,10 @@
     ARROW_GAIN: 6, ARROW_GAIN_HEAVY: 12, // Starlight per arrow hit: less than a melee hit
     BOW_SLOW: 0.6,                       // Lune's speed while she is drawing and loosing
     STARFALL_DMG: 46, STARFALL_R: 165,
-    CHARGE_T: 1.05, // how long Aster's smash takes to charge fully
-    CHARGE_DMG: 0.5, // how much a full charge adds to the smash (0.5 = half again)
+    // (v1.7b: 0.9 s for +80% and a wave of 20. At 1.05 s for +50% and a wave of 14, holding the smash
+    // dealt less in a second than not holding it; before v1.4a, at 0.9 s for double and 24, it was too much.)
+    CHARGE_T: 0.9,   // how long Aster's smash takes to charge fully
+    CHARGE_DMG: 0.8, // how much a full charge adds to the smash (0.8 = 40 becomes 72)
     // Eos keeps her blade in its sheath. Holding the attack gathers Focus; letting go is the draw.
     FOCUS: [0.45, 0.95, 1.5],     // seconds of stance for the first, second and third mark
     DRAW_DMG: [18, 46, 100],      // what the draw is worth at one, two and three marks: patience is paid for, the third mark most of all
@@ -27,7 +29,9 @@
     DRAW_WAIT: [0.2, 0.32, 0.46], // how long after it the cut lands: the blade going home
     DRAW_GAIN: [12, 24, 44],      // Starlight for each thing a draw cut
     STANCE_SLOW: 0.45,            // her speed while she holds the stance
-    ARC_DMG: 40, ARC_SPEED: 1500, // the Dawn Arc
+    ARC_DMG: 40, ARC_SPEED: 1500, // the crescent of light (Second Light throws one when a blow is turned)
+    GUARD_T: 0.45,                // how long Still Point waits for a blow
+    EDGE_T: 2.5,                  // how long a turned blow keeps all three marks lit without the button held
   };
   const GOLD = '255,214,140'; // the finisher's colour
   // The active hero and its two light colours; set in P.reset.
@@ -45,7 +49,7 @@
   P.reset = function () {
     H = G.hero(); STAR = H.col; HOT = H.hot;
     // the hero, the relic and the boons taken this run set these
-    const hp = Math.max(1, G.diff().hp + H.hp + G.boon('heart') + G.up('vigor') - G.boon('glass') - (G.relic('crown') ? 2 : 0));
+    const hp = Math.max(1, G.diff().hp + H.hp + G.boon('heart') + G.up('vigor') - G.boon('glass') - (G.relic('crown') ? 2 : 0) + (G.relic('pearl') ? 1 : 0) + (G.boon('hollow') ? 3 : 0));
     const maxAir = H.air + G.boon('wind') + (G.relic('cloak') ? 1 : 0), maxDash = 1 + G.boon('twin');
     const segs = C.SEGS + G.boon('fourth') + (G.relic('moons') ? 1 : 0);
     Object.assign(P, {
@@ -56,10 +60,10 @@
       maxAir, maxDash, airJumps: maxAir, airDashes: maxDash,
       segs,
       healTime: C.HEAL_T * (G.boon('swift') ? 0.5 : 1),
-      dashCdMax: C.DASH_CD * (G.boon('twin') ? 0.7 : 1),
-      dashHit: new Set(), dawnUsed: false,
+      dashCdMax: C.DASH_CD * (G.boon('twin') ? 0.7 : 1) * (G.relic('pelt') ? 0.8 : 1) * (G.boon('voidstep') ? 0.5 : 1),
+      dashHit: new Set(), dawnUsed: false, borrowUsed: false,
       ward: G.relic('ward'), hitCount: 0, plunge: false, afterT: 0, afterScale: 1,
-      jumpBuf: 0, atkBuf: 0, dashBuf: 0, flareBuf: 0,
+      jumpBuf: 0, atkBuf: 0, dashBuf: 0, flareBuf: 0, wardT: 0,
       dashT: 0, dashCd: 0, dashDir: 1, iframes: 0, pdDone: false, ghostT: 0,
       inv: 0, stun: 0, hp, maxHp: hp,
       ember: G.relic('moons') ? C.SEG * segs : 40 * G.up('spark'), healT: 0, healLock: false,
@@ -72,7 +76,7 @@
       recov: null, // how the weapon comes back to rest after the last attack (see recoverPose)
       // Eos: the stance she is holding, the Focus gathered in it, the draw carrying her, and the cuts made but not yet landed
       hold: null, focus: 0, drawT: 0, drawV: null, owed: [], arc2: null, hush: null,
-      pad: 0, grazeCd: 0, streakN: 0, streakT: 0, fallT: 0,
+      pad: 0, grazeCd: 0, streakN: 0, streakT: 0, fallT: 0, edge: 0,
       rig: {}, // pose memory for drawing (see drawBody)
       scarf: [], ghosts: [], slashes: [], bolts: [],
       stats: { dmg: 0, hits: 0, perfect: 0, heals: 0, lances: 0 },
@@ -88,7 +92,7 @@
 
   P.gain = function (n) {
     const before = Math.floor(P.ember / C.SEG);
-    P.ember = Math.min(C.SEG * P.segs, P.ember + n * (1 + 0.4 * G.boon('vein')));
+    P.ember = Math.min(C.SEG * P.segs, P.ember + n * (1 + 0.4 * G.boon('vein')) * (G.relic('pearl') ? 1.25 : 1) * (G.boon('starving') ? 2 : 1));
     if (Math.floor(P.ember / C.SEG) > before) { G.audio.play('segment'); P.emberFlash = 1; }
     G.flow.hit(n); // whatever earns Starlight also builds Flow
   };
@@ -112,7 +116,7 @@
   // The Warden entered a new phase: the Wardstone recharges.
   P.onPhase = function () {
     if (!G.relic('ward') || P.dead || P.ward) return;
-    P.ward = true;
+    P.ward = true; P.wardT = 0;
     G.fx.ring(P.x, P.y - 22, { r0: 70, r1: 30, life: 0.4, color: HOT, width: 4 });
   };
 
@@ -137,9 +141,13 @@
     }
     // a Dawnbreak takes the hero over until it is done
     if (P.ulting) { G.flow.ultStep(dt); return; }
+    // and so does the finishing blow at the end of a fight (finish.js)
+    if (P.finishing) { G.finish.step(dt); return; }
 
     P.inv = Math.max(0, P.inv - dt);
     P.iframes = Math.max(0, P.iframes - dt);
+    // Ember Ward (a pair): the ward a mend gives lasts 4 seconds
+    if (P.wardT > 0) { P.wardT -= dt; if (P.wardT <= 0) { P.wardT = 0; P.ward = false; } }
     P.grazeCd = Math.max(0, P.grazeCd - dt);
     P.streakT = Math.max(0, P.streakT - dt);
     P.dashCd = Math.max(0, P.dashCd - dt);
@@ -173,6 +181,7 @@
     const ctl = G.playerControl();
     const free = !P.plunge && !(P.cast && !P.cast.thrown) && P.drawT <= 0; // nothing else can be started mid-plunge, mid-throw or mid-draw
     let mx = ctl ? I.axisX() : 0;
+    if (P.cast && P.cast.kind === 'guard' && !P.cast.thrown) mx = 0; // Still Point: he stands his ground
     const up = ctl && I.down.up, down = ctl && I.down.down;
     if (ctl) {
       if (I.pressed.jump) P.jumpBuf = C.BUFFER;
@@ -207,7 +216,7 @@
 
     // --- mend: hold to spend one segment of Starlight for health
     if (!I.down.heal) P.healLock = false;
-    const wantHeal = ctl && I.down.heal && !P.healLock && P.flT === 0 && !P.hold;
+    const wantHeal = ctl && I.down.heal && !P.healLock && P.flT === 0 && !P.hold && !G.bane('hollow'); // (Hollow Crown: no mending)
     if (wantHeal && free && P.onGround && P.dashT <= 0 && !P.atk && P.stun <= 0 && P.hp < P.maxHp && P.ember >= C.SEG) {
       if (P.healT === 0) G.audio.play('healStart');
       P.healT += dt;
@@ -226,9 +235,13 @@
         G.fx.burst(P.x, P.y - 8, { n: 12, color: STAR, speed: [10, 60], life: [0.6, 1.2], size: [2, 3.5], grav: -260, wob: 120, jitter: 16 });
         G.fx.light(P.x, P.y - 24, 170, STAR, 0.35, 0.5);
         G.fx.text(P.x, P.y - 70, 'MENDED', { color: STAR, size: 16 });
+        if (G.boon('emberward') && !P.ward) {
+          P.ward = true; P.wardT = 4;
+          G.fx.ring(P.x, P.y - 22, { r0: 70, r1: 30, life: 0.4, color: HOT, width: 4 });
+        }
       }
     } else {
-      if (ctl && I.pressed.heal && P.hp < P.maxHp && P.ember < C.SEG) { G.audio.play('empty'); P.emberFlash = -1; }
+      if (ctl && I.pressed.heal && P.hp < P.maxHp && (P.ember < C.SEG || G.bane('hollow'))) { G.audio.play('empty'); P.emberFlash = -1; }
       P.healT = 0;
     }
 
@@ -238,6 +251,8 @@
       P.dashT = C.DASH_T; P.dashDir = mx || P.facing; P.facing = P.dashDir;
       P.iframes = C.IFRAME; P.pdDone = false;
       if (!P.onGround) P.airDashes--;
+      if (G.relic('pelt') && G.state === 'fight') P.gain(C.GAIN_HIT); // Cinder Pelt (the wolf's trophy)
+      if (G.bane('voidstep') && G.state === 'fight') G.hexes.scar(P.x); // Void Step's bane (hexes.js)
       if (P.cast && !P.cast.thrown && P.cast.kind === 'lance') throwLance(P.cast);
       if (P.cast && !P.cast.thrown && P.cast.kind === 'arc') throwArc(P.cast);
       P.cast = null;
@@ -283,9 +298,9 @@
         }
         if (P.onGround) G.fx.dust(P.x - P.dashDir * 10, P.y, 1, { dir: -P.dashDir, speed: [30, 110], size: [4, 8], a: 0.3 });
       }
-      if (G.boon('comet')) cometStep();
+      if (G.boon('comet') || G.boon('voidstep')) cometStep();
       if (P.dashT <= 0) {
-        P.vx = P.dashDir * P.run * (mx === P.dashDir ? 1 : 0.6); P.dashCd = P.dashCdMax; P.sinceDash = 0;
+        P.vx = P.dashDir * P.run * (mx === P.dashDir ? 1 : 0.6); P.dashCd = P.dashFree ? 0 : P.dashCdMax; P.dashFree = false; P.sinceDash = 0;
         if (P.onGround) G.fx.dust(P.x + P.dashDir * 10, P.y, 3, { dir: P.dashDir, speed: [50, 190], size: [5, 9], up: 26 });
       }
     } else if (P.stun > 0) {
@@ -449,6 +464,7 @@
         if (H.special === 'lance') castLance(d.x, d.y);
         else if (H.special === 'starfall') castStarfall();
         else if (H.special === 'arc') castArc(d.x, d.y);
+        else if (H.special === 'guard') castGuard();
         else castVolley(d.x, d.y);
       } else {
         G.audio.play('empty'); P.emberFlash = -1;
@@ -478,8 +494,10 @@
     P.combo = idx; P.comboT = idx === n - 1 ? 0 : 0.62 + (H.heavy ? 0.3 : 0);
     return idx;
   }
-  const weaponMult = (heavy) => (1 + 0.25 * G.boon('keen')) * G.dmgMult() * (heavy && G.relic('shard') ? 1.5 : 1);
-  const haste = () => 1 - 0.18 * G.boon('quick');
+  const weaponMult = (heavy) => (1 + 0.25 * G.boon('keen')) * G.dmgMult() * (heavy && G.relic('shard') ? 1.5 : 1)
+    * (heavy && G.boon('dayedge') ? 1.6 : 1) // Edge of Day (a pair)
+    * (G.boon('bloodedge') ? 1.6 : 1); // Bloodied Edge (corrupted)
+  const haste = () => (1 - 0.18 * G.boon('quick')) * (G.boon('feral') ? 0.74 : 1);
   const spec = () => (G.relic('prism') ? 1.4 : 1); // the Magus's Prism strengthens every special
 
   // ---------------------------------------------------------------- melee (sword, maul)
@@ -579,7 +597,7 @@
       G.fx.thud(P.x + a.dir * 90, FLOOR, 1.15 + 0.8 * ck, { col: STAR });
       // fully charged: the blow runs on along the floor as a wave of light
       if (ck >= 1) {
-        G.shots.push({ wave: true, x: P.x + a.dir * 120, y: FLOOR - 30, vx: a.dir * 980, vy: 0, t: 0, life: 0.5, hit: new Set(), dmg: Math.round(14 * G.dmgMult()) });
+        G.shots.push({ wave: true, x: P.x + a.dir * 120, y: FLOOR - 30, vx: a.dir * 980, vy: 0, t: 0, life: 0.5, hit: new Set(), dmg: Math.round(20 * G.dmgMult()) });
         G.fx.thud(P.x + a.dir * 200, FLOOR, 1.2, { col: GOLD });
       }
       G.fx.burst(P.x + a.dir * 90, FLOOR - 4, { n: 8, color: STAR, speed: [150, 520], angle: -Math.PI / 2, spread: 2.2, life: [0.2, 0.5], kind: 'spark', size: [2, 3.5], grav: 900 });
@@ -593,7 +611,8 @@
 
   // Crescent boon: a wave of light along a direction.
   function wave(x, y, dx, dy) {
-    G.shots.push({ wave: true, x, y, vx: dx * 980, vy: dy * 980, t: 0, life: 0.42, hit: new Set(), dmg: Math.round(16 * G.dmgMult()) });
+    const k = G.boon('tidecut') ? 2 : 1; // Tidecutter (a pair)
+    G.shots.push({ wave: true, x, y, vx: dx * 980, vy: dy * 980, t: 0, life: 0.42 * k, hit: new Set(), dmg: Math.round(16 * k * G.dmgMult()) });
   }
 
   function atkBox(a) {
@@ -670,7 +689,7 @@
   function checkHits(a) {
     clash(a);
     const boxes = [atkBox(a)];
-    if (a.quake) boxes.push({ cx: P.x + a.dir * (100 + 20 * (a.charge || 0)), cy: FLOOR - 26, hw: 130 + 40 * (a.charge || 0), hh: 30 });
+    if (a.quake) boxes.push({ cx: P.x + a.dir * (100 + 20 * (a.charge || 0)), cy: FLOOR - 26, hw: 130 + 55 * (a.charge || 0), hh: 30 });
     let bounced = false;
     for (const hb of boxes) {
       for (const t of G.boss.targets()) {
@@ -721,9 +740,10 @@
     for (const t of G.boss.targets()) {
       if (P.dashHit.has(t.id) || !touch(P.box(), t)) continue;
       P.dashHit.add(t.id);
-      const dmg = Math.round(24 * G.boon('comet') * G.dmgMult());
+      const dmg = Math.round((24 * G.boon('comet') * (G.boon('shooting') ? 2 : 1) + 40 * G.boon('voidstep')) * G.dmgMult());
       if (G.boss.damage(dmg, t, { x: P.x, y: P.y - 22, heavy: true, dir: P.dashDir })) {
         P.gain(C.GAIN_HIT);
+        if (G.boon('shooting')) { P.dashFree = true; P.airDashes = P.maxDash; } // Shooting Star (a pair): no wait after this dash
         G.audio.play('hit');
         G.fx.stop(0.04);
         G.fx.hit(P.x, P.y - 22, P.dashDir > 0 ? 0 : Math.PI, { thrust: true, col: STAR, hot: HOT });
@@ -747,9 +767,11 @@
     if (heavy) G.fx.burst(P.x + d.x * 14, P.y - 28 + d.y * 14, { n: 5, color: GOLD, speed: [30, 140], life: [0.15, 0.35], kind: 'spark', size: [2, 3] });
   }
 
-  function arrow(dx, dy, dmg, heavy, life) {
+  // spent: an arrow of the Moon Volley. It was paid for with Starlight, so it earns none back (v1.7b:
+  // with Bright Vein and Full Quiver a point-blank volley used to return 86 of the 100 it cost).
+  function arrow(dx, dy, dmg, heavy, life, spent) {
     G.shots.push({
-      arrow: true, heavy, x: P.x + dx * 20, y: P.y - 38 + dy * 20, ox: P.x, oy: P.y - 38,
+      arrow: true, heavy, spent: !!spent, x: P.x + dx * 20, y: P.y - 38 + dy * 20, ox: P.x, oy: P.y - 38,
       vx: dx * C.ARROW_SPEED, vy: dy * C.ARROW_SPEED, t: 0, hit: new Set(), dmg,
       life: (life || C.ARROW_LIFE) * (1 + 0.3 * G.boon('reach')),
     });
@@ -826,7 +848,7 @@
     const dmg = Math.round(C.VOLLEY_DMG * G.dmgMult() * spec());
     for (let i = 0; i < n; i++) {
       const a = (i / (n - 1) - 0.5) * spread, c = Math.cos(a), s = Math.sin(a);
-      arrow(dx * c - dy * s, dx * s + dy * c, dmg, false, 0.46);
+      arrow(dx * c - dy * s, dx * s + dy * c, dmg, false, 0.46, true);
     }
     P.vx = -dx * 420;
     if (dy > -0.5) { P.vy = Math.min(P.vy, -330); P.onGround = false; P.plat = null; }
@@ -882,9 +904,17 @@
 
   function stance(dt, ctl, mx, up, down, free) {
     const I = G.input;
-    if (!ctl || P.stun > 0) { P.hold = null; P.focus = 0; return; }
+    if (!ctl || P.stun > 0) { P.hold = null; P.focus = 0; P.edge = 0; return; }
     const can = free && P.healT === 0 && P.flT === 0;
+    // a turned blow keeps all three marks lit for a while, button or no button
+    if (P.edge > 0) { P.edge -= dt; if (P.edge > 0) P.focus = C.FOCUS[2]; else if (!P.hold) P.focus = 0; }
     if (!P.hold) {
+      if (P.edge > 0 && P.atkBuf > 0 && can && P.dashT <= 0) {
+        // ...and the next press is the full draw, at once
+        P.atkBuf = 0; P.cast = null; P.focus = 0;
+        drawCut(3, mx, up, down);
+        return;
+      }
       if (P.atkBuf > 0 && can && P.atkCd <= 0 && P.dashT <= 0) {
         // a press: the flick comes out at once, and the stance begins behind it
         P.atkBuf = 0; P.cast = null;
@@ -974,7 +1004,7 @@
     // it passes through attacks, as a dash does: drawn through one, it is a perfect dodge
     P.iframes = Math.max(P.iframes, C.DRAW_T + 0.06 + 0.02 * lvl); P.pdDone = false;
     P.atkCd = C.DRAW_T + C.DRAW_WAIT[k] + 0.03;
-    P.cast = null; P.recov = null; P.healT = 0; P.squash = -0.07; P.dashHit.clear();
+    P.cast = null; P.recov = null; P.healT = 0; P.squash = -0.07; P.dashHit.clear(); P.edge = 0;
     G.audio.play('draw');
     G.fx.kick(d.x * (3 + 2 * lvl), d.y * (3 + 2 * lvl));
     const hx = mouthX(), hy = mouthY();
@@ -1076,7 +1106,54 @@
     G.audio.play('finish'); G.audio.play('bell'); G.audio.play('shatter');
   }
 
-  // Eos's special: a cut thrown across the arena as a crescent of light.
+  // Eos's special: Still Point. He sets the sheath across his body and waits for the blow. One that
+  // lands in that time is turned: no damage, the swing that made it is stopped, and all three marks
+  // light at once, so his next press is a full draw (and for a while he does not have to hold
+  // anything to keep it). Nothing lands, and the Starlight is spent for nothing. It is the other way
+  // to play him: do not wait for an opening, ask for the blow.
+  function castGuard() {
+    P.atk = null; P.recov = null;
+    P.cast = { kind: 'guard', t: 0, wind: C.GUARD_T, dur: C.GUARD_T + 0.2, thrown: false };
+    P.vx *= 0.3;
+    G.audio.play('glint');
+    G.fx.ring(P.x + P.facing * 12, P.y - 34, { r0: 46, r1: 12, life: C.GUARD_T, color: STAR, width: 2, alpha: 0.7 });
+    G.fx.glint(P.x + P.facing * 12, P.y - 44, 20, HOT, 0.2);
+  }
+  function turned(srcX, src) {
+    const c = P.cast, dir = G.sign(srcX - P.x) || P.facing, gx = P.x + dir * 16, gy = P.y - 34;
+    c.thrown = true; c.hit = true; c.t = c.wind; c.dur = c.wind + 0.34;
+    P.facing = dir;
+    P.iframes = Math.max(P.iframes, 0.5); P.pdDone = true;
+    P.focus = C.FOCUS[2]; P.edge = C.EDGE_T;
+    P.vx = -dir * 150;
+    // the swing that was turned is stopped, and whoever swung it is rocked
+    if (src && src.kind === 'arc' && src.owner) {
+      const o = src.owner, B = G.boss;
+      src.dead = true;
+      if (o.kx != null) o.kx = G.clamp(o.kx + dir * 16, -18, 18);
+      if (B.kit && !B.staggered && o === B.body) { B.poise = Math.min(B.poiseMax - 1, B.poise + 46 * H.poise); o.recV = (o.recV || 0) + dir * 3; }
+    }
+    G.flow.add(12); P.ult = Math.min(100, P.ult + 5);
+    G.audio.play('clash'); G.audio.play('focus', { n: 3 });
+    G.fx.stop(0.14); G.fx.shake(10); G.fx.punch(0.03); G.fx.kick(-dir * 6, 0);
+    G.fx.ripple(gx, gy, 260, 0.36, 1.1);
+    G.fx.glint(gx, gy, 56, GOLD, 0.3);
+    G.fx.ring(gx, gy, { r0: 10, r1: 130, life: 0.3, color: GOLD, width: 5 });
+    G.fx.lines(gx, gy, 14, HOT, { r0: 18, speed: [600, 1200] });
+    G.fx.burst(gx, gy, { n: 18, color: GOLD, speed: [200, 800], life: [0.15, 0.45], kind: 'spark', size: [2, 4], grav: 500, angle: dir > 0 ? Math.PI : 0, spread: 2.4 });
+    if (P.onGround) G.fx.dust(P.x, P.y, 5, { dir: -dir, speed: [80, 280], size: [5, 10] });
+    // Second Light: the turned blow is answered with a crescent of light
+    if (G.boon('second')) {
+      const B = G.boss;
+      let dx = dir, dy = 0;
+      if (B.active && B.core) { const ax = B.core.x - P.x, ay = B.core.y - (P.y - 34), d = Math.hypot(ax, ay) || 1; dx = ax / d; dy = P.onGround && ay > 0 ? 0 : ay / d; const n = Math.hypot(dx, dy) || 1; dx /= n; dy /= n; }
+      arcShot(dx, dy, 1); G.audio.play('draw');
+    }
+    G.feats.bump('turned');
+  }
+
+  // A cut thrown across the arena as a crescent of light. (It was Eos's special until v1.7c; now
+  // Second Light throws one when a blow is turned.)
   function castArc(dx, dy) {
     P.atk = null; P.recov = null;
     P.cast = { kind: 'arc', t: 0, wind: 0.07, dur: 0.46, dx, dy, thrown: false };
@@ -1135,6 +1212,8 @@
     G.fx.light(P.x, P.y - 22, 220, STAR, 0.3, 0.55);
     G.fx.punch(0.012);
     G.fx.text(P.x, P.y - 74, 'PERFECT', { color: HOT, size: 17, life: 0.9 });
+    // Wellspring (a pair): a whole segment of Starlight
+    if (G.boon('well')) { P.ember = Math.min(C.SEG * P.segs, P.ember + C.SEG); P.emberFlash = 1; }
     // Mirror Step answers a perfect dodge with a free shot at the core
     const B = G.boss;
     if (G.boon('mirror') && B.active && !B.dead && !B.dying) {
@@ -1161,6 +1240,7 @@
 
   P.tryHit = function (dmg, srcX, src) {
     if (P.dead || P.hidden || P.ulting || !G.canHurt()) return false;
+    if (P.cast && P.cast.kind === 'guard' && !P.cast.thrown) { turned(srcX, src); return false; } // Eos was waiting for it
     if (P.iframes > 0) {
       if (!P.pdDone) { P.pdDone = true; perfect(); }
       return false;
@@ -1168,7 +1248,7 @@
     if (P.inv > 0 || G.debug.god) return false;
     if (P.ward) {
       // Wardstone: this phase's first hit is turned aside
-      P.ward = false; P.inv = 0.9;
+      P.ward = false; P.wardT = 0; P.inv = 0.9;
       G.audio.play('tink'); G.audio.play('perfect');
       G.fx.shake(6);
       G.fx.ring(P.x, P.y - 22, { r0: 26, r1: 130, life: 0.45, color: HOT, width: 8 });
@@ -1176,14 +1256,17 @@
       G.fx.text(P.x, P.y - 78, 'WARDED', { color: HOT, size: 18, life: 1 });
       return false;
     }
+    if (G.bane('bloodedge')) dmg += 1; // Bloodied Edge's bane
     P.hp -= dmg; P.stats.hits++;
+    if (G.bane('feral')) P.ember = 0; // Feral Rhythm's bane
+    if (G.bane('ravenous')) G.hexes.feed(); // Ravenous Light's bane
     if (P.cast && !P.cast.thrown) P.ember += C.SEG; // caught mid wind-up: the lance never left, the Starlight comes back
     P.cast = null;
     P.lastHit = { kind: src && src.kind, attack: G.boss.attackName || '' }; // for the defeat screen
     const braced = !!(P.atk && P.atk.canCharge && !P.atk.swung && P.atk.hold > 0.12) && P.hp > 0;
     const dir = G.sign(P.x - srcX) || -P.facing;
     P.inv = C.HURT_INV; P.dashT = 0; P.healT = 0; P.hurtFlash = 1; P.plunge = false;
-    P.drawT = 0; if (!braced) { P.hold = null; P.focus = 0; } // and whatever Focus Eos had gathered is gone
+    P.drawT = 0; if (!braced) { P.hold = null; P.focus = 0; P.edge = 0; } // and whatever Focus Eos had gathered is gone
     P.streakT = 0;
     if (P.flT > 0) { P.flT = 0; P.flCd = 2; } // caught showing off
     G.feats.bump('hurt');
@@ -1204,6 +1287,13 @@
       // Second Dawn: survive the killing blow once per trial
       P.dawnUsed = true; P.hp = 1; P.inv = 2.6;
       revived('SECOND DAWN');
+      if (G.boon('dying') && G.boss.forceStagger) G.boss.forceStagger(); // Dying Light (a pair)
+    }
+    if (P.hp <= 0 && G.boon('borrowed') && !P.borrowUsed) {
+      // Borrowed Time (corrupted): once per trial
+      P.borrowUsed = true; P.hp = 2; P.inv = 2.6;
+      revived('BORROWED TIME');
+      if (G.boss.forceStagger) G.boss.forceStagger();
     }
     if (P.hp <= 0 && G.relic('phoenix') && !G.run.phoenixUsed) {
       // Phoenix Feather: once per run
@@ -1257,7 +1347,7 @@
             const em = G.moments.strike(s.heavy);
             const res = G.boss.damage(Math.round(s.dmg * close * far * em.mult), t, { x: s.x, y: s.y, heavy: s.heavy, finisher: s.heavy || em.mult > 1, dir: G.sign(s.vx), poise: H.poise });
             if (res) {
-              P.gain(s.heavy ? C.ARROW_GAIN_HEAVY : C.ARROW_GAIN);
+              if (s.spent) G.flow.hit(C.ARROW_GAIN); else P.gain(s.heavy ? C.ARROW_GAIN_HEAVY : C.ARROW_GAIN);
               G.fx.stop(s.heavy ? 0.06 : 0.016); G.fx.shake(s.heavy ? 6 : 1.2);
               G.audio.play(s.heavy ? 'hitHeavy' : 'hit', { pitch: hitPitch() });
               G.fx.hit(s.x, s.y, Math.atan2(s.vy, s.vx), { heavy: s.heavy, power: s.heavy ? 0.8 : 0.75, col: s.heavy ? GOLD : STAR, hot: HOT });
@@ -1283,7 +1373,7 @@
         for (const o of G.hazards.slashables()) {
           if (!s.dead && G.dist(o.x, o.y, s.x, s.y) < o.r + (s.arrow ? 12 : 18) * (s.big || 1)) {
             o.slash();
-            if (s.arrow) { P.gain(C.GAIN_ORB); if (!s.heavy) s.dead = true; }
+            if (s.arrow) { if (!s.spent) P.gain(C.GAIN_ORB); if (!s.heavy) s.dead = true; }
           }
         }
       }
@@ -1755,6 +1845,15 @@
       return freeBlade(3 + Math.cos(ang) * 6, SH - 6 + Math.sin(ang) * 6, ang, sc);
     }
     if (s.cast && !a && s.cast.kind === 'arc') return arcPose(s.cast, sc, SH);
+    if (s.cast && !a && s.cast.kind === 'guard') {
+      // Still Point: the sheath brought up across his body, nearly upright, the guard thumbed clear.
+      // A blow that lands knocks it back a hand's breadth; with none, it is lowered again.
+      const c = s.cast, up = [sx + 4, sy - 10, 1.95];
+      if (!c.thrown) { const k = smooth(c.t / 0.07); return sheathed(G.lerp(sx, up[0], k), G.lerp(sy, up[1], k), G.lerp(sang, up[2], k), { out: 3 * k }); }
+      const k = smooth((c.t - c.wind) / Math.max(0.01, c.dur - c.wind));
+      if (c.hit) return sheathed(up[0] - 5 * (1 - k), up[1] + 2 * (1 - k) + 6 * k, G.lerp(1.95 + 0.45 * (1 - k), sang, k * k), { out: 3 + 6 * (1 - k) });
+      return sheathed(G.lerp(up[0], sx, k), G.lerp(up[1], sy, k), G.lerp(up[2], sang, k), { out: 3 * (1 - k) });
+    }
     if (s.stun > 0 && !a) return sheathed(sx - 1, sy, 2.35, { fx: 9, fy: SH - 6, bx: -10, by: SH + 1 });
     if (s.healT > 0 && !a) { const q = Math.sin(G.t * 9) * 0.4; return sheathed(sx, sy, sang, { fx: 5, fy: -27 + q, bx: 2.5, by: -28.5 + q }); }
     if (s.recov && !a && !s.dash) return bladeRecover(s.recov, sc, SH);
@@ -2214,7 +2313,7 @@
     if (h.draw && !air) {
       if (drawing) crouchT = 6;
       else if (s.recov && s.recov.kind === 'noto' && !s.dash) crouchT = s.recov.t < s.recov.dur * s.recov.at ? 5 : 1;
-      else if (c && c.kind === 'arc') crouchT = 3;
+      else if (c && (c.kind === 'arc' || c.kind === 'guard')) crouchT = 3;
       else if (s.hold && s.focus > 0.12 && !s.dash) crouchT = 3 + 0.8 * focusMark(s.focus);
     }
     const crouch = h.draw ? ease('crouch', crouchT, drawing ? 60 : 22) : 0;
@@ -2301,7 +2400,7 @@
     const weapon = () => {
       if (h.weapon === 'sword') drawSword(ctx, W, h, gold);
       else if (h.weapon === 'maul') drawMaul(ctx, W, h, st, gold);
-      else if (h.weapon === 'blade') { drawScabbard(ctx, W, h, st, s.hold ? focusMark(s.focus || 0) : 0); drawKatana(ctx, W, h, gold); }
+      else if (h.weapon === 'blade') { drawScabbard(ctx, W, h, st, s.hold || s.edge > 0 ? focusMark(s.focus || 0) : 0); drawKatana(ctx, W, h, gold); }
       else drawBow(ctx, W, h, a, gold);
     };
 
@@ -2417,7 +2516,7 @@
 
     const blink = P.inv > 0 && P.iframes <= 0 && Math.floor(G.t * 28) % 2 === 0;
     if (blink) ctx.globalAlpha = 0.35;
-    P.primed = H.draw ? !!P.hold && focusMark() >= 3 : P.combo === (H.chain || 3) - 2 && P.comboT > 0 && !P.atk;
+    P.primed = H.draw ? (!!P.hold || P.edge > 0) && focusMark() >= 3 : P.combo === (H.chain || 3) - 2 && P.comboT > 0 && !P.atk;
     P.dash = P.dashT > 0;
     if (!P.vanish) { drawTail(ctx, H, P.scarf); drawBody(ctx, H, P); }
     ctx.globalAlpha = 1;

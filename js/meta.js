@@ -44,6 +44,8 @@
     { id: 'prism', boss: 'mage', name: 'Magus’s Prism', desc: 'Your special deals 40% more damage.' },
     { id: 'shroud', boss: 'assassin', name: 'Silent Shroud', desc: 'After a perfect dodge, everything you do deals 50% more for 3 seconds.' },
     { id: 'oath', boss: 'knight', name: 'Unburied Oath', desc: 'On your last point of health, everything you do deals 50% more.' },
+    { id: 'pelt', boss: 'wolf', name: 'Cinder Pelt', desc: 'A dash fills Starlight as a hit does, and dashes recover 20% faster.' },
+    { id: 'pearl', boss: 'leviathan', name: 'Drowned Pearl', desc: 'One more health, and Starlight fills 25% faster.' },
   ];
   for (const t of TROPHIES) { G.RELICS.push(t); }
   G.TROPHIES = TROPHIES;
@@ -56,7 +58,8 @@
   M.earning = earning;
   const GRADE = { S: 1.5, A: 1.25, B: 1.1, C: 1 }, DIFF = [0.75, 1, 1.4];
   const base = () => 12 + 5 * (G.run.trial - 1);
-  const scale = () => (DIFF[G.settings.difficulty] || 1) * (1 + 0.1 * G.up('fortune')) * (1 + 0.25 * G.run.omens.length);
+  const scale = () => (DIFF[G.settings.difficulty] || 1) * (1 + 0.1 * G.up('fortune')) * (1 + 0.25 * G.run.omens.length)
+    * (G.run.corrupt ? 3 : 1); // a corrupted boss pays three times over
 
   // A boss fell. Returns what was earned, for the victory screen.
   M.onVictory = function (grade, bossId) {
@@ -78,6 +81,7 @@
       out.lines.push('First victory over ' + G.bosses[bossId].short + ' +25');
     }
     if (G.run.omens.length) out.lines.push('Omen +' + 25 * G.run.omens.length + '%');
+    if (G.run.corrupt) out.lines.push('Corrupted \u00d73');
     // feats done for the first time in this fight (see feats.js); their pay is not scaled
     for (const f of G.feats.win(bossId)) { n += f.pay; out.lines.push('Feat: ' + f.name + ' +' + f.pay); }
     M.kills[bossId] = (M.kills[bossId] || 0) + 1;

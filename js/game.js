@@ -16,7 +16,7 @@
   G.cam = { x: 0, y: 0 }; // small view offset that follows the hero
 
   G.canHurt = () => G.state === 'fight' && !G.player.dead && !G.boss.dying && !G.boss.dead;
-  G.playerControl = () => (G.state === 'fight' || G.state === 'won' || G.state === 'hub') && !G.paused && !G.ui.current;
+  G.playerControl = () => (G.state === 'fight' || G.state === 'won' || G.state === 'hub' || G.state === 'rest') && !G.paused && !G.ui.current;
 
   function resize() {
     const s = Math.min(window.innerWidth / G.W, window.innerHeight / G.H);
@@ -48,10 +48,14 @@
     G.run.relic = r.id;
     G.startFight();
   };
-  // After a fall: same hero, straight back to the gate for a fresh choice of relics.
+  // After a fall (or Restart run): same hero and the same relic, straight into a new first trial.
+  // The relic is only given up by going back to the camp, where the reliquary offers new ones.
   G.newRun = function () {
     if (G.practice) { G.startPractice(G.practice.phase, G.practice.boss); return; } // R in a practice fight tries it again
-    G.toHub('gate'); G.openGate();
+    const relic = G.run.relic;
+    if (!relic || !G.relicDef(relic)) { G.toHub('gate'); G.openGate(); return; }
+    G.run.reset(); G.run.relic = relic;
+    G.startFight();
   };
   // Practice: one boss, from the phase you choose. No relic, no omens, no rewards, nothing lost.
   G.practice = null;
@@ -73,6 +77,7 @@
   // The Vigil: the camp between runs, where the hero walks about (see hub.js).
   // where: 'fire' (coming from the title) or 'gate' (coming back from a run).
   G.toHub = function (where) {
+    G.rest.leave();
     G.practice = null;
     G.run.reset();
     G.setBoss('dummy');
@@ -91,17 +96,44 @@
   };
   // Straight into a fight with no relic (used by tests and the console).
   G.startRun = function () { G.run.reset(); G.startFight(); };
-  G.nextTrial = function () { G.run.ult = G.player.ult || 0; G.run.trial++; G.startFight(); }; // the Dawnbreak meter carries over
+  // After a victory: out onto the road between trials, where the boon is chosen (rest.js).
+  G.toRest = function () {
+    G.practice = null;
+    G.run.ult = G.player.ult || 0; // the Dawnbreak meter carries over
+    G.setBoss('rest');
+    G.arena.reset(); G.hazards.clear(); F.reset();
+    G.player.reset(); G.flow.reset(); G.boss.reset(); G.moments.reset();
+    G.rest.enter();
+    G.player.x = G.rest.spawn(); G.player.facing = 1;
+    G.cam.x = G.rest.camTarget(); G.cam.y = 0;
+    G.state = 'rest'; G.paused = false; G.hitstop = 0; G.slowT = 0;
+    G.ui.resetHud(); G.ui.close(); G.ui.buildHp(G.player.maxHp); G.ui.buildRun(); G.ui.hud(true, true, true);
+    G.ui.fade(); G.ui.mood('fight');
+    G.audio.init(); G.audio.startMusic(); G.audio.setIntensity(0); G.audio.duck(1);
+    G.input.endStep();
+  };
+  // Through a portal on the road between (rest.js): the next trial against the boss chosen, or a
+  // corrupted portal's optional fight, which does not count as a trial. The Dawnbreak meter carries over.
+  G.enterPortal = function (id, corrupt) {
+    const R = G.run;
+    R.ult = G.player.ult || 0;
+    R.current = id; R.corrupt = !!corrupt;
+    if (!corrupt) R.trial++;
+    G.startFight();
+  };
+  G.nextTrial = function () { const left = G.run.left(); G.enterPortal(G.pick(left.length ? left : G.BOSS_IDS), false); };
   G.rerollBoons = function () { if (G.run.reroll()) { G.audio.play('uiSelect'); G.ui.fillBoons(); } else G.audio.play('empty'); };
   G.takeBoon = function (i) { G.run.take(i); G.nextTrial(); };
 
   G.startFight = function () {
+    G.rest.leave();
     G.seed((Date.now() ^ (Math.random() * 1e9)) >>> 0);
     G.setBoss(G.debug.boss || (G.practice ? G.practice.boss : G.run.foe()));
+    if (G.corrupt.on()) G.arena.setTheme(G.corrupt.theme(G.boss.theme || G.boss.id)); // corrupt.js
     G.cam.x = 0; G.cam.y = 0; // the camp scrolls; an arena does not
     G.run.rollOmens(); // before the boss works out its health
     G.arena.reset(); G.hazards.clear(); F.reset();
-    G.player.reset(); G.flow.reset(); G.boss.reset(); G.moments.reset(); G.feats.reset(); G.boss.intro();
+    G.player.reset(); G.flow.reset(); G.boss.reset(); G.moments.reset(); G.feats.reset(); G.hexes.reset(); G.boss.intro();
     G.state = 'fight'; G.paused = false;
     G.time = 0; G.hitstop = 0; G.slowT = 0; G.deadT = 0; G.wonT = 0; G.endShown = false;
     G.ui.close(); G.ui.resetHud(); G.ui.buildHp(G.player.maxHp); G.ui.buildRun(); G.ui.bossIntro(); G.ui.hud(true); G.ui.keysHint();
@@ -111,6 +143,7 @@
   };
 
   G.toTitle = function () {
+    G.rest.leave();
     G.practice = null;
     G.run.reset();
     G.cam.x = 0; G.cam.y = 0;
@@ -126,8 +159,9 @@
   };
 
   G.pause = function () {
-    if ((G.state !== 'fight' && G.state !== 'hub') || G.paused || G.ui.current || G.player.dead || G.boss.dying || G.debug.freeze) return;
+    if ((G.state !== 'fight' && G.state !== 'hub' && G.state !== 'rest') || G.paused || G.ui.current || G.player.dead || (G.boss.dying && !G.boss.toppled) || G.debug.freeze) return;
     G.paused = true;
+    G.rest.leave(); // the road's boon card would sit over the menu (it comes back on resume)
     G.ui.show('pause');
     G.audio.duck(0.3);
   };
@@ -144,10 +178,17 @@
     G.ui.letterbox(false); G.ui.mood('dead');
     G.audio.duck(0.35);
   };
-  G.onBossDying = function () {
+  // At nothing the boss goes down and stays down: E near it is the hero's finishing blow, any other
+  // blow ends it plainly (finish.js).
+  G.onBossToppled = function () { G.audio.duck(0.5); };
+  G.onBossDying = function (fin) {
     G.ui.hud(false);
     G.audio.duck(0.2);
-    // the finishing blow: one long cut through the boss, in the hero's light
+    // the hero's own finishing blow (finish.js); the boss's death waits for it
+    if (fin && G.finish.start()) return;
+    // a Dawnbreak that kills is its own finishing blow: its last strike is the ending
+    if (G.player.ulting) { G.finish.played = true; return; }
+    // after a Dawnbreak (or with no hero to do it): the finishing blow: one long cut through the boss, in the hero's light
     const c = G.boss.core, H = G.hero(), a = G.rand(-0.5, 0.5) + (G.player.x > c.x ? Math.PI : 0);
     F.cut(c.x, c.y, a, 1500, 11, '255,214,140', H.hot, 0.6);
     F.cut(c.x, c.y, a, 1500, 30, H.col, H.hot, 0.32);
@@ -170,13 +211,26 @@
     const depth = G.store.load('depth', {});
     const newDepth = !depth[d] || trial > depth[d];
     if (newDepth) { depth[d] = trial; G.store.save('depth', depth); }
-    return { grade, title, newBest, best: best[d], trial, newDepth, offer: G.run.rollOffer(), meta: G.meta.onVictory(grade, G.boss.id) };
+    // the boss is beaten (or a corrupted one cleansed); the sixth wins the run (the seventh, final
+    // fight is still to come); now and then a portal already beaten turns corrupted
+    const R = G.run, corrupt = R.corrupt, wasWon = R.runWon(), id = G.boss.id;
+    if (!G.practice) {
+      if (corrupt) { R.corrupted = R.corrupted.filter((x) => x !== id); if (!R.cleansed.includes(id)) R.cleansed.push(id); }
+      else if (!R.beaten.includes(id)) R.beaten.push(id);
+    }
+    const done = !G.practice && R.runWon(), wonNow = done && !wasWon;
+    if (wonNow) { const wins = G.store.load('wins', {}); wins[d] = (wins[d] || 0) + 1; G.store.save('wins', wins); }
+    const newCorrupt = !G.practice && !corrupt ? R.rollCorruption(id) : null;
+    const meta = G.meta.onVictory(grade, id);
+    const offer = corrupt ? R.rollRelicReward() : R.rollOffer();
+    R.current = null;
+    return { grade, title, newBest, best: best[d], trial, newDepth, done, wonNow, corrupt, newCorrupt, offer, meta };
   }
 
   // The Moves page: what each button does for the hero in play. Held open with Tab (the fight
   // waits while it is up), or opened from the pause menu.
   G.showMoves = function () {
-    if ((G.state !== 'fight' && G.state !== 'hub') || G.paused || G.ui.current || G.player.dead || G.debug.freeze) return;
+    if ((G.state !== 'fight' && G.state !== 'hub' && G.state !== 'rest') || G.paused || G.ui.current || G.player.dead || G.debug.freeze) return;
     G.paused = true; G.movesHeld = true;
     G.ui.showMoves(false);
     G.audio.duck(0.5);
@@ -204,12 +258,16 @@
     G.t += sdt;
     G.arena.update(sdt);
     if (G.state === 'hub') G.hub.update(sdt);
+    if (G.state === 'rest') G.rest.update(sdt);
+    G.finish.update(sdt);
     G.player.update(sdt);
     G.input.endStep();
     // while a Dawnbreak plays, the boss and everything it has thrown all but stand still
     const bdt = G.player.ulting ? sdt * G.flow.SLOW : sdt;
     G.boss.update(bdt);
     G.hazards.update(bdt);
+    G.corrupt.update(bdt);
+    G.hexes.update(bdt); // the banes of corrupted boons
     G.omens.update(sdt);
     G.flow.update(sdt);
     // a practice fight that starts in a later phase: push the boss there as soon as it can be hit
@@ -224,6 +282,7 @@
     const P = G.player;
     const follow = G.state === 'title' || P.hidden ? 0 : 1;
     if (G.state === 'hub') G.cam.x = G.damp(G.cam.x, G.hub.camTarget(), 5, dt); // the camp is wide: the view follows the hero across it
+    else if (G.state === 'rest') G.cam.x = G.damp(G.cam.x, G.rest.camTarget(), 5, dt);
     else G.cam.x = G.damp(G.cam.x, follow * (P.x - G.W / 2) * 0.026, 3.5, dt);
     G.cam.y = G.damp(G.cam.y, follow * G.clamp((P.y - G.FLOOR) * 0.035, -10, 0), 3.5, dt);
     // at close quarters the view leans in a little (2.5% at most), and a little more while the boss is down
@@ -265,7 +324,7 @@
     ctx.translate(G.W / 2 + F.shakeX, G.H / 2 + F.shakeY);
     ctx.scale(z, z);
     ctx.translate(-G.W / 2 - G.cam.x, -G.H / 2 - G.cam.y);
-    if (G.state === 'hub') G.hub.drawBack(ctx); else G.arena.drawBack(ctx);
+    if (G.state === 'hub') G.hub.drawBack(ctx); else if (G.state === 'rest') G.rest.drawBack(ctx); else G.arena.drawBack(ctx);
     G.flow.drawVeil(ctx);
     G.moments.drawGloom(ctx);
     F.drawDecals(ctx);
@@ -278,6 +337,7 @@
     G.hazards.draw(ctx, 'under');
     G.arena.drawPlatforms(ctx);
     if (G.state === 'hub') G.hub.draw(ctx);
+    if (G.state === 'rest') G.rest.draw(ctx);
     if (G.boss.kit) drawBoss();
     G.moments.draw(ctx);
     if (G.boss.drawOver) G.boss.drawOver(ctx); // e.g. the Veil's darkness: over the arena and the boss, under the hero
@@ -285,9 +345,13 @@
     G.player.draw(ctx);
     G.hazards.draw(ctx, 'over');
     F.draw(ctx);
+    G.finish.drawPrompt(ctx);
     if (G.state === 'hub') {
       G.hub.drawFore(ctx); G.hub.drawOver(ctx);
       ctx.translate(G.cam.x, 0); // the vignette stays on the view, not on the ground
+    } else if (G.state === 'rest') {
+      G.rest.drawOver(ctx);
+      ctx.translate(G.cam.x, 0);
     } else {
       // the floor takes a faint reflection of whatever is bright above it (see post.js)
       G.post.reflect(ctx, canvas, ((G.FLOOR - G.cam.y - G.H / 2) * z + G.H / 2 + F.shakeY) * k, k);
@@ -304,10 +368,11 @@
   }
 
   function drawBoss() {
-    if (!F.rattleA) { G.boss.draw(ctx); return; }
+    const draw = G.corrupt.active() ? () => G.corrupt.drawBoss(ctx, (c) => G.boss.draw(c)) : () => G.boss.draw(ctx);
+    if (!F.rattleA) { draw(); return; }
     ctx.save();
     ctx.translate(F.rattleX, F.rattleY);
-    G.boss.draw(ctx);
+    draw();
     ctx.restore();
   }
 
@@ -370,7 +435,7 @@
     G.arena.init();
     G.ui.init();
     G.input.bindMouse(stage);
-    G.input.mouseBlocked = () => !!G.ui.current || G.paused || (G.state !== 'fight' && G.state !== 'won' && G.state !== 'hub');
+    G.input.mouseBlocked = () => !!G.ui.current || G.paused || (G.state !== 'fight' && G.state !== 'won' && G.state !== 'hub' && G.state !== 'rest');
     G.input.onAction = onAction;
     resize();
     window.addEventListener('resize', resize);

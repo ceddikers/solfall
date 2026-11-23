@@ -32,6 +32,8 @@
     },
     cards: { 2: ['THE HOST', 'The dead answer the call'], 3: ['BLOOD OATH', 'It will not fall alone'] },
     first: { 1: 'cleave', 2: 'wraiths', 3: 'leap' },
+    // its corrupted self's own two (corrupt.js): the Requiem in every phase, the Colossus from the second
+    corruptBags: { 1: ['requiem'], 2: ['requiem', 'colossus'], 3: ['requiem', 'colossus'] },
   };
 
   // ------------------------------------------------------------------ poses
@@ -60,6 +62,8 @@
     heft: [-0.04, -60, 18, 0, -18, 0, 18, -98, -1.25, 999, 0],
     wrench: [-0.22, -52, 22, 0, -22, 0, 30, -86, 1.42, 999, 0],
     push: [0.34, -38, 24, 0, -28, 0, 26, -88, 1.5708, -8, -30],
+    // corrupted: down on one knee with the sword held up in both hands, point to the sky (the Colossus)
+    vigil: [0.06, -36, 24, 0, -30, 0, 8, -126, -1.5708, 999, 0],
   };
   const NP = 11;
   function walkPose(t) {
@@ -73,15 +77,21 @@
   B.setup = function () {
     const b = B.body;
     b.x = 900; b.y = FLOOR + 150; b.pose = 'kneel'; b.p = POSES.kneel.slice(); b.walkT = 0; b.hurt = false; b.spin = 0; b.spinning = false; b.fast = false;
-    b.bare = false; b.still = false;
+    b.bare = false; b.still = false; b.voidK = 0; b.voidOn = false; b.hush = false; b.smooth = 0; b.fd = -1;
     B.cape = D.chain(9, b.x, b.y - 100);
     WL = G.WALL_L; WR = G.WALL_R; B.ring = false; B.swords = []; B.lost = null;
   };
   B.bounds = () => (B.ring ? { l: WL + 13, r: WR - 13 } : null);
   B.onHit = function () { if (B.body.unarmed) G.feats.bump('unarmed'); }; // for the feat
-  B.onRelease = function () { const b = B.body; b.hurt = false; b.pose = 'idle'; b.spinning = false; b.fast = false; b.unarmed = false; b.blaze = 0; };
+  // the Requiem's silence ends however the attack does (finished, staggered, or cut short by a phase)
+  function unhush() {
+    const b = B.body;
+    if (b.hush && G.state === 'fight' && !G.player.dead && !G.paused) G.audio.duck(1);
+    b.hush = false;
+  }
+  B.onRelease = function () { const b = B.body; b.hurt = false; b.pose = 'idle'; b.spinning = false; b.fast = false; b.unarmed = false; b.blaze = 0; b.voidOn = false; unhush(); };
   B.onStagger = function () { B.body.pose = 'kneel'; };
-  B.onInterrupt = function () { B.lost = null; };
+  B.onInterrupt = function () { B.lost = null; unhush(); };
   B.staggerWord = 'DISARMED';
   B.staggerIn = function* () {
     const b = B.body;
@@ -376,7 +386,9 @@
     yield* wait(0.75);
   }
 
-  // Spikes of bone erupt where the hero stands, one after another.
+  // Columns come down where the hero stands, one after another. They reach from the top of the
+  // screen to the floor (v1.7c; they used to stop 200 pixels up, so a jump cleared them): the only
+  // way out of one is sideways.
   function* atkGraves() {
     const b = B.body, P = G.player, T = K.T();
     facePlayer();
@@ -387,7 +399,7 @@
     const n = 4 + (B.phase - 1) + (K.hard() ? 1 : 0);
     for (let i = 0; i < n; i++) {
       const x = G.clamp(P.x + P.vx * 0.22 + G.rrand(-12, 12), WL + 50, WR - 50);
-      H.zone({ x: x - 46, y: FLOOR - 200, w: 92, h: 200, tele: 0.66 * T, active: 0.3, style: 'column', onFire() { G.audio.play('boom'); G.fx.shake(5); } });
+      H.zone({ x: x - 46, y: -80, w: 92, h: FLOOR + 80, tele: 0.66 * T, active: 0.3, style: 'column', onFire() { G.audio.play('boom'); G.fx.shake(5); } });
       yield* wait(0.4);
     }
     yield* wait(0.66 * T + 0.35);
@@ -678,6 +690,428 @@
     yield* drag();
   }
 
+  // ------------------------------------------------------------------ corrupted
+  // Two attacks only its corrupted self uses (corrupt.js, B.corruptBags), in the void's own colours.
+
+  // Requiem. The Knight swings in silence: four to six fast cuts through empty air, around the arena
+  // and at different heights, and every one leaves a thin tear hanging where the blade went. Nothing
+  // hurts yet. Then it ends the requiem and the tears open as real cuts. The answer is to remember
+  // where they hang and be out of them when they open.
+  //   Its tell: the music falls away and its blade goes black from the guard to the point.
+  //   How it ends says how they open: the sword driven into the ground opens them all at once; the
+  //   sword lifted back onto its shoulder opens them one by one, the last made first.
+  // Where a tear hangs, by the cut that made it (from the Knight's side to the far end, x along its
+  // facing, y up from the floor).
+  const TEARS = {
+    sweep: { seg: [-150, -60, 150, -14], at: 165, wind: 'raise', to: 'low' },   // low along the ground
+    fall: { seg: [-140, -246, 140, -10], at: 150, wind: 'raise', to: 'cleave' }, // high behind to the floor in front
+    rise: { seg: [-34, -4, 54, -272], at: 72, wind: 'low', to: 'rise' },         // up off the floor, nearly upright
+    high: { seg: [-170, -164, 170, -138], at: 180, wind: 'raise', to: 'whirl', hop: 92 }, // level, at the height of a jump
+  };
+  const TEAR_W = 10; // half the width of a cut once it opens
+  // how far along its facing a cut crosses the floor (0 for the ones that never reach it)
+  const FLOOR_OFF = {};
+  function floorOff(type) {
+    if (type === 'air' || type === 'high') return 0;
+    if (FLOOR_OFF[type] == null) { const s = tearSpan(tearSeg(type, 0, 1), FLOOR, 0); FLOOR_OFF[type] = s ? (s[0] + s[1]) / 2 : 0; }
+    return FLOOR_OFF[type];
+  }
+  function tearSeg(type, cx, f, airY) {
+    if (type === 'air') return [cx - f * 170, airY + 12, cx + f * 170, airY - 12]; // cut at the hero's height
+    const s = TEARS[type].seg;
+    return [cx + f * s[0], FLOOR + s[1], cx + f * s[2], FLOOR + s[3]];
+  }
+  // The stretch of x where a hero whose feet are at py would be inside a tear (pad widens it).
+  function tearSpan(seg, py, pad) {
+    const [ax, ay, bx, by] = seg, r = TEAR_W + pad;
+    let lo = 1e9, hi = -1e9;
+    for (let x = Math.min(ax, bx) - r; x <= Math.max(ax, bx) + r; x += 4) {
+      for (const dy of [6, 22, 38]) if (G.distPointSeg(x, py - dy, ax, ay, bx, by) < r) { lo = Math.min(lo, x); hi = Math.max(hi, x); break; }
+    }
+    return lo <= hi ? [lo, hi] : null;
+  }
+  // Fairness: is there still floor that no tear crosses, wide enough to stand in and near enough to
+  // reach before they open? (Never a layout that leaves only the sky.)
+  function floorLeft(segs, from, reach) {
+    const lo = WL + 22, hi = WR - 22, spans = segs.map((s) => tearSpan(s, FLOOR, 14)).filter(Boolean);
+    let run = 0;
+    for (let x = lo; x <= hi; x += 6) {
+      if (spans.some((s) => x >= s[0] && x <= s[1])) { run = 0; continue; }
+      run += 6;
+      if (run >= 48 && Math.abs(x - 24 - from) <= reach) return true;
+    }
+    return false;
+  }
+
+  function tear(seg) {
+    const C = G.corrupt.COL, [ax, ay, bx, by] = seg, len = Math.hypot(bx - ax, by - ay), ang = Math.atan2(by - ay, bx - ax);
+    const nx = -Math.sin(ang), ny = Math.cos(ang);
+    // torn, not ruled: a ragged line that stays the same for as long as it hangs
+    const rag = []; for (let i = 0; i <= 14; i++) rag.push(i && i < 14 ? G.rand(-3.5, 3.5) : 0);
+    const OPEN = 0.13, FADE = 0.42, FLARE = 0.38;
+    return H.add({
+      kind: 'requiem', x: (ax + bx) / 2, y: (ay + by) / 2, seg, openAt: null, est: 2, opened: false, oT: 0,
+      update(dt) {
+        this.srcX = this.x;
+        if (!this.opened && this.openAt != null && this.t >= this.openAt) {
+          this.opened = true;
+          G.fx.cut(this.x, this.y, ang, len, 15, C.blood, C.hot, 0.32);
+          for (let i = 0; i < 12; i++) {
+            const q = G.rand(0, 1), v = G.rand(160, 520) * (Math.random() < 0.5 ? 1 : -1);
+            G.fx.spawn({ kind: 'spark', x: G.lerp(ax, bx, q), y: G.lerp(ay, by, q), vx: nx * v + Math.cos(ang) * G.rand(-80, 80), vy: ny * v, life: G.rand(0.14, 0.32), size: G.rand(1.5, 2.8), color: C.hot, drag: 2, grav: 500 });
+          }
+          G.fx.shards(this.x, this.y, 4, C.blood, { speed: [80, 300], size: [2, 4] });
+          if (Math.max(ay, by) > FLOOR - 16) G.fx.dust(ay > by ? ax : bx, FLOOR, 3, { speed: [30, 160], size: [6, 10], up: 40, a: 0.34 });
+        }
+        if (this.opened) { this.oT += dt; if (this.oT > OPEN + FADE) this.dead = true; }
+        else if (Math.random() < dt * 7) { const q = G.rand(0.1, 0.9); G.fx.spawn({ x: G.lerp(ax, bx, q), y: G.lerp(ay, by, q), vx: G.rand(-8, 8), vy: G.rand(10, 40), life: G.rand(0.4, 0.8), size: G.rand(1.5, 3), color: C.blood, kind: 'glow' }); }
+        if (this.t > 16) this.dead = true;
+      },
+      hits(P) {
+        if (!this.opened || this.oT > OPEN) return false;
+        const r = TEAR_W + 5 + (P.pad || 0);
+        for (const dy of [6, 22, 38]) if (G.distPointSeg(P.x, P.y - dy, ax, ay, bx, by) < r) return true;
+        return false;
+      },
+      danger(P) {
+        if (this.opened && this.oT > OPEN) return null;
+        const s = tearSpan(seg, P.y, 12);
+        if (!s) return null;
+        return [(s[0] + s[1]) / 2, (s[1] - s[0]) / 2, this.openAt == null ? Math.max(0.4, this.est - this.t) : Math.max(0, this.openAt - this.t)];
+      },
+      draw(ctx) {
+        const drawn = Math.min(1, this.t / 0.09); // it is torn along the blade's path, not all at once
+        const pts = (w) => {
+          // the lens of the tear: w wide in the middle, closed at both ends
+          const up = [], dn = [];
+          for (let i = 0; i <= 14; i++) {
+            const q = i / 14 * drawn, hw = w * Math.pow(Math.sin(Math.PI * i / 14), 0.7);
+            const x = G.lerp(ax, bx, q) + nx * rag[i], y = G.lerp(ay, by, q) + ny * rag[i];
+            up.push([x + nx * hw, y + ny * hw]); dn.push([x - nx * hw, y - ny * hw]);
+          }
+          ctx.beginPath(); ctx.moveTo(up[0][0], up[0][1]);
+          for (const p of up) ctx.lineTo(p[0], p[1]);
+          for (let i = dn.length - 1; i >= 0; i--) ctx.lineTo(dn[i][0], dn[i][1]);
+          ctx.closePath();
+        };
+        if (!this.opened) {
+          // hanging: a thread of blood round a sliver of void, swelling as it is about to open
+          const left = this.openAt == null ? 9 : this.openAt - this.t, k = G.clamp(1 - left / FLARE, 0, 1);
+          const born = Math.min(1, this.t / 0.2), settle = 0.72 + 0.28 * Math.max(0, 1 - (this.t - 0.2) / 0.5);
+          const a = born * Math.max(settle, k) * (0.9 + 0.1 * Math.sin(this.t * 13 + ax));
+          ctx.save();
+          ctx.globalAlpha *= a;
+          // a shadow of void round it first, so it reads against a sky as red as itself
+          ctx.fillStyle = 'rgba(5,0,3,0.5)';
+          pts(8 + 4 * k); ctx.fill();
+          ctx.globalCompositeOperation = 'lighter';
+          D.glow(ctx, C.blood, this.x, this.y, len * 0.32, 0.12 + 0.2 * k);
+          ctx.fillStyle = G.rgba(C.blood, 0.75 + 0.25 * k);
+          pts(3.2 + 4 * k); ctx.fill();
+          ctx.globalCompositeOperation = 'source-over';
+          ctx.fillStyle = C.dark;
+          pts(1.4 + 2.6 * k); ctx.fill();
+          if (k > 0) { ctx.strokeStyle = G.rgba(C.hot, k * (0.5 + 0.5 * Math.sin(this.t * 60))); ctx.lineWidth = 1; pts(3.2 + 4 * k); ctx.stroke(); }
+          ctx.restore();
+        } else {
+          // open: the cut itself, a band of blood round a black core that snaps wide and closes
+          const e = this.oT, w = e < OPEN ? G.lerp(10, 15, e / OPEN) : 15 * Math.max(0, 1 - (e - OPEN) / FADE);
+          const f = e < OPEN ? 1 : Math.max(0, 1 - (e - OPEN) / FADE);
+          ctx.save();
+          ctx.globalCompositeOperation = 'lighter';
+          ctx.fillStyle = G.rgba(C.blood, 0.8 * f); pts(w + 4); ctx.fill();
+          ctx.fillStyle = G.rgba(C.hot, 0.5 * f); pts(w * 0.25); ctx.fill();
+          ctx.globalCompositeOperation = 'source-over';
+          ctx.fillStyle = G.rgba('5,0,3', 0.9 * f); pts(w * 0.55); ctx.fill();
+          ctx.restore();
+        }
+      },
+    });
+  }
+
+  // Between the silent cuts the Knight gets where it is going on its own two feet: a few long
+  // strides if it is near, otherwise it springs there, low and heavy, and lands into the next wind-up.
+  function* stride(x, face, wind) {
+    const b = B.body, x0 = b.x, d = Math.abs(x - x0);
+    b.smooth = 1;
+    if (d < 12) { b.face = face; return; }
+    if (d < 170) {
+      b.fast = false; b.pose = 'walk';
+      while (Math.abs(x - b.x) > 3) {
+        const dt = yield, s = G.sign(x - b.x);
+        b.face = s; b.walkT += dt * 12; // (its legs keep up with it)
+        b.x += s * Math.min(Math.abs(x - b.x), 470 * dt);
+      }
+      b.face = face; b.pose = wind;
+      return;
+    }
+    b.fast = false; b.pose = 'chargeUp'; // it sinks before it springs
+    yield* wait(0.1);
+    b.fast = true; b.pose = 'air';
+    G.fx.dust(b.x, FLOOR, 4, { dir: -G.sign(x - x0), speed: [40, 200], size: [6, 11], up: 30, a: 0.36 });
+    const dur = G.clamp(0.22 + d / 2600, 0.26, 0.5), h = 46 + d * 0.09;
+    let e = 0;
+    b.face = G.sign(x - x0);
+    while (e < dur) {
+      const dt = yield;
+      e += dt;
+      const q = Math.min(1, e / dur);
+      b.x = G.lerp(x0, x, E.inOutQuad(q)); b.y = FLOOR - h * 4 * q * (1 - q);
+      if (q > 0.55) { b.face = face; b.fast = false; b.pose = wind; } // it turns and winds up as it comes down
+      if (Math.random() < dt * 40) G.fx.spawn({ x: b.x + G.rand(-20, 20), y: b.y - G.rand(20, 110), vx: G.rand(-20, 20), vy: G.rand(-30, 10), life: G.rand(0.3, 0.6), size: G.rand(4, 9), color: G.corrupt.COL.void, wob: 30 });
+    }
+    b.y = FLOOR;
+    if (b.pv) b.pv[1] += 40; // the landing goes down through its knees
+    G.fx.dust(b.x, FLOOR, 5, { speed: [30, 170], size: [6, 12], up: 34, a: 0.4 });
+    G.fx.kick(0, 1.2);
+  }
+
+  function* atkRequiem() {
+    const b = B.body, P = G.player, T = K.T();
+    const n = 3 + B.phase, all = !K.chance(0.4, 'reverse'), openIn = 0.62 * T, per = 0.62;
+    facePlayer(); b.smooth = 1;
+    // the tell: the sound drains out of the fight, and the black creeps up the blade
+    b.fast = false; b.pose = 'heft';
+    b.hush = true; G.audio.duck(0.06);
+    b.voidOn = true;
+    yield* tween(b, { voidK: 1 }, 0.62 * T, E.inOutQuad);
+    yield* wait(0.12); // held: it is ready
+    const tears = [], segs = [], made = [];
+    let lastX = -1e9;
+    for (let i = 0; i < n; i++) {
+      // every other cut, and the last, is made where the hero is now; the rest anywhere else
+      const chase = i % 2 === 0 || i === n - 1;
+      const left = (n - 1 - i) * per + openIn + 0.15; // about how long until this one opens
+      let type = 'high', cx = P.x, f = b.face, seg = null, airY = 0;
+      for (let tries = 0; tries < 16 && !seg; tries++) {
+        if (chase) {
+          const air = P.y < FLOOR - 60;
+          type = air ? 'air' : ['sweep', 'fall', 'rise'][Math.floor(G.rng() * 3)];
+          cx = P.x + P.vx * 0.12 + G.rrand(-18, 18); airY = P.y - 22;
+        } else {
+          type = ['high', 'fall', 'rise', 'sweep'][Math.floor(G.rng() * 4)];
+          cx = G.rrand(WL + 110, WR - 110);
+          if (Math.abs(cx - lastX) < 200 || Math.abs(cx - b.x) > 560) continue; // somewhere new, and not across the whole arena
+        }
+        // it takes the cut from the side it is on, unless that puts it in the wall; and the cut is
+        // placed so that where it crosses the floor is where it was aimed (the hero, for a chasing one)
+        const at = type === 'air' ? 180 : TEARS[type].at, aim = cx;
+        if (made.some((m) => m.type === type && Math.abs(m.x - aim) < 90)) continue; // not the same cut twice in one place
+        f = G.sign(aim - b.x) || b.face;
+        cx = aim - f * floorOff(type);
+        if (cx - f * at < WL + 50 || cx - f * at > WR - 50) { f = -f; cx = aim - f * floorOff(type); }
+        const s = tearSeg(type, cx, f, airY);
+        if (floorLeft(segs.concat([s]), P.x, 320 * left + 40)) seg = s;
+      }
+      if (!seg) { type = 'high'; f = G.sign(cx - b.x) || b.face; if (cx - f * 180 < WL + 50 || cx - f * 180 > WR - 50) f = -f; seg = tearSeg('high', cx, f); } // (no floor to cross, so always fair)
+      const spec = type === 'air' ? { at: 180, wind: 'raise', to: 'whirl', hop: G.clamp(FLOOR - airY - 66, 40, 230) } : TEARS[type];
+      yield* stride(G.clamp(cx - f * spec.at, WL + 50, WR - 50), f, spec.wind);
+      // a short wind-up with the blade held at the top, then the cut: fast, and without a sound
+      b.fast = false; b.pose = spec.wind;
+      if (spec.hop) {
+        // the level cuts are made in the air: it jumps, and cuts at the top of the jump
+        yield* tween(b, { y: FLOOR - spec.hop }, 0.2, E.outQuad);
+      } else yield* wait(0.15);
+      b.fast = true; b.pose = spec.to;
+      const t = tear(seg);
+      t.est = left; tears.push(t); segs.push(seg); lastX = cx + f * floorOff(type); made.push({ type, x: lastX });
+      G.fx.kick(f * 1.2, 0.6);
+      yield* wait(0.1); // follow-through
+      if (spec.hop) { b.fast = false; yield* tween(b, { y: FLOOR }, 0.18, E.inQuad); if (b.pv) b.pv[1] += 36; G.fx.dust(b.x, FLOOR, 3, { speed: [20, 120], size: [5, 10], up: 26, a: 0.34 }); }
+      else yield* wait(0.06);
+    }
+    b.smooth = 1; facePlayer();
+    if (all) {
+      // the sword goes into the ground: everything opens at once
+      b.fast = false; b.pose = 'raise';
+      yield* wait(0.16);
+      b.fast = true; b.pose = 'plant';
+      yield* wait(0.08);
+      G.fx.thud(b.x + b.face * 24, FLOOR, 0.6, { noCrack: true });
+      for (const t of tears) t.openAt = t.t + openIn;
+      yield* wait(openIn);
+      unhush();
+      G.audio.play('cleave'); G.audio.play('boom'); G.audio.play('slam');
+      G.fx.shake(14); G.fx.impact(b.x, b.y - 70, 0.07); G.fx.ripple(b.x, b.y - 70, 520, 0.5, 1.2);
+      b.voidOn = false;
+      yield* wait(0.55);
+    } else {
+      // the sword goes back onto its shoulder: they open in the order they were not made
+      b.fast = false; b.pose = 'heft';
+      yield* wait(0.14);
+      b.pose = 'idle';
+      const gap = 0.2;
+      tears.forEach((t, i) => { t.openAt = t.t + openIn + (tears.length - 1 - i) * gap; });
+      yield* wait(openIn);
+      unhush();
+      for (let i = 0; i < tears.length; i++) {
+        G.audio.play(i % 2 ? 'blade' : 'cleave'); G.fx.shake(6);
+        if (i === tears.length - 1) { G.audio.play('boom'); G.fx.shake(10); b.voidOn = false; }
+        yield* wait(gap);
+      }
+      yield* wait(0.35);
+    }
+    b.voidOn = false;
+  }
+
+  // Colossus. It kneels and raises its sword point to the sky, and a giant sword of the void gathers
+  // above the arena, following the hero. It stops, it falls point first into the floor, and then it
+  // leans and topples sideways like a felled tree, the way it leans. Dodge the plunge, then get to the
+  // side it is not falling to (or dash through it as it lands).
+  // (152 and 41: the Knight's own blade and grip, SWORD in the drawing below)
+  const COL_S = 2.8, COL_L = 152 * COL_S, COL_GRIP = 41 * COL_S, COL_SINK = 34, COL_HW = 9.5 * COL_S;
+  function* atkColossus() {
+    const b = B.body, P = G.player, T = K.T(), C = G.corrupt.COL;
+    const gather = 1.05 * T, lock = 0.5 * T;
+    facePlayer(); b.smooth = 1;
+    // the tell: down on one knee, the sword raised in both hands, point up
+    b.fast = false; b.pose = 'vigil';
+    G.audio.play('bell'); G.audio.play('charge', { dur: gather + lock });
+    const lo = WL + 110, hi = WR - 110, reach = COL_L - COL_SINK + COL_GRIP;
+    const cs = H.add({
+      kind: 'colossus', layer: 'under', state: 'gather', x: G.clamp(P.x, lo, hi), tip: -120, k: 0, lean: 0, w: 0, dir: 1, a: 0, dropAt: 0, landT: 0,
+      update(dt) {
+        const st = this.state;
+        this.srcX = this.x;
+        if (st === 'gather' || st === 'lock') {
+          this.a = Math.min(1, this.a + dt * 2.2);
+          // the void is drawn up into it from the floor
+          if (Math.random() < dt * 40) G.fx.spawn({ x: this.x + G.rand(-120, 120), y: FLOOR - G.rand(0, 60), vx: G.rand(-10, 10), vy: -G.rand(140, 320), life: G.rand(0.5, 1), size: G.rand(4, 9), color: C.void, wob: 40 });
+        } else if (st === 'drop') {
+          const q = Math.min(1, (this.t - this.dropAt) / 0.13);
+          this.tip = G.lerp(this.tip0, FLOOR + COL_SINK, q * q);
+          if (q >= 1) {
+            this.state = 'stand';
+            K.impact(this.x, true, C.blood);
+            G.fx.ripple(this.x, FLOOR - 40, 380, 0.4, 1.1);
+            G.fx.crack(this.x, 2, C.blood);
+            G.fx.burst(this.x, FLOOR - 6, { n: 16, color: C.void, speed: [100, 420], angle: -Math.PI / 2, spread: 2.4, life: [0.5, 1], size: [5, 10], grav: 300 });
+            G.audio.play('boom');
+          }
+        } else if (st === 'lean') {
+          // the base tears up on the far side as it starts to go
+          if (Math.random() < dt * 24) G.fx.burst(this.x - this.dir * 24, FLOOR - 4, { n: 1, color: '24,22,30', speed: [80, 260], angle: -Math.PI / 2 - this.dir * 0.4, spread: 1, life: [0.4, 0.8], size: [3, 7], kind: 'chunk', grav: 1400 });
+        } else if (st === 'fall') {
+          // a felled tree: slow at first, then all at once
+          this.w += 21 * Math.sin(this.lean) * dt;
+          this.lean += this.w * dt;
+          const hx = this.x + this.dir * Math.sin(this.lean) * reach, hy = FLOOR - Math.cos(this.lean) * reach;
+          if (Math.random() < dt * 50) G.fx.spawn({ x: G.lerp(this.x, hx, G.rand(0.3, 1)), y: G.lerp(FLOOR, hy, G.rand(0.3, 1)), vx: G.rand(-30, 30), vy: G.rand(-30, 30), life: G.rand(0.3, 0.7), size: G.rand(4, 10), color: C.void, wob: 40 });
+          if (this.lean >= 1.5) {
+            this.lean = 1.5; this.state = 'down'; this.landT = this.t;
+            G.audio.play('slam'); G.audio.play('boom');
+            G.fx.shake(18); G.fx.punch(0.025);
+            G.fx.impact(this.x + this.dir * reach * 0.5, FLOOR - 30, 0.07);
+            for (let d = 60; d < reach; d += 80) {
+              const x = this.x + this.dir * d;
+              if (x < G.WALL_L + 10 || x > G.WALL_R - 10) continue;
+              G.fx.thud(x, FLOOR, 0.9, { col: C.blood, noCrack: d % 160 !== 140 });
+              G.fx.burst(x, FLOOR - 10, { n: 4, color: C.blood, speed: [120, 420], angle: -Math.PI / 2, spread: 2, life: [0.2, 0.5], kind: 'spark', size: [1.6, 3], grav: 900 });
+            }
+          }
+        } else if (st === 'down') {
+          // it does not stay: the void it was made of comes apart
+          const q = (this.t - this.landT) / 0.6;
+          this.a = Math.max(0, 1 - Math.max(0, q - 0.15) / 0.85);
+          if (Math.random() < dt * 60 * this.a) { const d = G.rand(0, reach); G.fx.spawn({ x: this.x + this.dir * d, y: FLOOR - G.rand(10, 50), vx: G.rand(-20, 20), vy: -G.rand(40, 140), life: G.rand(0.4, 0.9), size: G.rand(4, 10), color: C.void, wob: 40 }); }
+          if (q >= 1) this.dead = true;
+        }
+        if (this.t > 12) this.dead = true;
+      },
+      seg() {
+        // from the floor where it stands, along the blade to the end of the pommel
+        if (this.state === 'drop' || this.state === 'gather' || this.state === 'lock') return [this.x, this.tip, this.x, this.tip - COL_L - COL_GRIP];
+        return [this.x, FLOOR, this.x + this.dir * Math.sin(this.lean) * reach, FLOOR - Math.cos(this.lean) * reach];
+      },
+      hits(Pl) {
+        const live = this.state === 'drop' || this.state === 'fall' || (this.state === 'down' && this.t - this.landT < 0.08);
+        if (!live) return false;
+        const [x1, y1, x2, y2] = this.seg(), r = COL_HW + 6 + (Pl.pad || 0);
+        for (const dy of [6, 22, 38]) if (G.distPointSeg(Pl.x, Pl.y - dy, x1, y1, x2, y2) < r) return true;
+        return false;
+      },
+      danger() {
+        const st = this.state;
+        if (st === 'gather') return null; // still following: it will be wherever the hero goes
+        if (st === 'lock' || st === 'drop') return [this.x, COL_HW + 16, Math.max(0, this.dropAt - this.t) + 0.1];
+        // the whole fall side, from just behind the base (the blade is broad there) out past the pommel
+        const near = COL_HW + 26, far = reach + 24, mid = this.x + this.dir * (far - near) / 2;
+        if (st === 'lean') return [mid, (far + near) / 2, Math.max(0, this.fallAt - this.t) + 0.5];
+        if (st === 'fall') return [mid, (far + near) / 2, 0.2];
+        return null;
+      },
+      draw(ctx) {
+        const a = this.a;
+        if (a <= 0.01) return;
+        // its shadow on the floor, gathering as it comes down
+        const sk = this.state === 'gather' || this.state === 'lock' ? G.clamp((this.tip + 120) / (FLOOR + 120), 0, 1) : 1;
+        ctx.fillStyle = 'rgba(4,0,2,' + (0.5 * a * sk) + ')';
+        if (this.state === 'down' || this.state === 'fall') {
+          const L = Math.sin(this.lean) * reach;
+          ctx.beginPath(); ctx.ellipse(this.x + this.dir * L / 2, FLOOR + 2, L / 2 + 20, 9, 0, 0, G.TAU); ctx.fill();
+        } else { ctx.beginPath(); ctx.ellipse(this.x, FLOOR + 2, 20 + 50 * sk, 7 + 4 * sk, 0, 0, G.TAU); ctx.fill(); }
+        ctx.save();
+        ctx.beginPath(); ctx.rect(-80, -400, G.W + 160, FLOOR + 402); ctx.clip(); // the point is buried
+        let gx, gy, ang;
+        if (this.state === 'gather' || this.state === 'lock' || this.state === 'drop') {
+          gx = this.x; gy = this.tip - COL_L; ang = Math.PI / 2;
+          // (a lock that shivers, so the moment it stops following can be seen)
+          if (this.state === 'lock') gx += Math.sin(this.t * 70) * 1.5;
+        } else {
+          const ux = this.dir * Math.sin(this.lean), uy = -Math.cos(this.lean), wob = this.state === 'lean' ? Math.sin(this.t * 40) * 0.004 : 0;
+          gx = this.x + ux * (COL_L - COL_SINK); gy = FLOOR + uy * (COL_L - COL_SINK);
+          ang = Math.atan2(-uy, -ux) + wob;
+        }
+        if (this.state === 'drop') {
+          // the fall streaks: dark lines above it
+          ctx.strokeStyle = G.rgba(C.blood, 0.25 * a); ctx.lineWidth = 2;
+          for (const ox of [-30, 0, 30]) D.line(ctx, gx + ox, gy - 200, gx + ox * 0.6, gy - 40);
+        }
+        voidSword(ctx, gx, gy, ang, COL_S, a);
+        ctx.restore();
+      },
+    });
+    // it gathers above, and follows the hero
+    let e = 0;
+    while (e < gather) {
+      const dt = yield;
+      e += dt;
+      cs.x = G.damp(cs.x, G.clamp(P.x, lo, hi), 3.4, dt);
+      cs.tip = G.lerp(-120, FLOOR - 300, E.outCubic(Math.min(1, e / gather)));
+      if (Math.random() < dt * 24) G.fx.spawn({ kind: 'spark', x: b.x + b.face * 8 + G.rand(-4, 4), y: b.y - 200, vx: G.rand(-20, 20), vy: -G.rand(400, 800), life: G.rand(0.2, 0.4), size: G.rand(1.4, 2.6), color: C.blood, len: 0.06 });
+    }
+    // it stops following: a glint at its point, and a breath of stillness
+    cs.state = 'lock'; cs.dropAt = cs.t + lock;
+    G.fx.glint(cs.x, cs.tip - 10, 44, C.hot, 0.3); G.audio.play('glint');
+    G.fx.glint(b.x + b.face * 8, b.y - 210, 22, C.hot, 0.24);
+    yield* wait(lock);
+    // the Knight drives its own sword down, and the giant one comes down with it
+    b.fast = true; b.pose = 'kneel';
+    cs.state = 'drop'; cs.tip0 = cs.tip;
+    G.audio.play('streak');
+    while (cs.state === 'drop') yield;
+    yield* wait(B.phase === 3 ? 0.22 : 0.34);
+    // which way it will fall: on the hero (if they stand right under it, the longer side)
+    const dir = Math.abs(P.x - cs.x) > 24 ? G.sign(P.x - cs.x) : (cs.x < (WL + WR) / 2 ? 1 : -1);
+    const leanT = 0.75 * T;
+    cs.dir = dir; cs.state = 'lean'; cs.fallAt = cs.t + leanT;
+    // the Knight rises with its sword up; the giant blade creaks over the way it will go
+    b.fast = false; b.pose = 'overRaise';
+    G.audio.play('pull'); G.audio.play('charge', { dur: leanT });
+    // first it gives with a crack, then it creaks on over, gathering speed, and does not stop
+    G.audio.play('tink'); G.fx.shake(4);
+    G.fx.dust(cs.x - dir * 30, FLOOR, 4, { dir: -dir, speed: [40, 180], size: [6, 11], up: 40, a: 0.4 });
+    yield* tween(cs, { lean: 0.07 }, 0.22, E.outQuad);
+    const creak = Math.max(0.2, leanT - 0.22);
+    yield* tween(cs, { lean: 0.2 }, creak, E.inQuad);
+    // and brings it down: the giant one follows it over
+    b.fast = true; b.pose = 'slam';
+    cs.state = 'fall'; cs.w = 2 * 0.13 / creak; // (at the speed the creak had reached)
+    G.audio.play('whoosh'); G.fx.shake(6);
+    while (cs.state === 'fall') yield;
+    yield* wait(0.55);
+  }
+
   // Back to rest. Whatever it has just done, the sword ends on its shoulder, and how it gets there
   // depends on where the sword was left: stuck in the ground it is wrenched free; dropped after a
   // crash it is pushed up off; low or out in front it is stood up and let fall back.
@@ -716,6 +1150,7 @@
     hurl: atkHurl,
     cleave: atkCleave, cleave2: atkCleave2, overhead: atkOverhead, charge: atkCharge, grip: atkGrip, graves: atkGraves,
     wraiths: atkWraiths, desecrate: atkDesecrate, whirl: atkWhirl, rend: atkRend, leap: atkLeap, reap: atkReap,
+    requiem: atkRequiem, colossus: atkColossus, // (corrupted only: B.corruptBags)
   };
 
   // ------------------------------------------------------------------ scenes
@@ -834,9 +1269,19 @@
         if (b.y >= FLOOR - 1 && !b.hidden) {
           G.fx.dust(b.x + b.face * 14, FLOOR, 3, { speed: [20, 110], size: [5, 10], up: 26, a: 0.36 });
           G.fx.shake(1.6); G.fx.kick(0, 1.4);
-          G.audio.play('stomp');
+          if (!b.hush) G.audio.play('stomp'); // (the Requiem is walked in silence)
         }
       }
+    }
+    // (corrupted) a turn the Knight makes in its own two attacks is a turn, not a flip: the figure
+    // narrows through the turn, as it does in the whirl
+    if (b.smooth > 0) { b.smooth -= dt; b.fd = G.damp(b.fd == null ? b.face : b.fd, b.face, 20, dt); } else b.fd = b.face;
+    // the Requiem's black blade: it creeps up from the guard, and drains away when the attack ends
+    if (!b.voidOn && b.voidK > 0) b.voidK = Math.max(0, b.voidK - dt * 2.5);
+    if (b.voidK > 0.3 && !b.unarmed && Math.random() < dt * 30 * b.voidK) {
+      const a = b.p[8] * (b.face > 0 ? 1 : -1) + (b.face > 0 ? 0 : Math.PI), q = G.rand(0.15, 1) * SWORD * b.voidK;
+      const hx = b.x + b.face * b.p[6], hy = b.y + b.p[7];
+      G.fx.spawn({ x: hx + Math.cos(a) * q, y: hy + Math.sin(a) * q, vx: G.rand(-16, 16), vy: -G.rand(20, 70), life: G.rand(0.4, 0.9), size: G.rand(3, 7), color: G.corrupt.COL.void, wob: 30, rot: G.rand(0, 6) });
     }
     for (const w of B.swords) w.t = Math.min(1, w.t + dt / 0.12);
     const target = b.pose === 'walk' ? walkPose(b.walkT) : (POSES[b.pose] || POSES.idle);
@@ -893,6 +1338,54 @@
     for (let rx = 22; rx < L - 44; rx += 17) { D.poly(ctx, [rx, 0, rx + 4, -2.6, rx + 8, 0, rx + 4, 2.6]); ctx.fill(); }
     ctx.restore();
   }
+  // (corrupted) The Requiem's tell: the blade goes black from the guard to the point (k from 0 to 1),
+  // the light of its runes put out, with only a thread of blood along the edge.
+  function voidBlade(ctx, x, y, ang, k) {
+    const L = SWORD, C = G.corrupt.COL, reach = 7 + (L - 7) * Math.min(1, k * 1.15);
+    ctx.save();
+    ctx.translate(x, y); ctx.rotate(ang);
+    ctx.beginPath(); ctx.rect(0, -14, reach, 28); ctx.clip();
+    ctx.globalAlpha *= Math.min(1, k * 1.6);
+    ctx.fillStyle = C.dark;
+    D.poly(ctx, [7, -10.5, L - 25, -9, L + 1.5, 0, L - 25, 9, 7, 10.5]); ctx.fill();
+    ctx.strokeStyle = G.rgba(C.blood, 0.85); ctx.lineWidth = 1.1;
+    ctx.beginPath(); ctx.moveTo(7, -9.5); ctx.lineTo(L - 26, -8); ctx.lineTo(L, 0); ctx.lineTo(L - 26, 8); ctx.stroke();
+    // the darkness smoulders where it has reached
+    ctx.fillStyle = G.rgba(C.blood, 0.5 + 0.5 * Math.sin(G.t * 20));
+    D.poly(ctx, [reach - 5, 0, reach - 1, -2.4, reach + 3, 0, reach - 1, 2.4]); ctx.fill();
+    ctx.restore();
+  }
+  // (corrupted) The Colossus: the Knight's own greatsword made giant out of the void, s times its size.
+  // Drawn like the real one from the guard along ang: black, edged in blood, runes like embers.
+  function voidSword(ctx, x, y, ang, s, a) {
+    const L = SWORD, C = G.corrupt.COL;
+    if (a <= 0.01) return;
+    ctx.save();
+    ctx.translate(x, y); ctx.rotate(ang); ctx.scale(s, s);
+    ctx.globalAlpha *= a;
+    // the dark it is made of, smoking off it (darkens what is behind it rather than lighting it)
+    const g = ctx.createLinearGradient(0, -26, 0, 26);
+    g.addColorStop(0, 'rgba(5,0,3,0)'); g.addColorStop(0.5, 'rgba(5,0,3,0.55)'); g.addColorStop(1, 'rgba(5,0,3,0)');
+    ctx.fillStyle = g; ctx.fillRect(-44, -26, L + 54, 52);
+    D.glow(ctx, C.blood, L * 0.5, 0, L * 0.62, 0.18);
+    // grip, pommel and the hooked guard
+    ctx.strokeStyle = C.dark; ctx.lineWidth = 6; D.line(ctx, -34, 0, 2, 0);
+    ctx.strokeStyle = G.rgba(C.blood, 0.5); ctx.lineWidth = 1; D.line(ctx, -32, -2, 0, -2);
+    ctx.fillStyle = G.rgba(C.blood, 0.9); D.poly(ctx, [-41, 0, -35.5, -5, -30, 0, -35.5, 5]); ctx.fill();
+    ctx.fillStyle = C.dark;
+    D.poly(ctx, [0, -15, 5, -19, 9, -15, 7, -4, 7, 4, 9, 15, 5, 19, 0, 15]); ctx.fill();
+    ctx.strokeStyle = G.rgba(C.blood, 0.8); ctx.lineWidth = 0.8; ctx.stroke();
+    // the blade
+    ctx.fillStyle = C.dark;
+    D.poly(ctx, [7, -9.5, L - 26, -8, L, 0, L - 26, 8, 7, 9.5]); ctx.fill();
+    ctx.fillStyle = 'rgba(40,4,16,0.9)';
+    D.poly(ctx, [7, -9.5, L - 26, -8, L, 0, L - 22, -3.4, 9, -4.8]); ctx.fill();
+    ctx.strokeStyle = G.rgba(C.blood, 0.95); ctx.lineWidth = 0.9;
+    ctx.beginPath(); ctx.moveTo(7, -9.5); ctx.lineTo(L - 26, -8); ctx.lineTo(L, 0); ctx.lineTo(L - 26, 8); ctx.lineTo(7, 9.5); ctx.stroke();
+    ctx.fillStyle = G.rgba(C.hot, 0.55 + 0.25 * Math.sin(G.t * 9));
+    for (let rx = 22; rx < L - 44; rx += 17) { D.poly(ctx, [rx, 0, rx + 4, -2.6, rx + 8, 0, rx + 4, 2.6]); ctx.fill(); }
+    ctx.restore();
+  }
 
   B.drawGround = function (ctx) {
     const b = B.body;
@@ -939,7 +1432,8 @@
     const dark = '#090c11', mid = '#18212b', plate = '#2b3846', trim = '#40536a';
     const jx = b.jit ? G.rand(-b.jit, b.jit) : 0;
     // while it whirls the whole figure turns: squeeze it sideways and flip
-    const turn = b.spinning ? Math.cos(b.spin) : 1;
+    // (and a turn made in its corrupted attacks narrows it through the turn: b.fd, see B.tick)
+    const turn = b.spinning ? Math.cos(b.spin) : real && b.fd != null ? b.fd * b.face : 1;
     const sx = b.face * (Math.abs(turn) < 0.25 ? 0.25 * (turn < 0 ? -1 : 1) : turn);
 
     ctx.save();
@@ -1046,6 +1540,7 @@
       // a burning blade: the warning colour, and a glow that grows through the wind-up
       if (b.blaze) { ctx.save(); ctx.translate(hx, hy); ctx.rotate(ang); D.glow(ctx, DANGER, SWORD / 2, 0, SWORD * 0.76, 0.75); ctx.restore(); }
       sword(ctx, hx, hy, ang, b.blaze ? DANGER : col, b.blaze ? '255,236,220' : hot); // thrown: see atkHurl
+      if (b.voidK > 0.01) voidBlade(ctx, hx, hy, ang, b.voidK);
     }
     arm(true);
     pauldron(shx + 14, shy, 1, plate);

@@ -1,0 +1,52 @@
+<!doctype html>
+<!-- Solfall - each boss as itself and corrupted, side by side, in the same moment of the fight.
+     Open http://localhost:8321/tools/corrupt-compare.html while tools/serve.js runs. Optional query:
+     ?t=2.5 (seconds into the fight after the boss's entrance), ?atk=none (stand idle; default) or an
+     attack name to catch both mid-attack. The game runs in a hidden frame; nothing is saved. -->
+<html><head><meta charset="utf-8"><title>Solfall: corrupted vs normal</title>
+<style>
+  body { margin: 0; background: #07050c; color: #ece9f4; font: 600 15px system-ui, sans-serif; }
+  #out { display: block; }
+  iframe { position: absolute; left: -9999px; width: 1280px; height: 720px; border: 0; }
+</style></head>
+<body><canvas id="out"></canvas><iframe id="f" src="/?compare=1"></iframe>
+<script>
+'use strict';
+const q = new URLSearchParams(location.search), AFTER = Number(q.get('t') || 2.5), ATK = q.get('atk') || 'none';
+const CW = 800, CH = 450, LAB = 34, HEAD = 56;
+const f = document.getElementById('f');
+f.addEventListener('load', () => setTimeout(run, 300));
+function run() {
+  const W = f.contentWindow, G = W.G, D = 1 / 60;
+  try { W.localStorage.setItem('solfall.meta', '{"shards":0,"earned":0,"up":{},"kills":{},"runs":1,"best":{},"feats":{},"toys":{}}'); } catch (e) { }
+  const ids = G.BOSS_IDS.slice(), out = document.getElementById('out'), x = out.getContext('2d');
+  out.width = CW * 2 + 30; out.height = HEAD + ids.length * (CH + LAB + 14);
+  x.fillStyle = '#07050c'; x.fillRect(0, 0, out.width, out.height);
+  x.font = '600 22px system-ui'; x.fillStyle = '#ece9f4'; x.textBaseline = 'middle';
+  x.fillText('As itself', 10, HEAD / 2); x.fillStyle = '#ff6e8c'; x.fillText('Corrupted', CW + 20, HEAD / 2);
+  const errs = [];
+  W.addEventListener('error', (e) => errs.push(e.message));
+  ids.forEach((id, row) => {
+    [false, true].forEach((cor, col) => {
+      try {
+        G.debug.boss = id; G.debug.corrupt = cor; G.debug.god = true; G.debug.forceAttack = '';
+        G.startRun(); if (G.seed) G.seed(7);
+        const B = G.boss, P = G.player;
+        let t = 0;
+        while (t < 14 && !(B.active && !B.invuln)) { G.step(D); t += D; }
+        G.debug.forceAttack = ATK;
+        P.x = 330; P.facing = 1;
+        for (let s = 0; s < AFTER; s += D) G.step(D);
+        G.render();
+        const gx = 10 + col * (CW + 10), gy = HEAD + row * (CH + LAB + 14);
+        x.drawImage(W.document.getElementById('game'), gx, gy + LAB, CW, CH);
+        x.font = '600 17px system-ui'; x.fillStyle = cor ? '#ff6e8c' : '#ece9f4';
+        x.fillText((cor ? 'Corrupted · ' : '') + (B.name || id).replace(/\b\w+/g, (w) => w[0] + w.slice(1).toLowerCase()), gx + 2, gy + LAB / 2 + 2);
+      } catch (e) { errs.push(id + (cor ? ' corrupted' : '') + ': ' + e.message); }
+    });
+  });
+  G.debug.corrupt = false; G.debug.god = false; G.debug.boss = ''; G.debug.forceAttack = '';
+  if (errs.length) { x.fillStyle = '#ff6e8c'; x.font = '13px monospace'; errs.slice(0, 6).forEach((e, i) => x.fillText(e.slice(0, 200), 10, out.height - 14 - i * 16)); }
+  document.title = 'done' + (errs.length ? ' with ' + errs.length + ' errors' : '');
+}
+</script></body></html>

@@ -1,7 +1,7 @@
 // Solfall - the Vigil: the camp between runs. It is nearly three screens wide and the view follows
 // the hero across it. Everything that used to be a menu is a place: the Hall of Echoes to change
 // hero, the Shrine, a training yard with a sparring post, the brazier that sets the difficulty,
-// the banners that name the first foe, a ring to practise in, the reliquary where the run's relic
+// a ring to practise in (its menu chooses the foe), the reliquary where the run's relic
 // is chosen, and the gate that starts a run.
 // The backdrop is painted once into four layers that slide at different speeds (sky, far hills,
 // a ruined aqueduct, near columns and tents); the places themselves are drawn every frame.
@@ -11,15 +11,14 @@
   const GOLD = '255,214,140', RIM = '255,206,150', WARM = '255,170,90';
   const STONE = '#120f26', STONE2 = '#1c1736', DARK = '#0b0919';
   const HW = 4040, WALL_L = 150, WALL_R = HW - 110, PAD = 48;
-  const FOES = ['random', 'warden', 'mage', 'assassin', 'knight'];
   const NOTES = ['7 health. Warnings last longer, attacks come slower', '5 health. The fight as intended', '4 health. Shorter warnings, less rest, extra attacks'];
   const FLAME = ['150,215,255', '255,170,90', '255,70,60'];
   // where things stand
   // The Hall of Echoes has one bay for each hero, between piers that stand BAY apart
   const NH = G.HEROES.length, BAY = 510 / NH, ARCH = BAY / 2 - 23;
   const ECHO_X = G.HEROES.map((h, i) => Math.round(335 + BAY * (i + 0.5)));
-  const SHRINE_X = 1130, FIRE_X = 1560, POST_X = 1950, BRAZIER_X = 2390, BANNER_X = 2770, RELIQ_X = 3266, GATE_X = 3720;
-  const BANNERS = [2665, 2735, 2805, 2875], RING_X = 2975;
+  const SHRINE_X = 1130, FIRE_X = 1560, POST_X = 1950, BRAZIER_X = 2390, RELIQ_X = 3266, GATE_X = 3720;
+  const RING_X = 2900; // (the banners that stood before it went in v1.8c: the ring's own menu chooses the foe)
 
   const HUB = G.hub = { near: null, t: 0, lastX: FIRE_X - 70, msg: '', msgT: 0, W: HW, layers: null, flies: [], blades: [] };
   HUB.maxCam = HW - W;
@@ -234,7 +233,8 @@
     for (const f of FE.CAMP) ids.push(f.id);
     ctx.globalCompositeOperation = 'lighter';
     ids.forEach((id, i) => {
-      const cx = x - 18 + (i % 4) * 12, cy = FLOOR - 138 + Math.floor(i / 4) * 24, done = FE.done(id);
+      const gap = Math.min(24, 126 / Math.ceil(ids.length / 4)); // the rows close up as bosses are added
+      const cx = x - 18 + (i % 4) * 12, cy = FLOOR - 138 + Math.floor(i / 4) * gap, done = FE.done(id);
       if (done) diamond(ctx, cx, cy, 4, 7, G.rgba(GOLD, 0.8 + 0.2 * Math.sin(t * 2 + i)));
       else { ctx.strokeStyle = G.rgba(RIM, 0.28); ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(cx, cy - 6); ctx.lineTo(cx, cy + 6); ctx.stroke(); }
     });
@@ -270,7 +270,6 @@
     { id: 'tally', x: TALLY_X, reach: 62, top: 204 },
     { id: 'post', x: POST_X, reach: 0, top: 140 },
     { id: 'brazier', x: BRAZIER_X, reach: 70, top: 222 },
-    { id: 'banner', x: BANNER_X, reach: 150, top: 292 },
     { id: 'ring', x: RING_X, reach: 44, top: 150 },
     { id: 'gate', x: GATE_X, reach: 160, top: 474 },
   ];
@@ -282,6 +281,7 @@
   const RELIC_COL = {
     chalice: '255,150,120', shard: '150,225,255', moons: '214,170,255', crown: '255,96,56', ward: '255,226,170', cloak: '140,245,185',
     storm: '255,250,160', phoenix: '255,170,90', sunstone: '255,214,140', eye: '255,186,92', prism: '150,170,255', shroud: '190,135,255', oath: '130,195,255',
+    pelt: '255,130,60', pearl: '120,230,220',
   };
   const relicCol = (r) => RELIC_COL[r.id] || GOLD;
   let relicKey = '', relicSt = [];
@@ -306,29 +306,29 @@
     if (s.id === 'tally') return ['The Tally', G.feats.count() + ' of ' + G.feats.total + ' feats done', 'read it'];
     if (s.id === 'shrine') return ['The Shrine', '◆ ' + G.meta.shards + ' Sunshards', 'spend them'];
     if (s.id === 'brazier') return ['The Brazier: ' + G.diff().name, NOTES[G.settings.difficulty], 'change the difficulty'];
-    if (s.id === 'banner') {
-      // what you have done against the chosen foe: how often it fell, and your fastest first-trial win
+    if (s.id === 'ring') {
+      // the foe last practised, and what you have done against it: how often it fell, your fastest win
       const f = G.settings.firstFoe, kills = G.meta.kills[f] || 0, best = G.meta.bestTime(f);
-      const rec = !G.bosses[f] ? 'Who waits behind the gate' : !kills ? 'Not yet beaten'
-        : 'Beaten ' + kills + (kills > 1 ? ' times' : ' time') + (best ? ' \u00b7 fastest ' + G.ui.fmtTime(best) + ' on ' + G.diff().name : '');
-      return ['First foe: ' + foeName(f), rec, 'choose another'];
+      const rec = !G.bosses[f] ? 'Any boss, from any phase' : foeName(f) + ': ' + (!kills ? 'not yet beaten'
+        : 'beaten ' + kills + (kills > 1 ? ' times' : ' time') + (best ? ' \u00b7 fastest ' + G.ui.fmtTime(best) + ' on ' + G.diff().name : ''));
+      return ['The Proving Ring', rec, 'step in'];
     }
-    if (s.id === 'ring') return ['The Proving Ring', 'Practise against ' + (G.bosses[G.settings.firstFoe] ? G.bosses[G.settings.firstFoe].short : 'a foe at random') + ', from any phase', 'step in'];
     if (s.id === 'relic') {
       const r = G.run.relicOffer[s.i];
       return [r.name, r.desc, G.run.relic === r.id ? 'this is your relic for the run' : 'take it for the run'];
     }
     if (s.id === 'gate') {
       const deep = G.store.load('depth', {})[G.settings.difficulty], r = G.relicDef(G.run.relic);
+      const won = G.store.load('wins', {})[G.settings.difficulty];
       return ['The Gate', (r ? 'Relic: ' + r.name : 'No relic chosen: the reliquary is just behind you')
-        + (deep ? ' \u00b7 deepest trial ' + G.roman(deep) : ''), r ? 'begin the run' : 'choose a relic and begin'];
+        + (won ? ' \u00b7 runs won ' + won : deep ? ' \u00b7 deepest trial ' + G.roman(deep) + ' of ' + G.roman(G.RUN_FIGHTS) : ''), r ? 'begin the run' : 'choose a relic and begin'];
     }
     return ['', '', ''];
   }
   function shortName(s) {
     if (s.id === 'echo') return G.HEROES[s.hero].id === G.run.hero ? '' : G.HEROES[s.hero].name;
     if (s.id === 'relic') return G.run.relicOffer[s.i].name;
-    return { shrine: 'The Shrine', tally: 'The Tally', post: 'Sparring post', brazier: G.diff().name, banner: 'First foe', ring: 'Practice', gate: 'The Gate' }[s.id];
+    return { shrine: 'The Shrine', tally: 'The Tally', post: 'Sparring post', brazier: G.diff().name, ring: 'Practice', gate: 'The Gate' }[s.id];
   }
 
   function say(text) { HUB.msg = text; HUB.msgT = 3; }
@@ -362,12 +362,6 @@
       F.light(s.x, FLOOR - 120, 340, c, 0.45, 0.8);
       say(G.diff().name);
       HUB.offer(); retake(); // health changes with the difficulty, and with it which relics may be offered
-    } else if (s.id === 'banner') {
-      G.settings.firstFoe = FOES[(FOES.indexOf(G.settings.firstFoe) + 1) % FOES.length]; G.saveSettings();
-      G.audio.play('uiSelect');
-      const i = FOES.indexOf(G.settings.firstFoe) - 1;
-      for (const k of (i < 0 ? [0, 1, 2, 3] : [i])) F.burst(BANNERS[k], FLOOR - 170, { n: 10, color: foeCol(FOES[k + 1]), speed: [40, 220], life: [0.3, 0.8], size: [2, 4] });
-      say(foeName(G.settings.firstFoe));
     } else if (s.id === 'ring') {
       G.audio.play('uiSelect'); G.ui.showPractice();
     } else if (s.id === 'relic') {
@@ -672,6 +666,25 @@
   const seen = (x, m) => Math.abs(x - (G.cam.x + W / 2)) < W / 2 + (m || 300);
 
   // ------------------------------------------------------------------ the backdrop and the ground
+  // The sky and the far hills, shared with the rest area between trials (rest.js), which also
+  // borrows the drawing helpers. n: how many of the painted layers (the nearest has the camp's lamps).
+  HUB.drawSky = function (ctx, n, t) {
+    if (!HUB.layers) build();
+    const cam = G.cam.x;
+    for (const L of HUB.layers.slice(0, n || HUB.layers.length)) ctx.drawImage(L.c, cam * (1 - L.f) - PAD, -PAD, L.c.width / G.bgK, L.c.height / G.bgK);
+    ctx.globalCompositeOperation = 'lighter';
+    const img = F.glow('255,255,255');
+    for (const tw of HUB.twinkles) {
+      const k = Math.sin(t * tw.sp + tw.ph);
+      if (k <= 0) continue;
+      const s = 3 + 5 * k * k;
+      ctx.globalAlpha = k * k * k * 0.9;
+      ctx.drawImage(img, cam + tw.x - s, tw.y - s, s * 2, s * 2);
+    }
+    ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
+  };
+  HUB.paint = { glow, pool, poly, block, flame, diamond, STONE, STONE2, DARK, RIM, GOLD, WARM };
+
   HUB.drawBack = function (ctx) {
     if (!HUB.layers) build();
     const cam = G.cam.x, t = HUB.t;
@@ -715,7 +728,6 @@
     drawYard(ctx, t);
     drawLamp(ctx, t);
     drawBrazier(ctx, t);
-    drawBanners(ctx, t);
     drawRing(ctx, t);
     drawReliquary(ctx, t);
     drawGate(ctx, t);
@@ -905,28 +917,6 @@
     pool(ctx, c, x, 240 + 40 * d, 0.55);
   }
 
-  // The banners: one for each boss, on a rail. The lit one comes first; all four lit means whoever comes.
-  function drawBanners(ctx, t) {
-    if (!seen(BANNER_X, 460)) return;
-    const pick = FOES.indexOf(G.settings.firstFoe) - 1, on = HUB.near && HUB.near.id === 'banner';
-    for (const px of [BANNER_X - 150, BANNER_X + 150]) {
-      poly(ctx, [px - 10, FLOOR, px - 8, FLOOR - 262, px + 8, FLOOR - 262, px + 10, FLOOR], STONE);
-      poly(ctx, [px - 18, FLOOR, px - 18, FLOOR - 16, px + 18, FLOOR - 16, px + 18, FLOOR], STONE2);
-      diamond(ctx, px, FLOOR - 274, 7, 12, G.rgba(RIM, 0.8));
-    }
-    poly(ctx, [BANNER_X - 166, FLOOR - 250, BANNER_X + 166, FLOOR - 250, BANNER_X + 166, FLOOR - 240, BANNER_X - 166, FLOOR - 240], STONE2);
-    for (let i = 0; i < 4; i++) {
-      const bx = BANNERS[i], c = foeCol(FOES[i + 1]), lit = pick < 0 || pick === i, chosen = pick === i;
-      const sw = Math.sin(t * 1.5 + i * 1.3) * (chosen ? 6 : 3.5), len = chosen ? 150 : 124, a = lit ? 1 : 0.32;
-      if (lit) glow(ctx, c, bx, FLOOR - 170, chosen ? 96 : 60, (chosen ? 0.6 : 0.3) + (on ? 0.1 : 0));
-      poly(ctx, [bx - 27, FLOOR - 240, bx + 27, FLOOR - 240, bx + 27 + sw, FLOOR - 240 + len, bx + sw, FLOOR - 258 + len, bx - 27 + sw, FLOOR - 240 + len], chosen ? '#241d44' : STONE2, G.rgba(c, a));
-      ctx.globalCompositeOperation = 'lighter';
-      diamond(ctx, bx + sw * 0.5, FLOOR - 184, 9, 15, G.rgba(c, 0.95 * a));
-      if (chosen) diamond(ctx, bx + sw * 0.5, FLOOR - 184, 4, 8, 'rgba(255,255,255,0.9)');
-      ctx.globalCompositeOperation = 'source-over';
-    }
-  }
-
   // The proving ring: two marker stones and a circle cut in the floor, where a single foe can be practised.
   function drawRing(ctx, t) {
     if (!seen(RING_X, 300)) return;
@@ -1076,6 +1066,7 @@
     ctx.fillStyle = 'rgba(0,0,0,' + 0.7 * alpha + ')'; ctx.fillText(str, x + 1, y + 2);
     ctx.fillStyle = G.rgba(color, alpha); ctx.fillText(str, x, y);
   }
+  HUB.paint.text = text;
 
   // Names over each place, what the nearest one does, and a line on how to move. In front of everything.
   HUB.drawOver = function (ctx) {

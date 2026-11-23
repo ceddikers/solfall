@@ -40,6 +40,8 @@
   }
 
   function run(label, phase, atk, px, policy, prep) {
+    // window.TEST_ONLY = ['pendulum'] runs only the tests whose label holds one of those words
+    if (window.TEST_ONLY && !window.TEST_ONLY.some((w) => label.includes(w))) return null;
     stage(phase, atk, px, prep);
     window.hitLog = [];
     for (const a in I.down) I.down[a] = false;
@@ -306,11 +308,79 @@
     }));
   }
 
+  // ---- the corrupted Warden's own two (corrupt.js; forced on here)
+  G.debug.corrupt = true;
+  const prints = () => G.hazards.list.filter((h) => h.kind === 'afterhand');
+  for (const [ph, px] of [[1, 640], [2, 640], [3, 640], [2, 200], [3, 1100]]) {
+    out.push(run('afterhands: keep walking the roomier way, never turn back, phase ' + ph + ' from x=' + px, ph, 'afterhands', px, (t, st) => {
+      if (!st.dir && prints().length) st.dir = P.x < 640 ? 1 : -1;
+      hold(st.dir < 0, st.dir > 0);
+    }));
+  }
+  for (const ph of [1, 3]) {
+    out.push(run('afterhands: stand still, then step on ahead before the fists reach you, phase ' + ph, ph, 'afterhands', 500, (t, st) => {
+      const under = prints().find((h) => Math.abs(h.x - P.x) < 70 && h.fireAt - h.t < 0.5);
+      if (under && !st.dir) st.dir = P.x < 640 ? 1 : -1;
+      hold(st.dir < 0, st.dir > 0);
+    }));
+  }
+  // Where lobbed orbs (the Pendulum's embers) come down to the hero's height, if that is soon: seen
+  // from the moment they are thrown, as a player sees them
+  function lobbed(window) {
+    const xs = [];
+    for (const o of G.hazards.list) {
+      if (o.kind !== 'orb') continue;
+      const g = o.grav || 0, dy = P.y - 22 - o.y;
+      const ta = g ? (-o.vy + Math.sqrt(Math.max(0, o.vy * o.vy + 2 * g * dy))) / g : (o.vy > 20 ? dy / o.vy : -1);
+      if (ta > -0.05 && ta < window) xs.push(o.x + o.vx * ta);
+    }
+    return xs;
+  }
+  // where the clapper is and how fast it is coming
+  function swingIn(st) {
+    const c = B.core, vx = st.cx == null ? 0 : (c.x - st.cx) / D;
+    st.cx = c.x;
+    const pend = G.hazards.list.find((h) => h.kind === 'pendulum');
+    const low = pend && c.y > G.FLOOR - 200, toward = Math.sign(P.x - c.x) === Math.sign(vx) && Math.abs(vx) > 60;
+    return { c, vx, pend, low, toward, eta: (Math.abs(c.x - P.x) - 84) / Math.max(1, Math.abs(vx)) };
+  }
+  function leaveSlam(st) {
+    const m = mark();
+    // (out towards the middle: the last blow falls at an end)
+    if (m && Math.abs(m.x - P.x) < 150) { hold(m.x > 640, m.x <= 640); return true; }
+    return false;
+  }
+  for (const [ph, px] of [[2, 640], [3, 640], [2, 560]]) {
+    out.push(run('pendulum: stay in the middle, dash through it at the bottom, phase ' + ph + ' from x=' + px, ph, 'pendulum', px, (t, st) => {
+      const s = swingIn(st);
+      if (leaveSlam(st)) return;
+      stepClear(st, lobbed(0.9), 300, 980, 50);
+      if (s.low && s.toward && s.eta < 0.05 && P.dashCd <= 0 && P.dashT <= 0) { st.goal = null; hold(s.c.x < P.x, s.c.x > P.x); I.pressed.dash = true; }
+    }));
+    out.push(run('pendulum: stay in the middle, double jump it at the bottom, phase ' + ph + ' from x=' + px, ph, 'pendulum', px, (t, st) => {
+      const s = swingIn(st);
+      if (leaveSlam(st)) return;
+      stepClear(st, lobbed(0.9), 300, 980, 50);
+      // jump as it comes down the near side (eta reads long: it is still gathering speed), and jump
+      // again on the way up rather than at the top, so the hero is high as it goes through
+      if (P.onGround && st.j === 2) st.j = 0;
+      if (s.low && s.toward && s.eta < 0.5 && !st.j && P.onGround) { st.j = 1; jump(); }
+      if (st.j === 1 && P.vy > -400 && !P.onGround) { st.j = 2; I.pressed.jump = true; }
+    }));
+  }
+  for (const [ph, px] of [[2, 80], [3, 1200]]) {
+    out.push(run('pendulum: hug the wall, dodge the embers, leave before the last blow, phase ' + ph + ' from x=' + px, ph, 'pendulum', px, (t, st) => {
+      if (leaveSlam(st)) { st.goal = null; if (!st.d) { st.d = 1; I.pressed.dash = true; } return; }
+      stepClear(st, lobbed(1.4), px < 640 ? 50 : 960, px < 640 ? 320 : 1230, 36);
+    }));
+  }
+  G.debug.corrupt = false;
+
   G.debug.forceAttack = '';
   G.debug.variant = '';
   G.debug.boss = '';
   G.debug.freeze = false;
   for (const a in I.down) I.down[a] = false;
   G.toTitle();
-  return out.join('\n');
+  return out.filter((l) => l).join('\n');
 })();

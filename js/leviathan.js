@@ -1,0 +1,2230 @@
+// Solfall - The Drowned Leviathan: a sea serpent as long as the coast it drowned. Its body lies out
+// at sea, behind the arena, and only its head and neck come in over the shore; the head is the one
+// thing that can be struck, and it lies open after its big moves. In the second phase the sea comes
+// in and the floor is water that drags at the legs; in the third the flood drains into a maelstrom
+// that pulls the hero towards its eye. Staggered or toppled, it lies beached on the shore.
+'use strict';
+(function () {
+  const { wait, tween } = G.seq;
+  const E = G.ease, FLOOR = G.FLOOR, H = G.hazards, K = G.kit, DANGER = G.COL.danger;
+  const WL = G.WALL_L, WR = G.WALL_R;
+  const HZ = FLOOR - 170;   // the horizon, where the sea ends
+  const DEPTH = 2.2;        // how quickly things shrink as they go out to sea
+  const ZS = 0.2;           // nearer than this is drawn among the platforms; further, behind them
+  const HH = 40;            // half the head's height (B.h / 2)
+  const SEA1 = FLOOR + 18, FLOOD = FLOOR - 24, SHALLOW = FLOOR - 9;
+  const WATER = '170,222,232';
+  const HS = 1.15;          // the head's drawing scale
+
+  // where a point out at sea (depth z) lands on the screen
+  const proj = (x, y, z) => { const s = 1 / (1 + DEPTH * Math.max(0, z)); return { x: 640 + (x - 640) * s, y: HZ + (y - HZ) * s, s }; };
+  // the snout's direction for a facing and a tilt (tilt > 0: snout down)
+  const aim = (face, tilt) => (face > 0 ? tilt : Math.PI - tilt);
+  const rgbOf = (h) => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
+  const memo = {};
+  function mix(a, b, f) {
+    f = Math.round(G.clamp(f, 0, 1) * 16) / 16;
+    const k = a + b + f;
+    let v = memo[k];
+    if (!v) { const p = rgbOf(a), q = rgbOf(b); v = memo[k] = 'rgb(' + p.map((c, i) => Math.round(c + (q[i] - c) * f)).join(',') + ')'; }
+    return v;
+  }
+  const rgbStr = (h) => rgbOf(h).join(',');
+  // the void, for its two corrupted attacks (corrupt.js loads after this file, so its colours are copied here)
+  const VOIDC = '16,3,10', BLOOD = '235,30,80', VHOT = '255,206,220', VDARK = '#050003';
+  const VPAL = { boss: BLOOD, hot: VHOT, far: VDARK, rim: BLOOD };
+  let VOIDED = false; // while set, a length of body or a head is drawn as void: black flesh, blood in the seams
+  const palNow = () => (VOIDED ? VPAL : G.pal());
+  const shade = (h, P, fog) => (VOIDED ? mix(h, VDARK, 0.68) : mix(h, P.far, fog));
+
+  // ------------------------------------------------------------------ sounds
+  const AU = G.audio, S = AU.synth;
+  AU.define('splash', (o) => {
+    const v = (o && o.vol) || 1;
+    S.noise({ dur: 0.55, vol: 0.4 * v, type: 'lowpass', f0: 2600, f1: 260, q: 0.6 });
+    S.noise({ dur: 0.25, vol: 0.16 * v, type: 'highpass', f0: 3200 });
+    S.tone({ type: 'sine', f0: 92, f1: 38, dur: 0.32, vol: 0.32 * v });
+  });
+  AU.define('spout', () => {
+    S.noise({ dur: 0.6, vol: 0.34, f0: 380, f1: 3400, q: 0.7, attack: 0.04 });
+    S.tone({ type: 'sine', f0: 58, f1: 120, dur: 0.4, vol: 0.26 });
+  });
+  AU.define('bubble', () => { S.tone({ f0: 300, f1: 900, dur: 0.06, vol: 0.08 }); S.tone({ f0: 430, f1: 1150, dur: 0.05, vol: 0.06, delay: 0.05 }); });
+  AU.define('hiss', () => { S.noise({ dur: 0.45, vol: 0.16, type: 'highpass', f0: 3800, attack: 0.08 }); });
+  AU.define('seaRoar', () => {
+    S.tone({ type: 'sawtooth', f0: 72, f1: 36, dur: 1.5, vol: 0.22, attack: 0.1 });
+    S.tone({ type: 'triangle', f0: 146, f1: 66, dur: 1.3, vol: 0.13, attack: 0.08 });
+    S.noise({ dur: 1.4, vol: 0.3, type: 'lowpass', f0: 1000, f1: 180, attack: 0.1 });
+  });
+  AU.define('bite', () => {
+    S.noise({ dur: 0.05, vol: 0.42, type: 'highpass', f0: 2400 });
+    S.tone({ type: 'square', f0: 230, f1: 80, dur: 0.09, vol: 0.13 });
+    S.tone({ type: 'sine', f0: 112, f1: 44, dur: 0.18, vol: 0.42 });
+  });
+  AU.define('lunge', () => { S.noise({ dur: 0.6, vol: 0.42, f0: 280, f1: 2600, q: 0.8 }); S.tone({ type: 'sine', f0: 120, f1: 46, dur: 0.55, vol: 0.32 }); });
+  AU.define('gulp', () => { S.tone({ type: 'sine', f0: 170, f1: 66, dur: 0.18, vol: 0.26 }); S.noise({ dur: 0.12, vol: 0.12, type: 'lowpass', f0: 620, f1: 200 }); });
+  AU.define('thunder', () => { S.noise({ dur: 2.4, vol: 0.26, type: 'lowpass', f0: 520, f1: 55, attack: 0.05 }); S.tone({ type: 'sine', f0: 48, f1: 28, dur: 1.8, vol: 0.2 }); });
+  AU.define('drain', () => { S.noise({ dur: 1.8, vol: 0.24, f0: 1300, f1: 180, q: 1.3, attack: 0.3 }); S.tone({ type: 'sine', f0: 44, f1: 30, dur: 1.8, vol: 0.18, attack: 0.3 }); });
+  AU.vary.splash = 2; AU.vary.bubble = 3; AU.vary.bite = 1.5; AU.vary.spout = 1.5;
+
+  // ------------------------------------------------------------------ the arena
+  G.THEMES.leviathan = [null,
+    {
+      name: 'LOW TIDE', scene: 'drowned',
+      sky: ['#02060c', '#08182a', '#123848', '#4e8c94'],
+      far: '#0c2230', near: '#07141c', pillar: '#040b10', rim: '130,226,218',
+      floorTop: '#24404a', floor: '#081216',
+      boss: '90,228,205', hot: '226,255,248', ember: '120,220,210', stars: 0.35,
+    },
+    {
+      name: 'HIGH WATER', scene: 'drowned',
+      sky: ['#020403', '#0a1610', '#1c3426', '#6a7a4c'],
+      far: '#0e1c14', near: '#08110c', pillar: '#040906', rim: '255,206,130',
+      floorTop: '#2a3424', floor: '#0a0e08',
+      boss: '255,188,96', hot: '255,242,214', ember: '255,200,120', stars: 0.05,
+    },
+    {
+      name: 'MAELSTROM', scene: 'drowned',
+      sky: ['#010103', '#06050e', '#141028', '#5c5488'],
+      far: '#0c0a18', near: '#06050c', pillar: '#030207', rim: '200,190,255',
+      floorTop: '#24203a', floor: '#08070e',
+      boss: '196,180,255', hot: '246,242,255', ember: '190,180,255', stars: 0.2,
+    }, G.THEMES.warden[4]];
+  G.arena.WEATHER.leviathan = { kind: 'rain', n: 170 };
+  G.arena.BIRDS.leviathan = 'crow';
+  G.arena.LAYOUTS.leviathan = {
+    2: [[150, 130, 515], [575, 130, 466], [1000, 130, 515]], // three pieces of wreckage afloat on the flood
+    3: [[54, 112, 500], [1114, 112, 500]],                     // a rock by each wall, out of the current
+  };
+
+  // The coast it drowned: a sea to the horizon, sea stacks, a drowned lighthouse and a wreck.
+  G.SCENES.drowned = function (x, P, F, lcg) {
+    const L = -60, R = G.W + 60, sea = F + 18;
+    // headlands on the horizon
+    x.fillStyle = P.far;
+    x.beginPath(); x.moveTo(L, HZ + 2);
+    for (let px = L; px <= R; px += 10) {
+      const n = Math.sin(px * 0.011 + 1.3) * 0.5 + Math.sin(px * 0.029) * 0.3 + Math.sin(px * 0.07 + 2) * 0.2;
+      x.lineTo(px, HZ + 2 - Math.max(0, n) * 24 - (px < 240 || px > 1000 ? 16 : 0));
+    }
+    x.lineTo(R, HZ + 2); x.closePath(); x.fill();
+    // the sea
+    let g = x.createLinearGradient(0, HZ, 0, F + 4);
+    g.addColorStop(0, P.sky[2]); g.addColorStop(0.07, P.far); g.addColorStop(0.55, P.near); g.addColorStop(1, '#020406');
+    x.fillStyle = g; x.fillRect(L, HZ, R - L, F - HZ + 6);
+    // the sky's light laid on the water
+    x.save(); x.translate(640, HZ); x.scale(1, 0.2);
+    g = x.createRadialGradient(0, 0, 10, 0, 0, 720);
+    g.addColorStop(0, G.rgba(P.rim, 0.3)); g.addColorStop(1, G.rgba(P.rim, 0));
+    x.fillStyle = g; x.fillRect(-720, 0, 1440, 720); x.restore();
+    // sea stacks standing out of the water, nearer ones bigger
+    function stack(wx, z, h, w, seed) {
+      const q = lcg(seed), b = proj(wx, sea, z), s = b.s, hh = h * s, hw = w * s / 2, j = () => (q() - 0.5) * hw * 0.3;
+      const pts = [b.x - hw * 1.3, b.y + 3, b.x - hw * 1.0 + j(), b.y - hh * 0.4, b.x - hw * 0.85 + j(), b.y - hh * 0.75, b.x - hw * 0.5 + j(), b.y - hh,
+        b.x - hw * 0.05, b.y - hh * 0.92, b.x + hw * 0.4 + j(), b.y - hh * 0.98, b.x + hw * 0.72 + j(), b.y - hh * 0.68, b.x + hw * 0.95 + j(), b.y - hh * 0.32, b.x + hw * 1.3, b.y + 3];
+      x.fillStyle = P.pillar;
+      x.beginPath(); for (let i = 0; i < pts.length; i += 2) { if (i) x.lineTo(pts[i], pts[i + 1]); else x.moveTo(pts[i], pts[i + 1]); } x.closePath(); x.fill();
+      x.strokeStyle = G.rgba(P.rim, 0.22); x.lineWidth = 1.2;
+      x.beginPath(); x.moveTo(pts[8], pts[9]); x.lineTo(pts[10], pts[11]); x.lineTo(pts[12], pts[13]); x.lineTo(pts[14], pts[15]); x.stroke();
+      x.fillStyle = G.rgba(P.rim, 0.12);
+      x.beginPath(); x.ellipse(b.x, b.y + 1, hw * 1.5, 3 + 4 * s, 0, 0, G.TAU); x.fill();
+      return { x: b.x + hw * 0.1, y: b.y - hh * 0.95, s };
+    }
+    stack(520, 2.6, 120, 50, 3); stack(760, 1.9, 90, 44, 5); stack(60, 1.5, 160, 70, 7);
+    // the wreck: a broken hull low in the water, two masts leaning
+    const wk = proj(960, sea, 1.1), ws = wk.s;
+    x.fillStyle = P.pillar;
+    x.beginPath(); x.moveTo(wk.x - 150 * ws, wk.y + 2); x.quadraticCurveTo(wk.x - 120 * ws, wk.y - 60 * ws, wk.x - 20 * ws, wk.y - 70 * ws);
+    x.lineTo(wk.x + 30 * ws, wk.y - 48 * ws); x.lineTo(wk.x + 70 * ws, wk.y - 66 * ws); x.quadraticCurveTo(wk.x + 140 * ws, wk.y - 40 * ws, wk.x + 160 * ws, wk.y + 2); x.closePath(); x.fill();
+    x.strokeStyle = P.pillar; x.lineCap = 'round';
+    for (const [mx, len, lean] of [[-60, 300, -0.32], [50, 240, 0.2]]) {
+      const bx = wk.x + mx * ws, by = wk.y - 60 * ws, tx = bx + Math.sin(lean) * len * ws, ty = by - Math.cos(lean) * len * ws;
+      x.lineWidth = 6 * ws; x.beginPath(); x.moveTo(bx, by); x.lineTo(tx, ty); x.stroke();
+      for (const k of [0.45, 0.75]) {
+        const yx = G.lerp(bx, tx, k), yy = G.lerp(by, ty, k), c = Math.cos(lean), sn = Math.sin(lean);
+        x.lineWidth = 3.5 * ws; x.beginPath(); x.moveTo(yx - c * 70 * ws * (1.2 - k), yy - sn * 70 * ws * (1.2 - k)); x.lineTo(yx + c * 70 * ws * (1.2 - k), yy + sn * 70 * ws * (1.2 - k)); x.stroke();
+      }
+      // a rag of sail still on it
+      x.fillStyle = G.rgba(P.rim, 0.1);
+      x.beginPath(); x.moveTo(G.lerp(bx, tx, 0.75), G.lerp(by, ty, 0.75)); x.lineTo(G.lerp(bx, tx, 0.75) + 50 * ws, G.lerp(by, ty, 0.75) + 30 * ws);
+      x.lineTo(G.lerp(bx, tx, 0.5) + 34 * ws, G.lerp(by, ty, 0.5) + 60 * ws); x.lineTo(G.lerp(bx, tx, 0.5), G.lerp(by, ty, 0.5)); x.closePath(); x.fill();
+    }
+    x.lineCap = 'butt';
+    // the drowned lighthouse, leaning on its rock; one ember still in the lamp
+    const top = stack(210, 0.72, 120, 150, 11), ls = top.s;
+    x.save(); x.translate(top.x, top.y + 6); x.rotate(-0.07);
+    x.fillStyle = P.pillar;
+    x.beginPath(); x.moveTo(-24 * ls, 0); x.lineTo(-15 * ls, -230 * ls); x.lineTo(15 * ls, -230 * ls); x.lineTo(24 * ls, 0); x.closePath(); x.fill();
+    x.fillRect(-21 * ls, -246 * ls, 42 * ls, 16 * ls);
+    x.beginPath(); x.moveTo(-17 * ls, -246 * ls); x.lineTo(-14 * ls, -284 * ls); x.lineTo(2 * ls, -270 * ls); x.lineTo(10 * ls, -290 * ls); x.lineTo(17 * ls, -246 * ls); x.closePath(); x.fill();
+    x.strokeStyle = G.rgba(P.rim, 0.2); x.lineWidth = 1.2;
+    x.beginPath(); x.moveTo(15 * ls, -230 * ls); x.lineTo(24 * ls, 0); x.stroke();
+    for (let i = 1; i < 4; i++) { x.fillStyle = G.rgba(P.rim, 0.08); x.fillRect(-18 * ls, -i * 58 * ls, 36 * ls, 4 * ls); }
+    g = x.createRadialGradient(0, -262 * ls, 0, 0, -262 * ls, 40 * ls);
+    g.addColorStop(0, G.rgba(P.rim, 0.55)); g.addColorStop(1, G.rgba(P.rim, 0));
+    x.fillStyle = g; x.fillRect(-40 * ls, -302 * ls, 80 * ls, 80 * ls);
+    x.restore();
+    stack(1180, 0.42, 240, 120, 13);
+  };
+
+  // ------------------------------------------------------------------ the boss
+  const B = {
+    id: 'leviathan', name: 'THE DROWNED LEVIATHAN', short: 'The Leviathan', theme: 'leviathan',
+    sub: 'The sea remembers the coast it swallowed', taunt: 'the tide turns again',
+    blurb: 'A sea serpent that strikes from the deep',
+    tips: [
+      'Watch how it rears. Head held low with its snout to the ground: it strikes low, so jump. Reared up tall with its snout to the sky: it strikes high, so stay on the ground.',
+      'After a lunge, a snap or a dive its head lies on the shore. Strike it then.',
+      'One slap of its tail on the water: one great blow from above. Three quick shakes: three lighter ones that follow you.',
+      'If it rolls sideways as it dives, the spouts come up in rows: stand in a gap, then step into the row that has finished. If it sinks straight down, they come up under you.',
+      'Its jaw chatters before a double snap.',
+      'In high water the floor drags at your legs. A dash is still a dash, and the wreckage is dry.',
+      'If the spines on its coil stand up and rattle, the coil comes back off the far wall.',
+      'In the maelstrom the current drags you towards the eye. Count how often its fin circles: twice round, and it comes up twice.',
+    ],
+    hudCols: [null, ['#3ad6c0', '#cffff6'], ['#ffb44a', '#ffe8c4'], ['#a896ff', '#ece6ff']],
+    BASE_HP: 2900, poise0: 400, w: 128, h: 80,
+    answer: 'volley',
+    gaps: [0, 0.95, 0.8, 0.65],
+    bags: {
+      1: ['lunge', 'snap', 'slam', 'spouts', 'snap', 'volley'],
+      2: ['lunge', 'snap', 'slam', 'spouts', 'sweep', 'volley', 'snap'],
+      3: ['lunge', 'snap', 'slam', 'spouts', 'sweep', 'maw', 'volley', 'maw'],
+    },
+    cards: { 2: ['HIGH WATER', 'The sea comes in'], 3: ['MAELSTROM', 'All of it goes down'] },
+    first: { 1: 'lunge', 2: 'sweep', 3: 'maw' },
+  };
+
+  // ------------------------------------------------------------------ state
+  B.setup = function () {
+    const b = B.body;
+    Object.assign(b, {
+      x: 860, y: SEA1 + 260, z: 0.6, ang: -Math.PI / 2, vx: 0, vy: 0, va: 0, px: 860, py: SEA1 + 260,
+      tx: 860, ty: FLOOR - 16, tz: 0, ta: Math.PI, jaw: 0, jawT: 0, direct: true, fast: false,
+      hurt: false, coil: 0, fin: 0, chatter: 0, gill: 0, throat: 0, throatT: 0, beached: false, face: -1, hidden: true,
+    });
+    B.sea = { y: SEA1, to: SEA1 };
+    B.vortex = { x: 640, tx: 640, k: 0, to: 0, spin: 0 };
+    B.em = { x: 820, z: 0.7 };
+    B.humps = [{ x: 280, z: 1.15, ph: 0, sp: 0.5, R: 70, dir: 1 }, { x: 1020, z: 0.8, ph: 2.4, sp: 0.42, R: 82, dir: -1 }];
+    B.tail = { on: false, pose: 'under', ex: 300, ez: 0.5, aimX: 640, tipX: 300, tipY: SEA1 + 160, tipZ: 0.5, c2x: 300, c2y: SEA1 + 120, c2z: 0.5, rate: 4, shake: 0 };
+    B.spine = []; B.tailPts = []; B.humpPts = [[], []];
+    B.wave = null; B.wash = 0; B.bolt = null; B.boltT = 5; B.calm = 0; B.shadow = null; B.wall = null; B.finCircle = null;
+    B.lastPX = G.player.x; B.front = null; B.circling = 0; B.pullK = 1;
+    B.vh = null; B.under = null; b.voidEye = 0; b.voidEyeT = 0; b.voidThroat = 0;
+  };
+
+  B.kiting = (P, b) => !!P.plat || Math.abs(P.x - b.x) > 430 || (!P.onGround && P.y < FLOOR - 150 && Math.abs(P.x - b.x) > 160);
+  B.onRelease = function () {
+    const b = B.body;
+    b.hurt = false; b.coil = 0; b.chatter = 0; b.fin = 0; b.throatT = 0; b.fast = false; b.direct = false;
+    if (B.tail.on && B.tail.pose !== 'under') { B.tail.pose = 'under'; B.tail.rate = 3; }
+    B.finCircle = null; B.pullK = 1;
+    letGoVoid();
+  };
+  B.onInterrupt = function () {
+    B.finCircle = null; B.tail.pose = 'under'; B.tail.rate = 3;
+    // (the hazards were just cleared: the hydra's crack is put back to seal itself, not cut off)
+    if (B.vh) { const c = voidCrack(B.vh.root, 0.01); c.t = 0.01; c.closing = true; c.holds = B.vh; }
+    letGoVoid();
+  };
+  // its corrupted attacks let go: the void head drops back down its crack, the black water drains
+  function letGoVoid() {
+    const b = B.body;
+    b.voidEyeT = 0; b.voidThroat = 0;
+    if (B.vh) B.vh.gone = true;
+    if (B.under) { B.under.to = 0; }
+  }
+  B.onHit = function (dmg, info) {
+    // water flies off the head where the blow lands
+    G.fx.burst(info.x, info.y, { n: 5, color: WATER, kind: 'spark', speed: [120, 380], angle: -Math.PI / 2, spread: 2.4, life: [0.25, 0.5], size: [1.4, 2.6], grav: 1300, a: 0.6 });
+  };
+
+  const facePlayer = () => (G.player.x >= B.body.x ? 1 : -1);
+  const level = (z) => (z > 0.04 ? B.sea.y : Math.min(B.sea.y, FLOOR));
+  const flooded = () => B.sea.y < FLOOR - 12;
+  function target(x, y, z, ang) {
+    const b = B.body;
+    b.direct = false; b.tx = x; b.ty = y; b.tz = z;
+    if (ang != null) b.ta = ang;
+  }
+  function* glide(x, y, z, ang, maxT, fast) {
+    const b = B.body;
+    target(x, y, z, ang); b.fast = !!fast;
+    let e = 0;
+    while (e < maxT) {
+      e += yield;
+      if (e > 0.15 && Math.hypot(b.tx - b.x, b.ty - b.y) < 14 && Math.abs(b.z - b.tz) < 0.02) break;
+    }
+  }
+  // the tip of the snout, in the arena
+  function mouth(b) {
+    const c = Math.cos(b.ang), s = Math.sin(b.ang);
+    return { x: b.x + c * 96 * HS, y: b.y - HH + s * 96 * HS + (c >= 0 ? 4 : 4) };
+  }
+
+  // ------------------------------------------------------------------ effects
+  function splash(x, y, power, dir) {
+    const p = power || 1;
+    G.fx.burst(x, y, { n: Math.round(16 * p), color: WATER, kind: 'spark', speed: [180, 300 + 300 * p], angle: -Math.PI / 2 + (dir || 0) * 0.5, spread: 1.6, life: [0.4, 0.9], size: [1.6, 3.2], grav: 1400, a: 0.6 });
+    G.fx.burst(x, y, { n: Math.round(5 * p), color: WATER, speed: [60, 200 + 100 * p], angle: -Math.PI / 2, spread: 2.2, life: [0.4, 0.9], size: [3, 7], grav: 900, a: 0.4 });
+    G.fx.dust(x, y, Math.round(2 + 2 * p), { speed: [30, 150], size: [8, 14], life: [0.5, 1], up: 70, a: 0.2, color: '150,190,200' });
+  }
+  function splashAt(x, z, power) { const q = proj(x, B.sea.y, z); splash(q.x, q.y, (power || 1) * Math.max(0.4, q.s)); }
+  function crash(x, power) {
+    const p = power || 1;
+    G.fx.shake(8 + 6 * p); G.fx.kick(0, 3.5 * p);
+    G.audio.play('slam'); G.audio.play('splash');
+    G.fx.thud(x, FLOOR, 1.1 * p, { col: G.pal().boss });
+    splash(x, FLOOR - 6, p);
+    G.fx.ripple(x, FLOOR - 30, 200 * p, 0.4, 0.9);
+  }
+
+  // ------------------------------------------------------------------ hazards of its own
+  // A spout: the floor boils, then a column of water is torn up from it to the top of the sky.
+  // The boiling and a rim are the warning (it comes from under the floor, where nothing shows).
+  function spout(x, w, tele) {
+    return H.add({
+      kind: 'spout', x, w, tele, active: 0.45, layer: 'under', fired: false,
+      update(dt) {
+        this.srcX = this.x;
+        if (this.t < this.tele && Math.random() < dt * 22) G.fx.spawn({ x: this.x + G.rand(-this.w * 0.4, this.w * 0.4), y: level(0) - 2, vx: G.rand(-10, 10), vy: -G.rand(40, 120), life: G.rand(0.2, 0.45), size: G.rand(1.4, 2.6), color: WATER, a: 0.5 });
+        if (this.t >= this.tele && !this.fired) {
+          this.fired = true;
+          G.audio.play('spout'); G.fx.shake(5); G.fx.kick(0, -2);
+          splash(this.x, level(0) - 4, 1.1);
+          G.fx.ripple(this.x, FLOOR - 140, 170, 0.3, 0.7);
+        }
+        if (this.fired && this.t < this.tele + this.active && Math.random() < dt * 40) {
+          G.fx.spawn({ kind: 'spark', x: this.x + G.rand(-this.w / 2, this.w / 2), y: G.rand(40, FLOOR - 40), vx: G.rand(-160, 160), vy: G.rand(-200, 40), life: G.rand(0.3, 0.6), size: G.rand(1.4, 2.6), color: WATER, grav: 1200, a: 0.5 });
+        }
+        if (this.t > this.tele + this.active + 0.45) this.dead = true;
+      },
+      hits(P) { return this.t >= this.tele && this.t < this.tele + this.active && Math.abs(P.x - this.x) < this.w / 2 - 4; },
+      danger() { return this.t < this.tele + this.active ? [this.x, this.w / 2 + 16, this.tele - this.t] : null; },
+      draw(ctx) { drawColumn(ctx, this.x, this.w, this.t, this.tele, this.active); },
+    });
+  }
+  function drawColumn(ctx, x, w, t, tele, active) {
+    const P = G.pal(), F = level(0) - 1;
+    if (t < tele) {
+      const k = t / tele;
+      ctx.fillStyle = G.rgba(WATER, 0.07 + 0.13 * k);
+      ctx.beginPath(); ctx.ellipse(x, F, w / 2 * (0.4 + 0.6 * k), 8, 0, 0, G.TAU); ctx.fill();
+      ctx.strokeStyle = G.rgba(DANGER, 0.22 + 0.5 * k); ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.ellipse(x, F, w / 2, 8, 0, 0, G.TAU); ctx.stroke();
+      ctx.strokeStyle = G.rgba(WATER, 0.45); ctx.lineWidth = 1.2;
+      for (let i = 0; i < 6; i++) {
+        const bx = x + Math.sin(i * 2.1 + t * 3) * w * 0.34, by = F - ((t * 80 + i * 13) % 34) * (0.4 + k);
+        ctx.beginPath(); ctx.arc(bx, by, 1.6 + (i % 3), 0, G.TAU); ctx.stroke();
+      }
+      return;
+    }
+    const e = t - tele, up = Math.min(1, e / 0.08), f = e < active ? 1 : Math.max(0, 1 - (e - active) / 0.45);
+    const cw = w * (0.5 + 0.5 * up) * (0.85 + 0.15 * f);
+    // the top falls back once it is spent
+    const topY = e < active ? G.lerp(F, -60, E.outCubic(up)) : G.lerp(-60, F, E.inQuad(Math.min(1, (e - active) / 0.45)));
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    const g = ctx.createLinearGradient(x - cw / 2, 0, x + cw / 2, 0);
+    g.addColorStop(0, G.rgba(WATER, 0)); g.addColorStop(0.25, G.rgba(WATER, 0.2 * f)); g.addColorStop(0.5, G.rgba(P.hot, 0.24 * f)); g.addColorStop(0.75, G.rgba(WATER, 0.2 * f)); g.addColorStop(1, G.rgba(WATER, 0));
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.moveTo(x - cw / 2, F);
+    for (let y = F; y > topY; y -= 24) ctx.lineTo(x - cw / 2 + Math.sin(y * 0.05 + t * 18) * 4, y);
+    ctx.lineTo(x, topY - 14);
+    for (let y = topY; y < F; y += 24) ctx.lineTo(x + cw / 2 + Math.sin(y * 0.05 - t * 16) * 4, y);
+    ctx.lineTo(x + cw / 2, F); ctx.closePath(); ctx.fill();
+    // water running up it
+    ctx.strokeStyle = G.rgba(P.hot, 0.16 * f); ctx.lineWidth = 2;
+    ctx.setLineDash([26, 40]); ctx.lineDashOffset = e * 1100;
+    for (const o of [-0.28, -0.08, 0.14, 0.3]) { ctx.beginPath(); ctx.moveTo(x + o * cw, F); ctx.lineTo(x + o * cw, topY); ctx.stroke(); }
+    ctx.setLineDash([]);
+    ctx.fillStyle = G.rgba(WATER, 0.3 * f);
+    ctx.beginPath(); ctx.ellipse(x, F, cw * 0.8, 11, 0, 0, G.TAU); ctx.fill();
+    ctx.restore();
+  }
+
+  // The tail coming down from above the screen: its shadow grows on the floor and water rains from
+  // it (it is out of sight until it lands, so it gets a drawn warning). The column reaches the top.
+  function tailfall(x, w, tele, lock, dmg) {
+    const P = G.player;
+    return H.add({
+      kind: 'tailfall', x, w, tele, lock, dmg, active: 0.14, layer: 'under',
+      update(dt) {
+        this.srcX = this.x;
+        if (this.t < this.tele - this.lock) this.x = G.damp(this.x, G.clamp(P.x, WL + 70, WR - 70), 6, dt);
+        B.tail.aimX = this.x;
+        if (this.t < this.tele && Math.random() < dt * 30) G.fx.spawn({ kind: 'spark', x: this.x + G.rand(-this.w * 0.4, this.w * 0.4), y: -10, vx: 0, vy: G.rand(500, 800), life: 1.2, size: G.rand(1.2, 2.2), color: WATER, grav: 900, a: 0.5 });
+        if (this.t > this.tele + this.active) this.dead = true;
+      },
+      hits(Pl) { return this.t >= this.tele && Math.abs(Pl.x - this.x) < this.w / 2 - 4; },
+      danger() { return [this.x, this.w / 2 + 18, this.tele - this.t]; },
+      draw(ctx) {
+        if (this.t >= this.tele) return;
+        const k = Math.min(1, this.t / this.tele), F = level(0) - 1;
+        ctx.fillStyle = 'rgba(0,0,0,' + (0.18 + 0.3 * k) + ')';
+        ctx.beginPath(); ctx.ellipse(this.x, F, this.w / 2 * (0.5 + 0.5 * k), 10, 0, 0, G.TAU); ctx.fill();
+        ctx.strokeStyle = G.rgba(DANGER, 0.2 + 0.55 * k); ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.ellipse(this.x, F, this.w / 2, 10, 0, 0, G.TAU); ctx.stroke();
+        const g = ctx.createLinearGradient(0, 0, 0, F);
+        g.addColorStop(0, 'rgba(0,0,0,' + 0.2 * k + ')'); g.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = g; ctx.fillRect(this.x - this.w / 2, -60, this.w, F + 60);
+      },
+    });
+  }
+
+  // A loop of its body that breaks the surface and rolls along the floor (jump it). If its spines
+  // stand up and rattle, it comes back off the far wall.
+  function hump(x, dir, speed, back) {
+    const pts = [];
+    return H.add({
+      kind: 'wave', x, y: FLOOR, dir, speed, hgt: 56, back, layer: 'under', srcX: x, rise: 0, sinking: 0,
+      update(dt) {
+        this.rise = Math.min(1, this.t / 0.3) * (1 - this.sinking);
+        this.x += this.dir * this.speed * G.lerp(0.4, 1, Math.min(1, this.t / 0.3)) * dt;
+        this.srcX = this.x - this.dir * 30;
+        if (Math.random() < dt * 40) G.fx.spawn({ kind: 'spark', x: this.x + this.dir * 50, y: level(0) - 4, vx: this.dir * G.rand(100, 300), vy: -G.rand(150, 420), life: G.rand(0.3, 0.6), size: G.rand(1.4, 2.6), color: WATER, grav: 1300, a: 0.6 });
+        if (this.sinking) { this.sinking = Math.min(1, this.sinking + dt * 3); if (this.sinking >= 1) this.dead = true; return; }
+        if ((this.dir > 0 && this.x > WR - 70) || (this.dir < 0 && this.x < WL + 70)) {
+          splash(this.x + this.dir * 40, level(0) - 4, 1.1, -this.dir); G.fx.shake(6); G.audio.play('splash');
+          if (this.back) { this.back = false; this.dir = -this.dir; } else this.sinking = 0.01;
+        }
+      },
+      hits(P) { return this.rise > 0.5 && G.rectsOverlap(P.box(), { cx: this.x, cy: FLOOR - 25, hw: 40, hh: 23 }); },
+      draw(ctx) {
+        const R = 76, top = 52 * this.rise, lv = level(0);
+        for (let k = 0; k <= 12; k++) {
+          const u = this.dir > 0 ? k / 12 : 1 - k / 12, s = Math.sin(Math.PI * u);
+          const q = pts[k] || (pts[k] = {});
+          q.x = this.x + (u - 0.5) * 2 * R + this.dir * 16 * s; q.y = FLOOR + 34 - s * (top + 34 + (lv < FLOOR ? 0 : 0)); q.z = 0; q.w = 46;
+        }
+        drawChain(ctx, pts, false, { fin: this.back ? 1 : 0 });
+      },
+    });
+  }
+
+  // The jaws come up out of the eye of the maelstrom (third phase).
+  function maw(x, w, tele, track) {
+    const P = G.player;
+    return H.add({
+      kind: 'maw', x, w, tele, track, active: 0.4, dmg: 2, layer: 'under',
+      update(dt) {
+        this.srcX = this.x;
+        if (this.track && this.t < this.tele - 0.32) this.x = G.damp(this.x, G.clamp(P.x, WL + 100, WR - 100), 5, dt);
+        if (this.t < this.tele && Math.random() < dt * 26) G.fx.spawn({ x: this.x + G.rand(-this.w, this.w), y: level(0) - 2, vx: G.rand(-20, 20), vy: -G.rand(40, 140), life: G.rand(0.2, 0.5), size: G.rand(1.6, 3), color: WATER, a: 0.5 });
+        if (this.t > this.tele + this.active + 0.4) this.dead = true;
+      },
+      hits(Pl) { return this.t >= this.tele && this.t < this.tele + this.active && Math.abs(Pl.x - this.x) < this.w - 6; },
+      danger() { return this.t < this.tele + this.active ? [this.x, this.w + 18, this.tele - this.t] : null; },
+      draw(ctx) {
+        const F = level(0) - 1, Pp = G.pal();
+        if (this.t < this.tele) {
+          const k = this.t / this.tele;
+          // the water turns round on itself, and two eyes show under it
+          ctx.lineWidth = 2;
+          for (let i = 0; i < 3; i++) {
+            const a = this.t * (5 + 6 * k) + i * 2.1;
+            ctx.strokeStyle = G.rgba(WATER, 0.2 + 0.25 * k);
+            ctx.beginPath(); ctx.ellipse(this.x, F, this.w * (0.4 + 0.2 * i) * (0.6 + 0.4 * k), 9, 0, a, a + 2.2); ctx.stroke();
+          }
+          ctx.strokeStyle = G.rgba(DANGER, 0.22 + 0.5 * k);
+          ctx.beginPath(); ctx.ellipse(this.x, F, this.w, 11, 0, 0, G.TAU); ctx.stroke();
+          for (const d of [-1, 1]) {
+            ctx.globalCompositeOperation = 'lighter';
+            ctx.globalAlpha = 0.3 + 0.5 * k;
+            ctx.drawImage(G.fx.glow(Pp.boss), this.x + d * 22 - 12, F - 7, 24, 14);
+            ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
+          }
+          return;
+        }
+        drawColumn(ctx, this.x, this.w * 2, this.t, this.tele, this.active);
+      },
+    });
+  }
+
+  // a bubble: a projectile, so its rim is the warning colour
+  function drawBubble(ctx) {
+    const r = this.r * (1 + 0.08 * Math.sin(this.t * 14)), P = G.pal();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.globalAlpha = 0.45; ctx.drawImage(G.fx.glow(P.boss), this.x - r * 2.2, this.y - r * 2.2, r * 4.4, r * 4.4); ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.fillStyle = G.rgba(WATER, 0.14);
+    ctx.beginPath(); ctx.arc(this.x, this.y, r, 0, G.TAU); ctx.fill();
+    ctx.strokeStyle = G.rgba(DANGER, 0.8); ctx.lineWidth = 2.2; ctx.stroke();
+    ctx.strokeStyle = 'rgba(255,255,255,0.5)'; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.arc(this.x - r * 0.3, this.y - r * 0.3, r * 0.45, Math.PI * 1.05, Math.PI * 1.55); ctx.stroke();
+  }
+  function drawBomb(ctx) {
+    drawBubble.call(this, ctx);
+    // where it will come down
+    const g = this.grav, dy = (FLOOR - this.r) - this.y, t = (this.vy + Math.sqrt(Math.max(0, this.vy * this.vy + 2 * g * dy))) / g, lx = this.x + this.vx * t;
+    ctx.strokeStyle = G.rgba(DANGER, 0.5); ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.ellipse(lx, FLOOR - 1, 60, 8, 0, 0, G.TAU); ctx.stroke();
+  }
+
+  // ------------------------------------------------------------------ hazards of the void (corrupted only)
+  AU.define('abyss', () => {
+    S.tone({ type: 'sawtooth', f0: 46, f1: 29, dur: 1.3, vol: 0.18, attack: 0.3 });
+    S.noise({ dur: 1.2, vol: 0.22, type: 'lowpass', f0: 460, f1: 80, attack: 0.35 });
+  });
+  AU.define('rend', () => {
+    S.noise({ dur: 0.55, vol: 0.42, type: 'lowpass', f0: 1900, f1: 110 });
+    S.noise({ dur: 0.14, vol: 0.2, type: 'highpass', f0: 2600 });
+    S.tone({ type: 'square', f0: 74, f1: 28, dur: 0.45, vol: 0.16 });
+  });
+  AU.define('rush', () => {
+    S.noise({ dur: 2.4, vol: 0.2, f0: 260, f1: 820, q: 0.9, attack: 0.6 });
+    S.tone({ type: 'sine', f0: 38, f1: 50, dur: 2.2, vol: 0.14, attack: 0.6 });
+  });
+  AU.define('mine', () => { S.tone({ type: 'sine', f0: 160, f1: 60, dur: 0.22, vol: 0.2 }); S.noise({ dur: 0.18, vol: 0.18, type: 'lowpass', f0: 1400, f1: 200 }); });
+  AU.vary.rend = 1.5; AU.vary.mine = 2;
+
+  // the void torn out of something: black chunks and motes, a few sparks of blood
+  function voidBurst(x, y, power, up) {
+    const p = power || 1;
+    G.fx.burst(x, y, { n: Math.round(10 * p), color: VOIDC, speed: [80, 260 + 240 * p], angle: up ? -Math.PI / 2 : 0, spread: up ? 1.8 : G.TAU, life: [0.5, 1.1], size: [4, 10], grav: 600, drag: 1.2, wob: 30 });
+    G.fx.burst(x, y, { n: Math.round(7 * p), color: '14,4,8', speed: [150, 420 + 200 * p], angle: -Math.PI / 2, spread: 2.2, life: [0.5, 1], size: [3, 7], kind: 'chunk', grav: 1400 });
+    G.fx.burst(x, y, { n: Math.round(8 * p), color: BLOOD, speed: [160, 520], angle: up ? -Math.PI / 2 : 0, spread: up ? 2 : G.TAU, life: [0.15, 0.4], kind: 'spark', size: [1.4, 2.6], len: 0.05, a: 0.8 });
+  }
+
+  // Hydra: the crack the void head comes up through. It opens and glows while the real head's throat
+  // fills (the second head comes from under the floor, where nothing else would show it), the head
+  // tears up out of it, and it stays open until the head has sunk back in, then seals.
+  function voidCrack(x, tele) {
+    const lines = [];
+    for (let i = 0; i < 8; i++) {
+      let px = x + G.rand(-56, 56), py = FLOOR + 2, a = Math.PI / 2 + G.rand(-1.1, 1.1);
+      const pts = [px, py];
+      for (let k = 0; k < 4; k++) { a += G.rand(-0.6, 0.6); const L = G.rand(8, 17); px += Math.cos(a) * L; py = Math.min(FLOOR + 70, py + Math.abs(Math.sin(a)) * L + 1); pts.push(px, py); }
+      lines.push(pts);
+    }
+    const lip = [];
+    for (let u = -1; u <= 1.001; u += 0.125) lip.push(u, G.rand(-1, 1));
+    return H.add({
+      kind: 'voidcrack', x, tele, lines, lip, layer: 'under', shut: 0, closing: false,
+      update(dt) {
+        this.srcX = this.x;
+        const k = this.k();
+        if (Math.random() < dt * (6 + 26 * k)) G.fx.spawn({ x: this.x + G.rand(-50, 50) * k, y: level(0) - 2, vx: G.rand(-12, 12), vy: -G.rand(30, 90), life: G.rand(0.6, 1.2), size: G.rand(4, 8), color: VOIDC, wob: 30 });
+        if (Math.random() < dt * 10 * k) G.fx.spawn({ kind: 'spark', x: this.x + G.rand(-46, 46) * k, y: FLOOR - 1, vx: G.rand(-40, 40), vy: -G.rand(80, 260), life: G.rand(0.15, 0.35), size: G.rand(1.2, 2), color: BLOOD, len: 0.05 });
+        // (it seals once the head it let out has gone back down through it)
+        if (this.closing && !(this.holds && B.vh === this.holds)) { this.shut = Math.min(1, this.shut + dt * 2.2); if (this.shut >= 1) this.dead = true; }
+      },
+      // how far open: it eases open over the warning, and eases shut at the end
+      k() { return E.outCubic(Math.min(1, this.t / this.tele)) * (1 - E.inOutQuad(this.shut)); },
+      // the head tearing up through it
+      hits(P) { return this.t >= this.tele && this.t < this.tele + 0.22 && Math.abs(P.x - this.x) < 60 && P.y > FLOOR - 260; },
+      danger() { return this.t < this.tele + 0.22 ? [this.x, 78, this.tele - this.t] : null; },
+      draw(ctx) {
+        const k = this.k();
+        if (k < 0.01) return;
+        // it beats faster as the head comes
+        const beat = 0.8 + 0.2 * Math.sin(this.t * (8 + 22 * Math.min(1, this.t / this.tele)));
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.globalAlpha = 0.3 * k * beat; ctx.drawImage(G.fx.glow(BLOOD), this.x - 100 * k, FLOOR - 26, 200 * k, 52);
+        ctx.globalAlpha = 1;
+        // the fissures run down the face of the floor, growing as it opens
+        ctx.lineCap = 'round';
+        for (const pts of this.lines) {
+          const n = Math.max(2, Math.round(pts.length / 2 * k));
+          ctx.beginPath(); ctx.moveTo(pts[0], pts[1]);
+          for (let i = 1; i < n; i++) ctx.lineTo(pts[i * 2], pts[i * 2 + 1]);
+          ctx.strokeStyle = G.rgba(BLOOD, 0.5 * k * beat); ctx.lineWidth = 2.6; ctx.stroke();
+          ctx.strokeStyle = G.rgba(VHOT, 0.3 * k * beat); ctx.lineWidth = 0.9; ctx.stroke();
+        }
+        ctx.restore();
+        // the split itself: a black lens on the floor with lips of blood
+        const w = 66 * k, lv = Math.min(FLOOR, level(0));
+        ctx.fillStyle = VDARK;
+        ctx.beginPath();
+        for (let i = 0; i < this.lip.length; i += 2) { const u = this.lip[i], yy = FLOOR - 1 - (1 - u * u) * 5 * k + this.lip[i + 1]; if (i) ctx.lineTo(this.x + u * w, yy); else ctx.moveTo(this.x + u * w, yy); }
+        for (let i = this.lip.length - 2; i >= 0; i -= 2) { const u = this.lip[i]; ctx.lineTo(this.x + u * w, FLOOR + 1 + (1 - u * u) * 3 * k); }
+        ctx.closePath(); ctx.fill();
+        ctx.strokeStyle = G.rgba(BLOOD, 0.8 * k); ctx.lineWidth = 1.4; ctx.stroke();
+        if (lv < FLOOR - 2) { ctx.strokeStyle = G.rgba(BLOOD, 0.3 * k * beat); ctx.beginPath(); ctx.ellipse(this.x, lv, w * 1.1, 4, 0, 0, G.TAU); ctx.stroke(); }
+      },
+    });
+  }
+
+  // A bite of one of the hydra's heads: the ground it sweeps, from behind its head to where its jaws
+  // shut. The head itself is the warning; this only carries the reach, for the hit and for the
+  // scripted player. The script sets l, r, top, bot, and live while the head goes through.
+  function fang(src) {
+    return H.add({
+      kind: 'fang', x: src, srcX: src, l: src, r: src, top: FLOOR - 150, bot: FLOOR + 40, live: false, show: false, at: 1,
+      update() { this.x = (this.l + this.r) / 2; },
+      hits(P) { return this.live && P.x + 11 > this.l && P.x - 11 < this.r && P.y > this.top && P.y - 43 < this.bot; },
+      danger() { return this.show ? [this.x, (this.r - this.l) / 2 + 14, this.at - this.t] : null; },
+    });
+  }
+
+  // Undertow: a mine of the void riding the current in from the far wall. It surfaces as it is
+  // spawned, bobs, and goes off on whoever it meets; a cut bursts it. What reaches the jaws is swallowed.
+  function voidMine(x, y0, dir, speed, mawX) {
+    return H.add({
+      kind: 'voidmine', x, y: y0 + 30, y0, dir, speed, mawX, r: 14, grow: 0, spin: G.rand(0, 6), slashable: true, once: true,
+      update(dt) {
+        this.grow = Math.min(1, this.t / 0.4);
+        this.x += this.dir * this.speed * G.lerp(0.25, 1, this.grow) * dt;
+        // up out of the water, then riding it
+        this.y = G.lerp(this.y0 + 30, this.y0, E.outBack(this.grow)) + Math.sin(this.t * 5 + this.spin) * 4;
+        this.srcX = this.x - this.dir * 10;
+        this.spin += dt * 2.6 * this.dir;
+        if (Math.random() < dt * 24) G.fx.spawn({ x: this.x - this.dir * 14, y: level(0) - 2, vx: -this.dir * G.rand(20, 60), vy: -G.rand(10, 50), life: G.rand(0.3, 0.6), size: G.rand(3, 6), color: VOIDC });
+        if ((this.x - this.mawX) * this.dir > -60) {
+          // into the jaws
+          this.dead = true;
+          G.fx.burst(this.x, this.y, { n: 6, color: VOIDC, speed: [40, 140], life: [0.3, 0.6], size: [3, 6] });
+          G.audio.play('gulp', { vol: 0.5 }); B.body.gill = 1; // its gills flare as it swallows
+        }
+        if (this.x < WL - 40 || this.x > WR + 40) this.dead = true;
+      },
+      hits(P) { return this.grow > 0.6 && G.circleRect(this.x, this.y, this.r * 0.8, P.box()); },
+      pop() {
+        this.dead = true;
+        voidBurst(this.x, this.y, 0.7);
+        G.fx.ring(this.x, this.y, { r0: 6, r1: 46, life: 0.25, color: BLOOD, width: 3, alpha: 0.6 });
+        G.fx.ripple(this.x, this.y, 70, 0.25, 0.6);
+        G.audio.play('mine'); G.fx.shake(4);
+      },
+      slash() { this.pop(); },
+      draw(ctx) {
+        const r = this.r * Math.max(0.01, this.grow) * (1 + 0.05 * Math.sin(this.t * 11)), x = this.x, y = this.y;
+        // it drinks the light around it
+        let g = ctx.createRadialGradient(x, y, r * 0.5, x, y, r * 2.6);
+        g.addColorStop(0, 'rgba(6,0,4,0.55)'); g.addColorStop(1, 'rgba(6,0,4,0)');
+        ctx.fillStyle = g; ctx.fillRect(x - r * 2.6, y - r * 2.6, r * 5.2, r * 5.2);
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.globalAlpha = 0.3 + 0.15 * Math.sin(this.t * 7); ctx.drawImage(G.fx.glow(BLOOD), x - r * 1.9, y - r * 1.9, r * 3.8, r * 3.8);
+        ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
+        // spines, turning with it
+        ctx.fillStyle = '#0a0206';
+        ctx.beginPath();
+        for (let i = 0; i < 7; i++) {
+          const a = this.spin + i * G.TAU / 7, c = Math.cos(a), s = Math.sin(a);
+          ctx.moveTo(x + Math.cos(a - 0.22) * r * 0.85, y + Math.sin(a - 0.22) * r * 0.85);
+          ctx.lineTo(x + c * r * 1.55, y + s * r * 1.55);
+          ctx.lineTo(x + Math.cos(a + 0.22) * r * 0.85, y + Math.sin(a + 0.22) * r * 0.85);
+        }
+        ctx.fill();
+        ctx.fillStyle = '#070104'; ctx.beginPath(); ctx.arc(x, y, r, 0, G.TAU); ctx.fill();
+        // veins of blood, and a heart that beats
+        ctx.strokeStyle = G.rgba(BLOOD, 0.85); ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        for (let i = 0; i < 3; i++) {
+          const a = -this.spin * 0.7 + i * 2.1;
+          ctx.moveTo(x + Math.cos(a) * r * 0.2, y + Math.sin(a) * r * 0.2);
+          ctx.lineTo(x + Math.cos(a + 0.4) * r * 0.55, y + Math.sin(a + 0.4) * r * 0.55);
+          ctx.lineTo(x + Math.cos(a + 0.1) * r * 0.95, y + Math.sin(a + 0.1) * r * 0.95);
+        }
+        ctx.stroke();
+        g = ctx.createRadialGradient(x, y, 0, x, y, r * 0.45);
+        g.addColorStop(0, G.rgba(VHOT, 0.6 + 0.3 * Math.sin(this.t * 9))); g.addColorStop(1, G.rgba(BLOOD, 0));
+        ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r * 0.45, 0, G.TAU); ctx.fill();
+        // a projectile: its rim is the warning colour
+        ctx.strokeStyle = G.rgba(DANGER, 0.7); ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, y, r, 0, G.TAU); ctx.stroke();
+      },
+    });
+  }
+
+  // Undertow: the jaws shutting over the near side at the end. All the way to the top of the sky
+  // (the upper jaw comes down from above). Its warning is the head rearing with its jaws wide; this
+  // carries the reach, and tells the scripted player from the start which ground the jaws will take.
+  function mawClose(l, r) {
+    return H.add({
+      kind: 'mawclose', x: (l + r) / 2, l, r, live: false, at: 9, srcX: (l + r) / 2,
+      update() { },
+      hits(P) { return this.live && P.x + 11 > this.l && P.x - 11 < this.r; },
+      danger() { return this.at > this.t - 0.25 ? [this.x, (this.r - this.l) / 2 + 22, this.at - this.t] : null; },
+    });
+  }
+
+  // The hydra's second head: the Leviathan's own head, done in the void, on a neck that runs down
+  // into the crack. It moves like the real one: weights on springs, unless a script moves it by hand.
+  function voidHead(x, face) {
+    const y = FLOOR + 190;
+    return {
+      x, y, z: 0, tx: x, ty: y, px: x, py: y, vx: 0, vy: 0, ang: -Math.PI / 2, ta: aim(face, -0.6), va: 0,
+      direct: true, jaw: 0, jawT: 0, face, throat: 0, gill: 0, fin: 0, root: x, spine: [], gone: false, sinkV: 0,
+    };
+  }
+  function tickVoidHead(V, dt) {
+    if (V.gone) {
+      // let go of: it drops back down the crack
+      V.direct = true; V.sinkV += 1500 * dt; V.y += V.sinkV * dt; V.ta = -Math.PI / 2;
+      if (V.y > FLOOR + 200) { B.vh = null; return; }
+    }
+    if (V.direct) {
+      const idt = 1 / Math.max(dt, 1e-4);
+      V.vx = (V.x - V.px) * idt; V.vy = (V.y - V.py) * idt;
+    } else {
+      const w = 13, z = 0.62;
+      V.vx += ((V.tx - V.x) * w * w - 2 * z * w * V.vx) * dt;
+      V.vy += ((V.ty - V.y) * w * w - 2 * z * w * V.vy) * dt;
+      V.x += V.vx * dt; V.y += V.vy * dt;
+    }
+    V.px = V.x; V.py = V.y;
+    const wa = 13;
+    V.va += (G.angDiff(V.ang, V.ta) * wa * wa - 2 * 0.6 * wa * V.va) * dt;
+    V.ang = Math.atan2(Math.sin(V.ang + V.va * dt), Math.cos(V.ang + V.va * dt));
+    const c = Math.cos(V.ang), s = Math.sin(V.ang);
+    if (Math.abs(c) > 0.15) V.face = c > 0 ? 1 : -1;
+    V.jaw = G.damp(V.jaw, V.jawT, 16, dt);
+    V.gill = G.damp(V.gill, 0, 2, dt);
+    // its neck: up out of the crack, arching, to the back of its skull
+    const J = { x: V.x - c * 64, y: V.y - HH - s * 64, z: 0 }, L = 130;
+    sample(V.spine, { x: V.root, y: FLOOR + 230, z: 0 }, { x: V.root + (J.x - V.root) * 0.1, y: Math.min(FLOOR + 40, J.y + 60), z: 0 },
+      { x: J.x - c * L, y: J.y - s * L * 0.6, z: 0 }, J, 22, 96, 58, 7, 8);
+  }
+  function drawVoidHead(ctx) {
+    const V = B.vh;
+    if (!V || V.y > FLOOR + 185) return;
+    // a darkness around it that eats the light
+    const hx = V.x, hy = V.y - HH, g = ctx.createRadialGradient(hx, hy, 20, hx, hy, 190);
+    g.addColorStop(0, 'rgba(6,0,4,0.5)'); g.addColorStop(1, 'rgba(6,0,4,0)');
+    ctx.fillStyle = g; ctx.fillRect(hx - 190, hy - 190, 380, 380);
+    VOIDED = true;
+    drawChain(ctx, V.spine, false, { up: headUp(V) });
+    drawHead(ctx, V);
+    VOIDED = false;
+  }
+
+  // ------------------------------------------------------------------ moves that several attacks share
+  // under the water behind the shore
+  function* sinkAway(dur) {
+    const b = B.body, x0 = b.x, y0 = b.y, z0 = b.z, d = dur || 0.45;
+    b.direct = true; b.ta = aim(b.face, 1.2);
+    let e = 0;
+    while (e < d) {
+      e += yield;
+      const k = Math.min(1, e / d);
+      b.y = G.lerp(y0, B.sea.y + 160, E.inQuad(k)) - 60 * Math.sin(Math.PI * k);
+      b.z = G.lerp(z0, 0.45, k); b.x = x0;
+    }
+    splashAt(b.x, 0.45, 1); G.audio.play('splash', { vol: 0.6 });
+  }
+  // up out of the sea and down on the shore beside the hero, facing them
+  function* breach(x, face) {
+    const b = B.body;
+    b.direct = true; b.x = x - face * 60; b.y = B.sea.y + 150; b.z = 0.3; b.ang = b.ta = -Math.PI / 2;
+    splashAt(b.x, 0.3, 1.6); G.audio.play('splash');
+    yield* tween(b, { y: FLOOR - 250, z: 0.1 }, 0.34, E.outCubic);
+    b.ta = aim(face, 0.7);
+    yield* tween(b, { x, y: FLOOR, z: 0 }, 0.28, E.inQuad);
+    b.ta = aim(face, 0.06);
+    crash(x + face * 50, 1);
+  }
+
+  // ------------------------------------------------------------------ attacks
+  // Lunge: it comes up at a wall, rears, and strikes the length of the shore.
+  //   The tell is the rear. Low, snout to the ground and neck wound tight: it strikes along the floor.
+  //   Up tall, snout to the sky: it strikes at head height, over anyone who stays on the ground.
+  function* lunge(side, first, low) {
+    const b = B.body, T = K.T(), dir = -side;
+    const x0 = side > 0 ? WR - 120 : WL + 120, x1 = side > 0 ? WL + 130 : WR - 130;
+    if (first) {
+      yield* sinkAway(0.4);
+      b.x = x0 + side * 40; b.y = B.sea.y + 140; b.z = 0.42; b.ang = b.ta = -Math.PI / 2;
+      splashAt(b.x, 0.42, 1.4); G.audio.play('splash');
+    }
+    b.direct = false; b.fast = false;
+    target(x0, low ? FLOOR - 30 : FLOOR - 275, 0, aim(dir, low ? 0.55 : -0.62));
+    b.coil = low ? 1 : 0; b.jawT = low ? 0.15 : 0.3;
+    G.audio.play('hiss');
+    const rear = (first ? 0.9 : 0.62) * T;
+    let e = 0, glinted = false;
+    while (e < rear) {
+      const dt = yield;
+      e += dt;
+      b.tx = x0 + side * 34 * Math.min(1, e / rear); // it draws back into itself
+      if (Math.random() < dt * 14) { const m = mouth(b); G.fx.spawn({ kind: 'spark', x: m.x, y: m.y, vx: G.rand(-20, 20), vy: 40, life: 0.6, size: 1.6, color: WATER, grav: 1300, a: 0.6 }); }
+      if (!glinted && e >= rear - 0.22) { glinted = true; const m = mouth(b); G.fx.glint(m.x, m.y, 36, G.pal().hot, 0.3); G.audio.play('glint'); }
+    }
+    // the strike
+    b.coil = 0; b.direct = true; b.hurt = true; b.jawT = 0.95; b.ta = aim(dir, low ? 0.05 : 0.03);
+    G.audio.play('lunge'); G.fx.shake(9); G.fx.kick(dir * 7, 0); G.fx.punch(0.012);
+    G.fx.ripple(b.x, b.y - HH, 240, 0.32, 0.9);
+    const ys = low ? FLOOR : FLOOR - 92, xs = b.x, ys0 = b.y, dur = K.gentle() ? 0.86 : 0.74;
+    e = 0;
+    while (e < dur) {
+      const dt = yield;
+      e += dt;
+      const k = Math.min(1, e / dur);
+      b.x = G.lerp(xs, x1, (k - 0.25 * k * k) / 0.75);
+      b.y = G.lerp(ys0, ys, E.outCubic(Math.min(1, e / 0.16)));
+      b.z = 0;
+      // the water it throws up, or the air it tears
+      if (Math.random() < dt * 70) {
+        if (low || flooded()) G.fx.spawn({ kind: 'spark', x: b.x - dir * G.rand(20, 80), y: level(0) - 3, vx: -dir * G.rand(60, 260), vy: -G.rand(200, 520), life: G.rand(0.4, 0.7), size: G.rand(1.6, 3), color: WATER, grav: 1400, a: 0.6 });
+        G.fx.spawn({ kind: 'spark', x: b.x - dir * 60, y: b.y - HH + G.rand(-40, 40), vx: -dir * G.rand(500, 900), vy: G.rand(-30, 30), life: G.rand(0.1, 0.2), size: G.rand(1.4, 2.4), color: G.pal().hot, len: 0.06, drag: 3, a: 0.5 });
+      }
+    }
+    b.hurt = false; b.jawT = 0;
+    G.audio.play('bite');
+    if (!low) { b.ta = aim(dir, 0.18); yield* tween(b, { y: FLOOR }, 0.2, E.inQuad); }
+    crash(b.x + dir * 50, 1.15);
+    G.fx.impact(b.x + dir * 40, FLOOR - 40, 0.06); G.fx.lines(b.x + dir * 60, FLOOR - 40, 14, G.pal().hot);
+    b.ta = aim(dir, 0.04);
+  }
+  function* atkLunge() {
+    const b = B.body, P = G.player;
+    let side = P.x < 640 ? 1 : -1;
+    const twice = B.phase === 3 ? K.chance(0.7, 'twice') : B.phase === 2 && K.chance(0.4, 'twice');
+    yield* lunge(side, true, !K.chance(0.5, 'high'));
+    if (twice) { yield* wait(0.22); side = -side; yield* lunge(side, false, !K.chance(0.5, 'high')); }
+    b.exposed = true;
+    yield* wait(B.phase === 3 ? 0.95 : 1.15);
+    b.exposed = false;
+  }
+
+  // Snap: it glides in low over the shore and bites. A jaw that chatters while it draws back means a
+  // second bite follows.
+  function* atkSnap() {
+    const b = B.body, P = G.player, T = K.T();
+    const twice = K.chance(B.phase === 1 ? 0.3 : 0.45, 'twice');
+    let f = facePlayer();
+    yield* glide(G.clamp(P.x - f * 220, WL + 110, WR - 110), FLOOR - 16, 0, aim(f, 0.12), 0.8, true);
+    for (let i = 0; i < (twice ? 2 : 1); i++) {
+      f = facePlayer();
+      const tele = (i ? 0.46 : 0.62) * T, ff = f;
+      b.fast = false; b.chatter = twice && !i ? 1 : 0;
+      target(G.clamp(b.x - f * 40, WL + 100, WR - 100), FLOOR - 72, 0, aim(f, 0.45));
+      b.jawT = 0.75;
+      G.audio.play('hiss');
+      const m = (a) => (ff > 0 ? a : Math.PI - a);
+      H.arc({
+        x: b.x + f * 50, y: b.y - HH, r: 185, a0: m(-1.15), a1: m(1.05), tele, active: 0.12, owner: b,
+        follow(h) { if (!h.fired) { h.x = b.x + ff * 50; h.y = Math.max(b.y - HH, FLOOR - 120); } },
+        onFire() { b.chatter = 0; G.fx.shake(6); },
+      });
+      yield* wait(tele);
+      // the head shoots forward and the jaws shut
+      b.direct = true;
+      const x1 = G.clamp(b.x + f * 150, WL + 90, WR - 90);
+      yield* tween(b, { x: x1, y: FLOOR - 8 }, 0.11, E.outQuad);
+      b.jawT = 0; b.jaw = 0;
+      G.audio.play('bite');
+      const mo = mouth(b);
+      G.fx.lines(mo.x, mo.y, 10, G.pal().hot, { r0: 18 });
+      splash(mo.x, level(0) - 4, 0.5);
+      yield* wait(0.2);
+      target(b.x, FLOOR - 12, 0, aim(f, 0.1));
+    }
+    b.exposed = true;
+    yield* wait(0.6);
+    b.exposed = false;
+  }
+
+  // Slam: the head waits on the shore while the tail comes down out of the sky.
+  //   One slap of the tail on the water: one great blow (two health; from the second phase it throws
+  //   a wave each way). Three quick shakes: three lighter blows, each one after the hero.
+  function* atkSlam() {
+    const b = B.body, P = G.player, T = K.T(), tl = B.tail;
+    const triple = K.chance(B.phase === 1 ? 0.4 : 0.5, 'triple');
+    const f = facePlayer();
+    target(G.clamp(P.x - f * 330, WL + 110, WR - 110), FLOOR - 20, 0, aim(f, 0.1));
+    tl.on = true; tl.ex = G.clamp(P.x + f * 220, 180, 1100); tl.ez = 0.5;
+    tl.pose = 'under'; tl.tipX = tl.ex; tl.tipY = B.sea.y + 160; tl.tipZ = tl.ez; tl.c2x = tl.ex; tl.c2y = B.sea.y + 120; tl.c2z = tl.ez;
+    tl.pose = 'up'; tl.rate = 5;
+    splashAt(tl.ex, tl.ez, 1.2); G.audio.play('splash', { vol: 0.6 });
+    yield* wait(0.5);
+    if (triple) {
+      tl.shake = 1;
+      for (let i = 0; i < 3; i++) { yield* wait(0.16); splashAt(tl.ex + 40, tl.ez, 0.5); G.audio.play('splash', { vol: 0.35 }); }
+      tl.shake = 0;
+    } else {
+      tl.pose = 'slap'; tl.rate = 9;
+      yield* wait(0.32);
+      splashAt(tl.ex + 160, tl.ez, 2); G.audio.play('splash'); G.fx.shake(5);
+      yield* wait(0.15);
+    }
+    // up, off the top of the sky
+    tl.aimX = P.x; tl.pose = 'raised'; tl.rate = 6;
+    G.audio.play('whoosh');
+    yield* wait(0.4);
+    const n = triple ? 3 : 1;
+    for (let i = 0; i < n; i++) {
+      const tele = (triple ? (i ? 0.5 : 0.66) : 0.92) * T, w = triple ? 124 : 180;
+      tl.pose = 'raised'; tl.rate = 7;
+      const hz = tailfall(G.clamp(P.x + P.vx * 0.2, WL + 70, WR - 70), w, tele, triple ? 0.3 : 0.36, triple ? 1 : 2);
+      yield* wait(tele - 0.12);
+      // the fall: it gathers speed all the way down
+      tl.pose = 'hold';
+      const x = hz.x, y0 = Math.max(-460, tl.tipY);
+      tl.tipX = x; tl.tipZ = 0; tl.c2x = x + (tl.ex > x ? 40 : -40); tl.c2z = 0;
+      let e = 0;
+      while (e < 0.12) { e += yield; const k = Math.min(1, e / 0.12); tl.tipY = G.lerp(y0, FLOOR - 16, k * k); tl.c2y = G.lerp(-500, -700, k); }
+      // impact
+      crash(x, triple ? 1.1 : 1.7);
+      if (!triple) {
+        G.fx.impact(x, FLOOR - 60, 0.07); G.fx.punch(0.025); G.fx.lines(x, FLOOR - 50, 18, G.pal().hot, { r0: 40 });
+        if (B.phase >= 2) for (const d of [-1, 1]) H.shockwave(x + d * 60, d, 520, 46, { boss: '120,200,215', hot: '220,245,250' });
+      }
+      yield* wait(triple ? 0.16 : 0.42);
+      tl.pose = 'raised'; tl.rate = 8;
+      if (i < n - 1) yield* wait(0.12);
+    }
+    tl.pose = 'under'; tl.rate = 3;
+    yield* wait(0.5);
+  }
+
+  // Spouts: it dives, and the floor erupts.
+  //   It rolls sideways as it dives: the spouts come up in two rows, the second in the gaps of the first.
+  //   It rears straight up and sinks tail-first: the spouts come up under the hero, one after another.
+  function* atkSpouts() {
+    const b = B.body, P = G.player, T = K.T();
+    const chase = K.chance(B.phase === 1 ? 0.4 : 0.5, 'chase');
+    const dir = P.x < 640 ? 1 : -1; // the rows march away from the near wall
+    B.pullK = 0.35; // with its head down under the floor the current slackens
+    if (chase) {
+      yield* glide(b.x, FLOOR - 290, 0, -Math.PI / 2, 0.45);
+      b.direct = true;
+      const x0 = b.x, y0 = b.y;
+      let e = 0;
+      while (e < 0.6) { e += yield; const k = Math.min(1, e / 0.6); b.y = G.lerp(y0, B.sea.y + 200, E.inQuad(k)); b.z = G.lerp(0, 0.12, k); b.x = x0 + Math.sin(e * 30) * 4; }
+      splashAt(x0, 0.12, 1.5); G.audio.play('splash');
+      G.fx.ring(x0, FLOOR - 4, { r0: 20, r1: 130, life: 0.6, color: WATER, width: 4, alpha: 0.5 });
+      b.z = 0.5;
+    } else {
+      b.direct = true;
+      const x0 = b.x, y0 = b.y, xe = G.clamp(dir > 0 ? WL + 200 : WR - 200, WL, WR);
+      b.ta = aim(-dir, 1.3);
+      let e = 0;
+      while (e < 0.75) {
+        e += yield;
+        const k = Math.min(1, e / 0.75);
+        b.x = G.lerp(x0, xe, k); b.y = G.lerp(y0, B.sea.y + 170, E.inQuad(k)) - 150 * Math.sin(Math.PI * k); b.z = G.lerp(0, 0.4, k);
+      }
+      splashAt(xe, 0.4, 1.4); G.audio.play('splash');
+    }
+    yield* wait(0.2);
+    // it comes up out of the sea and down on the shore by the hero while the last of them are still
+    // coming up, and lies there open
+    let left;
+    if (chase) {
+      const n = 3 + B.phase + (K.hard() ? 1 : 0);
+      for (let i = 0; i < n; i++) {
+        spout(G.clamp(P.x + P.vx * 0.25, WL + 60, WR - 60), 112, 0.72 * T);
+        yield* wait(0.42);
+      }
+      left = 0.72 * T - 0.42 + 0.45;
+    } else {
+      const xs = [];
+      for (let x = WL + 150; x < WR - 40; x += 200) xs.push(x);
+      if (dir < 0) xs.reverse();
+      xs.forEach((x, i) => spout(x, 100, 0.85 * T + i * 0.09));
+      yield* wait(0.85 * T + (xs.length - 1) * 0.09);
+      const second = xs.map((x) => x + 100).filter((x) => x < WR - 50), tB = (0.95 + (flooded() ? 0.15 : 0)) * T;
+      second.forEach((x, i) => spout(x, 100, tB + i * 0.09));
+      yield* wait(0.3);
+      left = tB - 0.3 + second.length * 0.09 + 0.45;
+    }
+    const f = P.x < 640 ? -1 : 1;
+    yield* breach(G.clamp(P.x + f * 210, WL + 120, WR - 120), -f);
+    b.exposed = true;
+    yield* wait(Math.max(0.95, left - 0.62));
+    b.exposed = false;
+  }
+
+  // Volley: its answer to a hero who keeps away. It rears where it can see them and spits.
+  //   Three quick gulps: a fan of bubbles that drift after the hero. One long swell of the throat: a
+  //   brine bomb lobbed onto them, which bursts into droplets.
+  function* atkVolley() {
+    const b = B.body, P = G.player, T = K.T();
+    const big = K.chance(0.35, 'big');
+    const f = facePlayer();
+    yield* glide(G.clamp(P.x - f * 400, WL + 120, WR - 120), FLOOR - 205, 0, aim(f, -0.25), 0.8);
+    if (big) {
+      b.throatT = 1; G.audio.play('gulp');
+      yield* wait(0.75 * T);
+    } else {
+      for (let i = 0; i < 3; i++) {
+        b.throat = 0.8; G.audio.play('gulp'); b.vy -= 160;
+        yield* wait(0.22 * T);
+      }
+    }
+    const ff = facePlayer();
+    b.ta = Math.atan2(P.y - 30 - (b.y - HH), P.x - b.x);
+    if (Math.cos(b.ta) * ff < 0.3) b.ta = aim(ff, 0.2);
+    yield* wait(0.08);
+    const mo = mouth(b);
+    b.jawT = 0.9; b.throatT = 0; b.throat = 0;
+    G.fx.kick(-ff * 4, 0); G.audio.play('bubble');
+    if (big) {
+      const tf = 0.95, g = 1100, dx = P.x - mo.x, dy = (FLOOR - 24) - mo.y;
+      const ob = H.orb(mo.x, mo.y, dx / tf, (dy - 0.5 * g * tf * tf) / tf, {
+        r: 24, grav: g, life: 5,
+        onPop(o) {
+          G.audio.play('splash'); splash(o.x, Math.min(o.y, FLOOR - 6), 1);
+          for (const vx of [-380, -240, -110, 110, 240, 380]) {
+            const d = H.orb(o.x, Math.min(o.y, FLOOR - 20), vx, -G.rrand(380, 520), { r: 9, grav: 1300, life: 3 });
+            d.draw = drawBubble;
+          }
+        },
+      });
+      ob.draw = drawBomb;
+    } else {
+      const n = 2 + B.phase + (K.hard() ? 1 : 0), base = Math.atan2(P.y - 26 - mo.y, P.x - mo.x);
+      for (let i = 0; i < n; i++) {
+        const a = base + (i - (n - 1) / 2) * 0.22, sp = 300;
+        const ob = H.orb(mo.x, mo.y, Math.cos(a) * sp, Math.sin(a) * sp, {
+          r: 15, life: 4.5,
+          steer(o, dt) {
+            if (o.t < 0.25 || o.t > 1.4) return;
+            const want = Math.atan2(P.y - 24 - o.y, P.x - o.x), cur = Math.atan2(o.vy, o.vx), v = Math.hypot(o.vx, o.vy);
+            const d = G.clamp(G.angDiff(cur, want), -1.3 * dt, 1.3 * dt);
+            o.vx = Math.cos(cur + d) * v; o.vy = Math.sin(cur + d) * v;
+          },
+        });
+        ob.draw = drawBubble;
+        G.audio.play('bubble');
+        yield* wait(0.1);
+      }
+    }
+    yield* wait(0.25);
+    b.jawT = 0;
+    yield* wait(0.55);
+  }
+
+  // Sweep (from the second phase): a loop of its body rolls the length of the floor while its head
+  // waits at the wall it started from. Spines up and rattling: the coil comes back.
+  function* atkSweep() {
+    const b = B.body, P = G.player, T = K.T();
+    const back = K.chance(B.phase === 3 ? 0.55 : 0.4, 'back');
+    const s = P.x < 640 ? 1 : -1, hx = s > 0 ? WR - 140 : WL + 140;
+    yield* glide(hx, FLOOR - 40, 0, aim(-s, 0.2), 0.9);
+    b.fin = back ? 1 : 0;
+    G.audio.play(back ? 'hiss' : 'gulp');
+    target(hx + s * 20, FLOOR - 80, 0, aim(-s, 0.4));
+    yield* wait(0.75 * T);
+    splash(hx - s * 130, level(0) - 4, 1.2); G.audio.play('splash');
+    const hp = hump(hx - s * 130, -s, B.phase === 3 ? 440 : 420, back);
+    target(hx, FLOOR - 30, 0, aim(-s, 0.15));
+    while (!hp.dead) yield;
+    b.fin = 0;
+    yield* wait(0.3);
+  }
+
+  // Maw (third phase): it goes down into the eye of the maelstrom and comes up out of it jaws first,
+  // past the top of the sky. Its fin circles the eye before it does: once round, it comes up once;
+  // twice round, it comes up a second time, under the hero.
+  function* atkMaw() {
+    const b = B.body, P = G.player, T = K.T(), V = B.vortex;
+    const twice = K.chance(0.45, 'twice');
+    // up and over into the eye
+    b.direct = true;
+    const x0 = b.x, y0 = b.y;
+    b.ta = aim(V.x >= b.x ? 1 : -1, 1.3);
+    let e = 0;
+    while (e < 0.55) { e += yield; const k = Math.min(1, e / 0.55); b.x = G.lerp(x0, V.x, k); b.y = G.lerp(y0, FLOOR + 160, k * k) - 200 * Math.sin(Math.PI * k); }
+    splash(V.x, level(0) - 4, 1.3); G.audio.play('splash');
+    b.z = 0.3;
+    const laps = twice ? 2 : 1;
+    B.finCircle = { a: Math.PI * 0.5, laps };
+    e = 0;
+    while (e < laps * 0.7) { const dt = yield; e += dt; B.finCircle.a += dt * G.TAU / 0.7; }
+    B.finCircle = null;
+    let x = V.x;
+    for (let i = 0; i < laps; i++) {
+      const tele = (i ? 0.72 : 0.86) * T;
+      const m = maw(x, i ? 96 : 110, tele, i > 0);
+      G.audio.play('charge', { dur: tele });
+      yield* wait(tele);
+      x = m.x;
+      // jaws first, out of the eye and past the top of the sky
+      b.direct = true; b.x = x; b.y = FLOOR + 170; b.z = 0; b.ang = b.ta = -Math.PI / 2; b.jawT = 1; b.jaw = 1;
+      G.fx.impact(x, FLOOR - 220, 0.07); G.fx.punch(0.03); G.fx.shake(16);
+      G.fx.lines(x, FLOOR - 140, 20, G.pal().hot, { r0: 60, speed: [900, 1600] });
+      G.audio.play('seaRoar'); G.audio.play('lunge');
+      splash(x, level(0) - 4, 2.2);
+      yield* tween(b, { y: FLOOR - 470 }, 0.22, E.outQuad);
+      b.jawT = 0; G.audio.play('bite');
+      yield* wait(0.24);
+      if (i < laps - 1) {
+        yield* tween(b, { y: FLOOR + 170 }, 0.28, E.inQuad);
+        splash(x, level(0) - 4, 1.2); G.audio.play('splash');
+        x = G.clamp(P.x, WL + 100, WR - 100);
+      }
+    }
+    // it falls across the shore beside the eye and lies stunned
+    const f = P.x >= x ? 1 : -1, lx = G.clamp(x + f * 150, WL + 120, WR - 120);
+    b.ta = aim(f, 0.4);
+    yield* tween(b, { x: lx, y: FLOOR }, 0.34, E.inQuad);
+    b.ta = aim(f, 0.04);
+    crash(lx, 1.4);
+    b.exposed = true;
+    yield* wait(1.15);
+    b.exposed = false;
+    // the eye wanders, and the pull with it
+    V.tx = G.rpick([430, 640, 850].filter((v) => Math.abs(v - V.x) > 60));
+  }
+
+  // ------------------------------------------------------------------ corrupted: its own two attacks
+  // the ground a bite sweeps: from a little behind the head to where its jaws shut, at the height it strikes
+  function aimFang(f, base, tip, dir, yb) {
+    f.l = Math.min(base - dir * 40, tip); f.r = Math.max(base - dir * 40, tip);
+    f.top = yb - 150; f.bot = yb + 40; f.srcX = base;
+  }
+  // A head bites: down and through, so that its jaws shut on the tip; it lies there a moment after.
+  function* lungeBite(h, tip, yb, f, dir, d) {
+    const hx = G.clamp(tip - dir * 100, WL + 60, WR - 60), x0 = h.x, y0 = h.y;
+    h.direct = true; h.jawT = 1.1; h.ta = aim(dir, 0.12);
+    f.live = true;
+    G.audio.play('lunge');
+    let e = 0;
+    while (e < d) {
+      const dt = yield;
+      e += dt;
+      const k = Math.min(1, e / d);
+      // (the same shot forward as its snap: all speed at once, slowing into the bite)
+      h.x = G.lerp(x0, hx, E.outQuad(k)); h.y = G.lerp(y0, yb, E.outCubic(k));
+      if (Math.random() < dt * 70) G.fx.spawn({ kind: 'spark', x: h.x - dir * 70, y: h.y - HH + G.rand(-34, 34), vx: -dir * G.rand(400, 800), vy: G.rand(-20, 20), life: G.rand(0.1, 0.2), size: G.rand(1.4, 2.4), color: BLOOD, len: 0.06, drag: 3, a: 0.5 });
+    }
+    h.jawT = 0;
+    G.audio.play('bite'); G.fx.shake(6); G.fx.kick(dir * 4, 0);
+    const m = mouth(h);
+    G.fx.lines(m.x, m.y, 10, VHOT, { r0: 18 });
+    if (yb > FLOOR - 30) voidBurst(m.x, level(0) - 4, 0.5, true);
+    yield* wait(0.06);
+    f.live = false; f.dead = true;
+  }
+
+  // Hydra (corrupted, every phase): a second head, of the void, tears up out of the floor on the far
+  // side of the hero, and the two bite in turn from either side: the real head, then the void head
+  // a beat behind it, its jaws always shutting a little short of where the real head's did. So each
+  // bite sends the hero back the other way, into the ground the last bite has just left. Last, both
+  // at once, closing on either side of the hero and stopping a stride apart: the gap between them is
+  // the one safe place. Then the void head sinks back, and the real one lies open where it bit.
+  //   The tell: it rears on the near side, its throat swells black and its eyes go dark, and the
+  //   floor splits crimson where the second head will come up.
+  function* atkHydra() {
+    const b = B.body, P = G.player, T = K.T();
+    const s = P.x < 640 ? 1 : -1; // the void head comes up on the roomier side
+    const root = G.clamp(P.x + s * 330, WL + 120, WR - 120);
+    const pairs = B.phase === 1 ? 2 : 3, beat = (B.phase === 3 ? 0.47 : 0.53) * T, REACH = 360;
+    // the real head keeps to the hero's other side from the void head, wherever the hero goes
+    // (and never so near the void head that its reach would run past it)
+    const flank = () => {
+      const sd = G.sign(P.x - root) || -s;
+      return G.clamp(root + sd * Math.max(420, (P.x + sd * 290 - root) * sd), WL + 110, WR - 110);
+    };
+    const faceOf = (x) => G.sign(P.x - x) || s;
+    B.pullK = 0; // (in the maelstrom: the void holds the floor still, so the gap at the end can be stood in)
+    // round to the near side of the hero, and up
+    yield* glide(flank(), FLOOR - 150, 0, aim(s, -0.35), 0.6, true);
+    b.fast = false;
+    b.voidEyeT = 1; b.voidThroat = 1; b.throatT = 1; b.gill = 1; b.jawT = 0.25;
+    G.audio.play('gulp'); G.audio.play('abyss');
+    const crack = voidCrack(root, 0.95 * T);
+    target(b.x - s * 18, FLOOR - 172, 0, aim(s, -0.5)); // it draws itself up as its throat fills
+    yield* wait(0.95 * T);
+    // the second head tears up out of the floor
+    const V = B.vh = voidHead(root, -s);
+    b.throatT = 0; b.jawT = 0.7;
+    G.audio.play('rend'); G.audio.play('seaRoar');
+    G.fx.shake(14); G.fx.kick(0, -4); G.fx.punch(0.02);
+    voidBurst(root, FLOOR - 4, 1.6, true);
+    G.fx.ring(root, FLOOR - 4, { r0: 20, r1: 150, life: 0.5, color: BLOOD, width: 4, alpha: 0.5 });
+    G.fx.ripple(root, FLOOR - 120, 220, 0.4, 0.9);
+    V.jawT = 1;
+    yield* tween(V, { y: FLOOR - 205 }, 0.32, E.outCubic);
+    // it overshoots, and settles facing the hero
+    V.direct = false; V.tx = root; V.ty = FLOOR - 150; V.ta = aim(-s, -0.3); V.jawT = 0.15;
+    b.jawT = 0;
+    yield* wait(0.32);
+
+    let tipA = 0, tipB = 0, yb = FLOOR - 8;
+    for (let i = 0; i < pairs; i++) {
+      // the real head comes round again to flank the hero
+      if (i) { target(flank(), FLOOR - 150, 0, aim(faceOf(flank()), -0.3)); b.fast = true; yield* wait(0.26); b.fast = false; }
+      // drawn back and up, the jaws wide. Its reach is its own, not the hero's: from where it rears
+      // it strikes a fixed length, a step past where the hero stood when it came round. Its height
+      // follows the hero until the last moment (onto the wreckage too).
+      const base = b.x, tele = (i ? 0.52 : 0.72) * T, fa = fang(base);
+      let dirA = faceOf(base), lockY = P.y;
+      b.jawT = 0.9; G.audio.play('hiss');
+      let e = 0, glinted = false;
+      while (e < tele) {
+        const dt = yield;
+        e += dt;
+        if (e < tele - 0.24) { dirA = faceOf(base); lockY = P.y; }
+        target(base - dirA * 30, FLOOR - 185, 0, aim(dirA, -0.55));
+        tipA = base + dirA * REACH;
+        if ((V.root - base) * dirA > 0) tipA = base + dirA * Math.min(REACH, Math.max(120, Math.abs(V.root - base) - 60));
+        tipA = G.clamp(tipA, WL + 16, WR - 16);
+        yb = G.clamp(lockY + 10, FLOOR - 220, FLOOR - 8);
+        aimFang(fa, base, tipA, dirA, yb); fa.show = true; fa.at = fa.t + tele - e;
+        if (!glinted && e >= tele - 0.2) { glinted = true; const m = mouth(b); G.fx.glint(m.x, m.y, 34, VHOT, 0.28); G.audio.play('glint'); }
+        // the void head watches, swaying
+        V.ta = aim(faceOf(V.root), -0.3 + 0.08 * Math.sin(B.t * 3));
+      }
+      yield* lungeBite(b, tipA, yb, fa, dirA, 0.14);
+      // the echo: its jaws shut a little short of where the real head's did, from the other side
+      let dirB = G.sign(tipA - dirA * 60 - V.root) || -dirA;
+      tipB = tipA - dirA * 60;
+      if (dirB === dirA) { dirB = faceOf(V.root); tipB = V.root + dirB * REACH; } // (the hero is behind it: it turns and bites its own length)
+      tipB = G.clamp(V.root + dirB * Math.min(Math.abs(tipB - V.root), 620), WL + 16, WR - 16);
+      yield* G.seq.par(settleBack(b, base, 0.12), echo(V, tipB, dirB, yb, beat));
+    }
+
+    // last: both together, closing on either side of the hero and stopping a stride apart
+    target(flank(), FLOOR - 150, 0, aim(faceOf(flank()), -0.3)); b.fast = true; yield* wait(0.28); b.fast = false;
+    const baseA = b.x, dA = G.sign(V.root - baseA) || s, tele = 0.8 * T, GAP = 56;
+    const lo = Math.min(baseA, V.root) + 130, hi = Math.max(baseA, V.root) - 130;
+    const fa = fang(baseA), fb = fang(V.root);
+    // the gap: halfway between the two heads, the one place neither reaches
+    const g = lo < hi ? G.clamp((baseA + V.root) / 2, lo, hi) : (baseA + V.root) / 2;
+    let e = 0, glinted = false;
+    b.jawT = 1; V.jawT = 1; G.audio.play('hiss'); G.audio.play('abyss');
+    while (e < tele) {
+      const dt = yield;
+      e += dt;
+      target(baseA - dA * 30, FLOOR - 195, 0, aim(dA, -0.6));
+      V.direct = false; V.tx = V.root + dA * 30; V.ty = FLOOR - 195; V.ta = aim(-dA, -0.6);
+      aimFang(fa, baseA, g - dA * GAP, dA, FLOOR - 8); aimFang(fb, V.root, g + dA * GAP, -dA, FLOOR - 8);
+      fa.show = fb.show = true; fa.at = fa.t + tele - e; fb.at = fb.t + tele - e;
+      if (!glinted && e >= tele - 0.2) {
+        glinted = true; G.audio.play('glint');
+        for (const h of [b, V]) { const m = mouth(h); G.fx.glint(m.x, m.y, 36, VHOT, 0.28); }
+      }
+    }
+    yield* G.seq.par(lungeBite(b, g - dA * GAP, FLOOR - 8, fa, dA, 0.16), lungeBite(V, g + dA * GAP, FLOOR - 8, fb, -dA, 0.16));
+    // the two pairs of jaws shut a stride apart, and the shock of it runs out between them
+    G.fx.impact(g, FLOOR - 50, 0.07); G.fx.punch(0.025); G.fx.shake(16);
+    G.fx.lines(g, FLOOR - 50, 16, VHOT, { r0: 44 });
+    G.fx.ripple(g, FLOOR - 50, 260, 0.4, 1);
+    voidBurst(g, FLOOR - 20, 1.1, true);
+    G.audio.play('slam');
+    yield* wait(0.3);
+    // the real head slumps where it bit, open; the void head lets go and sinks back down the crack
+    b.direct = false; b.voidEyeT = 0;
+    target(b.x, FLOOR - 10, 0, aim(dA, 0.05));
+    b.exposed = true;
+    V.direct = false; V.tx = V.root; V.ty = FLOOR - 120; V.ta = -Math.PI / 2; V.jawT = 0.35;
+    yield* wait(0.24);
+    V.direct = true;
+    yield* tween(V, { y: FLOOR + 200 }, 0.45, E.inQuad);
+    voidBurst(V.root, FLOOR - 4, 0.8, true); G.audio.play('splash', { vol: 0.5 });
+    B.vh = null; crack.closing = true;
+    yield* wait(B.phase === 3 ? 0.2 : 0.35);
+    b.exposed = false; b.voidThroat = 0;
+  }
+  // after a bite: it lies there a moment, then draws back on its neck to where it struck from
+  function* settleBack(h, base, hold) {
+    yield* wait(hold);
+    h.direct = false;
+    target(base, FLOOR - 150, 0, aim(G.sign(G.player.x - base) || h.face, -0.3));
+    yield* wait(0.3);
+  }
+  // the void head answers the real head's bite: drawn back, a glint, and through
+  function* echo(V, tip, dir, yb, beat) {
+    const f = fang(V.root);
+    aimFang(f, V.root, tip, dir, yb); f.show = true; f.at = f.t + beat;
+    V.direct = false; V.tx = V.root - dir * 30; V.ty = FLOOR - 185; V.ta = aim(dir, -0.55); V.jawT = 0.9;
+    G.audio.play('hiss');
+    yield* wait(Math.max(0, beat - 0.2));
+    const m = mouth(V);
+    G.fx.glint(m.x, m.y, 34, VHOT, 0.28);
+    yield* wait(Math.min(beat, 0.2));
+    yield* lungeBite(V, tip, yb, f, dir, 0.14);
+    yield* wait(0.12);
+    V.direct = false; V.tx = V.root; V.ty = FLOOR - 150; V.ta = aim(G.sign(G.player.x - V.root) || -dir, -0.3); V.jawT = 0.15;
+    yield* wait(0.3);
+  }
+
+  // Undertow (corrupted, from the second phase): it goes to the wall further from the hero, lays its
+  // head flat to the water and unhinges its jaw, and drinks. The floor floods black and runs towards
+  // it, dragging the hero in (in the air and on the wreckage too, only a little less), and void mines
+  // ride the current in from the far wall. Whoever is dragged to its lip is bitten. Last, it rears out
+  // of the water with its jaws wide to the sky and shuts them over the near side, top to bottom.
+  //   The answer: walk against the current, cut or jump the mines, be well clear when the jaws close.
+  //   The tell: the head down flat at the wall, the jaw hanging wide, the gills pumping.
+  function* atkUndertow() {
+    const b = B.body, P = G.player, T = K.T();
+    const side = P.x < 640 ? 1 : -1;
+    const wall = side > 0 ? WR : WL, mx = wall - side * 130, dir = -side;
+    // (the pull is beaten by walking, even by Lune with her bow drawn, which slows her; high water's
+    // drag on the legs takes a third off both the pull and the walk)
+    const reach = 410, PULL = B.phase === 2 ? 170 : 160;
+    // to the wall, then down flat to the water with the jaw unhinged
+    yield* glide(mx, FLOOR - 110, 0, aim(dir, -0.2), 0.7);
+    B.pullK = 0; // (the maelstrom's own current gives way to this one)
+    target(mx + side * 16, FLOOR - 2, 0, aim(dir, 0.3)); b.jawT = 1.25; b.gill = 1;
+    G.audio.play('drain'); G.audio.play('gulp');
+    const U = B.under = { side, mx, k: 0, to: 1, pull: 0, flow: 0, PULL };
+    const close = mawClose(side > 0 ? mx - reach : WL - 20, side > 0 ? WR + 20 : mx + reach);
+    yield* wait(0.75 * T);
+    G.audio.play('rush');
+    const dur = B.phase === 3 ? 4.4 : 4.0, n = B.phase === 3 ? 7 : 5, tele = 0.7 * T;
+    close.at = close.t + dur + tele + 0.17;
+    const farX = side > 0 ? WL + 30 : WR - 30, lip = mx + dir * 70;
+    let e = 0, next = 0.35, made = 0, gnash = 0;
+    while (e < dur) {
+      const dt = yield;
+      e += dt;
+      U.pull = PULL * E.inOutQuad(Math.min(1, e / 0.8));
+      // the gills pump as it drinks, and the head throbs with it
+      b.gill = Math.max(b.gill, 0.55 + 0.45 * Math.sin(e * 8));
+      b.ty = FLOOR - 2 + Math.sin(e * 8) * 3;
+      next -= dt;
+      if (made < n && next <= 0) {
+        made++; next = (dur - 1.6) / n;
+        voidMine(farX, level(0) - (made % 3 === 0 ? 46 : 14), side, 240, mx); // every third rides a swell, at chest height
+        G.audio.play('bubble');
+      }
+      // dragged to its lip: the jaws snap on them, and open again
+      gnash -= dt;
+      if (gnash <= 0 && Math.abs(P.x - lip) < 80 && P.y > FLOOR - 150) {
+        gnash = 0.8; b.jawT = 0.05;
+        K.crush(lip, FLOOR - 40, 70, 50, 1);
+        G.audio.play('bite'); G.fx.shake(5);
+      }
+      if (gnash < 0.55) b.jawT = 1.25;
+    }
+    // it rears up out of the water, jaws wide to the sky (the current still running)
+    b.jawT = 1.35; G.audio.play('seaRoar');
+    target(mx + side * 30, FLOOR - 285, 0, aim(dir, -1.05));
+    e = 0;
+    let glinted = false;
+    while (e < tele) {
+      const dt = yield;
+      e += dt;
+      if (!glinted && e >= tele - 0.2) { glinted = true; const m = mouth(b); G.fx.glint(m.x, m.y, 40, VHOT, 0.3); G.audio.play('glint'); }
+    }
+    // and shuts them over the near side
+    const hx = mx + dir * (reach - 105), x0 = b.x, y0 = b.y;
+    b.direct = true; b.ta = aim(dir, 0.15); close.live = true;
+    G.audio.play('lunge');
+    e = 0;
+    while (e < 0.17) { e += yield; const k = Math.min(1, e / 0.17); b.x = G.lerp(x0, hx, E.inQuad(k)); b.y = G.lerp(y0, FLOOR - 8, E.inQuad(k)); }
+    b.jawT = 0;
+    G.audio.play('bite');
+    crash(hx + dir * 60, 1.5);
+    voidBurst(hx + dir * 80, FLOOR - 10, 1.4, true);
+    G.fx.impact(hx + dir * 70, FLOOR - 50, 0.07); G.fx.punch(0.03);
+    G.fx.lines(hx + dir * 80, FLOOR - 50, 16, VHOT, { r0: 40 });
+    for (const h of H.list) if (h.kind === 'voidmine' && !h.dead) h.pop(); // the crash bursts what is left on the water
+    U.to = 0;
+    yield* wait(0.06);
+    close.live = false; close.dead = true;
+    b.exposed = true;
+    yield* wait(B.phase === 3 ? 0.9 : 1.05);
+    b.exposed = false;
+  }
+
+  // Back to rest: each move ends its own way. Off the shore it lifts its head and shakes the water
+  // from it; after the tail it lets it sink and settles; after spitting, water runs from its jaws.
+  B.recover = function* (name) {
+    const b = B.body;
+    if (B.dying || b.beached) return;
+    b.direct = false; b.hurt = false; b.fast = false;
+    if (name === 'lunge' || name === 'spouts' || name === 'maw' || name === 'snap' || name === 'hydra' || name === 'undertow') {
+      b.ty = FLOOR - 64; b.tz = 0; b.tx = b.x;
+      yield* wait(0.12);
+      b.va += b.face * 10; splash(b.x, level(0) - 6, 0.5); G.audio.play('splash', { vol: 0.4 });
+      yield* wait(0.16);
+      b.va -= b.face * 13;
+      for (let i = 0; i < 8; i++) G.fx.spawn({ kind: 'spark', x: b.x + G.rand(-60, 60), y: b.y - HH + G.rand(-20, 20), vx: G.rand(-220, 220), vy: -G.rand(60, 260), life: G.rand(0.4, 0.7), size: G.rand(1.4, 2.4), color: WATER, grav: 1300, a: 0.6 });
+      yield* wait(0.18);
+    } else if (name === 'slam' || name === 'sweep') {
+      B.tail.pose = 'under'; B.tail.rate = 3;
+      b.ty = FLOOR - 26;
+      yield* wait(0.32);
+    } else if (name === 'volley') {
+      b.jawT = 0.35; b.ty = FLOOR - 60;
+      for (let i = 0; i < 6; i++) { const m = mouth(b); G.fx.spawn({ kind: 'spark', x: m.x, y: m.y, vx: G.rand(-30, 30), vy: G.rand(20, 80), life: 0.7, size: 1.8, color: WATER, grav: 1200, a: 0.6 }); }
+      yield* wait(0.3);
+      b.jawT = 0;
+    } else yield* wait(0.2);
+    // a breath: the gills flare once
+    b.gill = 1; G.audio.play('hiss');
+    yield* wait(0.12);
+  };
+
+  B.ATTACKS = { lunge: atkLunge, snap: atkSnap, slam: atkSlam, spouts: atkSpouts, volley: atkVolley, sweep: atkSweep, maw: atkMaw, hydra: atkHydra, undertow: atkUndertow };
+  // its corrupted self's own two (corrupt.js): the hydra in every phase, the undertow from the second
+  B.corruptBags = { 1: ['hydra'], 2: ['hydra', 'undertow'], 3: ['hydra', 'undertow'] };
+
+  // ------------------------------------------------------------------ stagger and topple: beached
+  B.staggerWord = 'BEACHED';
+  B.staggerMult = 1.5;
+  B.staggerDur = 1.0;
+  B.onStagger = function () {
+    const b = B.body;
+    b.hurt = false; b.coil = 0; b.chatter = 0; b.fin = 0; b.throatT = 0; b.direct = true;
+    B.tail.pose = 'under'; B.tail.rate = 3; B.finCircle = null;
+  };
+  B.dying0 = function () { B.body.beached = true; };
+  // thrown up and down onto the shore, where it lies on its side, gasping
+  B.staggerIn = function* () {
+    const b = B.body, away = G.sign(b.x - G.player.x) || -b.face, f = -away;
+    const x0 = b.x, y0 = Math.min(b.y, FLOOR), z0 = b.z, x1 = G.clamp(x0 + away * 70, WL + 130, WR - 130);
+    b.direct = true; b.ta = aim(f, -1.0); b.jawT = 0.8;
+    G.audio.play('seaRoar');
+    let e = 0;
+    const d = 0.5;
+    while (e < d) {
+      const dt = yield;
+      e += dt;
+      const k = Math.min(1, e / d);
+      b.x = G.lerp(x0, x1, k); b.y = G.lerp(y0, FLOOR, k * k) - 170 * Math.sin(Math.PI * k); b.z = G.lerp(z0, 0, Math.min(1, k * 2));
+      if (k > 0.5) b.ta = aim(f, 0.04);
+    }
+    b.x = x1; b.y = FLOOR; b.z = 0; b.beached = true; b.ang = b.ta = aim(f, 0.04);
+    crash(b.x, 1.7);
+    G.fx.impact(b.x, FLOOR - 40, 0.07); G.fx.punch(0.022);
+    G.fx.lines(b.x, FLOOR - 40, 16, G.pal().hot, { r0: 50 });
+    for (const dd of [-1, 1]) splash(b.x + dd * 120, level(0) - 4, 0.8, dd);
+    // it bounces once, and lies still
+    yield* tween(b, { y: FLOOR - 28 }, 0.13, E.outQuad);
+    yield* tween(b, { y: FLOOR }, 0.15, E.inQuad);
+    G.fx.thud(b.x, FLOOR, 0.6, { noCrack: true }); G.audio.play('stomp');
+  };
+  // it thrashes, and drags itself back into the water
+  B.staggerOut = function* () {
+    const b = B.body;
+    for (let i = 0; i < 2; i++) {
+      b.va += (i ? -1 : 1) * 16;
+      splash(b.x + (i ? -1 : 1) * 60, level(0) - 4, 1);
+      G.audio.play('splash'); G.fx.shake(7);
+      yield* wait(0.22);
+    }
+    b.beached = false; b.jawT = 0;
+    target(b.x, FLOOR - 50, 0, aim(b.face, 0.1));
+    yield* wait(0.3);
+  };
+  B.onRecover = function () { B.body.beached = false; };
+
+  // ------------------------------------------------------------------ scenes
+  // The sea goes still, a shadow passes under it, and it breaches in a wall of water.
+  B.enter = function* () {
+    const b = B.body;
+    b.direct = true; b.x = 760; b.y = B.sea.y + 300; b.z = 0.5; b.ang = b.ta = -Math.PI / 2 + 0.15;
+    B.calm = 1;
+    yield* wait(0.5);
+    G.audio.play('drain');
+    B.shadow = { x: -200, z: 0.5 };
+    yield* tween(B.shadow, { x: 1500 }, 1.7, E.inOutQuad);
+    B.shadow = null;
+    yield* wait(0.25);
+    // the breach
+    b.x = 760; b.z = 0.42; b.y = B.sea.y + 150;
+    B.wall = { x: 760, z: 0.42, t: 0 };
+    G.audio.play('splash'); G.audio.play('lunge');
+    G.fx.shake(16); G.fx.ripple(proj(760, B.sea.y, 0.42).x, proj(760, B.sea.y, 0.42).y, 420, 0.6, 1.3);
+    for (let i = 0; i < 3; i++) splashAt(760 + (i - 1) * 90, 0.42, 2.2);
+    yield* tween(b, { y: FLOOR - 400 }, 0.6, E.outCubic);
+    yield* wait(0.35);
+    // and it comes in over the shore
+    b.ta = aim(-1, 0.25);
+    yield* tween(b, { z: 0, x: 880, y: FLOOR - 190 }, 0.8, E.inOutCubic);
+    b.jawT = 1;
+    G.audio.play('seaRoar'); G.fx.shake(12); G.fx.ripple(b.x - 60, b.y - HH, 460, 0.6, 1.2);
+    yield* wait(0.55);
+    b.jawT = 0; B.calm = 0; B.wall = null;
+    target(880, FLOOR - 16, 0, aim(-1, 0.12));
+  };
+
+  // II: it rears and roars, and goes down; the sea goes out after it, and a surge rises far out and
+  //     breaks over the shore. From then on the floor is water that drags at the legs.
+  // III: it swims a circle out at sea and the flood begins to turn; the maelstrom opens, the water
+  //     drains into it, and it comes up out of the eye. From then on the current pulls to the eye.
+  B.phaseIn = function* (n) {
+    const b = B.body;
+    b.direct = false; b.beached = false; b.hurt = false;
+    if (n === 2) {
+      yield* glide(640, FLOOR - 300, 0, -Math.PI / 2 + 0.25 * b.face, 0.5, true);
+      b.jawT = 1; G.audio.play('seaRoar'); G.fx.shake(12); G.fx.ripple(b.x, b.y - HH, 420, 0.5, 1.1);
+      yield* wait(0.5);
+      b.jawT = 0;
+      yield* sinkAway(0.45);
+      B.sea.to = FLOOR + 90; G.audio.play('drain'); B.calm = 1;
+      yield* wait(0.6);
+      G.audio.play('thunder');
+      B.wave = { z: 2.2, h: 0 };
+      yield* tween(B.wave, { z: 0.22, h: 360 }, 1.25, E.inQuad);
+    } else {
+      yield* sinkAway(0.45);
+      B.circling = 1;
+      b.direct = true;
+      let e = 0;
+      while (e < 1.3) {
+        const dt = yield;
+        e += dt;
+        const a = e * 3.2;
+        b.x = 640 + Math.cos(a) * 420; b.z = 0.42 + 0.18 * Math.sin(a); b.y = B.sea.y - 30 + Math.sin(a * 2) * 10;
+        b.ta = b.ang = Math.sin(a) > 0 ? Math.PI : 0; // swimming round
+        B.vortex.to = 0.3 * (e / 1.3);
+      }
+      yield* sinkAway(0.3);
+    }
+  };
+  B.phaseOut = function* (n) {
+    const b = B.body;
+    if (n === 2) {
+      // it breaks
+      yield* tween(B.wave, { z: -0.05, h: 420 }, 0.28, E.inQuad);
+      B.wave = null; B.wash = 1;
+      B.sea.y = B.sea.to = FLOOD; B.calm = 0;
+      G.fx.impact(640, FLOOR - 200, 0.08); G.fx.shake(22); G.fx.punch(0.03);
+      G.audio.play('splash'); G.audio.play('slam');
+      for (let x = 90; x < 1200; x += 110) splash(x, FLOOR - 20, 1.4);
+      yield* wait(0.4);
+      // and it rides in on it
+      yield* breach(640, facePlayer());
+      b.jawT = 1; G.audio.play('seaRoar');
+      yield* wait(0.35);
+      b.jawT = 0;
+    } else {
+      // the maelstrom opens and the flood drains into it
+      B.vortex.to = 1; B.sea.to = SHALLOW;
+      G.audio.play('drain');
+      let e = 0;
+      while (e < 0.85) { e += yield; G.fx.shake(3); }
+      b.direct = true; b.x = B.vortex.x; b.y = FLOOR + 170; b.z = 0; b.ang = b.ta = -Math.PI / 2; b.jawT = 1;
+      G.fx.impact(b.x, FLOOR - 220, 0.08); G.fx.shake(18); G.fx.punch(0.03);
+      G.fx.lines(b.x, FLOOR - 140, 22, G.pal().hot, { r0: 60, speed: [900, 1600] });
+      splash(b.x, level(0) - 4, 2.4); G.audio.play('seaRoar');
+      yield* tween(b, { y: FLOOR - 340 }, 0.3, E.outQuad);
+      yield* wait(0.35);
+      b.jawT = 0; B.circling = 0;
+      yield* glide(G.clamp(b.x + 260 * facePlayer(), WL + 120, WR - 120), FLOOR - 20, 0, aim(facePlayer(), 0.12), 0.7);
+    }
+  };
+
+  B.idle = function () {
+    const b = B.body, P = G.player;
+    b.direct = false; b.fast = false;
+    const d = P.x - b.x, f = G.sign(d) || b.face;
+    if (Math.abs(d) > 340 || b.z > 0.02 || Math.abs(b.tx - b.x) > 400) b.tx = G.clamp(P.x - f * 240, WL + 110, WR - 110);
+    b.ty = FLOOR - 16 + Math.sin(B.t * 1.6) * 9; b.tz = 0;
+    b.ta = aim(f, 0.12 + Math.sin(B.t * 1.1) * 0.06);
+    b.jawT = 0.05;
+  };
+
+  // ------------------------------------------------------------------ every frame
+  const TAILP = {
+    under: (t, s) => [t.ex, s + 170, t.ez, t.ex, s + 120, t.ez],
+    up: (t, s) => [t.ex + 120, s - 330, t.ez, t.ex - 60, s - 330, t.ez],
+    slap: (t, s) => [t.ex + 230, s + 10, t.ez, t.ex + 80, s - 360, t.ez],
+    raised: (t) => [t.aimX, -520, 0.02, (t.aimX + t.ex) / 2, -380, t.ez * 0.35],
+  };
+  function sample(out, p0, p1, p2, p3, n, w0, w1, amp, k) {
+    for (let i = 0; i < n; i++) {
+      const t = i / (n - 1), u = 1 - t;
+      const b0 = u * u * u, b1 = 3 * u * u * t, b2 = 3 * u * t * t, b3 = t * t * t;
+      let x = b0 * p0.x + b1 * p1.x + b2 * p2.x + b3 * p3.x, y = b0 * p0.y + b1 * p1.y + b2 * p2.y + b3 * p3.y;
+      const z = b0 * p0.z + b1 * p1.z + b2 * p2.z + b3 * p3.z;
+      const d0 = 3 * u * u, d1 = 6 * u * t, d2 = 3 * t * t;
+      const dx = d0 * (p1.x - p0.x) + d1 * (p2.x - p1.x) + d2 * (p3.x - p2.x), dy = d0 * (p1.y - p0.y) + d1 * (p2.y - p1.y) + d2 * (p3.y - p2.y);
+      const dl = Math.hypot(dx, dy) || 1, off = Math.sin(t * k - G.t * 2.6) * amp * Math.sin(Math.PI * t);
+      x += -dy / dl * off; y += dx / dl * off;
+      const q = out[i] || (out[i] = {});
+      q.x = x; q.y = y; q.z = z; q.w = G.lerp(w0, w1, Math.pow(t, 1.4)); q.foam = false;
+    }
+    out.length = n;
+    return out;
+  }
+
+  B.tick = function (dt) {
+    const b = B.body, P = G.player, sea = B.sea, V = B.vortex, tl = B.tail;
+    // ---- the head: weights on springs, a little under-damped, unless a script is moving it by hand
+    if (b.direct) {
+      const idt = 1 / Math.max(dt, 1e-4);
+      b.vx = (b.x - b.px) * idt; b.vy = (b.y - b.py) * idt;
+    } else {
+      const w = b.fast ? 15 : 7.5, z = 0.62;
+      b.vx += ((b.tx - b.x) * w * w - 2 * z * w * b.vx) * dt;
+      b.vy += ((b.ty - b.y) * w * w - 2 * z * w * b.vy) * dt;
+      b.x += b.vx * dt; b.y += b.vy * dt;
+      b.z = G.damp(b.z, b.tz, b.fast ? 9 : 4.5, dt);
+    }
+    b.px = b.x; b.py = b.y;
+    const wa = b.fast || b.direct ? 14 : 8;
+    b.va += (G.angDiff(b.ang, b.ta) * wa * wa - 2 * 0.6 * wa * b.va) * dt;
+    b.ang += b.va * dt;
+    b.ang = Math.atan2(Math.sin(b.ang), Math.cos(b.ang));
+    const c = Math.cos(b.ang);
+    if (Math.abs(c) > 0.15) b.face = c > 0 ? 1 : -1;
+    if (b.beached) { b.jawT = 0.25 + 0.3 * Math.pow(Math.sin(B.t * 2.1), 2); b.gill = Math.max(b.gill, 0.5 + 0.5 * Math.sin(B.t * 4.2)); }
+    b.jaw = G.damp(b.jaw, b.jawT + (b.chatter ? 0.2 * Math.abs(Math.sin(B.t * 38)) : 0), 16, dt);
+    b.throat = G.damp(b.throat, b.throatT, 4, dt);
+    b.gill = G.damp(b.gill, 0, 2, dt);
+    b.voidEye = G.damp(b.voidEye || 0, b.voidEyeT || 0, 5, dt);
+    if (B.vh) tickVoidHead(B.vh, dt);
+    // out at sea or under the water it cannot be struck
+    b.hidden = b.z > 0.08 || b.y - HH * 0.6 > level(b.z);
+
+    // ---- the sea, the maelstrom, the body
+    sea.y = G.damp(sea.y, sea.to, 1.4, dt);
+    if (B.dying || B.dead) { sea.to = SEA1; V.to = 0; }
+    V.k = G.damp(V.k, V.to, 1.2, dt); V.x = G.damp(V.x, V.tx, 0.8, dt); V.spin += dt * (1 + 2.4 * V.k);
+    if (B.wash > 0) B.wash = Math.max(0, B.wash - dt * 1.1);
+    if (B.wall) {
+      B.wall.t += dt;
+      // spray thrown off the breach
+      if (B.wall.t < 0.9) for (let i = 0; i < 3; i++) {
+        const p = proj(B.wall.x + G.rand(-140, 140), sea.y, B.wall.z);
+        G.fx.spawn({ kind: 'spark', x: p.x, y: p.y, vx: G.rand(-160, 160), vy: -G.rand(250, 650), life: G.rand(0.6, 1.1), size: G.rand(1.4, 2.6), color: WATER, grav: 900, a: 0.5 });
+      }
+    }
+    const em = B.em;
+    const exT = b.beached ? b.x - b.face * 420 : b.x * 0.55 + 640 * 0.45 - b.face * 140;
+    em.x = G.damp(em.x, G.clamp(exT, 60, 1220), b.direct ? 2.2 : 1.4, dt);
+    em.z = G.damp(em.z, b.beached ? 0.38 : 0.42 + b.z * 0.8, 2, dt);
+    const s = Math.sin(b.ang), J = { x: b.x - c * 64, y: b.y - HH - s * 64, z: b.z };
+    let P0, P1, P2;
+    if (b.beached) {
+      P2 = { x: J.x - b.face * 240, y: FLOOR - 22, z: 0.03 };
+      P1 = { x: em.x, y: FLOOR - 50, z: 0.28 };
+      P0 = { x: em.x - b.face * 60, y: sea.y + 100, z: 0.42 };
+    } else {
+      const L = 150 + 70 * b.coil;
+      P2 = { x: J.x - c * L, y: J.y - s * L - 40 + 90 * b.coil, z: b.z + 0.08 };
+      P1 = { x: em.x, y: sea.y - 300 + 120 * b.coil, z: em.z };
+      P0 = { x: em.x + (em.x < 640 ? -40 : 40), y: sea.y + 100, z: em.z + 0.06 };
+    }
+    sample(B.spine, P0, P1, P2, J, 30, 104, 60, 10 + 14 * b.coil, 9 + 8 * b.coil);
+    // the humps of its coils out at sea (in the maelstrom they circle the eye)
+    B.humps.forEach((h, i) => {
+      if (B.phase === 3 || B.circling) {
+        const a = G.t * 0.55 + i * Math.PI;
+        h.x = V.x + Math.cos(a) * 520; h.z = 0.5 + 0.3 * Math.sin(a); h.dir = -Math.sin(a) >= 0 ? 1 : -1;
+      } else {
+        h.x += h.dir * 16 * dt;
+        if (h.x > 1500) h.x = -220; else if (h.x < -220) h.x = 1500;
+      }
+      const rise = B.calm ? 0 : 0.5 + 0.5 * Math.sin(G.t * h.sp + h.ph), pts = B.humpPts[i];
+      for (let k = 0; k <= 11; k++) {
+        const u = h.dir > 0 ? k / 11 : 1 - k / 11, q = pts[k] || (pts[k] = {});
+        q.x = h.x + (u - 0.5) * 2 * h.R * 1.3; q.y = sea.y + 40 - Math.sin(Math.PI * u) * (40 + h.R * (0.15 + 0.9 * rise)); q.z = h.z; q.w = 68; q.foam = false;
+      }
+    });
+    // the tail
+    if (tl.on) {
+      if (tl.pose !== 'hold') {
+        const g = TAILP[tl.pose](tl, sea.y), q = 1 - Math.exp(-tl.rate * dt);
+        tl.tipX += (g[0] - tl.tipX) * q; tl.tipY += (g[1] - tl.tipY) * q; tl.tipZ += (g[2] - tl.tipZ) * q;
+        tl.c2x += (g[3] - tl.c2x) * q; tl.c2y += (g[4] - tl.c2y) * q; tl.c2z += (g[5] - tl.c2z) * q;
+        if (tl.pose === 'under' && tl.tipY > sea.y + 120) tl.on = false;
+      }
+      const sh = tl.shake ? Math.sin(G.t * 34) * 26 : 0;
+      sample(B.tailPts, { x: tl.ex, y: sea.y + 90, z: tl.ez }, { x: tl.ex, y: sea.y - 150, z: tl.ez }, { x: tl.c2x, y: tl.c2y, z: tl.c2z }, { x: tl.tipX + sh, y: tl.tipY, z: tl.tipZ }, 24, 112, 40, 8, 7);
+    }
+
+    // ---- rain sheeting off it, and water pouring off a head that rises fast
+    if (!B.dead && Math.random() < dt * 30) {
+      const p = B.spine[(Math.random() * 30) | 0];
+      if (p && p.y < level(p.z)) {
+        const q = proj(p.x, p.y, p.z);
+        G.fx.spawn({ kind: 'spark', x: q.x + G.rand(-p.w, p.w) * 0.3 * q.s, y: q.y + p.w * 0.3 * q.s, vx: G.rand(-20, 20), vy: G.rand(60, 180), life: G.rand(0.3, 0.6), size: G.rand(1.1, 1.9) * Math.max(0.5, q.s), color: WATER, grav: 1300, len: 0.04, a: 0.5 });
+      }
+    }
+    if (!B.dead && !b.hidden && b.vy < -300 && Math.random() < dt * 60) G.fx.spawn({ kind: 'spark', x: b.x + G.rand(-70, 70), y: b.y - G.rand(0, 80), vx: G.rand(-60, 60), vy: G.rand(0, 120), life: G.rand(0.4, 0.8), size: G.rand(1.4, 2.6), color: WATER, grav: 1300, a: 0.55 });
+    // the maelstrom's foam drifting in
+    if (V.k > 0.2 && Math.random() < dt * 14 * V.k) {
+      const sd = Math.random() < 0.5 ? -1 : 1, d = G.rand(120, 420);
+      G.fx.spawn({ x: V.x + sd * d, y: level(0) - G.rand(1, 6), vx: -sd * G.rand(60, 140), vy: 0, life: d / 120, size: G.rand(1.4, 2.6), color: WATER, a: 0.4 });
+    }
+
+    // ---- a storm out at sea (high water)
+    B.boltT -= dt;
+    if (B.phase === 2 && !B.dead && B.boltT <= 0) { B.boltT = G.rand(6, 11); B.bolt = { x: G.rand(120, 1160), t: 0, seed: Math.random() * 1000 }; G.audio.play('thunder'); }
+    if (B.bolt) { B.bolt.t += dt; if (B.bolt.t > 0.35) B.bolt = null; }
+    // wreckage afloat bobs on the flood
+    if (flooded()) for (const p of G.arena.platforms) if (p.rise > 0.95 && Math.random() < dt * 0.7) G.arena.bob(p, 9);
+
+    // ---- what the water does to the hero
+    const fighting = G.state === 'fight' && !P.dead && !P.finishing && !P.ulting;
+    const live = fighting && B.active && !B.dying && !B.dead && !B.staggered && !B.invuln;
+    // high water drags at the legs (a dash is untouched): pull back part of what the hero moved this frame
+    if (fighting && flooded() && !P.plat && P.y > sea.y - 6 && P.dashT <= 0) {
+      const moved = P.x - B.lastPX;
+      if (Math.abs(moved) < 40) P.x = G.clamp(P.x - moved * 0.36, WL + 13, WR - 13);
+    }
+    B.lastPX = P.x;
+    // the maelstrom's current pulls towards the eye (not on the rocks)
+    let wind = 0;
+    if (live && V.k > 0.5 && !P.plat && P.y > FLOOR - 120) {
+      const dx = V.x - P.x, pull = (82 + 26 * Math.sin(G.t * 0.9)) * (B.pullK == null ? 1 : B.pullK);
+      wind = G.sign(dx) * pull * G.clamp(Math.abs(dx) / 140, 0, 1) * (P.onGround ? 1 : 0.15);
+    }
+    // the undertow (corrupted): the black water runs to its jaws and drags the hero with it. In the
+    // air and on the wreckage it drags a little less, but it drags: there is no getting above it.
+    const U = B.under;
+    if (U) {
+      U.k = G.damp(U.k, U.to, 2.2, dt);
+      if (!U.to) U.pull = G.damp(U.pull, 0, 7, dt);
+      U.flow += dt * (50 + U.pull);
+      // black flecks and sparks of blood riding the current in
+      if (U.pull > 20 && Math.random() < dt * 50) {
+        const fx0 = U.side > 0 ? WL : WR, x = G.lerp(fx0, U.mx, Math.random()), y = Math.min(FLOOR - 12, level(0)) - G.rand(0, 22);
+        if (Math.random() < 0.6) G.fx.spawn({ x, y, vx: U.side * (U.pull + G.rand(40, 140)), vy: G.rand(-10, 4), life: G.rand(0.5, 1.1), size: G.rand(3, 7), color: VOIDC });
+        else G.fx.spawn({ kind: 'spark', x, y, vx: U.side * (U.pull + G.rand(120, 260)), vy: G.rand(-14, 6), life: G.rand(0.25, 0.5), size: G.rand(1.1, 1.9), color: BLOOD, len: 0.05, a: 0.7 });
+      }
+      if (live && U.pull > 1) wind += U.side * U.pull * (P.onGround && !P.plat ? 1 : 0.75);
+      if (!U.to && U.k < 0.01) B.under = null;
+    }
+    G.wind = wind;
+    // the water's near edge is drawn over the feet of whoever wades in it
+    if (sea.y < FLOOR - 2 && G.state === 'fight' && (!B.front || !H.list.includes(B.front))) {
+      B.front = H.add({ kind: 'floodfront', layer: 'over', update() { if (B.sea.y >= FLOOR - 2 || G.boss !== B) this.dead = true; }, draw: drawFloodFront });
+    }
+    // ---- its bite
+    if (b.hurt && G.canHurt() && G.rectsOverlap(P.box(), { cx: b.x + b.face * 10, cy: b.y - 34, hw: 54, hh: 28 })) P.tryHit(b.dmg || 1, b.x, b);
+  };
+
+  // ------------------------------------------------------------------ drawing
+  function crossPt(a, b) {
+    const la = level(a.z), lb = level(b.z), den = (b.y - a.y) - (lb - la);
+    const f = den ? G.clamp((la - a.y) / den, 0, 1) : 0;
+    return { x: G.lerp(a.x, b.x, f), y: G.lerp(a.y, b.y, f), z: G.lerp(a.z, b.z, f), w: G.lerp(a.w, b.w, f), foam: true };
+  }
+  // the parts of a chain above the water
+  function runs(pts) {
+    const out = [];
+    let cur = null;
+    for (let i = 0; i < pts.length; i++) {
+      const p = pts[i], vis = p.y < level(p.z);
+      if (vis) { if (!cur) { cur = []; if (i) cur.push(crossPt(pts[i - 1], p)); } cur.push(p); }
+      else if (cur) { cur.push(crossPt(pts[i - 1], p)); out.push(cur); cur = null; }
+    }
+    if (cur) out.push(cur);
+    return out;
+  }
+  // far: the parts out at sea, behind the platforms; near: the rest (with one point of overlap)
+  function drawChain(ctx, pts, far, o) {
+    // which side is its back: the side the head's crest is on, or else the side that faces up
+    if (pts.length < 2) return;
+    let sg;
+    const a = proj(pts[pts.length - 2].x, pts[pts.length - 2].y, pts[pts.length - 2].z), c = proj(pts[pts.length - 1].x, pts[pts.length - 1].y, pts[pts.length - 1].z);
+    if (o.up) sg = ((c.y - a.y) * o.up[0] - (c.x - a.x) * o.up[1]) >= 0 ? 1 : -1;
+    else {
+      let sy = 0;
+      for (let i = 1; i < pts.length; i++) sy -= pts[i].x - pts[i - 1].x;
+      sg = sy > 0 ? -1 : 1;
+    }
+    o = Object.assign({ sg }, o);
+    for (const run of runs(pts)) {
+      const isL = (i) => i >= 0 && i < run.length && (far ? run[i].z > ZS : run[i].z <= ZS);
+      let piece = [];
+      for (let i = 0; i < run.length; i++) {
+        if (isL(i) || isL(i - 1) || isL(i + 1)) piece.push(run[i]);
+        else if (piece.length) { if (piece.length >= 2) ribbon(ctx, piece, o); piece = []; }
+      }
+      if (piece.length >= 2) ribbon(ctx, piece, o);
+    }
+  }
+  // An armoured length of body: dark scutes with seams that glow, a pale belly, a crest of spines
+  // and a row of lure-lights down the flank. Far parts are lost in the haze over the sea.
+  function ribbon(ctx, pts, o) {
+    const P = palNow(), n = pts.length, q = [];
+    let zs = 0;
+    for (let i = 0; i < n; i++) { const p = pts[i], pr = proj(p.x, p.y, p.z); pr.w = p.w * pr.s; pr.foam = p.foam; q.push(pr); zs += p.z; }
+    const fog = G.clamp((zs / n - 0.06) * 0.85, 0, 0.78), lit = 1 - fog;
+    const nx = [], ny = [], tx = [], ty = [], sg = o.sg || 1;
+    for (let i = 0; i < n; i++) {
+      const a = q[Math.max(0, i - 1)], c = q[Math.min(n - 1, i + 1)];
+      let dx = c.x - a.x, dy = c.y - a.y;
+      const d = Math.hypot(dx, dy) || 1; dx /= d; dy /= d;
+      tx.push(dx); ty.push(dy); nx.push(dy * sg); ny.push(-dx * sg);
+    }
+    const at = (i, f) => [q[i].x + nx[i] * q[i].w * f, q[i].y + ny[i] * q[i].w * f];
+    function band(f0, f1) {
+      ctx.beginPath();
+      for (let i = 0; i < n; i++) { const p = at(i, f0); if (i) ctx.lineTo(p[0], p[1]); else ctx.moveTo(p[0], p[1]); }
+      for (let i = n - 1; i >= 0; i--) { const p = at(i, f1); ctx.lineTo(p[0], p[1]); }
+      ctx.closePath();
+    }
+    ctx.lineJoin = 'round';
+    // spines first, so the body covers their roots
+    const fin = o.fin || 0;
+    ctx.fillStyle = shade('#0a161c', P, fog);
+    for (let i = 1; i < n - 1; i += 2) {
+      if (q[i].foam) continue;
+      const w = q[i].w, h = w * (0.55 + 0.7 * fin) + (fin ? Math.sin(G.t * 40 + i) * 3 : 0);
+      const b0 = at(i, 0.42), x1 = b0[0] + tx[i] * w * 0.22, y1 = b0[1] + ty[i] * w * 0.22, x2 = b0[0] - tx[i] * w * 0.45, y2 = b0[1] - ty[i] * w * 0.45;
+      const tipx = b0[0] + nx[i] * h - tx[i] * h * 0.55, tipy = b0[1] + ny[i] * h - ty[i] * h * 0.55;
+      ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(tipx, tipy); ctx.lineTo(x2, y2); ctx.closePath(); ctx.fill();
+      if (lit > 0.3) { ctx.strokeStyle = G.rgba(P.boss, (0.25 + 0.3 * fin) * lit); ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(tipx, tipy); ctx.stroke(); }
+    }
+    // the body
+    band(0.5, -0.5); ctx.fillStyle = shade('#08131a', P, fog); ctx.fill();
+    // the belly: pale plates
+    band(-0.12, -0.5); ctx.fillStyle = shade('#1a2d33', P, fog); ctx.fill();
+    ctx.strokeStyle = shade('#08131a', P, fog); ctx.lineWidth = Math.max(0.8, q[0].s * 1.4);
+    ctx.beginPath();
+    for (let i = 1; i < n; i++) { const a = at(i, -0.12), b = at(i, -0.5); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); }
+    ctx.stroke();
+    // the scutes on its back, and the seams between them that glow
+    band(0.5, 0.06); ctx.fillStyle = shade('#13262f', P, fog); ctx.fill();
+    if (lit > 0.15) {
+      ctx.strokeStyle = G.rgba(P.boss, 0.32 * lit); ctx.lineWidth = Math.max(0.8, 1.3 * q[n - 1].s);
+      ctx.beginPath();
+      for (let i = 1; i < n - 1; i++) { if (q[i].foam) continue; const a = at(i, 0.48), b = at(i + 1, 0.02); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); }
+      ctx.stroke();
+      // the lit edge of its back
+      ctx.strokeStyle = G.rgba(P.boss, 0.5 * lit); ctx.lineWidth = Math.max(1, 1.8 * q[n - 1].s);
+      ctx.beginPath();
+      for (let i = 0; i < n; i++) { const p = at(i, 0.5); if (i) ctx.lineTo(p[0], p[1]); else ctx.moveTo(p[0], p[1]); }
+      ctx.stroke();
+      // lure-lights down the flank, each with its own slow pulse
+      ctx.globalCompositeOperation = 'lighter';
+      const img = G.fx.glow(P.boss);
+      for (let i = 2; i < n - 1; i += 3) {
+        if (q[i].foam) continue;
+        const p = at(i, -0.05), r = Math.max(3, q[i].w * 0.22);
+        ctx.globalAlpha = (0.35 + 0.25 * Math.sin(G.t * 2.2 + i * 1.7)) * lit;
+        ctx.drawImage(img, p[0] - r, p[1] - r, r * 2, r * 2);
+      }
+      ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
+    }
+    // white water where it goes into the sea
+    for (let i = 0; i < n; i++) {
+      if (!q[i].foam) continue;
+      const r = q[i].w * 0.85 + Math.sin(G.t * 6 + i) * 2;
+      ctx.fillStyle = VOIDED ? 'rgba(5,0,3,0.6)' : G.rgba(WATER, 0.2 * (1 - fog * 0.5));
+      ctx.beginPath(); ctx.ellipse(q[i].x, q[i].y, r, r * 0.2, 0, 0, G.TAU); ctx.fill();
+      ctx.strokeStyle = G.rgba(P.rim, 0.28 * (1 - fog * 0.5)); ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.ellipse(q[i].x, q[i].y, r * 1.3, r * 0.26, 0, 0, G.TAU); ctx.stroke();
+    }
+  }
+
+  const headUp = (b) => { const fl = Math.cos(b.ang) < 0 ? -1 : 1; return [fl * Math.sin(b.ang), -fl * Math.cos(b.ang)]; };
+  function drawFluke(ctx, far) {
+    const tl = B.tail, pts = B.tailPts;
+    if (!tl.on || pts.length < 3) return;
+    const tip = pts[pts.length - 1], pre = pts[pts.length - 3];
+    if ((tip.z > ZS) !== far || tip.y > level(tip.z) + 6) return;
+    const a = proj(tip.x, tip.y, tip.z), b = proj(pre.x, pre.y, pre.z), P = G.pal();
+    let tx = a.x - b.x, ty = a.y - b.y;
+    const d = Math.hypot(tx, ty) || 1; tx /= d; ty /= d;
+    const nx = -ty, ny = tx, s = a.s, fog = G.clamp((tip.z - 0.06) * 0.85, 0, 0.78);
+    const pt = (u, v) => [a.x + (tx * u + nx * v) * s, a.y + (ty * u + ny * v) * s];
+    const shape = [pt(-28, 0), pt(-8, 30), pt(14, 74), pt(36, 82), pt(20, 34), pt(26, 0), pt(20, -34), pt(36, -82), pt(14, -74), pt(-8, -30)];
+    ctx.beginPath(); shape.forEach((p, i) => (i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1]))); ctx.closePath();
+    ctx.fillStyle = mix('#0a171d', P.far, fog); ctx.fill();
+    ctx.strokeStyle = G.rgba(P.boss, 0.45 * (1 - fog)); ctx.lineWidth = 1.4; ctx.stroke();
+    ctx.strokeStyle = G.rgba(P.boss, 0.2 * (1 - fog)); ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (const v of [-60, -30, 30, 60]) { const p0 = pt(-6, v * 0.3), p1 = pt(22, v); ctx.moveTo(p0[0], p0[1]); ctx.lineTo(p1[0], p1[1]); }
+    ctx.stroke();
+  }
+
+  // The head: a long armoured skull with swept horns, a slit eye under a heavy brow, a lure on a
+  // filament over the snout, gill slits that flare, and a jaw full of needles.
+  function drawHead(ctx, b) {
+    const P = palNow(), pr = proj(b.x, b.y - HH, b.z), fog = G.clamp((b.z - 0.06) * 0.85, 0, 0.78), lit = 1 - fog;
+    const C = (h) => shade(h, P, fog);
+    const bone = VOIDED ? 'rgb(96,34,48)' : mix('#d6dccf', P.far, fog * 0.7);
+    const blind = VOIDED ? 0 : (b.voidEye || 0); // (hydra) its eyes going black
+    const jx = b.jit ? G.rand(-b.jit, b.jit) : 0;
+    ctx.save();
+    // under the water nothing shows
+    const lv = proj(0, level(b.z), b.z).y;
+    ctx.beginPath(); ctx.rect(-200, -1200, G.W + 400, lv + 1200); ctx.clip();
+    ctx.translate(pr.x + (b.kx || 0) * pr.s + jx, pr.y);
+    K.recoil(ctx, b);
+    ctx.scale(pr.s * HS, pr.s * HS);
+    ctx.rotate(b.ang);
+    if (Math.cos(b.ang) < 0) ctx.scale(1, -1);
+    ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+    const poly = (a) => { ctx.beginPath(); for (let i = 0; i < a.length; i += 2) { if (i) ctx.lineTo(a[i], a[i + 1]); else ctx.moveTo(a[i], a[i + 1]); } ctx.closePath(); };
+    const ja = b.jaw * 0.55;
+    // horns and the frill between them
+    ctx.fillStyle = G.rgba(P.boss, (0.1 + 0.12 * b.fin) * lit);
+    poly([-46, -24, -118, -56, -112, -40, -126, -23, -58, -6]); ctx.fill();
+    ctx.fillStyle = C('#0b1a20');
+    poly([-40, -26, -86, -48, -124, -60, -92, -38, -52, -16]); ctx.fill();
+    poly([-54, -10, -96, -22, -130, -22, -98, -8, -60, 0]); ctx.fill();
+    ctx.strokeStyle = G.rgba(P.boss, 0.45 * lit); ctx.lineWidth = 1.2;
+    ctx.beginPath(); ctx.moveTo(-40, -26); ctx.lineTo(-86, -48); ctx.lineTo(-124, -60); ctx.moveTo(-54, -10); ctx.lineTo(-96, -22); ctx.lineTo(-130, -22); ctx.stroke();
+    // the throat, swelling as it gathers water to spit
+    if (b.throat > 0.02) {
+      ctx.fillStyle = C('#14262c');
+      ctx.beginPath(); ctx.ellipse(-20, 14 + 8 * b.throat, 38, 10 + 16 * b.throat, 0, 0, G.TAU); ctx.fill();
+      if (b.voidThroat) {
+        // (hydra) it fills with the void instead: black, veined with blood
+        ctx.fillStyle = 'rgba(5,0,3,' + 0.75 * b.throat + ')';
+        ctx.beginPath(); ctx.ellipse(-20, 14 + 8 * b.throat, 36, 9 + 15 * b.throat, 0, 0, G.TAU); ctx.fill();
+        ctx.strokeStyle = G.rgba(BLOOD, 0.6 * b.throat); ctx.lineWidth = 1.1;
+        ctx.beginPath();
+        for (let k = 0; k < 4; k++) { const vx = -44 + k * 15; ctx.moveTo(vx, 8 + 4 * b.throat); ctx.lineTo(vx + 5, 14 + 10 * b.throat); ctx.lineTo(vx + 2, 20 + 18 * b.throat); }
+        ctx.stroke();
+      } else {
+        ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.5 * b.throat * lit;
+        ctx.drawImage(G.fx.glow(P.boss), -50, 0, 60, 30 + 30 * b.throat);
+        ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
+      }
+    }
+    // inside the mouth, and a glow far down the throat
+    if (ja > 0.03) {
+      const jtx = -40 + Math.cos(ja) * 126, jty = 6 + Math.sin(ja) * 126;
+      poly([-40, 6, 90, 2, jtx, jty]); ctx.fillStyle = '#12060a'; ctx.fill();
+      ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.45 * lit * Math.min(1, ja * 3);
+      ctx.drawImage(G.fx.glow(P.boss), -40, -4, 70, 40);
+      ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
+    }
+    // the lower jaw, on its hinge
+    ctx.save();
+    ctx.translate(-40, 6); ctx.rotate(ja);
+    ctx.fillStyle = bone;
+    for (const t of [52, 68, 84, 100, 114]) { poly([t - 3, 1, t, -8 - (t === 100 ? 5 : 0), t + 3, 1]); ctx.fill(); }
+    ctx.fillStyle = C('#0d1c22');
+    poly([-6, -2, 40, 0, 100, 0, 128, 2, 122, 8, 92, 14, 40, 18, 0, 14]); ctx.fill();
+    ctx.strokeStyle = G.rgba(P.boss, 0.35 * lit); ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(0, 14); ctx.lineTo(40, 18); ctx.lineTo(92, 14); ctx.lineTo(122, 8); ctx.stroke();
+    ctx.restore();
+    // needles along the upper lip
+    ctx.fillStyle = bone;
+    for (const t of [20, 36, 50, 64, 76, 86]) { poly([t - 3, 4, t, 14 + (t === 64 ? 9 : 0), t + 3, 4]); ctx.fill(); }
+    // the skull
+    ctx.fillStyle = C('#0f2028');
+    poly([-66, -14, -54, -30, -30, -34, 2, -31, 22, -27, 54, -17, 80, -9, 96, -2, 88, 5, 50, 7, 10, 8, -30, 10, -58, 8]); ctx.fill();
+    // armour plates, and the seams between them glowing
+    ctx.fillStyle = C('#183039');
+    poly([-50, -28, -26, -33, 4, -30, 20, -24, 0, -20, -30, -22]); ctx.fill();
+    poly([26, -24, 54, -16, 78, -9, 56, -10, 30, -17]); ctx.fill();
+    poly([-60, -6, -36, -10, -14, -4, -36, 6, -58, 4]); ctx.fill();
+    ctx.strokeStyle = G.rgba(P.boss, (0.42 + 0.3 * b.gill) * lit); ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(-30, -22); ctx.lineTo(-27, -8); ctx.moveTo(0, -20); ctx.lineTo(5, -2); ctx.moveTo(30, -17); ctx.lineTo(34, 0); ctx.moveTo(56, -10); ctx.lineTo(58, 4);
+    ctx.stroke();
+    // the lit line along the top of the skull
+    ctx.strokeStyle = G.rgba(P.boss, 0.7 * lit); ctx.lineWidth = 1.6;
+    ctx.beginPath(); ctx.moveTo(-54, -30); ctx.lineTo(-30, -34); ctx.lineTo(2, -31); ctx.lineTo(22, -27); ctx.lineTo(54, -17); ctx.lineTo(80, -9); ctx.lineTo(96, -2); ctx.stroke();
+    // gill slits
+    ctx.strokeStyle = G.rgba(P.boss, (0.15 + 0.6 * b.gill) * lit); ctx.lineWidth = 1.6;
+    ctx.beginPath(); for (let k = 0; k < 3; k++) { const x = -44 - k * 7; ctx.moveTo(x, -6); ctx.quadraticCurveTo(x - 4, 2, x - 2, 10); } ctx.stroke();
+    // lights along the jaw line
+    ctx.globalCompositeOperation = 'lighter';
+    const img = G.fx.glow(P.boss);
+    for (let k = 0; k < 4; k++) { ctx.globalAlpha = (0.3 + 0.2 * Math.sin(G.t * 3 + k)) * lit; ctx.drawImage(img, -8 + k * 22 - 5, 3, 10, 10); }
+    // the eye: a narrow slit, burning, under a heavy brow (dim while it lies beached)
+    const eyeA = (b.beached ? 0.35 : 1) * lit;
+    ctx.globalAlpha = 0.8 * eyeA * (1 - blind); ctx.drawImage(G.fx.glow(P.boss), 14 - 22, -17 - 22, 44, 44);
+    ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
+    ctx.fillStyle = G.rgba(P.hot, eyeA);
+    poly([3, -17, 14, -21, 29, -17, 14, -14]); ctx.fill();
+    if (blind > 0.02) {
+      // the void floods the eye from the slit outwards, leaving a thin rim of blood
+      ctx.fillStyle = 'rgba(2,0,1,' + blind + ')'; poly([3, -17, 14, -21, 29, -17, 14, -14]); ctx.fill();
+      ctx.strokeStyle = G.rgba(BLOOD, 0.75 * blind); ctx.lineWidth = 1; ctx.stroke();
+    }
+    ctx.strokeStyle = '#020405'; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.moveTo(15, -21); ctx.lineTo(16, -14); ctx.stroke();
+    ctx.fillStyle = C('#0a161c');
+    poly([-4, -24, 32, -23, 36, -19, 4, -19.5]); ctx.fill();
+    // the lure: a filament off the brow with a light at its end, swinging as the head moves
+    const sw = G.clamp(-b.vx * 0.02, -16, 16) * (Math.cos(b.ang) < 0 ? -1 : 1), bob = Math.sin(G.t * 2.4) * 4 + G.clamp(b.vy * 0.015, -10, 10);
+    const lx = 44 + sw, ly = -60 + bob;
+    ctx.strokeStyle = C('#1d343c'); ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(-18, -32); ctx.quadraticCurveTo(6, -82, lx, ly); ctx.stroke();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.globalAlpha = (0.55 + 0.2 * Math.sin(G.t * 3.3)) * lit * (1 - 0.75 * blind); ctx.drawImage(G.fx.glow(P.boss), lx - 20, ly - 20, 40, 40);
+    ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
+    ctx.fillStyle = G.rgba(P.hot, 0.9 * lit * (1 - 0.7 * blind)); ctx.beginPath(); ctx.arc(lx, ly, 3, 0, G.TAU); ctx.fill();
+    if (b.flash > 0) { ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = b.flash * 0.3; ctx.drawImage(G.fx.glow('255,255,255'), -70, -60, 150, 110); ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over'; }
+    ctx.restore();
+  }
+
+  // the sea behind the shore: the swell, waves on the causeway, and the storm far out
+  function drawSea(ctx) {
+    const P = G.pal(), sea = B.sea.y, calm = 1 - 0.75 * B.calm;
+    ctx.save();
+    ctx.beginPath(); ctx.rect(-80, HZ, G.W + 160, FLOOR - HZ + 1); ctx.clip();
+    ctx.strokeStyle = G.rgba(P.rim, 1); ctx.lineCap = 'round';
+    for (let i = 0; i < 40; i++) {
+      const z = Math.pow((i * 0.618) % 1, 1.6) * 3 + 0.03;
+      const wx = ((i * 233 + G.t * (8 + (i % 5) * 4) * calm) % 1800) - 260;
+      const p = proj(wx, sea + Math.sin(G.t * 1.1 + i) * 3 * calm, z), len = 34 * p.s + 6;
+      ctx.globalAlpha = (0.05 + 0.13 * p.s) * (0.6 + 0.4 * Math.sin(G.t * 1.3 + i)) * calm;
+      ctx.lineWidth = 0.8 + p.s;
+      ctx.beginPath(); ctx.moveTo(p.x - len, p.y); ctx.lineTo(p.x + len, p.y); ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+    // a shadow under the water (its entrance)
+    if (B.shadow) {
+      const p = proj(B.shadow.x, sea + 10, B.shadow.z);
+      ctx.save(); ctx.translate(p.x, p.y); ctx.scale(1, 0.12);
+      const g = ctx.createRadialGradient(0, 0, 0, 0, 0, 340 * p.s);
+      g.addColorStop(0, 'rgba(0,0,0,0.6)'); g.addColorStop(0.6, 'rgba(0,0,0,0.35)'); g.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, 340 * p.s, 0, G.TAU); ctx.fill();
+      ctx.restore();
+      ctx.globalCompositeOperation = 'lighter';
+      for (let k = 0; k < 5; k++) { ctx.globalAlpha = 0.25 + 0.15 * Math.sin(G.t * 3 + k); ctx.drawImage(G.fx.glow(P.boss), p.x - 200 * p.s + k * 90 * p.s - 4, p.y - 3, 8, 6); }
+      ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
+    }
+    // waves breaking on the causeway, while the sea is below it
+    if (sea > FLOOR - 2 && sea < FLOOR + 50) {
+      for (let j = 0; j < 2; j++) {
+        ctx.strokeStyle = G.rgba(WATER, (j ? 0.12 : 0.2) * calm); ctx.lineWidth = j ? 1.5 : 2.5;
+        ctx.beginPath();
+        for (let x = -60; x <= G.W + 60; x += 14) {
+          const y = FLOOR - 3 - j * 7 - Math.max(0, Math.sin(x * 0.012 - G.t * (1.2 + j * 0.4) + j)) * 4 * calm;
+          if (x === -60) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+      }
+    }
+    ctx.restore();
+    // lightning far out
+    if (B.bolt) {
+      const bt = B.bolt, a = 0.5 * (1 - bt.t / 0.35);
+      let x = bt.x, y = -20, sd = bt.seed;
+      ctx.strokeStyle = G.rgba(P.hot, a); ctx.lineWidth = 1.6;
+      ctx.beginPath(); ctx.moveTo(x, y);
+      while (y < HZ) { sd = (sd * 9301 + 49297) % 233280; x += (sd / 233280 - 0.5) * 50; y += 26 + (sd % 20); ctx.lineTo(x, Math.min(y, HZ)); }
+      ctx.stroke();
+      ctx.fillStyle = G.rgba(P.rim, 0.05 * (1 - bt.t / 0.35)); ctx.fillRect(-80, -80, G.W + 160, HZ + 80);
+    }
+    // the wall of water it breaches through: two sheets thrown up either side of it, falling back
+    if (B.wall) {
+      const w = B.wall, p = proj(w.x, B.sea.y, w.z), k = Math.min(1, w.t / 0.45), fall = G.clamp((w.t - 0.6) / 0.9, 0, 1);
+      const h = 480 * p.s * E.outCubic(k) * (1 - fall * fall), fade = 1 - fall;
+      if (h > 2) {
+        ctx.save(); ctx.globalCompositeOperation = 'lighter';
+        for (const d of [-1, 1]) {
+          const x0 = p.x + d * 30 * p.s, x1 = p.x + d * (150 + 90 * k) * p.s;
+          const g = ctx.createLinearGradient(0, p.y - h, 0, p.y);
+          g.addColorStop(0, G.rgba(WATER, 0)); g.addColorStop(0.35, G.rgba(WATER, 0.16 * fade)); g.addColorStop(1, G.rgba(WATER, 0.05 * fade));
+          ctx.fillStyle = g;
+          ctx.beginPath(); ctx.moveTo(x0, p.y);
+          for (let i = 0; i <= 8; i++) {
+            const u = i / 8, yy = p.y - h * Math.sin(Math.PI * (0.15 + 0.7 * u)) * (1 - 0.35 * u) + Math.sin(i * 7.3 + w.t * 9) * 10 * p.s;
+            ctx.lineTo(G.lerp(x0, x1, u), yy);
+          }
+          ctx.lineTo(x1, p.y); ctx.closePath(); ctx.fill();
+        }
+        ctx.restore();
+      }
+    }
+  }
+
+  function surfacePath(ctx, y0, x0, x1) {
+    for (let x = x0; x <= x1; x += 16) {
+      const y = y0 + Math.sin(x * 0.025 + G.t * 2.1) * 2 + Math.sin(x * 0.061 - G.t * 3.3) * 1.2;
+      if (x === x0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    }
+  }
+  // the flood over the floor, behind everything that stands in it
+  function drawFloodBack(ctx) {
+    const y0 = B.sea.y;
+    if (y0 >= FLOOR - 1) return;
+    const P = G.pal(), c = rgbStr(P.near);
+    const g = ctx.createLinearGradient(0, y0, 0, FLOOR + 130);
+    g.addColorStop(0, G.rgba(c, 0.55)); g.addColorStop(0.3, G.rgba(c, 0.7)); g.addColorStop(1, 'rgba(2,4,6,0.85)');
+    ctx.fillStyle = g;
+    ctx.beginPath(); surfacePath(ctx, y0, WL - 80, WR + 80); ctx.lineTo(WR + 80, FLOOR + 140); ctx.lineTo(WL - 80, FLOOR + 140); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = G.rgba(P.rim, 0.3); ctx.lineWidth = 1.4;
+    ctx.beginPath(); surfacePath(ctx, y0, WL - 80, WR + 80); ctx.stroke();
+    // light moving on the surface
+    ctx.strokeStyle = G.rgba(P.rim, 0.18); ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (let i = 0; i < 16; i++) { const x = ((i * 157 + G.t * (20 + i % 4 * 9)) % 1400) - 60, y = y0 + 4 + (i % 4) * 6; ctx.moveTo(x, y); ctx.lineTo(x + 18 + (i % 3) * 10, y); }
+    ctx.stroke();
+  }
+  function drawFloodFront(ctx) {
+    const y0 = B.sea.y;
+    if (y0 >= FLOOR - 1) return;
+    const P = G.pal(), c = rgbStr(P.near), pl = G.player;
+    ctx.fillStyle = G.rgba(c, 0.4);
+    ctx.beginPath(); surfacePath(ctx, y0 + 2, WL - 80, WR + 80); ctx.lineTo(WR + 80, FLOOR + 8); ctx.lineTo(WL - 80, FLOOR + 8); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = G.rgba(P.rim, 0.32); ctx.lineWidth = 1.4;
+    ctx.beginPath(); surfacePath(ctx, y0 + 2, WL - 80, WR + 80); ctx.stroke();
+    // rings round whoever wades in it
+    if (!pl.plat && !pl.hidden && !pl.dead && pl.y > y0 - 4) {
+      for (let j = 0; j < 2; j++) {
+        const k = (G.t * 1.4 + j * 0.5) % 1;
+        ctx.strokeStyle = G.rgba(P.rim, 0.4 * (1 - k)); ctx.lineWidth = 1.2;
+        ctx.beginPath(); ctx.ellipse(pl.x, y0 + 2, 12 + 26 * k, 2.5 + 4 * k, 0, 0, G.TAU); ctx.stroke();
+      }
+    }
+  }
+
+  // the undertow: the floor flooded black, its current running in to the jaws, the air drawn after it
+  function drawUndertow(ctx) {
+    const U = B.under;
+    if (!U || U.k < 0.01) return;
+    const k = U.k, y0 = Math.min(FLOOR - 12, level(0)) - 8 * k, sd = U.side, run = U.pull / U.PULL;
+    const g = ctx.createLinearGradient(0, y0 - 4, 0, FLOOR + 100);
+    g.addColorStop(0, 'rgba(14,2,8,' + 0.6 * k + ')'); g.addColorStop(0.12, 'rgba(6,0,4,' + 0.82 * k + ')'); g.addColorStop(1, 'rgba(2,0,1,' + 0.9 * k + ')');
+    ctx.fillStyle = g;
+    ctx.beginPath(); surfacePath(ctx, y0, WL - 80, WR + 80); ctx.lineTo(WR + 80, FLOOR + 140); ctx.lineTo(WL - 80, FLOOR + 140); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = G.rgba(BLOOD, 0.4 * k); ctx.lineWidth = 1.4;
+    ctx.beginPath(); surfacePath(ctx, y0, WL - 80, WR + 80); ctx.stroke();
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter'; ctx.lineCap = 'round';
+    // streaks on the water, quickening as they near the jaws
+    const far = sd > 0 ? WL : WR;
+    for (let i = 0; i < 48; i++) {
+      const u = Math.pow((i * 0.137 + U.flow / 1000 * (0.75 + (i % 5) * 0.08)) % 1, 0.8), x = G.lerp(far, U.mx, u), y = y0 + 3 + (i % 5) * 6;
+      const len = 18 + 60 * u * (0.4 + run);
+      ctx.strokeStyle = G.rgba(i % 3 ? BLOOD : VHOT, (i % 3 ? 0.55 : 0.28) * k * Math.sin(Math.PI * u) * (0.35 + 0.65 * run));
+      ctx.lineWidth = i % 3 ? 2 : 1.2;
+      ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x - sd * len, y); ctx.stroke();
+    }
+    // the air drawn in after it: faint threads at every height, bending down into the jaws
+    if (run > 0.05) {
+      for (let i = 0; i < 16; i++) {
+        const u = (i * 0.211 + U.flow / 800 * (0.8 + (i % 3) * 0.15)) % 1, h = 40 + ((i * 67) % 300);
+        const x = G.lerp(far, U.mx, u), y = FLOOR - h * (1 - u * u * 0.85), len = 30 + 60 * u;
+        ctx.strokeStyle = G.rgba(BLOOD, 0.2 * run * k * Math.sin(Math.PI * u));
+        ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x - sd * len, y - h * 0.08 * u); ctx.stroke();
+      }
+    }
+    // where it pours into the jaws, the water turns over on itself
+    for (let i = 0; i < 3; i++) {
+      const a = U.flow * 0.02 * (1 + i * 0.3) + i * 2;
+      ctx.strokeStyle = G.rgba(BLOOD, (0.22 + 0.1 * i) * k * (0.4 + 0.6 * run)); ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.ellipse(U.mx - sd * 50, y0 + 3, 70 + 30 * i, 6 + 2 * i, 0, a, a + 2.4); ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  function drawVortex(ctx) {
+    const V = B.vortex;
+    if (V.k < 0.02) return;
+    const P = G.pal(), x = V.x, y = level(0) + 2, k = V.k, rx = 320 * k, ry = 46 * k;
+    ctx.save();
+    ctx.translate(x, y); ctx.scale(1, ry / rx);
+    const g = ctx.createRadialGradient(0, 0, 0, 0, 0, rx);
+    g.addColorStop(0, 'rgba(0,0,0,0.8)'); g.addColorStop(0.25, 'rgba(0,0,0,0.5)'); g.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, rx, 0, G.TAU); ctx.fill();
+    ctx.lineCap = 'round';
+    for (let i = 0; i < 8; i++) {
+      const q = 0.18 + i / 10, a = V.spin * (1.7 - q) + i * 2.1;
+      ctx.strokeStyle = G.rgba(i % 2 ? WATER : P.rim, 0.5 * (1.15 - q) * k);
+      ctx.lineWidth = (2 + 5 * (1 - q)) * (rx / ry) * 0.25;
+      ctx.beginPath(); ctx.arc(0, 0, rx * q, a, a + 1.5 + q); ctx.stroke();
+    }
+    ctx.strokeStyle = G.rgba(P.boss, 0.4 * k); ctx.lineWidth = 3 * (rx / ry) * 0.3;
+    ctx.beginPath(); ctx.arc(0, 0, rx * 0.16, 0, G.TAU); ctx.stroke();
+    ctx.restore();
+    // the current running in along the floor
+    ctx.strokeStyle = G.rgba(P.rim, 1); ctx.lineWidth = 1.2;
+    for (let i = 0; i < 24; i++) {
+      const sd = i % 2 ? 1 : -1, u = (G.t * (0.3 + (i % 4) * 0.07) + i * 0.137) % 1, d = (1 - u) * 600 + 40;
+      const sx = x + sd * d, sy = y - 2 - (i % 3) * 4;
+      if (sx < WL || sx > WR) continue;
+      ctx.globalAlpha = 0.28 * Math.sin(Math.PI * u) * k;
+      ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(sx - sd * (20 + 30 * u), sy); ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+  }
+  // its fin, circling the eye before it comes up out of it
+  function drawFinCircle(ctx) {
+    const fc = B.finCircle, V = B.vortex;
+    if (!fc) return;
+    const P = G.pal(), x = V.x + Math.cos(fc.a) * 250 * V.k, y = level(0) + Math.sin(fc.a) * 26 * V.k, d = -Math.sin(fc.a) >= 0 ? 1 : -1, s = 0.85 + 0.15 * Math.sin(fc.a);
+    ctx.fillStyle = '#0a171d';
+    ctx.beginPath(); ctx.moveTo(x - d * 34 * s, y); ctx.quadraticCurveTo(x - d * 10 * s, y - 40 * s, x - d * 26 * s, y - 86 * s); ctx.quadraticCurveTo(x + d * 18 * s, y - 40 * s, x + d * 30 * s, y); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = G.rgba(P.boss, 0.55); ctx.lineWidth = 1.4; ctx.stroke();
+    ctx.strokeStyle = G.rgba(WATER, 0.35); ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(x + d * 30, y); ctx.lineTo(x - d * 50, y - 4); ctx.moveTo(x + d * 30, y); ctx.lineTo(x - d * 50, y + 4); ctx.stroke();
+  }
+  // the surge that brings the flood
+  function drawWave(ctx) {
+    const w = B.wave;
+    if (!w) return;
+    const P = G.pal(), c = rgbStr(P.near), z = Math.max(0, w.z);
+    ctx.beginPath();
+    const pts = [];
+    const s0 = proj(0, 0, z).s;
+    for (let sx = -120; sx <= G.W + 120; sx += 32) {
+      const x = 640 + (sx - 640) / s0;
+      const p = proj(x, B.sea.y - w.h * (0.85 + 0.15 * Math.sin(x * 0.004 + 1)) + Math.sin(x * 0.01 + G.t * 2) * 16, z);
+      pts.push(p);
+      if (sx === -120) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y);
+    }
+    const base = proj(0, B.sea.y + 40, z).y;
+    ctx.lineTo(G.W + 120, base); ctx.lineTo(-120, base); ctx.closePath();
+    const g = ctx.createLinearGradient(0, pts[0].y, 0, base);
+    g.addColorStop(0, G.rgba(c, 0.9)); g.addColorStop(1, 'rgba(2,4,6,0.95)');
+    ctx.fillStyle = g; ctx.fill();
+    // white water along the crest, and streaks running down the face
+    ctx.strokeStyle = G.rgba(WATER, 0.16); ctx.lineWidth = 26 * s0;
+    ctx.beginPath(); pts.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y + 10 * s0) : ctx.moveTo(p.x, p.y + 10 * s0))); ctx.stroke();
+    ctx.strokeStyle = G.rgba(WATER, 0.5); ctx.lineWidth = 3;
+    ctx.beginPath(); pts.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y))); ctx.stroke();
+    ctx.strokeStyle = G.rgba(P.rim, 0.1); ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    for (let i = 0; i < pts.length; i += 2) { const p = pts[i], o = ((G.t * 160 + i * 37) % 120) * s0; ctx.moveTo(p.x + 6, p.y + 20 * s0 + o); ctx.lineTo(p.x + 2, p.y + 70 * s0 + o); }
+    ctx.stroke();
+    if (Math.random() < 0.8) { const p = pts[(Math.random() * pts.length) | 0]; G.fx.spawn({ kind: 'spark', x: p.x, y: p.y, vx: G.rand(-60, 60), vy: -G.rand(60, 200), life: 0.6, size: 2, color: WATER, grav: 600, a: 0.5 }); }
+  }
+  // wreckage on the floating platforms (high water) and weed on the rocks (the maelstrom)
+  function drawFlotsam(ctx) {
+    const P = G.pal();
+    for (const p of G.arena.platforms) {
+      if (p.rise < 0.3 || p.gone) continue;
+      const y = p.y;
+      if (B.phase === 2) {
+        ctx.fillStyle = '#1a130d';
+        ctx.beginPath(); ctx.moveTo(p.x - 8, y - 2); ctx.lineTo(p.x + p.w + 4, y - 3); ctx.lineTo(p.x + p.w + 12, y + 2); ctx.lineTo(p.x + p.w - 6, y + 9); ctx.lineTo(p.x + 4, y + 10); ctx.closePath(); ctx.fill();
+        ctx.strokeStyle = 'rgba(0,0,0,0.6)'; ctx.lineWidth = 1;
+        ctx.beginPath(); for (let x = p.x + 26; x < p.x + p.w; x += 30) { ctx.moveTo(x, y - 2); ctx.lineTo(x - 2, y + 9); } ctx.stroke();
+        ctx.strokeStyle = G.rgba(P.rim, 0.45); ctx.beginPath(); ctx.moveTo(p.x - 8, y - 2); ctx.lineTo(p.x + p.w + 4, y - 3); ctx.stroke();
+      } else if (B.phase === 3) {
+        ctx.strokeStyle = G.rgba(P.rim, 0.25); ctx.lineWidth = 1.5;
+        ctx.beginPath(); for (let x = p.x + 10; x < p.x + p.w; x += 14) { ctx.moveTo(x, y + 4); ctx.quadraticCurveTo(x + 4, y + 20, x - 2, y + 30 + (x % 9)); } ctx.stroke();
+      }
+    }
+  }
+
+  B.drawGround = function (ctx) {
+    const b = B.body;
+    drawSea(ctx);
+    if (!B.dead) {
+      // its coils far out in the sea (behind the water line); corrupted, they are black like the rest of it
+      const far = (c) => {
+        B.humps.forEach((h, i) => drawChain(c, B.humpPts[i], true, {}));
+        if (B.tail.on) { drawChain(c, B.tailPts, true, {}); drawFluke(c, true); }
+        if (B.spine.length) drawChain(c, B.spine, true, { fin: b.fin, up: headUp(b) });
+        if (b.z > ZS) drawHead(c, b);
+      };
+      if (G.corrupt.active()) G.corrupt.silhouette(ctx, far, false); else far(ctx);
+    }
+    drawFloodBack(ctx);
+    drawUndertow(ctx);
+    drawVortex(ctx);
+    if (!B.dead && b.z < 0.05 && !b.hidden) {
+      const k = G.clamp(1 - (FLOOR - b.y) / 380, 0.15, 1);
+      ctx.fillStyle = 'rgba(0,0,0,' + 0.42 * k + ')';
+      ctx.beginPath(); ctx.ellipse(b.x + b.face * 10, Math.min(FLOOR, B.sea.y) + 3, 80 * k, 9 * k, 0, 0, G.TAU); ctx.fill();
+    }
+  };
+  // the hydra's void head is drawn on its own, over the boss: a corrupted boss is drawn as one black
+  // shape (corrupt.js), and this head is to be seen as something else, black flesh with blood in it
+  B.drawOver = function (ctx) { if (!B.dead) drawVoidHead(ctx); };
+  // corrupted, only its body is drawn black (corrupt.js): the flotsam, its wave and the surge are not it
+  B.corruptBehind = (ctx) => drawFlotsam(ctx);
+  B.corruptFront = (ctx) => drawSurf(ctx);
+  B.draw = function (ctx) {
+    const b = B.body, plain = !G.corrupt.drawing;
+    if (plain) drawFlotsam(ctx);
+    if (!B.dead) {
+      if (B.tail.on) { drawChain(ctx, B.tailPts, false, {}); drawFluke(ctx, false); }
+      if (B.spine.length) drawChain(ctx, B.spine, false, { fin: b.fin, up: headUp(b) });
+      if (b.z <= ZS) drawHead(ctx, b);
+      drawFinCircle(ctx);
+    }
+    if (plain) drawSurf(ctx);
+  };
+  function drawSurf(ctx) {
+    drawWave(ctx);
+    if (B.wash > 0) {
+      // the surge breaking over everything, running down
+      const c = rgbStr(G.pal().near), a = B.wash;
+      ctx.fillStyle = G.rgba(c, 0.55 * a); ctx.fillRect(-80, -80, G.W + 160, G.H + 160);
+      ctx.strokeStyle = G.rgba(WATER, 0.25 * a); ctx.lineWidth = 2;
+      ctx.beginPath();
+      for (let i = 0; i < 40; i++) { const x = (i * 97) % G.W, y = ((i * 211) % G.H) + (1 - a) * 400; ctx.moveTo(x, y); ctx.lineTo(x - 6, y + 60); }
+      ctx.stroke();
+    }
+  };
+
+  G.makeBoss(B);
+  G.BOSS_IDS.push('leviathan');
+})();

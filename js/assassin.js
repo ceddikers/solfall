@@ -49,6 +49,13 @@
     // crossing at the waist as a spent throwing arm comes home
     flick: [0.05, -40, 0, 15, 0, -14, 0, 31, -42, 0.85, -27, -44, 2.3],
     sheathe: [0.28, -37, 0, 12, 0, -12, 0, 7, -43, 1.95, -3, -41, 1.15],
+    // corrupted: the blade raised high over the hero's shadow, then driven down into it from one knee
+    pinUp: [0.3, -31, 0, 18, 0, -17, 0, 17, -76, -1.45, -12, -42, 2.7],
+    pin: [0.88, -19, 0, 19, 0, -22, 0, 31, -7, 1.5, -12, -28, 2.8],
+    // corrupted: both hands drawn back with the fingers spread, then flung forward to let the thread go
+    strings: [-0.14, -38, 0, 16, 0, -14, 0, -8, -80, -2.0, -22, -44, 2.4],
+    cast: [0.35, -36, 0, 21, 0, -16, 0, 37, -55, -0.15, 30, -45, 0.1],
+    streak: null, // (corrupted) the dash, laid along the line of a cut (set for each cut)
   };
   const NP = 13;
   function runPose(t) {
@@ -63,9 +70,10 @@
     B.clones = []; B.serial = 0;
     B.scarf = D.chain(11, b.x, b.y - 70);
     B.lights = true; B.dark = 0; B.wires = []; B.wireHit = 0;
+    B.pinned = null; B.strings = 0;
   };
-  B.onRelease = function () { const b = B.body; b.hurt = false; b.pose = 'idle'; b.hidden = false; };
-  B.onInterrupt = function () { for (const c of B.clones) smoke(c.x, c.y - 40); B.clones.length = 0; };
+  B.onRelease = function () { const b = B.body; b.hurt = false; b.pose = 'idle'; b.hidden = false; B.pinned = null; B.strings = 0; };
+  B.onInterrupt = function () { for (const c of B.clones) smoke(c.x, c.y - 40); B.clones.length = 0; B.pinned = null; B.strings = 0; };
   B.onStagger = function () { B.body.pose = 'kneel'; };
   B.staggerWord = 'CAUGHT'; B.staggerMult = 1.9; B.staggerDur = 0.7;
   B.staggerIn = function* () {
@@ -373,11 +381,13 @@
     yield* wait(0.3);
     const side = G.rng() < 0.5 ? -1 : 1;
     const L = WL + 60, R = WR - 60;
-    const up = G.arena.platforms.every((p) => p.rise >= 1);
+    // the high lane runs at the height of the platform the hero is on, or of one that is up
+    const perch = G.arena.platforms.find((p) => !p.gone && p.rise >= 1);
+    const hiY = G.player.plat ? G.player.plat.top : perch ? perch.top : FLOOR;
     const runs = [
       { x: side > 0 ? L : R, y: FLOOR, to: side > 0 ? R : L },
       { x: side > 0 ? R : L, y: FLOOR, to: side > 0 ? L : R },
-      { x: side > 0 ? L : R, y: up ? 490 : FLOOR, to: side > 0 ? R : L },
+      { x: side > 0 ? L : R, y: hiY, to: side > 0 ? R : L },
     ];
     if (K.hard()) runs.push({ x: side > 0 ? R : L, y: FLOOR, to: side > 0 ? L : R });
     const real = Math.floor(G.rng() * runs.length);
@@ -589,9 +599,480 @@
     yield* wait(0.7);
   }
 
+  // ------------------------------------------------------------------ corrupted (corrupt.js)
+  // Two attacks only the corrupted Veil uses, in the void's black and crimson.
+
+  // The ground under a point: the floor, or the top of a platform below it.
+  function groundAt(x, y) {
+    let gy = FLOOR;
+    for (const pl of G.arena.platforms) {
+      if (!pl.gone && pl.rise > 0.05 && x >= pl.x - 9 && x <= pl.x + pl.w + 9 && y <= pl.y + 4) gy = Math.min(gy, pl.y);
+    }
+    return gy;
+  }
+
+  // Where the hero's own blade reached in a swing (measured as player.js measures it).
+  function swingBox(s) {
+    const a = s.atk, r = G.hero().reach || 1, dir = a.dir || s.f;
+    if (a.kind === 'up') { const hh = (a.heavy ? 57 : 46) * r; return { cx: s.x + dir * 6, cy: s.y - 34 - hh, hw: 42 * (0.6 + 0.4 * r), hh }; }
+    if (a.kind === 'down') return { cx: s.x, cy: s.y - 28 + 42 * r, hw: 36, hh: 42 * r };
+    const hw = ((a.heavy ? 66 : 48) + (a.thrust ? 22 : 0)) * r;
+    return { cx: s.x + dir * hw, cy: s.y - 26, hw, hh: a.thrust ? 32 : a.heavy ? 48 : 36 };
+  }
+  // a melee swing in the part of it that cuts (a bow's shot and Eos's draw are carried by the body)
+  const meleeLive = (a) => !!a && a.kind !== 'shot' && a.kind !== 'draw' && a.t >= a.a0 && a.t <= a.a1;
+  // one recorded moment of the hero, as G.drawHero wants it
+  const heroState = (q, y) => ({ x: q.x, y: y == null ? q.y : y, facing: q.f, vx: q.vx, vy: q.vy, onGround: q.g, squash: q.sq || 0, runT: q.rt || 0, atk: q.atk, primed: false, hurtFlash: 0, dash: q.d });
+
+  // A past self: the hero, torn out of their own shadow. It records everything the hero does and does
+  // it again `delay` seconds later, in the same place: each step, each jump, each dash, and each swing
+  // of their own weapon, which cuts as theirs would. Where the hero steps the floor is stained with
+  // void, and where they leap motes hang in the air; both last exactly until the past self gets there.
+  function pastSelf(delay, dur, gy) {
+    const P = G.player;
+    return H.add({
+      kind: 'pastself', delay, dur, gy, rec: [], i: 0, s: null, x: P.x, y: P.y, live: false, fade: 1,
+      prints: [], lastPx: null, moteT: 0,
+      update(dt) {
+        const rec = this.rec, a = P.atk, C = G.corrupt.COL;
+        rec.push({ t: this.t, x: P.x, y: P.y, f: P.facing || 1, vx: P.vx, vy: P.vy, g: P.onGround, d: P.dashT > 0, rt: P.runT, sq: P.squash, atk: a ? Object.assign({}, a, { hit: null }) : null });
+        if (this.t <= this.dur) {
+          if (P.onGround) {
+            if (this.lastPx == null || Math.abs(P.x - this.lastPx) > 30) { this.lastPx = P.x; this.prints.push({ x: P.x, y: P.y, t: this.t, end: -1 }); }
+          } else {
+            this.lastPx = null;
+            this.moteT -= dt;
+            if (this.moteT <= 0) {
+              this.moteT = 0.045;
+              G.fx.spawn({ x: P.x + G.rand(-6, 6), y: P.y - G.rand(10, 40), vx: G.rand(-8, 8), vy: G.rand(-8, 8), life: this.delay * 0.95, size: G.rand(2.5, 4.5), color: C.blood });
+            }
+          }
+        }
+        // where the hero was, `delay` ago
+        const r = this.t - this.delay;
+        while (this.i < rec.length - 1 && rec[this.i + 1].t <= r) this.i++;
+        const s = this.s = rec[this.i];
+        this.live = r >= 0;
+        this.x = s.x; this.y = s.y; this.srcX = s.x;
+        if (this.i > 240) { rec.splice(0, this.i); this.i = 0; }
+        for (const p of this.prints) if (p.end < 0 && r >= p.t) p.end = this.t;
+        this.prints = this.prints.filter((p) => p.end < 0 || this.t - p.end < 0.25);
+        const left = this.delay + this.dur - this.t;
+        this.fade = G.clamp(left / 0.35, 0, 1);
+        if (this.live && Math.random() < dt * 30 * this.fade) G.fx.spawn({ x: s.x + G.rand(-9, 9), y: s.y - G.rand(6, 54), vx: G.rand(-20, 20), vy: -G.rand(20, 70), life: G.rand(0.3, 0.6), size: G.rand(2, 4), color: C.blood });
+        if (left <= 0) {
+          // spent: it comes apart and runs home into the hero's feet
+          this.dead = true;
+          G.audio.play('pull');
+          for (let k = 0; k < 16; k++) {
+            const tt = G.rand(0.22, 0.4), sx = s.x + G.rand(-10, 10), sy = s.y - G.rand(6, 54);
+            G.fx.spawn({ x: sx, y: sy, vx: (P.x - sx) / tt, vy: (P.y - 6 - sy) / tt, life: tt, size: G.rand(2, 4), color: C.blood });
+          }
+        }
+      },
+      hits(Pl) {
+        if (!this.live || this.t < this.delay + 0.2 || this.fade < 0.75) return false;
+        const s = this.s;
+        if (G.rectsOverlap(Pl.box(), { cx: s.x, cy: s.y - 22, hw: 12, hh: 22 })) return true;
+        return meleeLive(s.atk) && G.rectsOverlap(Pl.box(), swingBox(s));
+      },
+      // (tests) the stretch of floor it will cover in the next moment, at the hero's height
+      danger(Pl) {
+        const r = this.t - this.delay, rec = this.rec, W = 0.45;
+        if (r < -W || this.fade < 0.75) return null;
+        let lo = 1e9, hi = -1e9, tHit = 9;
+        for (let j = this.i; j < rec.length && rec[j].t <= r + W; j++) {
+          const q = rec[j];
+          if (Math.abs(q.y - Pl.y) > 64) continue;
+          let a = q.x, z = q.x;
+          if (meleeLive(q.atk)) { const sb = swingBox(q); a = Math.min(a, sb.cx - sb.hw); z = Math.max(z, sb.cx + sb.hw); }
+          lo = Math.min(lo, a); hi = Math.max(hi, z);
+          if (tHit === 9 && Pl.x > a - 30 && Pl.x < z + 30) tHit = Math.max(0, q.t - r, this.delay + 0.2 - this.t);
+        }
+        if (lo > hi) return null;
+        return [(lo + hi) / 2, (hi - lo) / 2 + 30, tHit === 9 ? 0.5 : tHit];
+      },
+      draw(ctx) {
+        const s = this.s, C = G.corrupt.COL;
+        if (!s) return;
+        // the stains it has still to walk over
+        for (const p of this.prints) {
+          const k = Math.min(1, (this.t - p.t) / 0.15) * (p.end >= 0 ? Math.max(0, 1 - (this.t - p.end) / 0.25) : 1);
+          ctx.fillStyle = G.rgba(C.void, 0.85 * k);
+          ctx.beginPath(); ctx.ellipse(p.x, p.y + 1, 10, 2.6, 0, 0, G.TAU); ctx.fill();
+          ctx.strokeStyle = G.rgba(C.blood, 0.6 * k); ctx.lineWidth = 1; ctx.stroke();
+        }
+        if (!this.live) {
+          // tearing loose: it climbs out of a pool of void where the hero stood (an older self waits
+          // in the pool until the first is out)
+          const q = this.rec[0], climb = Math.min(1.2, this.delay), k = G.clamp((this.t - (this.delay - climb)) / climb, 0, 1);
+          const e = E.outCubic(k), pr = 30 * Math.min(1, this.t * 4);
+          ctx.fillStyle = G.rgba(C.void, 0.92);
+          ctx.beginPath(); ctx.ellipse(q.x, this.gy + 1, pr, pr * 0.2, 0, 0, G.TAU); ctx.fill();
+          ctx.strokeStyle = G.rgba(C.blood, 0.75); ctx.lineWidth = 1.5; ctx.stroke();
+          voidHero(ctx, heroState(q, G.lerp(this.gy + 84, q.y, e)), 0.35 + 0.65 * k, this.gy + 1);
+          return;
+        }
+        D.glow(ctx, C.blood, s.x, s.y - 34, 46, 0.32 * this.fade);
+        voidHero(ctx, heroState(s), this.fade);
+        if (meleeLive(s.atk)) {
+          // its swing: the hero's own, in blood
+          const a = s.atk, dir = a.dir || s.f, rr = 50 * (G.hero().reach || 1) * (a.heavy ? 1.2 : 1);
+          const k = (a.t - a.a0) / Math.max(0.01, a.a1 - a.a0);
+          let a0 = -1.3, a1 = 0.9;
+          if (a.kind === 'up') { a0 = -2.7; a1 = -0.4; } else if (a.kind === 'down') { a0 = 0.4; a1 = 2.7; }
+          if (dir < 0) { const m = Math.PI - a1; a1 = Math.PI - a0; a0 = m; }
+          const head = dir > 0 ? G.lerp(a0, a1, Math.min(1, k * 1.4)) : G.lerp(a1, a0, Math.min(1, k * 1.4));
+          ctx.lineCap = 'round';
+          ctx.strokeStyle = G.rgba(C.blood, 0.75 * this.fade); ctx.lineWidth = 8;
+          ctx.beginPath(); ctx.arc(s.x, s.y - 30, rr, dir > 0 ? a0 : head, dir > 0 ? head : a1); ctx.stroke();
+          ctx.strokeStyle = G.rgba(C.hot, 0.85 * this.fade); ctx.lineWidth = 2;
+          ctx.stroke();
+        }
+      },
+    });
+  }
+
+  // Past self. She comes down beside the hero, raises her blade and drives it from one knee into the
+  // hero's shadow on the floor, which is drawn out to the point. When she pulls it free the shadow
+  // tears loose and climbs up as the hero, black and rimmed in blood, and does everything the hero
+  // does about a second behind. She leaves it to them, and from far off throws a single knife now and
+  // then at where the hero stands, so standing still is no answer either. In the last phase a second,
+  // older self climbs out after the first.
+  // (Unlike the echo, it is the hero's own body and blade, she keeps up the pressure while it runs,
+  // and it leaves no line to read: the hero has to remember where they have been.)
+  function* atkPastself() {
+    const b = B.body, P = G.player, T = K.T(), C = G.corrupt.COL;
+    yield* vanish();
+    yield* wait(0.22);
+    // down beside the hero, on whatever they stand on
+    const gy = groundAt(P.x, P.y);
+    let lo = WL + 40, hi = WR - 40;
+    if (gy < FLOOR && P.plat) { lo = P.plat.x + 14; hi = P.plat.x + P.plat.w - 14; }
+    let x = P.x - (P.facing || 1) * 88;
+    if (x < lo || x > hi) x = P.x + (P.facing || 1) * 88;
+    appear(G.clamp(x, lo, hi), gy, 'crouch');
+    b.face = P.x >= b.x ? 1 : -1;
+    // the blade goes up and is held there...
+    yield* wait(0.1);
+    b.pose = 'pinUp';
+    G.audio.play('charge', { dur: 0.4 * T });
+    yield* wait(0.12);
+    G.fx.glint(b.x + b.face * 17, b.y - 80, 22, C.hot, 0.22); G.audio.play('glint');
+    yield* wait(0.26 * T);
+    // ...and comes down, from one knee, into the hero's shadow
+    b.pose = 'pin';
+    yield* wait(0.06);
+    const tipX = b.x + b.face * 34;
+    G.audio.play('tink'); G.audio.play('slam');
+    G.fx.shake(6); G.fx.stop(0.05);
+    G.fx.burst(tipX, gy - 2, { n: 12, color: C.blood, speed: [120, 420], angle: -Math.PI / 2, spread: 1.7, life: [0.15, 0.4], kind: 'spark', size: [1.6, 3], grav: 900 });
+    G.fx.dust(tipX, gy, 4, { speed: [30, 160], size: [6, 11], up: 30 });
+    G.fx.ripple(tipX, gy - 12, 80, 0.3, 0.5);
+    B.pinned = { gy, tipX, k: 0 };
+    yield* tween(B.pinned, { k: 1 }, 0.12, E.outCubic);
+    yield* wait(0.42 * T);
+    // she pulls the blade free and the shadow tears loose
+    const sx = P.x, sgy = groundAt(P.x, P.y);
+    G.audio.play('pull'); G.audio.play('whoosh');
+    G.fx.shake(7);
+    for (let i = 0; i <= 6; i++) G.fx.burst(G.lerp(sx, tipX, i / 6), gy - 2, { n: 2, color: C.blood, speed: [60, 220], angle: -Math.PI / 2, spread: 1.2, life: [0.2, 0.45], kind: 'spark', size: [1.4, 2.6], grav: 500 });
+    B.pinned = null;
+    const dur = B.phase === 1 ? 4.2 : B.phase === 2 ? 4.8 : 5.2, t0 = B.t;
+    pastSelf(1.2, dur, sgy);
+    if (B.phase === 3) pastSelf(2.4, dur - 1.2, sgy);
+    // a spring back off the blade, and she is gone to the far side
+    const x0 = b.x, x1 = G.clamp(b.x - b.face * 64, WL + 40, WR - 40), y0 = b.y;
+    b.pose = 'air';
+    let e = 0;
+    while (e < 0.26) { e += yield; const k = Math.min(1, e / 0.26); b.x = G.lerp(x0, x1, k); b.y = y0 - 4 * 40 * k * (1 - k); }
+    b.y = y0; b.pose = 'crouch';
+    yield* wait(0.08);
+    yield* vanish();
+    yield* wait(0.3);
+    appear(P.x < 640 ? WR - 110 : WL + 110, FLOOR, 'crouch');
+    // now and then a single knife lobbed high onto where the hero stands: light, but it says do not
+    // stand still
+    const end = 1.2 + dur, gap = B.phase === 1 ? 1.3 : B.phase === 2 ? 1.15 : 1.0, tint = { boss: C.blood, hot: C.hot };
+    while (B.t - t0 < end - 0.9) {
+      b.face = P.x > b.x ? 1 : -1; b.pose = 'crouch';
+      const wind = 0.34 * T;
+      yield* wait(wind - 0.12);
+      G.fx.glint(b.x + b.face * 18, b.y - 58, 16, C.hot, 0.16);
+      yield* wait(0.12);
+      b.face = P.x > b.x ? 1 : -1; b.pose = 'throw';
+      G.audio.play('arrow');
+      const ox = b.x + b.face * 22, oy = b.y - 64, tf = 0.72, g = 1500, lx = G.clamp(P.x, WL + 30, WR - 30);
+      H.orb(ox, oy, (lx - ox) / tf, (FLOOR - 14 - oy) / tf - 0.5 * g * tf, { r: 8, grav: g, blade: true, life: 2, tint });
+      yield* wait(Math.max(0.3, gap - wind));
+    }
+    b.pose = 'sheathe';
+    while (B.t - t0 < end + 0.1) yield;
+  }
+
+  // The thread and its pin: a black kunai driven into the floor beside the hero, and a thread from
+  // it that lashes round their waist. While it holds they can go no further from the pin than its
+  // length; at the end of it the thread pulls taut, and in the air it swings them round the pin.
+  // A dash through the instant it lashes slips it. Striking the pin cuts it.
+  function threadPin(fromX, fromY, px, flyT) {
+    const P = G.player;
+    return H.add({
+      kind: 'veilpin', x: px, y: FLOOR - 16, r: 15, fx0: fromX, fy0: fromY, flyT,
+      state: 'fly', slashable: false, len: 0, tieK: 0, missed: false, taut: 0, twangT: 0, endT: 0, fadeK: 1, ringK: 0,
+      update(dt) {
+        const C = G.corrupt.COL;
+        if (this.state === 'fly') {
+          if (this.t >= this.flyT) {
+            this.state = 'whip'; this.t0 = this.t;
+            G.audio.play('tink'); G.fx.shake(4);
+            G.fx.burst(this.x, FLOOR - 2, { n: 10, color: C.blood, speed: [100, 380], angle: -Math.PI / 2, spread: 1.6, life: [0.15, 0.35], kind: 'spark', size: [1.6, 3], grav: 900 });
+            G.fx.dust(this.x, FLOOR, 3, { speed: [20, 120], size: [5, 9], up: 30 });
+          }
+        } else if (this.state === 'whip') {
+          this.tieK = Math.min(1, (this.t - this.t0) / 0.1);
+          if (P.iframes > 0) this.missed = true;
+          if (this.tieK >= 1) {
+            if (this.missed) { this.state = 'loose'; this.endT = this.t; this.mx = P.x; G.audio.play('whoosh'); }
+            else {
+              this.state = 'tied'; this.slashable = true;
+              this.len = Math.max(250, G.dist(this.x, this.y, P.x, P.y - 24) + 70);
+              G.audio.play('pull'); G.fx.shake(5);
+              G.fx.ring(P.x, P.y - 24, { r0: 34, r1: 12, life: 0.25, color: C.blood, width: 3 });
+            }
+          }
+        } else if (this.state === 'tied') {
+          this.ringK = Math.min(1, this.ringK + dt / 0.3);
+          this.leash();
+        } else {
+          // slipped, cut or let go: it goes slack and burns away
+          this.fadeK = Math.max(0, 1 - (this.t - this.endT) / 0.45);
+          this.ringK = Math.max(0, this.ringK - dt / 0.25);
+          if (this.fadeK <= 0) this.dead = true;
+        }
+        this.twangT = Math.max(0, this.twangT - dt);
+        this.taut = Math.max(0, this.taut - dt * 4);
+      },
+      leash() {
+        const C = G.corrupt.COL, L = this.len, dx = P.x - this.x, dy = (P.y - 24) - this.y, d = Math.hypot(dx, dy);
+        if (d <= L) return;
+        if (P.onGround) {
+          // standing: it holds them where they are along the ground
+          const room = Math.sqrt(Math.max(0, L * L - dy * dy));
+          if (room < 2) { P.onGround = false; P.plat = null; return; }
+          P.x = this.x + Math.sign(dx) * room;
+          if (P.vx * dx > 0) P.vx = 0;
+        } else {
+          // in the air: back onto the circle; what carried them outward is lost, so they swing
+          const nx = dx / d, ny = dy / d;
+          P.x = this.x + nx * L; P.y = this.y + ny * L + 24;
+          const vn = P.vx * nx + P.vy * ny;
+          if (vn > 0) { P.vx -= vn * nx; P.vy -= vn * ny; }
+        }
+        this.taut = 1;
+        if (this.twangT <= 0) {
+          this.twangT = 0.4;
+          G.audio.play('tink');
+          G.fx.burst(P.x, P.y - 24, { n: 4, color: C.blood, speed: [60, 200], life: [0.1, 0.25], kind: 'spark', size: [1.2, 2.2] });
+        }
+      },
+      release() { if (this.state === 'tied') { this.state = 'done'; this.endT = this.t; this.slashable = false; this.lx = P.x; this.ly = P.y - 24; } },
+      slash() {
+        if (this.state !== 'tied') return;
+        const C = G.corrupt.COL;
+        this.state = 'cut'; this.slashable = false; this.endT = this.t; this.lx = P.x; this.ly = P.y - 24;
+        G.audio.play('blade'); G.audio.play('tink');
+        G.fx.stop(0.04); G.fx.shake(6);
+        G.fx.glint(this.x, this.y - 6, 30, C.hot, 0.22);
+        G.fx.burst(this.x, this.y, { n: 16, color: C.blood, speed: [140, 520], life: [0.15, 0.4], kind: 'spark', size: [1.6, 3.2], grav: 700 });
+        G.fx.shards(this.x, this.y, 4, C.blood, { speed: [100, 320], size: [2, 4] });
+      },
+      // (tests) the ground beyond the thread's reach on the hero's side of the pin cannot be reached
+      danger(Pl) {
+        if (this.state !== 'tied') return null;
+        const sd = Math.sign(Pl.x - this.x) || 1, dy = (Pl.y - 24) - this.y;
+        const room = Math.sqrt(Math.max(0, this.len * this.len - dy * dy));
+        const edge = this.x + sd * (room - 6), far = sd > 0 ? G.W + 400 : -400;
+        return [(edge + far) / 2, Math.abs(far - edge) / 2, 9];
+      },
+      draw(ctx) {
+        const C = G.corrupt.COL, a = this.fadeK, hx = this.x, hy = FLOOR - 20;
+        ctx.save();
+        ctx.lineCap = 'round';
+        if (this.state === 'fly') {
+          const k = Math.min(1, this.t / this.flyT), x = G.lerp(this.fx0, hx, k), y = G.lerp(this.fy0, hy, k);
+          // the thread paid out behind it from her hands
+          ctx.strokeStyle = G.rgba(C.blood, 0.55); ctx.lineWidth = 1.4;
+          ctx.beginPath(); ctx.moveTo(this.fx0, this.fy0); ctx.lineTo(x, y); ctx.stroke();
+          dagger(ctx, x, y, Math.atan2(hy - this.fy0, hx - this.fx0), C.blood, C.hot, false);
+          ctx.restore();
+          return;
+        }
+        ctx.globalAlpha = a;
+        // the reach of the thread: a faint arc over the floor
+        if (this.ringK > 0.01) {
+          ctx.strokeStyle = G.rgba(C.blood, (0.24 + 0.36 * this.taut) * this.ringK); ctx.lineWidth = 2;
+          ctx.setLineDash([6, 9]); ctx.lineDashOffset = this.t * 20;
+          ctx.beginPath(); ctx.arc(hx, this.y, this.len * (0.92 + 0.08 * this.ringK), Math.PI, G.TAU); ctx.stroke();
+          ctx.setLineDash([]);
+        }
+        // the thread
+        ctx.globalCompositeOperation = 'lighter';
+        const line = (x0, y0, x1, y1, sag, w) => {
+          const mx = (x0 + x1) / 2, my = (y0 + y1) / 2 + sag;
+          for (const [lw, col, al] of [[w * 3, C.blood, 0.35], [w, C.blood, 0.9], [w * 0.45, C.hot, 0.8]]) {
+            ctx.strokeStyle = G.rgba(col, al); ctx.lineWidth = lw;
+            ctx.beginPath(); ctx.moveTo(x0, y0); ctx.quadraticCurveTo(mx, my, x1, y1); ctx.stroke();
+          }
+        };
+        if (this.state === 'whip') {
+          const tx = P.x, ty = P.y - 24, k = this.tieK;
+          line(hx, hy, G.lerp(hx, tx, k), G.lerp(hy, ty, k), 0, 1.6);
+        } else if (this.state === 'tied') {
+          const tx = P.x, ty = P.y - 24, d = G.dist(hx, hy, tx, ty), slack = Math.max(0, this.len - d);
+          const jit = this.taut * Math.sin(this.t * 90) * 1.6;
+          line(hx, hy, tx, ty, Math.min(70, slack * 0.45) + jit, 1.4 + 0.8 * this.taut);
+          // the loop round the hero's waist
+          ctx.strokeStyle = G.rgba(C.blood, 0.8); ctx.lineWidth = 1.5;
+          ctx.beginPath(); ctx.ellipse(tx, ty, 13, 4.5, 0, 0, G.TAU); ctx.stroke();
+        } else if (this.state === 'loose') {
+          // slipped: it lashes on past and falls along the floor
+          const k = Math.min(1, (this.t - this.endT) / 0.2);
+          line(hx, hy, G.lerp(this.mx, hx + (this.mx - hx) * 1.3, k), G.lerp(FLOOR - 40, FLOOR - 2, k), 10 * (1 - k), 1.2);
+        } else {
+          // cut or let go: the thread drops slack from where it held the hero
+          const k = Math.min(1, (this.t - this.endT) / 0.3);
+          line(hx, hy, this.lx, G.lerp(this.ly, FLOOR - 2, k * k), 40 * k, 1.2);
+        }
+        ctx.globalCompositeOperation = 'source-over';
+        // the pin, standing in the floor
+        dagger(ctx, hx, hy, Math.PI / 2, C.blood, C.hot, false);
+        ctx.restore();
+      },
+    });
+  }
+
+  // Threads. She draws both hands back with the fingers spread, and strings glint between them.
+  // Then a pin goes into the floor beside the hero and its thread lashes round them, and she cuts
+  // across the circle it allows: from wherever she is, through the hero, to the far side of it,
+  // over and over, each cut ending where the next begins. Cut the pin and the thread whips back and
+  // throws her down; or stay inside and step off each line (jump the flat ones). A dash as the thread
+  // lashes slips it altogether.
+  function* atkThreads() {
+    // (its cuts burn crimson rather than white: a band of blood with a pale heart, not a flash)
+    const b = B.body, P = G.player, T = K.T(), C = G.corrupt.COL, tint = { boss: C.blood, hot: '255,140,170' };
+    yield* vanish();
+    yield* wait(0.22);
+    appear(P.x < 640 ? Math.min(WR - 110, P.x + 430) : Math.max(WL + 110, P.x - 430), FLOOR, 'crouch');
+    yield* wait(0.14);
+    // the tell
+    b.face = P.x > b.x ? 1 : -1;
+    b.pose = 'strings';
+    G.audio.play('pull');
+    const tele = 0.66 * T;
+    yield* par(tween(B, { strings: 1 }, 0.3, E.outCubic), wait(tele * 0.6));
+    G.audio.play('glint');
+    for (const i of [7, 10]) G.fx.glint(b.x + b.face * b.p[i], b.y + b.p[i + 1], 16, C.hot, 0.2);
+    yield* wait(tele * 0.4);
+    // let go: a pin into the floor beside the hero, towards the middle of the arena
+    b.face = P.x > b.x ? 1 : -1;
+    b.pose = 'cast';
+    G.audio.play('arrowHeavy'); G.fx.shake(3);
+    const px = G.clamp(P.x + (P.x < 640 ? 1 : -1) * 110, WL + 70, WR - 70);
+    const pin = threadPin(b.x + b.face * 34, b.y - 56, px, 0.16);
+    yield* par(tween(B, { strings: 0 }, 0.22, E.inQuad), wait(0.2));
+    while (pin.state === 'fly' || pin.state === 'whip') yield;
+    if (pin.state !== 'tied') {
+      // slipped: she is caught with her hands out
+      yield* wait(0.25);
+      b.pose = 'skid'; b.exposed = true;
+      yield* wait(0.9);
+      b.exposed = false;
+      return;
+    }
+    yield* wait(0.18);
+    // the cuts: the first from where she stands, then each from a spring to the edge of the circle;
+    // the higher up the edge, the steeper the cut. From the floor it runs flat.
+    const rise = B.phase === 3 ? [null, 1.25, 0, 0.9] : [null, 1.05, 1.3];
+    const n = B.phase === 3 ? 3 : 2; // (kept short: the thread is the pressure, not the number of cuts)
+    for (let i = 0; i < n && pin.state === 'tied'; i++) yield* threadCut(pin, i ? (rise[i] == null ? 0.6 : rise[i]) : null, (i ? 0.46 : 0.6) * T, tint);
+    if (pin.state === 'tied') pin.release();
+    if (b.y < FLOOR - 1) {
+      b.pose = 'air';
+      yield* tween(b, { y: FLOOR }, 0.24, E.inQuad);
+      G.fx.thud(b.x, FLOOR, 0.6, { noCrack: true }); G.audio.play('land');
+    }
+    if (pin.state === 'cut') {
+      // the thread whips back and takes her off her feet
+      G.audio.play('whoosh'); G.audio.play('hit');
+      G.fx.cut((pin.x + b.x) / 2, (pin.y + b.y - 40) / 2, Math.atan2(b.y - 40 - pin.y, b.x - pin.x), Math.max(40, G.dist(pin.x, pin.y, b.x, b.y - 40)), 4, C.blood, C.hot, 0.3);
+      b.kx = G.sign(b.x - pin.x) * 14; b.recV = G.sign(b.x - pin.x) * 4;
+      b.pose = 'kneel'; b.exposed = true;
+      G.fx.dust(b.x, FLOOR, 5, { speed: [40, 200], size: [6, 12], up: 40 });
+      yield* wait(1.2);
+      b.exposed = false;
+    } else {
+      b.pose = 'skid';
+      yield* wait(0.6);
+    }
+  }
+
+  // One cut of the threads. If asked to, she first springs up the edge of the circle; then she
+  // hangs a moment, her blade glints, and she goes through the hero to the far edge of the circle.
+  function* threadCut(pin, rise, tele, tint) {
+    const b = B.body, P = G.player, C = G.corrupt.COL, R = pin.len + 34;
+    if (rise != null) {
+      // to the edge of the circle on the far side of the pin from the hero, as high as asked
+      const sd = -(G.sign(P.x - pin.x) || 1);
+      const tx = G.clamp(pin.x + sd * R * Math.cos(rise), WL + 40, WR - 40), ty = Math.min(FLOOR, pin.y - R * Math.sin(rise) + 40);
+      const x0 = b.x, y0 = b.y, dur = 0.2 + Math.hypot(tx - x0, ty - y0) / 3000, arc = ty >= FLOOR - 1 ? 60 : 30;
+      if (b.y >= FLOOR - 1) { b.pose = 'crouch'; yield* wait(0.06); G.fx.dust(b.x, FLOOR, 3, { speed: [30, 140], size: [5, 9], up: 30 }); }
+      b.pose = 'air'; b.face = G.sign(tx - x0) || b.face; G.audio.play('whoosh');
+      let e = 0;
+      while (e < dur) {
+        e += yield;
+        const k = Math.min(1, e / dur), q = E.outQuad(k);
+        b.x = G.lerp(x0, tx, q); b.y = G.lerp(y0, ty, q) - 4 * arc * k * (1 - k);
+      }
+      b.x = tx; b.y = ty;
+      if (ty >= FLOOR - 1) { b.pose = 'crouch'; G.fx.dust(b.x, FLOOR, 3, { speed: [30, 140], size: [5, 9], up: 30 }); }
+    }
+    // aim through where the hero stands
+    const gy = groundAt(P.x, P.y), tx = P.x, ty = (P.onGround ? P.y : gy) - 24;
+    const ox = b.x, oy = b.y - 40, ang = Math.atan2(ty - oy, tx - ox), c = Math.cos(ang), s = Math.sin(ang);
+    // as far as the far edge of the circle, a wall or the floor
+    const fx = ox - pin.x, fy = oy - pin.y, bq = fx * c + fy * s, cq = fx * fx + fy * fy - R * R;
+    let len = -bq + Math.sqrt(Math.max(0, bq * bq - cq));
+    if (c > 0.01) len = Math.min(len, (WR - 30 - ox) / c); else if (c < -0.01) len = Math.min(len, (WL + 30 - ox) / c);
+    if (s > 0.02) len = Math.min(len, (FLOOR - 2 - oy) / s);
+    len = Math.max(len, G.dist(ox, oy, tx, ty) + 40);
+    b.face = c >= 0 ? 1 : -1; b.pose = b.y < FLOOR - 1 ? 'air' : 'crouch';
+    H.beam({ ox, oy, ang, maxLen: len, clip: true, width: 18, tele, lock: 99, active: 0.1, fade: 0.25, sfx: 'blade', shake: 4, tint });
+    yield* wait(Math.max(0, tele - 0.18));
+    G.fx.glint(b.x + b.face * 20, b.y - 44, 24, C.hot); G.audio.play('glint');
+    yield* wait(Math.min(tele, 0.18));
+    // the cut: she is the blade, all along the line, her body laid along it
+    const tilt = b.face > 0 ? ang : Math.PI - ang;
+    POSES.streak = POSES.dash.slice(); POSES.streak[2] = Math.atan2(Math.sin(tilt), Math.cos(tilt));
+    b.pose = 'streak'; G.audio.play('streak');
+    const x0 = b.x, y0 = b.y, x1 = ox + c * len, y1 = Math.min(FLOOR, oy + s * len + 40), dur = Math.max(0.08, len / 2600);
+    let e = 0;
+    while (e < dur) {
+      e += yield;
+      const k = Math.min(1, e / dur);
+      b.x = G.lerp(x0, x1, k); b.y = G.lerp(y0, y1, k);
+      G.fx.spawn({ x: b.x - c * 20, y: b.y - G.rand(10, 60), vx: -c * G.rand(40, 200), vy: -s * G.rand(40, 200), life: 0.25, size: G.rand(4, 9), color: G.pal().boss });
+    }
+    G.fx.cut((x0 + x1) / 2, (y0 + y1) / 2 - 40, ang, len, 5, C.blood, C.hot, 0.35);
+    if (b.y >= FLOOR - 1) {
+      b.y = FLOOR; b.pose = 'skid';
+      G.fx.dust(b.x, FLOOR, 4, { dir: b.face, speed: [60, 240], size: [6, 11], up: 30 });
+    } else b.pose = 'air';
+    yield* wait(0.14);
+  }
+
   // Back to rest. After a cut it flicks both blades clean; after a throw the arm comes home across
   // its waist; after an ambush it tears the blade out of the floor and springs back off it.
-  const THROWS = { knives: 1, rain: 1, hunt: 1, flurry: 1 };
+  const THROWS = { knives: 1, rain: 1, hunt: 1, flurry: 1, pastself: 1 };
   B.recover = function* (name) {
     const b = B.body, P = G.player;
     if (b.hidden || b.y < FLOOR - 1) return;
@@ -625,7 +1106,10 @@
     echo: atkEcho,
     lunge: atkLunge, pincer: atkPincer, flurry: atkFlurry, knives: atkKnives, ambush: atkAmbush, backstab: atkBackstab,
     mirror: atkMirror, rain: atkRain, cross: atkCross, cuts: atkCuts, mark: atkMark,
+    // corrupted only (corrupt.js)
+    pastself: atkPastself, threads: atkThreads,
   };
+  B.corruptBags = { 1: ['pastself'], 2: ['pastself', 'threads'], 3: ['pastself', 'threads'] };
 
   // ------------------------------------------------------------------ scenes
   B.enter = function* () {
@@ -715,7 +1199,7 @@
   function stepPose(a, dt) {
     if (a.pose === 'run') a.runT += dt * 15;
     const target = a.pose === 'run' ? runPose(a.runT) : (POSES[a.pose] || POSES.idle);
-    const k = 1 - Math.exp(-(a.pose === 'dash' || a.pose === 'dive' ? 60 : 24) * dt);
+    const k = 1 - Math.exp(-(a.pose === 'dash' || a.pose === 'dive' || a.pose === 'streak' ? 60 : 24) * dt);
     for (let i = 0; i < NP; i++) a.p[i] += (target[i] - a.p[i]) * k;
   }
 
@@ -858,6 +1342,44 @@
     ctx.restore();
   }
 
+  // The hero as the void draws them (a past self): their own silhouette in black, rimmed in blood,
+  // with a slit of crimson for eyes. Drawn into a small canvas, then laid down twice.
+  let voidCv = null, voidOut = null;
+  const VW = 180, VH = 180, VX = 90, VY = 140, VS = 2;
+  function voidHero(ctx, s, alpha, clipY) {
+    const C = G.corrupt.COL, W = VW * VS, Hh = VH * VS;
+    if (!voidCv) {
+      voidCv = document.createElement('canvas'); voidCv.width = W; voidCv.height = Hh;
+      voidOut = document.createElement('canvas'); voidOut.width = W; voidOut.height = Hh;
+    }
+    const d = voidCv.getContext('2d'), o = voidOut.getContext('2d');
+    d.setTransform(1, 0, 0, 1, 0, 0); d.globalCompositeOperation = 'source-over'; d.globalAlpha = 1;
+    d.clearRect(0, 0, W, Hh);
+    d.setTransform(VS, 0, 0, VS, VX * VS, VY * VS);
+    G.drawHero(d, G.hero(), Object.assign({}, s, { x: 0, y: 0 }));
+    d.setTransform(1, 0, 0, 1, 0, 0);
+    d.globalCompositeOperation = 'source-in';
+    d.fillStyle = G.rgba(C.blood, 1); d.fillRect(0, 0, W, Hh);
+    // the rim: the silhouette in blood, a hair larger on every side; then the body over it in black
+    o.globalCompositeOperation = 'source-over'; o.globalAlpha = 1;
+    o.clearRect(0, 0, W, Hh);
+    o.globalAlpha = 0.85;
+    for (const q of [[-3.4, 0], [3.4, 0], [0, -3.4], [0, 2.8]]) o.drawImage(voidCv, q[0], q[1]);
+    d.fillStyle = C.dark; d.fillRect(0, 0, W, Hh);
+    o.globalAlpha = 1;
+    o.drawImage(voidCv, 0, 0);
+    const x = s.x - VX, y = s.y - VY;
+    ctx.save();
+    if (clipY != null) { ctx.beginPath(); ctx.rect(x - 4, y - 4, VW + 8, clipY - y + 4); ctx.clip(); }
+    ctx.globalAlpha = alpha;
+    ctx.drawImage(voidOut, x, y, VW, VH);
+    // eyes
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.fillStyle = G.rgba(C.hot, 0.9 * alpha);
+    ctx.beginPath(); ctx.ellipse(s.x + s.facing * 5, s.y - 58, 3.2, 1.1, s.facing * 0.2, 0, G.TAU); ctx.fill();
+    ctx.restore();
+  }
+
   B.drawGround = function (ctx) {
     const b = B.body;
     if (B.dead) return;
@@ -909,6 +1431,7 @@
     if (!b.hidden) eye(b, pal.boss, 1);
     for (const c of B.clones) eye(c, pal.boss, c.hurt ? 1 : 0.7);
     ctx.globalCompositeOperation = 'source-over';
+    drawStrings(ctx, B.dark);
   };
 
   B.draw = function (ctx) {
@@ -937,6 +1460,22 @@
       figure(ctx, c, 0.78);
     }
     if (b.hidden) return;
+    if (B.pinned) {
+      // (corrupted) the hero's shadow, drawn out along the floor to her blade and held there
+      const C = G.corrupt.COL, pn = B.pinned, k = pn.k, P = G.player, gy = pn.gy;
+      const fx = G.lerp(pn.tipX, P.x, k), dir = Math.sign(pn.tipX - fx) || 1, mx = (fx + pn.tipX) / 2, wob = Math.sin(G.t * 40) * 0.8;
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.lineCap = 'round';
+      for (const [w, al] of [[12, 0.16], [5, 0.4]]) {
+        ctx.strokeStyle = G.rgba(C.blood, al * k); ctx.lineWidth = w;
+        ctx.beginPath(); ctx.moveTo(fx - dir * 14, gy + 1); ctx.quadraticCurveTo(mx, gy - 2 + wob, pn.tipX, gy); ctx.stroke();
+      }
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.fillStyle = G.rgba(C.void, 0.95);
+      ctx.beginPath(); ctx.moveTo(fx - dir * 18, gy - 3);
+      ctx.quadraticCurveTo(mx, gy - 5 + wob, pn.tipX, gy - 0.5); ctx.quadraticCurveTo(mx, gy + 6, fx - dir * 18, gy + 5); ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = G.rgba(C.blood, 0.9); ctx.lineWidth = 1.4; ctx.stroke();
+    }
     // the scarf: two glowing tails
     ctx.lineCap = 'round';
     ctx.globalCompositeOperation = 'lighter';
@@ -957,7 +1496,26 @@
       }
     }
     figure(ctx, b, 1);
+    drawStrings(ctx, 1);
   };
+  // (corrupted) strings between her spread fingers, catching the light; in the dark they show
+  // through it, as her eyes do
+  function drawStrings(ctx, al) {
+    const b = B.body;
+    if (B.strings > 0.01 && !b.hidden && al > 0.01) {
+      const C = G.corrupt.COL, k = B.strings * al, p = b.p;
+      const h1x = b.x + b.face * p[7], h1y = b.y + p[8], h2x = b.x + b.face * p[10], h2y = b.y + p[11];
+      ctx.globalCompositeOperation = 'lighter'; ctx.lineWidth = 1.2;
+      for (let j = 0; j < 4; j++) {
+        const o = (j - 1.5) * 4.5;
+        ctx.strokeStyle = G.rgba(C.blood, (0.45 + 0.2 * Math.sin(G.t * 9 + j)) * k);
+        ctx.beginPath(); ctx.moveTo(h1x, h1y + o); ctx.quadraticCurveTo((h1x + h2x) / 2, (h1y + h2y) / 2 + o * 1.4 + 3, h2x, h2y - o * 0.6); ctx.stroke();
+        const q = (G.t * 1.6 + j * 0.29) % 1;
+        D.glow(ctx, C.hot, G.lerp(h1x, h2x, q), G.lerp(h1y + o, h2y - o * 0.6, q) + Math.sin(Math.PI * q) * (o * 0.7 + 1.5), 5, 0.8 * k * Math.sin(Math.PI * q));
+      }
+      ctx.globalCompositeOperation = 'source-over';
+    }
+  }
 
   G.makeBoss(B);
 })();

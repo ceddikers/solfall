@@ -12,7 +12,7 @@
     numbers: { values: [false, true], label: (v) => (v ? 'On' : 'Off') },
     polish: { values: [false, true], label: (v) => (v ? 'On' : 'Off') },
     hints: { values: [false, true], label: (v) => (v ? 'On' : 'Off') },
-    firstFoe: { values: ['random', 'warden', 'mage', 'assassin', 'knight'], label: (v) => (G.bosses[v] ? G.bosses[v].short : 'Random') },
+    firstFoe: { values: ['random'].concat(G.BOSS_IDS), label: (v) => (G.bosses[v] ? G.bosses[v].short : 'Random') },
     music: { slider: true },
     sfx: { slider: true },
   };
@@ -42,7 +42,7 @@
       'hint', 'lowhp', 'lbTop', 'lbBot', 'diffNote', 'bestLine', 'ver', 'deadLead', 'deadFill', 'deadStats',
       'pauseBoons', 'boons', 'trial', 'winOver', 'winPick', 'winCards', 'heroName', 'heroCards', 'relicCards', 'relicOver',
       'deadTip', 'winStats', 'winBest', 'gradeLetter', 'gradeTitle', 'gradeSub', 'stage',
-      'practiceOver', 'keyList', 'resetItem', 'movesOver', 'movesTitle', 'movesBody', 'movesFoot', 'ult', 'ultFill', 'ultKey', 'flow', 'flowRank', 'flowFill', 'omen', 'shardCount', 'shrineLead', 'shrineList', 'shrineTrophies', 'rerollItem', 'featsLead', 'featsBody', 'helpBody', 'helpTabs']) el[id] = $(id);
+      'practiceOver', 'keyList', 'resetItem', 'movesOver', 'movesTitle', 'movesBody', 'movesFoot', 'ult', 'ultFill', 'ultKey', 'flow', 'flowRank', 'flowFill', 'omen', 'shardCount', 'shrineLead', 'shrineList', 'shrineTrophies', 'rerollItem', 'featsLead', 'featsBody', 'helpBody', 'helpTabs', 'fountainLead', 'fountainList']) el[id] = $(id);
     el.segs = Array.from(document.querySelectorAll('#ember .seg'));
     el.bbar = document.querySelector('.bbar');
     el.bname = document.getElementById('bname');
@@ -80,6 +80,7 @@
     return Array.from(document.querySelectorAll('#s-' + U.current + ' .item')).filter((it) => it.style.display !== 'none');
   };
   U.setFocus = function (i) {
+    document.body.classList.toggle('pad', G.input.device === 'gamepad');
     const items = U.items();
     U.focus = G.clamp(i, 0, items.length - 1);
     items.forEach((it, k) => it.classList.toggle('focus', k === U.focus));
@@ -102,7 +103,7 @@
     const prev = U.stack.pop();
     if (prev) { U.show(prev, false); G.audio.play('uiBack'); }
     // a screen opened from the camp closes back onto it
-    else if (G.state === 'hub' && U.current) { U.close(); G.audio.play('uiBack'); G.input.endStep(); }
+    else if ((G.state === 'hub' || G.state === 'rest') && U.current) { U.close(); G.audio.play('uiBack'); G.input.endStep(); }
   };
 
   function setOpt(opt, v) {
@@ -133,9 +134,11 @@
     else if (/^relic\d$/.test(name)) G.pickRelic(Number(name.slice(5)));
     else if (/^boon\d$/.test(name)) G.takeBoon(Number(name.slice(4)));
     else if (name === 'endrun') G.toHub('gate');
+    else if (name === 'rest') G.toRest();
     else if (name === 'reroll') G.rerollBoons();
     else if (name === 'shrine') U.showShrine();
     else if (/^shrine\d$/.test(name)) buy(Number(name.slice(6)));
+    else if (/^cleanse\d$/.test(name)) cleanse(Number(name.slice(7)));
     else if (name === 'how') U.show('how', true);
     else if (name === 'help') U.showHelp();
     else if (/^help\d$/.test(name)) U.fillHelp(Number(name.slice(4)));
@@ -175,7 +178,7 @@
     else if (a === 'pause') {
       if (U.stack.length) U.back();
       else if (U.current === 'pause' || U.current === 'moves') { G.audio.play('uiBack'); G.movesHeld = false; G.resume(); }
-      else if (G.state === 'hub') U.back();
+      else if (G.state === 'hub' || G.state === 'rest') U.back();
     }
     else if (a === 'retry') {
       if (U.current === 'dead') act('retry');
@@ -229,17 +232,43 @@
       + (got.length ? ': ' + got.map((t) => t.name).join(', ') + '.' : '. The first victory over each boss adds its relic to those you can be offered.');
   };
   U.showShrine = function () { U.fillShrine(); U.show('shrine', true); };
+  // ---- the Cleansing Fountain (rest.js): one row for each corrupted boon whose bane you still carry
+  U.fillFountain = function () {
+    const R = G.run, banes = R.banes(), cost = R.cleanseCost();
+    el.fountainLead.innerHTML = 'You hold <b style="color:var(--gold)">' + G.meta.shards + '</b> Sunshards. Each cleansing this run costs twice the last.';
+    Array.from(el.fountainList.children).forEach((row, i) => {
+      const id = banes[i], b = id && G.boonDef(id);
+      row.style.display = b ? '' : 'none';
+      if (!b) return;
+      row.querySelector('.uname').textContent = b.name;
+      row.querySelector('.udesc').textContent = 'Purge: ' + b.bane;
+      row.querySelector('.ucost').textContent = cost + ' \u25c6';
+      row.classList.toggle('poor', G.meta.shards < cost);
+    });
+  };
+  U.showFountain = function () { U.fillFountain(); U.show('fountain', true); };
+  function cleanse(i) {
+    const id = G.run.banes()[i];
+    if (!id || !G.run.cleanse(id)) { G.audio.play('empty'); return; }
+    G.audio.play('heal'); G.audio.play('segment');
+    G.rest.retake(); // the hero, remade without the bane
+    const P = G.player;
+    G.fx.ring(P.x, P.y - 24, { r0: 10, r1: 120, life: 0.5, color: '170,220,255', width: 5 });
+    G.fx.burst(P.x, P.y - 20, { n: 22, color: '170,220,255', speed: [20, 140], life: [0.6, 1.2], size: [2, 4], grav: -200, wob: 100, jitter: 20 });
+    G.fx.burst(P.x, P.y - 20, { n: 12, color: '235,30,80', speed: [60, 220], life: [0.3, 0.7], size: [2, 3], kind: 'spark' });
+    if (!G.run.banes().length) { U.close(); G.input.endStep(); } else { U.fillFountain(); U.refresh(); U.setFocus(0); }
+  }
   // ---- Help: how a fight goes, and every word the game uses, by subject
   // steps: a numbered account. words: [the word, what it means].
   const HELP = [
-    { name: 'How a fight works', lead: 'One hero, one boss, one arena. The run goes on, boss after boss, until you fall.', steps: [
+    { name: 'How a fight works', lead: 'One hero, one boss, one arena. A run is six of them: the first at random, then each one you choose at its portal, until you win or fall.', steps: [
       '<b>The boss has three phases.</b> Its health bar is cut in three. Each time a third is gone it changes: new attacks, less rest.',
       '<b>Red-orange is a warning.</b> It marks where an attack will land. When it fills and flashes, the attack fires.',
       '<b>Leave the marked place, or dash through the attack.</b> A dash passes straight through anything.',
       '<b>Strike between its attacks.</b> Every hit fills your Starlight, your Flow, your Dawnbreak and the boss’s stagger bar.',
       '<b>Fill the stagger bar</b> and the boss is thrown down, open, for a few seconds. Save your biggest blows for then.',
-      '<b>Twice it wards itself</b> and gathers a blast: a Reckoning. Break the ward before the ring closes on it.',
-      '<b>When its health is gone it falls.</b> You are graded, paid in Sunshards and offered a boon. Then the next trial: another boss, harder.',
+      '<b>The Warden wards itself twice</b> and gathers a blast: its Eclipse. Break the ward before the ring closes on it, while its hands come down on you in turn.',
+      '<b>When its health is gone it goes down and stays down.</b> Press <kbd>' + G.input.label('heal') + '</kbd> close to it for your hero’s finishing blow, or just hit it to end the fight plainly. Then you are graded, paid in Sunshards and offered a boon. Then the next trial: another boss, harder.',
       '<b>When your health is gone the run ends</b> and you wake in the Vigil. What you bought at the Shrine is still yours.',
     ] },
     { name: 'Attacking', lead: 'What your weapon does, and the blows that are worth more.', words: [
@@ -272,16 +301,21 @@
     ] },
     { name: 'Bosses', lead: 'Words for what a boss does.', words: [
       ['Phase', 'A third of a boss’s health, marked I, II, III beside its name. Each one brings new attacks.'],
-      ['Reckoning', 'Once in phase I and once in phase II the boss goes to the middle, wards itself and gathers a blast while a red ring closes on it for 6.5 seconds.'],
-      ['Ward', 'The shell round the boss during a Reckoning. Your hits go to it, shown as a gold arc. Break it and the boss is staggered and Dawnbreak gains a quarter of its bar.'],
+      ['Reckoning', 'The Warden only (it calls it Eclipse). Once in phase I and once in phase II it goes to the middle, wards itself and gathers a blast while a red ring closes on it for 6.5 seconds. Its hands guard it: they come down on you in turn, and each sends a wave along the floor.'],
+      ['Ward', 'The shell round the Warden during its Reckoning. Your hits go to it, shown as a gold arc. Break it and the Warden is staggered and Dawnbreak gains a quarter of its bar.'],
       ['Tell', 'See Staying alive. Each boss tells in its own way: the Veil by tempo, the Knight by its foot and blade, the Magus by its staff, the Warden by its eye and fist.'],
       ['One last push', 'Called out when a boss is under a tenth of its health.'],
       ['Omen', 'From the second trial a fight carries an omen that changes it (a storm, falling embers, a faster or tougher boss); from the sixth, two. Each adds 25% Sunshards.'],
     ] },
     { name: 'A run', lead: 'From the gate to the fall.', words: [
       ['Trial', 'One fight of a run. Each trial is against another boss and is harder than the last.'],
-      ['Relic', 'One power chosen at the reliquary before the gate. It lasts the whole run.'],
+      ['Portal', 'After each trial, at the crossroads, walk into a boss\u2019s portal to fight it next. A beaten boss\u2019s portal is sealed.'],
+      ['Corrupted', 'Now and then a beaten boss\u2019s portal turns corrupted: an optional, far harder fight that is not a trial. Win it for a second relic and three times the Sunshards; fall in it and the run ends.'],
+      ['Relic', 'One power chosen at the reliquary before the gate. It lasts the whole run, and stays with you if you fall and go again; it is given up only by going back to the camp.'],
       ['Boon', 'A smaller power chosen after each victory. They add up through the run.'],
+      ['Pair', 'A gold boon offered only once you hold both of the two boons it joins. A card that would open one says so.'],
+      ['Corrupted boon', 'A crimson boon, far stronger than the rest, with a drawback written under it. Once a boss has fallen, one sometimes takes a card\u2019s place.'],
+      ['Cleansing Fountain', 'At the crossroads. Spend Sunshards to purge a corrupted boon\u2019s drawback and keep the rest of it. Each use in a run costs twice the last.'],
       ['Grade', 'S, A, B or C for a victory. Every blow you take lowers it, and so does a fight that runs past two and a half minutes; perfect dodges raise it. A better grade pays more.'],
       ['Sunshards', 'What every fight pays, win or lose. They are kept between runs and spent at the Shrine.'],
       ['Trophy', 'The first victory over each boss adds its relic to those the reliquary can offer.'],
@@ -289,12 +323,12 @@
     ] },
     { name: 'The Vigil', lead: 'Your camp, from left to right.', words: [
       ['The old bell, the lantern', 'Toys. Keep the bell ringing; keep the lantern off the ground.'],
-      ['Hall of Echoes', 'Three alcoves, one for each hero. Use one to play as that hero.'],
+      ['Hall of Echoes', 'An alcove for each hero. Use one to play as that hero.'],
       ['The Tally', 'A standing stone with a mark for every feat.'],
       ['The Shrine', 'Spend Sunshards on things that last: health, damage, a fourth relic or boon to choose from.'],
       ['Sparring post', 'It cannot be hurt for good. Try every attack on it; Dawnbreak charges three times as fast here.'],
       ['The Brazier', 'Its flame is the difficulty: more health and longer warnings, or fewer and shorter.'],
-      ['The Banners, the Proving Ring', 'Choose which boss comes first, then practise against it from any phase, with nothing at stake.'],
+      ['The Proving Ring', 'Practise against any boss you choose, from any phase, with nothing at stake. A real run never tells you who comes next.'],
       ['The Reliquary, the Gate', 'Take a relic from a plinth, then step through the gate to begin the run.'],
     ] },
   ];
@@ -313,7 +347,7 @@
     const FE = G.feats;
     const row = (f) => '<div class="feat' + (FE.done(f.id) ? ' done' : '') + '"><b>' + f.name + '</b><span>' + f.desc + '</span><i>' + (FE.done(f.id) ? 'done' : '\u25c6 ' + f.pay) + '</i></div>';
     el.featsLead.innerHTML = '<b style="color:var(--gold)">' + FE.count() + '</b> of ' + FE.total + ' done. Each pays its Sunshards once, the first time you do it.';
-    el.featsBody.innerHTML = FE.BOSSES.map((b) => '<div class="featcol"><h3>' + G.bosses[b].short + '</h3>' + FE.of(b).map(row).join('') + '</div>').join('')
+    el.featsBody.innerHTML = FE.BOSSES.filter((b) => G.bosses[b]).map((b) => '<div class="featcol"><h3>' + G.bosses[b].short + '</h3>' + FE.of(b).map(row).join('') + '</div>').join('')
       + '<div class="featcol wide"><h3>The Vigil</h3>' + FE.CAMP.map(row).join('') + '</div>';
     U.show('feats', true);
   };
@@ -322,7 +356,7 @@
     const h = G.hero(), I = G.input, k = (a) => I.keys(a).map((n) => '<kbd>' + n + '</kbd>').join(' ');
     const jumps = 1 + h.air + G.boon('wind') + (G.relic('cloak') ? 1 : 0);
     const rows = [
-      ['Move', k('left') + ' ' + k('right'), 'Run. ' + (h.heavy ? 'She is heavy: slower to start, slower to stop.' : h.id === 'lune' ? 'The fastest of them.' : h.draw ? 'She slows to a walk while she holds her stance.' : 'Quick on her feet.')],
+      ['Move', k('left') + ' ' + k('right'), 'Run. ' + (h.heavy ? 'She is heavy: slower to start, slower to stop.' : h.id === 'lune' ? 'The fastest of them.' : h.draw ? 'He slows to a walk while he holds his stance.' : 'Quick on her feet.')],
       ['Jump', k('jump'), 'Jump; press again in the air (' + jumps + ' jumps in all). Hold for height. Down and jump drops through a platform.'],
       ['Attack', k('attack') + ' or left click', h.how.attack],
       ['Aim', k('up') + ' ' + k('down'), h.how.aim],
@@ -341,8 +375,7 @@
 
   // ---- the proving ring: practise against one boss, from any phase
   U.showPractice = function () {
-    const f = G.settings.firstFoe;
-    el.practiceOver.textContent = G.bosses[f] && f !== 'dummy' ? G.bosses[f].short : 'A foe at random';
+    el.practiceOver.textContent = 'The Proving Ring';
     U.show('practice', true);
   };
   // ---- Settings, Controls: choose a row, then press the key it should use
@@ -407,7 +440,9 @@
     el.pauseBoons.innerHTML = (held.length || relic || omens)
       ? '<h3>' + G.hero().name + '\u2019s run</h3>' + omens
         + (relic ? '<p><b>' + relic.name + '</b> ' + relic.desc + '</p>' : '')
-        + held.map((h) => '<p><b>' + h.def.name + (h.n > 1 ? ' \u00d7' + h.n : '') + '</b> ' + h.def.desc + '</p>').join('')
+        + (G.run.extraRelics || []).map((id) => G.relicDef(id)).filter(Boolean).map((r) => '<p><b>' + r.name + '</b> ' + r.desc + ' <i>(from a corrupted portal)</i></p>').join('')
+        + held.map((h) => '<p' + (h.def.cursed ? ' class="cursed"' : '') + '><b>' + h.def.name + (h.n > 1 ? ' \u00d7' + h.n : '') + '</b> ' + esc(h.def.desc) + U.pairNote(h.def)
+          + (h.def.cursed ? (G.bane(h.def.id) ? '<span class="bane">' + esc(h.def.bane) + '</span>' : ' <i>(cleansed)</i>') : '') + '</p>').join('')
       : '';
   };
 
@@ -415,7 +450,7 @@
   const H = { hp: -1, max: -1, ember: -1, full: -1, fill: -1, chip: 1, chipShown: -1, poise: -1, timer: '', phase: 0, low: null, mend: null, broken: null, introK: 1, introDelay: 0, hintT: 0, hitT: 0, lastHp: 0 };
 
   // camp: only the hero's name, Starlight and Dawnbreak, with no boss, timer or Flow.
-  U.hud = function (on, camp) { el.hud.classList.toggle('off', !on); el.hud.classList.toggle('camp', !!camp); };
+  U.hud = function (on, camp, rest) { el.hud.classList.toggle('off', !on); el.hud.classList.toggle('camp', !!camp); el.hud.classList.toggle('rest', !!rest); };
 
   function retrigger(node, cls) {
     node.classList.remove(cls);
@@ -436,7 +471,7 @@
   // Trial label, boon list and Starlight segments for the fight that is starting.
   U.buildRun = function () {
     const R = G.run;
-    el.trial.textContent = G.practice ? 'Practice' : R.trial > 1 ? 'Trial ' + G.roman(R.trial) : '';
+    el.trial.textContent = G.practice ? 'Practice' : R.corrupt ? '' : R.trial > 1 ? 'Trial ' + G.roman(R.trial) : '';
     el.omen.innerHTML = R.omens.map((id) => '<b>Omen \u00b7 ' + G.omenDef(id).name + '</b>' + G.omenDef(id).desc).join('');
     U.buildPrompts();
     H.ult = -1; H.ready = null; H.frank = -1; H.ffill = -1;
@@ -445,7 +480,8 @@
     // the health pips and Starlight take the hero's own colour
     el.stage.style.setProperty('--star', hero.css);
     el.boons.innerHTML = (relic ? '<span class="t-relic">' + relic.name + '</span>' : '')
-      + R.held().map((h) => '<span class="t-' + h.def.tag.toLowerCase() + '">' + h.def.name + (h.n > 1 ? ' \u00d7' + h.n : '') + '</span>').join('');
+      + (R.extraRelics || []).map((id) => G.relicDef(id)).filter(Boolean).map((r) => '<span class="t-relic">' + r.name + '</span>').join('')
+      + R.held().map((h) => '<span class="t-' + h.def.tag.toLowerCase() + (h.def.cursed && !G.bane(h.def.id) ? ' clean' : '') + '">' + h.def.name + (h.n > 1 ? ' \u00d7' + h.n : '') + '</span>').join('');
     const label = el.ember.querySelector('.elabel');
     el.ember.querySelectorAll('.seg').forEach((s) => s.remove());
     for (let i = 0; i < G.player.segs; i++) {
@@ -459,7 +495,9 @@
 
   U.bossIntro = function () {
     H.introK = 0; H.introDelay = 1.3; H.chip = 0; H.fill = -1; H.phase = 0; H.lastHp = G.boss.maxHp;
-    el.bname.textContent = G.boss.name + ' ';
+    const cor = G.corrupt.on();
+    el.bname.textContent = G.boss.name + (cor ? ' \u00b7 CORRUPTED' : '') + ' ';
+    el.hud.classList.toggle('corrupt', !!cor);
     el.bfill.style.width = '0%'; el.bchip.style.width = '0%';
   };
 
@@ -640,10 +678,32 @@
     ]);
     el.deadStats.lastElementChild.firstElementChild.classList.add('gold');
     el.deadTip.textContent = G.pick(TIPS.concat(B.tips || [], B.tips || []));
-    document.querySelector('#s-dead [data-act=retry]').innerHTML = (G.practice ? 'Try again' : 'New run') + ' <kbd>R</kbd>';
+    const keep = !G.practice && G.relicDef(G.run.relic);
+    document.querySelector('#s-dead [data-act=retry]').innerHTML = (G.practice ? 'Try again' : keep ? 'Again, with ' + keep.name : 'New run') + ' <kbd>R</kbd>';
+    document.querySelector('#s-dead [data-act=camp]').textContent = keep ? 'Back to camp, new relic' : 'Back to camp';
     U.hud(false);
     U.lockUntil = performance.now() + 500;
     U.show('dead');
+  };
+
+  // ---- pairs: a boon's card names the pairs it belongs to, underlined, and the pair's effect shows
+  // as a tooltip over the name (on the focused card too, when playing with a gamepad)
+  const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  U.esc = esc;
+  U.pairTip = function (p) {
+    return '<u class="pairtip" data-tip="' + esc(p.name + ' (' + p.of.map((id) => G.boonDef(id).name).join(' + ') + '): ' + p.desc) + '">' + esc(p.name) + '</u>';
+  };
+  U.pairNote = function (b) {
+    if (b.pair) return '';
+    const notes = [];
+    for (const p of G.pairsOf(b.id)) {
+      if (G.boon(p.id)) continue;
+      const other = G.boonDef(p.of.find((id) => id !== b.id));
+      if (other.heroes && !other.heroes.includes(G.run.hero)) continue;
+      notes.push(G.boon(other.id) && !G.boon(b.id) ? ' With your ' + esc(other.name) + ', it opens the pair ' + U.pairTip(p) + '.'
+        : ' Pairs with ' + esc(other.name) + ': ' + U.pairTip(p) + '.');
+    }
+    return notes.join('');
   };
 
   U.showWin = function (res) {
@@ -658,7 +718,8 @@
       ['+' + res.meta.shards, 'Sunshards'],
     ]);
     el.winStats.lastElementChild.firstElementChild.classList.add('gold');
-    el.winOver.textContent = 'Victory \u00b7 trial ' + G.roman(res.trial);
+    const R = G.run, waiting = R.corrupted.length;
+    el.winOver.textContent = res.corrupt ? 'The corruption is cleansed' : (res.wonNow ? 'The run is won' : 'Victory') + ' \u00b7 trial ' + G.roman(res.trial) + ' of ' + G.roman(G.RUN_FIGHTS);
     // feats done in this fight are always named, whatever else there is to say
     const feats = res.meta.lines.filter((l) => l.indexOf('Feat: ') === 0).join(' · ');
     el.winBest.textContent = res.meta.relic ? 'Trophy won: ' + res.meta.relic.name + ' joins the relics you can be offered.' + (feats ? ' ' + feats : '')
@@ -666,11 +727,23 @@
       : res.meta.lines.length ? res.meta.lines.join(' \u00b7 ')
       : res.newBest ? 'New fastest first trial on ' + G.diff().name + '.'
       : res.newDepth ? 'Your deepest trial yet on ' + G.diff().name + '.' : '';
-    const next = G.bosses[G.run.foe(res.trial + 1)];
-    el.winPick.textContent = 'Choose a boon to carry into trial ' + G.roman(res.trial + 1) + ', against ' + next.short;
+    // The boon (or a corrupted portal's relic) is taken, and the next boss chosen, on the road between
+    // trials (rest.js), not here. A portal that has just turned corrupted is named.
+    const turned = res.newCorrupt && G.bosses[res.newCorrupt] ? 'A portal has turned corrupted: ' + G.bosses[res.newCorrupt].short : '';
+    el.winPick.textContent = [
+      res.corrupt ? 'A second relic waits on the road' : res.done ? 'All ' + G.roman(G.RUN_FIGHTS) + ' trials won' : 'Trial ' + G.roman(res.trial + 1) + ' of ' + G.roman(G.RUN_FIGHTS) + ' lies ahead',
+      turned || (res.done && waiting ? (waiting > 1 ? 'Corrupted portals still wait' : 'A corrupted portal still waits') : ''),
+    ].filter(Boolean).join(' \u00b7 ');
+    const goOn = !res.done || waiting > 0;
+    document.querySelector('#s-win [data-act=endrun]').textContent = !goOn ? 'Return to camp' : res.done ? 'Leave the run won, return to camp' : 'End the run, return to camp';
+    el.winCards.style.display = 'none';
+    Array.from(el.winCards.children).forEach((c) => { c.style.display = 'none'; });
+    el.rerollItem.style.display = 'none';
+    const restItem = document.getElementById('restItem');
+    restItem.style.display = goOn ? '' : 'none';
+    restItem.textContent = res.corrupt ? 'Rest, and take a relic' : res.done ? 'Rest at the crossroads' : 'Rest, and choose a boon';
     U.hud(false);
     U.lockUntil = performance.now() + 700;
-    U.fillBoons();
     U.show('win');
   };
   // The boons on offer (three, or four with the Shrine's Fourth Boon), and the redraw button.
@@ -682,11 +755,11 @@
       if (!b) return;
       const own = G.boon(b.id);
       c.className = 'item card t-' + b.tag.toLowerCase();
-      c.querySelector('.ctag').textContent = b.tag;
+      c.querySelector('.ctag').textContent = b.pair ? 'Pair \u00b7 ' + b.of.map((id) => G.boonDef(id).name).join(' + ') : b.tag;
       c.querySelector('.cname').textContent = b.name;
-      c.querySelector('.cdesc').textContent = b.desc + (own ? ' You hold ' + own + '.' : '');
+      c.querySelector('.cdesc').innerHTML = esc(b.desc) + (own ? ' You hold ' + own + '.' : '') + U.pairNote(b);
     });
-    el.rerollItem.style.display = G.run.rerolls > 0 ? '' : 'none';
+    el.rerollItem.style.display = G.run.rerolls > 0 && offer.length ? '' : 'none';
     el.rerollItem.textContent = 'Redraw boons (' + G.run.rerolls + ' left)';
     if (U.current === 'win') U.setFocus(0);
   };

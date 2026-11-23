@@ -302,6 +302,29 @@ ul.tips b { color: var(--ink); font-weight: 600; }
 .t-starlight { --tagc: #96e1ff; }
 .t-survival { --tagc: #ff9aa6; }
 .t-risk { --tagc: #ff6038; }
+.t-pair { --tagc: #ffd27a; }
+/* a pair named in a boon's text: underlined, and its effect as a tooltip. The tooltip opens beside
+   the card or list it is in (they are its positioned parent), never over the text you are reading. */
+.item.card, .boonlist { position: relative; }
+.pairtip { color: #ffd27a; text-decoration: underline; text-decoration-color: rgba(255, 210, 122, 0.7); text-underline-offset: 3px; cursor: help; }
+.pairtip::after {
+  content: attr(data-tip); position: absolute; left: calc(100% + 14px); top: 0;
+  width: 240px; padding: 9px 11px; z-index: 20; pointer-events: none; display: none;
+  font-size: 12.5px; line-height: 1.4; letter-spacing: 0; text-transform: none; text-align: left; color: #f4ecdc;
+  background: rgba(10, 8, 18, 0.97); border: 1px solid rgba(255, 210, 122, 0.75); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+}
+.pairtip:hover::after, body.pad .item.card.focus .pairtip::after { display: block; }
+
+/* the rest between trials: the boon you stand at */
+#restCard { position: absolute; left: 50%; top: 96px; width: 330px; transform: translateX(-50%); display: none; pointer-events: auto; z-index: 5; background: rgba(10, 8, 18, 0.9); cursor: default; }
+#restCard.show { display: flex; }
+#restCard.item.card.focus { transform: translateX(-50%); }
+#restCard .cuse { margin-top: 4px; font-size: 12px; font-weight: 600; letter-spacing: 0.2em; text-transform: uppercase; color: var(--gold); }
+#hud.camp.rest #boons { display: flex; }
+/* a corrupted boss's bar: blood on void */
+#hud.corrupt .bname { color: #ff4f7a; text-shadow: 0 0 12px rgba(235, 30, 80, 0.7), 0 2px 6px #000; }
+#hud.corrupt .bbar { border-color: rgba(235, 30, 80, 0.7); box-shadow: 0 0 14px rgba(235, 30, 80, 0.35); }
+.item.card.t-pair { background: linear-gradient(180deg, rgba(255, 210, 122, 0.1), rgba(255, 255, 255, 0.03)); }
 
 .boonlist { margin-top: 16px; }
 .boonlist h3 { margin: 0 0 8px; text-align: center; }
@@ -442,7 +465,7 @@ ul.tips b { color: var(--ink); font-weight: 600; }
 .panel.feats .over { color: var(--gold); text-align: center; }
 .panel.feats h2 { margin-bottom: 8px; }
 .panel.feats .lead { text-align: center; margin-bottom: 14px; }
-.featgrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px 16px; }
+.featgrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px 16px; }
 .featcol h3 { font: 400 14px var(--display); letter-spacing: 0.2em; color: var(--ink); text-transform: uppercase; margin: 0 0 6px; padding-bottom: 5px; border-bottom: 1px solid rgba(255, 255, 255, 0.12); }
 .featcol.wide { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(4, 1fr); gap: 0 16px; }
 .featcol.wide h3 { grid-column: 1 / -1; }
@@ -462,3 +485,13 @@ ul.tips b { color: var(--ink); font-weight: 600; }
 .movetable .mkeys { width: 196px; color: var(--ink); white-space: nowrap; }
 .panel.moves .small { text-align: center; min-height: 16px; margin-top: 10px; }
 .panel.moves nav.row { margin-top: 6px; }
+
+/* corrupted boons (v1.9b): crimson, with the drawback written under the boon */
+.t-corrupted { --tagc: #ff4a72; }
+.item.card.t-corrupted { background: linear-gradient(180deg, rgba(235, 30, 80, 0.16), rgba(10, 0, 6, 0.5)); border-color: rgba(255, 74, 114, 0.55); }
+.bane { display: block; margin-top: 0.45em; color: #ff8aa4; font-style: italic; }
+.bane::before { content: 'But: '; font-style: normal; font-weight: 700; color: #ff4a72; }
+.boonlist p.cursed b { color: #ff6e8c; }
+#boons .t-corrupted.clean { --tagc: #aadcff; }
+.panel.fountain .item.up .uname { color: #ff8aa4; }
+.panel.fountain nav .item.up { grid-template-columns: 190px 1fr 84px; }
