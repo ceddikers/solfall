@@ -383,6 +383,26 @@ ul.tips b { color: var(--ink); font-weight: 600; }
 #ult.ready .elabel { color: var(--gold); }
 #ult.ready #ultKey { opacity: 1; }
 @keyframes ultready { 0%, 100% { box-shadow: 0 0 6px rgba(255, 214, 140, 0.6); } 50% { box-shadow: 0 0 18px rgba(255, 214, 140, 1); } }
+/* the crown (v2.3a): under Dawnbreak, in its set's colour, shown once a set has opened one */
+#crown { display: flex; align-items: center; gap: 5px; margin-top: 6px; --ccol: #fff; }
+#crown.off { display: none; }
+#crown .ubar { width: 120px; height: 6px; border-color: color-mix(in srgb, var(--ccol) 45%, transparent); }
+#crown .ubar i { background: linear-gradient(90deg, color-mix(in srgb, var(--ccol) 55%, #000), var(--ccol)); }
+#crown .elabel { color: color-mix(in srgb, var(--ccol) 70%, #aaa); }
+#crownKey { margin-left: 4px; font-size: 11px; letter-spacing: 0.08em; color: var(--ccol); opacity: 0; transition: opacity 0.2s; }
+#crown.ready .ubar { border-color: var(--ccol); animation: crownready 0.9s ease-in-out infinite; }
+#crown.ready .elabel { color: var(--ccol); }
+#crown.ready #crownKey { opacity: 1; }
+@keyframes crownready { 0%, 100% { box-shadow: 0 0 4px var(--ccol); } 50% { box-shadow: 0 0 14px var(--ccol); } }
+/* set boons wear their set's colour; their cards say the set's rule, what they replace, and the crown */
+.t-ember { --tagc: #ff8440; }
+.t-storm { --tagc: #ffec8c; }
+.t-tide { --tagc: #50d6cc; }
+.t-gloam { --tagc: #a878f0; }
+.setrule { display: block; margin-top: 0.45em; opacity: 0.72; font-style: italic; }
+.setswap { display: block; margin-top: 0.35em; color: #ffb38a; }
+.setcrown { display: block; margin-top: 0.35em; color: var(--tagc, #fff); letter-spacing: 0.04em; }
+.crownline b { color: var(--tagc); }
 
 #flow { position: absolute; right: 58px; top: 58px; display: flex; align-items: center; gap: 9px; opacity: 0; transition: opacity 0.4s; }
 #flow.on { opacity: 1; }

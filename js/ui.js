@@ -42,7 +42,7 @@
       'hint', 'lowhp', 'lbTop', 'lbBot', 'diffNote', 'bestLine', 'ver', 'deadLead', 'deadFill', 'deadStats',
       'pauseBoons', 'boons', 'trial', 'winOver', 'winPick', 'winCards', 'heroName', 'heroCards', 'relicCards', 'relicOver',
       'deadTip', 'winStats', 'winBest', 'gradeLetter', 'gradeTitle', 'gradeSub', 'stage',
-      'practiceOver', 'keyList', 'resetItem', 'movesOver', 'movesTitle', 'movesBody', 'movesFoot', 'ult', 'ultFill', 'ultKey', 'flow', 'flowRank', 'flowFill', 'omen', 'shardCount', 'shrineLead', 'shrineList', 'shrineTrophies', 'rerollItem', 'featsLead', 'featsBody', 'helpBody', 'helpTabs', 'fountainLead', 'fountainList', 'smithLead', 'smithList']) el[id] = $(id);
+      'practiceOver', 'keyList', 'resetItem', 'movesOver', 'movesTitle', 'movesBody', 'movesFoot', 'ult', 'ultFill', 'ultKey', 'crown', 'crownFill', 'crownName', 'crownKey', 'flow', 'flowRank', 'flowFill', 'omen', 'shardCount', 'shrineLead', 'shrineList', 'shrineTrophies', 'rerollItem', 'featsLead', 'featsBody', 'helpBody', 'helpTabs', 'fountainLead', 'fountainList', 'smithLead', 'smithList']) el[id] = $(id);
     el.segs = Array.from(document.querySelectorAll('#ember .seg'));
     el.bbar = document.querySelector('.bbar');
     el.bname = document.getElementById('bname');
@@ -387,6 +387,7 @@
       ['Special', k('flare') + ' or right click', h.how.special + ' Costs one segment of Starlight.'],
       ['Mend', 'hold ' + k('heal'), 'Stand still and hold to turn one segment of Starlight into one health. Jumping or dashing cancels it.'],
       ['Dawnbreak', k('ult') + ' or middle click', h.how.ult + ' The bar fills as you deal damage; nothing can hurt you while it plays.'],
+      ...(G.run.crownSet() ? [['Crown', k('crown'), G.SETS[G.run.crownSet()].crown + ': ' + G.SETS[G.run.crownSet()].crownDesc + ' The bar fills as your ' + G.SETS[G.run.crownSet()].name + ' set does its work.']] : []),
       ['Flourish', k('taunt'), 'A salute, for most of a second, in which you can do nothing else. Finish it and Flow and Dawnbreak rise a little; finish it while the boss is in the middle of an attack and it is BRAZEN, worth three times as much. Being struck ends it.'],
     ];
     el.movesOver.textContent = h.title; el.movesOver.style.color = h.css;
@@ -402,7 +403,7 @@
     U.show('practice', true);
   };
   // ---- Settings, Controls: choose a row, then press the key it should use
-  const ACTIONS = { left: 'Move left', right: 'Move right', up: 'Aim up', down: 'Aim down, drop', jump: 'Jump', attack: 'Attack', dash: 'Dash', flare: 'Special', heal: 'Mend, use', ult: 'Dawnbreak', taunt: 'Flourish' };
+  const ACTIONS = { left: 'Move left', right: 'Move right', up: 'Aim up', down: 'Aim down, drop', jump: 'Jump', attack: 'Attack', dash: 'Dash', flare: 'Special', heal: 'Mend, use', ult: 'Dawnbreak', crown: 'Crown', taunt: 'Flourish' };
   U.fillKeys = function () {
     Array.from(el.keyList.children).forEach((row) => {
       const a = (row.dataset.act || '').slice(4);
@@ -433,7 +434,12 @@
     } else { armed = performance.now(); el.resetItem.textContent = 'Choose again to erase everything'; G.audio.play('empty'); }
   }
   // Key names shown in prompts follow the bindings.
-  U.buildPrompts = function () { H.mend = null; if (el.ultKey) el.ultKey.innerHTML = G.input.device === 'gamepad' ? '<kbd>RT</kbd>' : '<kbd>' + G.input.label('ult') + '</kbd>'; };
+  U.buildPrompts = function () {
+    H.mend = null;
+    const pad = G.input.device === 'gamepad';
+    if (el.ultKey) el.ultKey.innerHTML = pad ? '<kbd>RT</kbd>' : '<kbd>' + G.input.label('ult') + '</kbd>';
+    if (el.crownKey) el.crownKey.innerHTML = pad ? '<kbd>LT</kbd>' : '<kbd>' + G.input.label('crown') + '</kbd>';
+  };
   function buy(i) {
     if (G.meta.buy(i)) {
       G.audio.play('segment');
@@ -464,7 +470,8 @@
       ? '<h3>' + G.hero().name + '\u2019s run</h3>' + omens
         + (relic ? '<p><b>' + relic.name + '</b> ' + relic.desc + '</p>' : '')
         + (G.run.extraRelics || []).map((id) => G.relicDef(id)).filter(Boolean).map((r) => '<p><b>' + r.name + '</b> ' + r.desc + ' <i>(from a corrupted portal)</i></p>').join('')
-        + held.map((h) => '<p' + (h.def.cursed ? ' class="cursed"' : '') + '><b>' + h.def.name + (h.n > 1 ? ' \u00d7' + h.n : '') + '</b> ' + esc(h.def.desc) + U.pairNote(h.def)
+        + (G.run.crownSet() ? '<p class="crownline" style="--tagc:' + G.SETS[G.run.crownSet()].css + '"><b>Crown · ' + G.SETS[G.run.crownSet()].crown + '</b> ' + esc(G.SETS[G.run.crownSet()].crownDesc) + '</p>' : '')
+        + held.map((h) => '<p' + (h.def.cursed ? ' class="cursed"' : '') + '><b>' + h.def.name + (h.n > 1 ? ' \u00d7' + h.n : '') + '</b> ' + (h.def.set ? '<i>' + G.SETS[h.def.set].name + ' · ' + G.SLOT_NAMES[h.def.slot] + '.</i> ' : '') + esc(h.def.desc) + U.pairNote(h.def)
           + (h.def.cursed ? (G.bane(h.def.id) ? '<span class="bane">' + esc(h.def.bane) + '</span>' : ' <i>(cleansed)</i>') : '') + '</p>').join('')
       : '';
   };
@@ -497,7 +504,7 @@
     el.trial.textContent = G.practice ? 'Practice' : R.corrupt ? '' : R.trial > 1 ? 'Trial ' + G.roman(R.trial) : '';
     el.omen.innerHTML = R.omens.map((id) => '<b>Omen \u00b7 ' + G.omenDef(id).name + '</b>' + G.omenDef(id).desc).join('');
     U.buildPrompts();
-    H.ult = -1; H.ready = null; H.frank = -1; H.ffill = -1;
+    H.ult = -1; H.ready = null; H.frank = -1; H.ffill = -1; H.cset = undefined;
     const hero = G.hero(), relic = G.relicDef(R.relic);
     el.heroName.textContent = hero.name.toUpperCase();
     // the health pips and Starlight take the hero's own colour
@@ -628,6 +635,17 @@
     if (ult !== H.ult) { H.ult = ult; el.ultFill.style.width = ult + '%'; }
     const rdy = ult >= 100 && !P.dead;
     if (rdy !== H.ready) { H.ready = rdy; el.ult.classList.toggle('ready', rdy); }
+    // the crown, once a set has opened one
+    const crn = G.state === 'hub' ? null : G.run.crownSet();
+    if (crn !== H.cset) {
+      H.cset = crn; H.cfill = -1;
+      el.crown.classList.toggle('off', !crn);
+      if (crn) { el.crownName.textContent = G.SETS[crn].crown.toUpperCase(); el.crown.style.setProperty('--ccol', G.SETS[crn].css); }
+    }
+    if (crn) {
+      const cf = Math.round(G.run.crown * 100);
+      if (cf !== H.cfill) { H.cfill = cf; el.crownFill.style.width = cf + '%'; el.crown.classList.toggle('ready', cf >= 100); }
+    }
     const FL = G.flow;
     if (FL.rank !== H.frank) {
       if (FL.rank > H.frank && H.frank >= 0) retrigger(el.flowRank, 'pop');
@@ -716,6 +734,19 @@
   U.pairTip = function (p) {
     return '<u class="pairtip" data-tip="' + esc(p.name + ' (' + p.of.map((id) => G.boonDef(id).name).join(' + ') + '): ' + p.desc) + '">' + esc(p.name) + '</u>';
   };
+  // A set boon's card: its set and slot on the tag line; under the text, the set's rule, what it
+  // would push out of its slot, and how near it brings the crown.
+  U.boonTag = (b) => (b.set ? b.tag + ' · ' + G.SLOT_NAMES[b.slot] : b.tag);
+  U.setNote = function (b) {
+    if (!b.set || G.boon(b.id)) return '';
+    const R = G.run, S = G.SETS[b.set], old = R.slots()[b.slot];
+    const n = R.setCount(b.set) + (old && G.boonDef(old).set === b.set ? 0 : 1);
+    return '<span class="setrule">' + esc(S.rule) + '</span>'
+      + (old ? '<span class="setswap">Replaces ' + esc(G.boonDef(old).name) + '.</span>' : '')
+      + (old && R.crownSet() && R.crownSet() !== b.set && G.boonDef(old).set === R.crownSet() ? '<span class="setswap">Your crown ' + esc(G.SETS[R.crownSet()].crown) + ' goes dark.</span>' : '')
+      + '<span class="setcrown">' + (n >= 3 ? (R.crownSet() === b.set ? 'Keeps the crown ' : 'Opens the crown ') + esc(S.crown) + '.'
+        : n + ' of 3 toward the crown ' + esc(S.crown) + '.') + '</span>';
+  };
   U.pairNote = function (b) {
     if (b.pair) return '';
     const notes = [];
@@ -778,9 +809,9 @@
       if (!b) return;
       const own = G.boon(b.id);
       c.className = 'item card t-' + b.tag.toLowerCase();
-      c.querySelector('.ctag').textContent = b.pair ? 'Pair \u00b7 ' + b.of.map((id) => G.boonDef(id).name).join(' + ') : b.tag;
+      c.querySelector('.ctag').textContent = b.pair ? 'Pair \u00b7 ' + b.of.map((id) => G.boonDef(id).name).join(' + ') : U.boonTag(b);
       c.querySelector('.cname').textContent = b.name;
-      c.querySelector('.cdesc').innerHTML = esc(b.desc) + (own ? ' You hold ' + own + '.' : '') + U.pairNote(b);
+      c.querySelector('.cdesc').innerHTML = esc(b.desc) + (own ? ' You hold ' + own + '.' : '') + U.pairNote(b) + U.setNote(b);
     });
     el.rerollItem.style.display = G.run.rerolls > 0 && offer.length ? '' : 'none';
     el.rerollItem.textContent = 'Redraw boons (' + G.run.rerolls + ' left)';

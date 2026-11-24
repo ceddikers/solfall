@@ -64,7 +64,7 @@
       onGround: true, plat: null, coyote: 0, dropT: 0, jumpHeld: false,
       maxAir, maxDash, airJumps: maxAir, airDashes: maxDash,
       segs,
-      healTime: C.HEAL_T * (G.boon('swift') ? 0.5 : 1),
+      healTime: C.HEAL_T * (G.boon('swift') ? 0.5 : 1) * G.sets.healTime(),
       dashCdMax: C.DASH_CD * (G.boon('twin') ? 0.7 : 1) * (G.relic('pelt') ? 0.8 : 1) * (G.boon('voidstep') ? 0.5 : 1),
       dashHit: new Set(), dawnUsed: false, borrowUsed: false,
       ward: G.relic('ward'), hitCount: 0, plunge: false, afterT: 0, afterScale: 1,
@@ -81,7 +81,7 @@
       recov: null, // how the weapon comes back to rest after the last attack (see recoverPose)
       // Eos: the stance she is holding, the Focus gathered in it, the draw carrying her, and the cuts made but not yet landed
       hold: null, focus: 0, strung: 0, sun: 0, hangs: [], pin: null, stars: null, faults: [], drawT: 0, drawV: null, owed: [], arc2: null, hush: null,
-      pad: 0, grazeCd: 0, streakN: 0, streakT: 0, fallT: 0, edge: 0,
+      pad: 0, grazeCd: 0, streakN: 0, streakT: 0, fallT: 0, edge: 0, fadeT: 0, castN: 0,
       rig: {}, // pose memory for drawing (see drawBody)
       scarf: [], ghosts: [], slashes: [], bolts: [],
       stats: { dmg: 0, hits: 0, perfect: 0, heals: 0, lances: 0 },
@@ -249,6 +249,7 @@
           P.ward = true; P.wardT = 4;
           G.fx.ring(P.x, P.y - 22, { r0: 70, r1: 30, life: 0.4, color: HOT, width: 4 });
         }
+        G.sets.mended(); // (the Mend slot's set boon: sets.js)
       }
     } else {
       if (ctl && I.pressed.heal && P.hp < P.maxHp && (P.ember < C.SEG || G.bane('hollow'))) { G.audio.play('empty'); P.emberFlash = -1; }
@@ -303,6 +304,7 @@
       P.ghostT -= dt;
       if (P.ghostT <= 0) {
         P.ghostT = 0.05; P.ghosts.push({ x: P.x, y: P.y, f: P.facing, life: 0.26 });
+        if (P.onGround) G.sets.trail(P.x); // Ashen Trail
         for (let i = 0; i < 3; i++) {
           G.fx.spawn({ kind: 'spark', x: P.x - P.dashDir * G.rand(0, 26), y: P.y - G.rand(4, 46), vx: -P.dashDir * G.rand(260, 620), vy: 0, life: G.rand(0.12, 0.24), size: G.rand(1.2, 2), color: STAR, len: 0.075 });
         }
@@ -465,12 +467,14 @@
 
     // --- Dawnbreak: the ultimate, when its meter is full
     if (ctl && I.pressed.ult && free && P.stun <= 0 && G.flow.tryUlt()) return;
+    // --- the crown: a set's own move, once three of its boons are held (sets.js)
+    if (ctl && I.pressed.crown && free && P.stun <= 0 && P.dashT <= 0) G.sets.tryCrown();
 
     // --- special: costs one segment of Starlight
     if (P.flareBuf > 0 && free && P.dashT <= 0 && P.stun <= 0 && P.healT === 0) {
       P.flareBuf = 0;
       if (P.ember >= C.SEG) {
-        P.ember -= C.SEG; P.stats.lances++;
+        P.ember -= C.SEG; P.stats.lances++; P.castN++; // (castN tells one special from the next: sets.js)
         const d = aim(mx, up, down, I.aim.flare);
         if (H.special === 'lance') castLance(d.x, d.y);
         else if (H.special === 'starfall') castStarfall();
@@ -509,7 +513,7 @@
     * (heavy && G.boon('dayedge') ? 1.6 : 1) // Edge of Day (a pair)
     * (G.boon('bloodedge') ? 1.6 : 1); // Bloodied Edge (corrupted)
   const haste = () => (1 - 0.18 * G.boon('quick')) * (G.boon('feral') ? 0.74 : 1);
-  const spec = () => (G.relic('prism') ? 1.4 : 1); // the Magus's Prism strengthens every special
+  const spec = () => (G.relic('prism') ? 1.4 : 1) * G.sets.specMult(); // the Magus's Prism strengthens every special (and Shadow Star)
 
   // ---------------------------------------------------------------- melee (sword, maul)
   function startSwing(mx, up, down) {
@@ -731,6 +735,7 @@
         const res = G.boss.damage(Math.round(a.dmg * em.mult), t, { x: c.x, y: c.y, heavy: a.heavy || a.thrust, finisher: a.heavy || em.mult > 1, dir: a.dir, poise: H.poise });
         if (res) {
           P.gain(a.heavy ? C.GAIN_HEAVY : C.GAIN_HIT);
+          G.sets.hit(a.heavy ? 'finisher' : 'light', t, c.x, c.y);
           if (a.flick && !a.banked) { a.banked = true; P.strung = Math.min(3, (P.strung || 0) + 1); } // Eos: a cut that lands is a mark on the sheath
           if (a.heavy && !a.thrust && (G.boon('pinlance') || G.boon('stars'))) finisherLanded(t, c);
           // the freeze, the shake and the kick all scale with the blow; the maul's are heavier
@@ -867,7 +872,7 @@
     fireLance(dx, dy);
     // the lance is drawn leaving her hand and settles onto its true line within a tenth of a second
     const hx = P.x + P.facing * 1.3 * (1 + Math.abs(dx) * 15), hy = P.y - 1.3 * (39 - dy * 15);
-    for (let i = n; i < G.shots.length; i++) { const s = G.shots[i]; s.vox = hx - s.x; s.voy = hy - s.y; }
+    for (let i = n; i < G.shots.length; i++) { const s = G.shots[i]; s.vox = hx - s.x; s.voy = hy - s.y; s.cast = P.castN; }
     P.vx -= dx * 240;
     if (dy > 0) P.vy = Math.min(P.vy, -420);
     G.audio.play('flare');
@@ -881,6 +886,7 @@
     for (let i = 0; i < n; i++) {
       const a = (i / (n - 1) - 0.5) * spread, c = Math.cos(a), s = Math.sin(a);
       arrow(dx * c - dy * s, dx * s + dy * c, dmg, false, 0.46, true);
+      G.shots[G.shots.length - 1].cast = P.castN;
     }
     P.vx = -dx * 420;
     if (dy > -0.5) { P.vy = Math.min(P.vy, -330); P.onGround = false; P.plat = null; }
@@ -907,7 +913,7 @@
       const inside = t.r ? G.dist(cx, cy, t.cx, t.cy) < R + t.r : G.circleRect(cx, cy, R, t);
       if (!inside) continue;
       const hx = t.r ? t.cx : G.clamp(cx, t.cx - t.hw, t.cx + t.hw), hy = t.r ? t.cy + t.r * 0.6 : G.clamp(cy, t.cy - t.hh, t.cy + t.hh);
-      G.boss.damage(dmg, t, { x: hx, y: hy, heavy: true, finisher: k >= 1, lance: k >= 1, poise: H.poise, dir: G.sign(t.cx - cx) });
+      if (G.boss.damage(dmg, t, { x: hx, y: hy, heavy: true, finisher: k >= 1, lance: k >= 1, poise: H.poise, dir: G.sign(t.cx - cx) }) && k >= 1) G.sets.hit('special', t, hx, hy, P.castN);
     }
     for (const o of G.hazards.slashables()) if (G.dist(o.x, o.y, cx, cy) < R + o.r) o.slash();
     G.audio.play('slam');
@@ -1118,6 +1124,7 @@
       const res = G.boss.damage(Math.round(o.dmg * em.mult), t, { x, y, heavy: true, finisher: o.heavy || em.mult > 1, dir: o.dir, poise: H.poise });
       if (!res) { G.audio.play('tink'); G.fx.tink(x, y, o.ang); continue; }
       P.gain(C.DRAW_GAIN[lvl - 1]);
+      G.sets.hit(o.heavy ? 'finisher' : 'light', t, x, y);
       G.fx.stop([0.05, 0.08, 0.14][lvl - 1]); G.fx.shake([4, 8, 16][lvl - 1]);
       G.fx.cut(x, y, o.ang, [240, 440, 900][lvl - 1], [9, 15, 20][lvl - 1], STAR, HOT, [0.22, 0.3, 0.42][lvl - 1]);
       G.fx.hit(x, y, o.ang, { heavy: lvl >= 2, thrust: lvl < 2, power: 0.8 + 0.2 * lvl, col: o.heavy ? GOLD : STAR, hot: HOT });
@@ -1381,6 +1388,7 @@
       if (B.kit && !B.staggered && o === B.body) { B.poise = Math.min(B.poiseMax - 1, B.poise + 46 * H.poise); o.recV = (o.recV || 0) + dir * 3; }
     }
     G.flow.add(12); P.ult = Math.min(100, P.ult + 5);
+    G.sets.hit('special', null, gx, gy, P.castN); // (a turned blow is Still Point landing)
     G.audio.play('clash'); G.audio.play('focus', { n: 3 });
     G.fx.stop(0.14); G.fx.shake(10); G.fx.punch(0.03); G.fx.kick(-dir * 6, 0);
     G.fx.ripple(gx, gy, 260, 0.36, 1.1);
@@ -1469,6 +1477,7 @@
       else { fireLance(dx / d, dy / d); G.audio.play('flare'); }
     }
     if (H.draw) hush();
+    G.sets.perfect(); // (the Dash slot's set boon: sets.js)
   }
 
   // Eos drew through a blow (or slipped one while a cut of hers was still on its way): that cut is
@@ -1596,6 +1605,7 @@
             const res = G.boss.damage(Math.round(s.dmg * close * far * em.mult), t, { x: s.x, y: s.y, heavy: s.heavy, finisher: s.heavy || em.mult > 1, dir: G.sign(s.vx), poise: H.poise });
             if (res) {
               if (s.spent) G.flow.hit(C.ARROW_GAIN); else P.gain(s.heavy ? C.ARROW_GAIN_HEAVY : C.ARROW_GAIN);
+              G.sets.hit(s.cast != null ? 'special' : s.heavy ? 'finisher' : 'light', t, s.x, s.y, s.cast);
               G.fx.stop(s.heavy ? 0.06 : 0.016); G.fx.shake(s.heavy ? 6 : 1.2);
               G.audio.play(s.heavy ? 'hitHeavy' : 'hit', { pitch: hitPitch() });
               G.fx.hit(s.x, s.y, Math.atan2(s.vy, s.vx), { heavy: s.heavy, power: s.heavy ? 0.8 : 0.75, col: s.heavy ? GOLD : STAR, hot: HOT });
@@ -1613,6 +1623,7 @@
             G.fx.hit(s.x, s.y, Math.atan2(s.vy, s.vx), { thrust: true, col: STAR, hot: HOT });
           } else if (res) {
             if (s.lance && G.boon('pinlance')) pinLance(s, t);
+            if (s.lance) G.sets.hit('special', t, s.x, s.y, s.cast);
             G.fx.stop(0.07); G.fx.shake(9);
             G.audio.play('flareHit');
             G.fx.ring(s.x, s.y, { r0: 10, r1: 120, life: 0.35, color: HOT, width: 8 });
@@ -2791,8 +2802,9 @@
       ctx.globalCompositeOperation = 'source-over';
     }
 
-    const blink = P.inv > 0 && P.iframes <= 0 && Math.floor(G.t * 28) % 2 === 0;
+    const blink = P.inv > 0 && P.iframes <= 0 && !(P.fadeT > 0) && Math.floor(G.t * 28) % 2 === 0;
     if (blink) ctx.globalAlpha = 0.35;
+    if (P.fadeT > 0) ctx.globalAlpha = 0.28 + 0.1 * Math.sin(G.t * 9); // Fade: half there
     P.primed = H.draw ? (!!P.hold || P.edge > 0) && focusMark() >= 3 : P.combo === (H.chain || 3) - 2 && P.comboT > 0 && !P.atk;
     P.dash = P.dashT > 0;
     if (!P.vanish) { drawTail(ctx, H, P.scarf); drawBody(ctx, H, P); }

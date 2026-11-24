@@ -2,7 +2,7 @@
 
 A side-on boss rush for the browser: four heroes, four three-phase bosses, played as a run of
 ever-harder trials. You pick a hero and a relic before the run and win a boon after each victory.
-Version 2.2a.
+Version 2.3a.
 
 This is an early slice of a planned boss-rush roguelite (short runs, a boon after each boss,
 bosses drawn from a pool). A run meets the four bosses in a shuffled order, then meets them again, harder.
@@ -29,8 +29,9 @@ then open http://localhost:8321. There is no build step and no dependency.
 | Aim an attack up or down | hold W / S or up / down | stick |
 | Dash (passes through attacks) | K or C or Shift | B or RB |
 | Special (costs one Starlight segment) | L or V, or right click (at the cursor) | Y |
-| Mend one health (costs one segment) | hold E or F while standing | LB or LT |
+| Mend one health (costs one segment) | hold E or F while standing | LB |
 | Dawnbreak (when its bar is full) | Q or I, or middle click | RT |
+| Crown (once three boons of one set are held, when its bar is full) | U | LT |
 | Flourish (a salute that leaves you open) | T or G | Back, or press the right stick |
 | Drop through a platform | S + Space | down + A |
 | Your hero's moves (the fight waits while it is up) | hold Tab, or Moves in the pause menu | |
@@ -112,6 +113,75 @@ hero (`tools/feel-check.js`).
 - Settings, Reset progress erases Sunshards, upgrades, trophies and records (it has to be chosen twice).
 
 Not done: touch controls, a colour-blind alternative to red-orange warnings, gamepad rebinding.
+
+## Sets and crowns (v2.3a)
+
+Asked for: boons that attach to the actions, and a new button "the crown action", unlocked by a full set.
+
+**Four sets, four slots.** Sixteen new boons, four to a set, one for each slot: **Strike** (your
+weapon), **Special**, **Dash** (a perfect dodge, or a dash along the ground) and **Mend** (when mending
+ends). A slot holds one set boon; taking another for a full slot gives up the old one (the card says
+"Replaces ..."). The other boons (Keen Edge, Steady Heart, the hero boons...) take no slot. An offering holds
+two set boons, both from one set, chosen from a set you already hold three times in five, and one or more
+ordinary boons. Each set leaves its own mark on the foe, drawn on it:
+
+| Set | Its mark | Strike | Special | Dash | Mend | Crown |
+|---|---|---|---|---|---|---|
+| **Ember** | embers: up to 5, each burning 2 a second; one dies down every 1.6 s unless more are set; drawn as coals on the foe | Searing Edge: finishers set 2 | Kindled Star: sets 3 | Ashen Trail: a dash along the ground leaves fire on the floor for 1.5 s; the foe catches an ember from it | Hearthwave: a wave of heat, 3 embers on a foe within 300 | **Pyre**: every ember bursts for 16; then the weapon burns for 6 s and every blow sets one (a finisher two) |
+| **Storm** | static: built by blows, held 2.5 s, then draining; at 10 a bolt strikes for 24; drawn as crackling arcs | Charged Edge: each blow 1, a finisher 2 | Thunderhead: a storm cloud over the foe strikes 4 times for 10, each building 2 | Lightning Step: a perfect dodge calls a bolt for 24 | Quickening: mending 30% quicker, and a bolt for 24 when it ends | **Thunderstep**: streak through the foe as lightning for 24 and out the far side, untouchable as you pass; press again to streak back, three times within 2 s |
+| **Tide** | soaked: up to 3 layers for 4 s; the boss's whole clock (its moves and what it throws) runs 6% slower a layer; drawn as water dripping off it | Undercurrent: finishers soak | Breaking Wave: soaks twice, and washes away what the foe has thrown within 340 of you | Slack Water: a perfect dodge soaks, and the boss runs at half speed for 1 s | Tidewall: a wall of water that turns the next blow aside | **Undertow**: a wave across the arena knocks the foe down (staggered at once, which clears everything it had out), 20 damage, and soaks it fully |
+| **Gloam** | a dark ring around the foe: the next finisher or special deals double and spends it; it returns 4 s later | Nightblade: a finisher that spends it gives back a third of a segment | Shadow Star: your special hits 30% harder and marks at once | Umbral Step: a perfect dodge marks at once, and its Riposte waits 3 s instead of 1.5 | Fade: you fade for 1.5 s and blows pass through you | **Nightfall**: the arena goes dark for 3 s (the foe, its warnings and you stay lit); every blow you land in the dark lands again when the light returns |
+
+What counts: a *finisher* is the big blow of a string (Vesper's third cut, Aster's smash, Lune's heavy
+arrow, Eos's gold draw). A *special* counts once a cast (all five of Moon Volley's arrows are one), and for
+Eos it is Still Point turning a blow. A free shot (Mirror Step) is not the special.
+
+**The crown.** Three boons of one set open its crown (only one set can, with four slots). It is a move on
+its own key, **U** (rebindable in Settings, Controls), or **LT** on a gamepad (mend is on LB alone now).
+Its bar sits under Dawnbreak in the set's colour, and it fills only from that set's mark doing its work:
+each ember burning, static built and bolts struck, each second the foe is soaked, each mark spent. That is
+about sixteen to twenty seconds of a set working. The charge carries over between trials like Dawnbreak, and starts
+again at nothing when the crown changes. It cannot be used while the boss cannot be struck. On the road,
+the third boon of a set lights the hero in the set's colour and says which crown is open; the Moves page
+(Tab) and the pause menu describe it.
+
+Each set and crown has its own sounds. All of it is in `js/sets.js`. The set boons are data in `run.js`
+(`G.SETS`, and the boons with `set` and `slot`). The boss's damage calls `G.sets.amp` (the Gloam mark)
+and `G.sets.dealt` (Nightfall's count). An ember burning hurts without a flinch, a number, stagger or the
+boss's own reaction to a blow (`info.tick`). Soaking slows the boss's clock in `G.step` (`game.js`).
+
+Measured in fights against the Knight (Vesper unless said):
+- Embers set by a finisher string, burning 2 a second each and dying down one per 1.6 s.
+- Pyre on five embers for 80.
+- A static bolt after about 2.5 s of steady cutting.
+- Thunderhead's cloud and bolt for 83 together with the lance.
+- Thunderstep's three streaks for 91.
+- Soak taking the boss's clock to 0.88 after a string, and Slack Water to 0.41.
+- Undertow staggering the Knight and the Wolf.
+- The Gloam mark doubling a finisher (26 to 52).
+- Nightfall's dark answered with 135 after a 2.9 s string.
+- Each mend boon working when mending ends.
+- Aster's smash, Lune's heavy arrow and Eos's gold draw counted as finishers. Starfall, Moon Volley and
+  Still Point counted once each as the special.
+- What one Strike boon is worth, against a Knight held still, over 20 s of Vesper cutting:
+  - nothing held: 49.8 a second;
+  - Keen Edge: 63.3;
+  - Charged Edge: 60.2;
+  - Searing Edge: 59;
+  - Nightblade: 57.5;
+  - Undercurrent: 49.8 (it slows the foe instead).
+
+  With three of a set, the crown came once in the 20 s (Storm 62.5, Gloam 66.5). Ember's took just over 20 s.
+- `tools/boss-tests.js` with the scripted hero fighting back, a full set held and the crown fired whenever
+  it was ready, against the Knight, the Leviathan, the Magus, the Wolf and the Veil. One run for each hero:
+  Vesper Ember, Lune Storm, Aster Tide, Eos Gloam. No errors from the game.
+  - Health lost over 548 runs: 88, 106, 111 and 81.
+  - The tool cannot test the Warden: it reads `B.body`, which the Warden does not have. That is an old gap
+    in the tool, not this change.
+  - The Warden was fought by hand instead, 20 s with each set and its crown: no errors.
+
+Not balanced by hand yet: these numbers are a first guess. A full set should beat Keen Edge, but not by a
+mile.
 
 ## Hero boons, and who you meet on the road (v2.2a)
 
@@ -1403,6 +1473,7 @@ To use these in a new attack, call the ready-made mixes in `js/fx.js`: `G.fx.hit
 | `tools/corrupt-compare.html` | every boss as itself and corrupted, side by side, in the same moment (open it while serve.js runs) |
 | `js/omens.js` | the omens (`G.OMENS`) and what each one does during a fight |
 | `js/moments.js` | Reckoning, Riposte, Sunder, Clash, Last Light and the last push |
+| `js/sets.js` | the four sets' marks on the foe (Ember, Storm, Tide, Gloam), their boons' effects and the crowns |
 | `js/hub.js` | the Vigil: the camp between runs, its places, the sparring post, the bell and the lantern |
 | `tools/feel-check.js` | whole fights played by a scripted hero, to measure Dawnbreak, Flow and Reckonings |
 | `docs/boss-study.md` | the v2.1a study of bosses in other games, and what Solfall took from it |

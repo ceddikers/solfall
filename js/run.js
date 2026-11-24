@@ -149,6 +149,45 @@
     { id: 'hanging', name: 'Hanging Cut', tag: 'Signature', max: 1, heroes: ['eos'], desc: 'The cut of a full draw hangs in the air, and a second later cuts again for half.' },
     { id: 'secondsun', name: 'Second Sun', tag: 'Signature', max: 1, heroes: ['eos'], desc: 'After a full draw, holding again starts at two marks.' },
   ];
+  // Sets (v2.3a): four kinds of boon, each leaving its own mark on the foe. A set boon fits one of four
+  // slots (Strike, Special, Dash, Mend), one boon to a slot: a new one for a full slot replaces the
+  // old. Three of one set opens its crown, a move of its own on the crown key, charged by the set's
+  // mark doing its work (the mechanics are in sets.js).
+  G.SETS = {
+    ember: { name: 'Ember', col: '255,132,64', css: '#ff8440', crown: 'Pyre',
+      rule: 'Embers burn the foe, five at most, and die down unless more are set.',
+      crownDesc: 'Tear every ember off the foe at once, each bursting for 16. Then your weapon burns for six seconds, and every blow sets an ember.' },
+    storm: { name: 'Storm', col: '255,236,140', css: '#ffec8c', crown: 'Thunderstep',
+      rule: 'Static builds on the foe. At ten, a bolt strikes it for 24.',
+      crownDesc: 'Streak through the foe as lightning for 24, untouchable as you pass. Press again to streak back, up to three times within two seconds.' },
+    tide: { name: 'Tide', col: '80,214,204', css: '#50d6cc', crown: 'Undertow',
+      rule: 'A soaked foe moves and strikes slower, 6% for each layer, three at most. Soaking lasts four seconds.',
+      crownDesc: 'A wave knocks the foe off its feet: it is staggered at once, and everything it has thrown is washed away.' },
+    gloam: { name: 'Gloam', col: '168,120,240', css: '#a878f0', crown: 'Nightfall',
+      rule: 'A dark ring marks the foe. Your next finisher or special deals double and spends it; it returns four seconds later.',
+      crownDesc: 'The arena goes dark for three seconds. Every blow you land in the dark lands again when the light returns.' },
+  };
+  G.SET_IDS = ['ember', 'storm', 'tide', 'gloam'];
+  G.SLOTS = ['strike', 'special', 'dash', 'mend'];
+  G.SLOT_NAMES = { strike: 'Strike', special: 'Special', dash: 'Dash', mend: 'Mend' };
+  for (const b of [
+    { id: 'emstrike', set: 'ember', slot: 'strike', name: 'Searing Edge', desc: 'Finishers set two embers on the foe.' },
+    { id: 'emspecial', set: 'ember', slot: 'special', name: 'Kindled Star', desc: 'Your special sets three embers on the foe.' },
+    { id: 'emdash', set: 'ember', slot: 'dash', name: 'Ashen Trail', desc: 'A dash along the ground leaves fire on the floor. A foe that touches it catches an ember.' },
+    { id: 'emmend', set: 'ember', slot: 'mend', name: 'Hearthwave', desc: 'Mending sends out a wave of heat: a foe close by catches three embers.' },
+    { id: 'ststrike', set: 'storm', slot: 'strike', name: 'Charged Edge', desc: 'Every blow of your weapon builds static on the foe, and a finisher builds two.' },
+    { id: 'stspecial', set: 'storm', slot: 'special', name: 'Thunderhead', desc: 'Your special leaves a storm cloud over the foe. It strikes four times for 10, each building two static.' },
+    { id: 'stdash', set: 'storm', slot: 'dash', name: 'Lightning Step', desc: 'A perfect dodge calls a bolt down on the foe for 24.' },
+    { id: 'stmend', set: 'storm', slot: 'mend', name: 'Quickening', desc: 'Mending takes 30% less time, and when it ends a bolt strikes the foe for 24.' },
+    { id: 'tdstrike', set: 'tide', slot: 'strike', name: 'Undercurrent', desc: 'Finishers soak the foe.' },
+    { id: 'tdspecial', set: 'tide', slot: 'special', name: 'Breaking Wave', desc: 'Your special soaks the foe twice, and washes away what it has thrown near you.' },
+    { id: 'tddash', set: 'tide', slot: 'dash', name: 'Slack Water', desc: 'A perfect dodge soaks the foe, and the attack you slipped runs at half speed for a second.' },
+    { id: 'tdmend', set: 'tide', slot: 'mend', name: 'Tidewall', desc: 'Mending raises a wall of water around you that turns the next blow aside.' },
+    { id: 'glstrike', set: 'gloam', slot: 'strike', name: 'Nightblade', desc: 'A finisher that spends the mark gives back a third of a segment of Starlight.' },
+    { id: 'glspecial', set: 'gloam', slot: 'special', name: 'Shadow Star', desc: 'Your special hits 30% harder and marks the foe at once.' },
+    { id: 'gldash', set: 'gloam', slot: 'dash', name: 'Umbral Step', desc: 'A perfect dodge marks the foe at once, and its Riposte waits twice as long.' },
+    { id: 'glmend', set: 'gloam', slot: 'mend', name: 'Fade', desc: 'When mending ends you fade for a second and a half, and blows pass through you.' },
+  ]) { b.tag = G.SETS[b.set].name; b.max = 1; G.BOONS.push(b); }
   // Pairs: a boon only offered once you hold both of the boons it joins. When one is open to you it
   // takes the place of one of the cards on half the offers, and a card that would open one says so.
   G.PAIRS = [
@@ -211,6 +250,7 @@
     R.purged = []; R.cleanses = 0; // corrupted boons cleansed at the fountain, and how often it has been used
     // who was met on the road last (rest.js), boons tempered by the smith, and an omen pledged at the altar
     R.lastEvent = null; R.tempers = 0; R.pledge = false;
+    R.crown = 0; R.replaced = null; // the crown's charge, which carries over like Dawnbreak; the set boon a take just pushed out
     if (typeof document !== 'undefined') document.documentElement.style.setProperty('--herocol', G.hero().css); // (a hero's own boons wear the hero's colour)
   };
 
@@ -262,14 +302,25 @@
     // a redraw shows different boons where there are enough left to do so
     const fresh = avoid ? pool.filter((b) => !avoid.includes(b)) : pool;
     if (fresh.length >= n) pool = fresh;
-    // never more than one of the hero's own in an offering (v2.2a)
     R.offer = [];
+    // set boons come from one set at a time (v2.3a): up to two of them, more often from a set you
+    // already lean on, so a set can be gathered without being forced
+    const bySet = {};
+    for (const b of pool) if (b.set) (bySet[b.set] = bySet[b.set] || []).push(b);
+    const sets = Object.keys(bySet);
+    if (sets.length) {
+      const leaned = sets.filter((s) => R.setCount(s) > 0);
+      const set = leaned.length && Math.random() < 0.6 ? G.pick(leaned) : G.pick(sets);
+      R.offer.push(...G.shuffle(bySet[set].slice()).slice(0, Math.min(2, n - 1)));
+    }
+    // the rest are ordinary boons, never more than one of the hero's own (v2.2a)
     let own = false;
-    for (const b of G.shuffle(pool.slice())) {
+    for (const b of G.shuffle(pool.filter((q) => !q.set))) {
       if (R.offer.length >= n) break;
       if (b.heroes) { if (own) continue; own = true; }
       R.offer.push(b);
     }
+    R.offer = G.shuffle(R.offer);
     R.offerKind = 'boon';
     // a pair you have earned takes one card's place, on half the offers
     const open = openPairs().filter((p) => !avoid || !avoid.includes(p));
@@ -308,7 +359,7 @@
     const pool = G.BOONS.filter((b) => G.boon(b.id) < b.max && !ids.includes(b.id) && (!b.heroes || b.heroes.includes(R.hero)) && b.id !== 'glass');
     if (!pool.length) return null;
     const b = G.pick(pool);
-    R.boons[b.id] = G.boon(b.id) + 1; R.order.push(b.id);
+    R.grant(b);
     return b;
   };
   R.freeCurse = function () {
@@ -329,9 +380,27 @@
   R.take = function (i) {
     const b = R.offer[i];
     if (!b) return;
+    R.grant(b);
+  };
+  // Add a boon to the run. A set boon takes its slot, and whatever was in that slot is given up.
+  R.grant = function (b) {
+    R.replaced = null;
+    if (b.slot) {
+      const old = R.slots()[b.slot];
+      if (old && old !== b.id) { delete R.boons[old]; R.order = R.order.filter((id) => id !== old); R.replaced = boonById[old]; }
+    }
     R.boons[b.id] = G.boon(b.id) + 1;
     R.order.push(b.id);
   };
+  // The set boon in each slot: { strike: id, ... }.
+  R.slots = function () {
+    const out = {};
+    for (const id of R.order) { const b = boonById[id]; if (b && b.slot) out[b.slot] = id; }
+    return out;
+  };
+  R.setCount = (set) => Object.values(R.slots()).filter((id) => boonById[id].set === set).length;
+  // The set whose crown is open: three of its four boons held. (With four slots only one can be.)
+  R.crownSet = () => G.SET_IDS.find((s) => R.setCount(s) >= 3) || null;
   // Boons held, in the order taken, with counts: [{ def, n }].
   R.held = function () {
     const out = [];

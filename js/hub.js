@@ -341,7 +341,7 @@
       const h = G.HEROES[s.hero], x = P.x, f = P.facing;
       G.settings.hero = h.id; G.saveSettings();
       G.run.reset(); HUB.offer();
-      P.reset(); G.flow.reset(); G.moments.reset();
+      P.reset(); G.flow.reset(); G.moments.reset(); G.sets.reset();
       P.x = x; P.facing = f; P.ember = G.PLAYER.SEG * P.segs;
       G.ui.buildRun();
       G.audio.play('heal'); G.audio.play('blink');

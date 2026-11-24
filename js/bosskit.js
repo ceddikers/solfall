@@ -195,29 +195,33 @@
         if (G.moments.wardHit(B, amount, info)) { if (B.onReckon) B.onReckon(false); stagger(); }
         return true;
       }
+      amount = G.sets.amp(amount, info); // (the Gloam mark: sets.js)
       let mult = B.staggered ? (B.staggerMult || 1.4) * (G.relic('eye') ? 1.3 : 1) : 1;
       if (b.exposed) mult *= 1.3;
       if (B.vuln) mult *= B.vuln(t, info);
       const dmg = Math.round(amount * mult);
       const floorHp = B.phase === 1 ? Math.floor(B.maxHp * 2 / 3) : B.phase === 2 ? Math.floor(B.maxHp / 3) : 0;
       B.hp = Math.max(floorHp, B.hp - dmg);
-      G.player.stats.dmg += dmg; G.flow.dealt(dmg);
-      b.flash = 1;
-      b.kx = G.clamp(b.kx + (info.dir || G.sign(b.x - G.player.x) || 1) * (info.lance ? 14 : info.heavy ? 10 : 5), -18, 18);
-      // it rocks away from the blow and is pressed down by it (see K.recoil)
-      const big = info.finisher ? 1.5 : info.lance ? 1.25 : info.heavy ? 1 : 0.45;
-      b.recV = G.clamp((b.recV || 0) + (info.dir || G.sign(b.x - G.player.x) || 1) * 2.4 * big, -5, 5);
-      b.sq = Math.max(b.sq || 0, 0.045 + 0.05 * big);
-      if (G.settings.numbers) {
-        G.fx.text(info.x + G.rand(-12, 12), info.y - 16, String(dmg), {
-          color: (B.staggered || b.exposed || info.finisher) ? '255,226,140' : '255,255,255',
-          size: info.finisher ? 28 : info.heavy ? 23 : 17, life: info.finisher ? 0.8 : 0.65, pop: true,
-        });
+      G.player.stats.dmg += dmg; G.flow.dealt(dmg); G.sets.dealt(amount, info);
+      // (an ember burning, info.tick, hurts without a flinch, a number or any stagger)
+      if (!info.tick) {
+        b.flash = 1;
+        b.kx = G.clamp(b.kx + (info.dir || G.sign(b.x - G.player.x) || 1) * (info.lance ? 14 : info.heavy ? 10 : 5), -18, 18);
+        // it rocks away from the blow and is pressed down by it (see K.recoil)
+        const big = info.finisher ? 1.5 : info.lance ? 1.25 : info.heavy ? 1 : 0.45;
+        b.recV = G.clamp((b.recV || 0) + (info.dir || G.sign(b.x - G.player.x) || 1) * 2.4 * big, -5, 5);
+        b.sq = Math.max(b.sq || 0, 0.045 + 0.05 * big);
+        if (G.settings.numbers) {
+          G.fx.text(info.x + G.rand(-12, 12), info.y - 16, String(dmg), {
+            color: (B.staggered || b.exposed || info.finisher) ? '255,226,140' : '255,255,255',
+            size: info.finisher ? 28 : info.heavy ? 23 : 17, life: info.finisher ? 0.8 : 0.65, pop: true,
+          });
+        }
+        if (!B.staggered) {
+          B.poise += (amount * (B.poiseK || 1.15) * (info.poise || 1) + (info.lance ? 60 : 0)) * (G.relic('sunstone') ? 1.4 : 1);
+        }
       }
-      if (!B.staggered) {
-        B.poise += (amount * (B.poiseK || 1.15) * (info.poise || 1) + (info.lance ? 60 : 0)) * (G.relic('sunstone') ? 1.4 : 1);
-      }
-      if (B.onHit) B.onHit(dmg, info);
+      if (B.onHit && !info.tick) B.onHit(dmg, info);
       if (B.hp <= 0) die();
       else if (B.phase < 3 && B.hp <= floorHp) beginPhase(B.phase + 1);
       else if (!B.staggered && B.poise >= B.poiseMax && !B.steadfast) stagger(); // (B.steadfast: a working that no blow stops; the stagger waits for the next blow after it)

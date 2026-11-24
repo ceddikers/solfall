@@ -13,7 +13,7 @@
   const ARCH_X = 210, FIRE_X = 600, ALTAR_X = 1090, STONE_X = 1400, FOUNT_X = 1610, EVENT_X = 1900, PORTAL_X = 2180, PORTAL_GAP = 210, SEVENTH_X = 3540;
   const TAG_COL = { movement: '127,227,176', weapon: '255,186,92', starlight: '150,225,255', survival: '255,154,166', risk: '255,96,56', pair: '255,210,122', relic: '255,224,138', corrupted: '235,30,80' };
   // (a hero's own boons are in the hero's colour)
-  const colOf = (b) => (b.tag === 'Signature' ? G.hero().col : TAG_COL[b.tag.toLowerCase()] || '255,214,140');
+  const colOf = (b) => (b.tag === 'Signature' ? G.hero().col : b.set ? G.SETS[b.set].col : TAG_COL[b.tag.toLowerCase()] || '255,214,140');
   const BLOOD = '235,30,80';
   const bossCol = (id) => (G.THEMES[id] && G.THEMES[id][1] ? G.THEMES[id][1].boss : '236,233,244');
 
@@ -187,12 +187,25 @@
     G.ui.buildHp(p.maxHp); G.ui.buildRun();
   }
 
+  // A set's third boon opens its crown: the hero is lit with the set's colour, and the road says so.
+  function crowned(was) {
+    const cs = R().crownSet();
+    if (!cs || cs === was) return;
+    const p = P(), S = G.SETS[cs];
+    G.sets.reset(); // (a new crown starts empty)
+    G.audio.play('crownTaken');
+    F.ring(p.x, p.y - 40, { r0: 10, r1: 190, life: 0.6, color: S.col, width: 6 });
+    F.burst(p.x, p.y - 40, { n: 26, color: S.col, speed: [40, 260], life: [0.6, 1.3], size: [2, 4.5], grav: -160, wob: 120, jitter: 20 });
+    say('The ' + S.name + ' crown: ' + S.crown);
+  }
+  REST.crowned = crowned;
+
   function use(s) {
     const p = P(), run = R();
     if (s.id === 'boon') {
       if (turning(s.i)) { startTurn(); return; } // (nothing can be taken while it turns)
       if (mineI(s.i) || closed()) { G.audio.play('uiMove'); say(mineI(s.i) ? 'Yours for the run' : 'One each rest'); return; }
-      const b = run.offer[s.i], c = colOf(b);
+      const b = run.offer[s.i], c = colOf(b), crownWas = run.crownSet();
       if (b.relicReward) run.extraRelics.push(b.id); else run.take(s.i);
       if (REST.taken < 0) REST.taken = s.i; else REST.taken2 = s.i;
       retake();
@@ -201,7 +214,8 @@
       F.shatter(s.x, FLOOR - 104, c, 14, { r: 240, r0: 24 });
       F.ring(s.x, FLOOR - 104, { r0: 10, r1: 150, life: 0.45, color: c, width: 6 });
       F.burst(p.x, p.y - 10, { n: 16, color: c, speed: [20, 130], life: [0.6, 1.2], size: [2, 4], grav: -220, wob: 130, jitter: 22 });
-      say(b.name);
+      say(run.replaced ? b.name + ' (for ' + run.replaced.name + ')' : b.name);
+      crowned(crownWas);
     } else if (s.id === 'stone') {
       if (run.reroll()) {
         G.audio.play('uiSelect'); G.audio.play('whoosh'); F.shake(4);
@@ -313,7 +327,7 @@
     ev.done = true; ev.pick = c.i;
     for (const k of ev.cards) k.flip = k === c ? 0.001 : -0.25 - 0.15 * Math.abs(k.i - c.i); // (the others turn a moment later)
     let got = '', col = EV_COL.fortune;
-    if (c.what === 'boon') { const b = run.freeBoon(); if (b) { got = b.name; col = colOf(b); } else c.what = 'shards'; }
+    if (c.what === 'boon') { const was = run.crownSet(), b = run.freeBoon(); if (b) { got = b.name; col = colOf(b); crowned(was); } else c.what = 'shards'; }
     if (c.what === 'curse') { const b = run.freeCurse(); if (b) { got = b.name; col = BLOOD; } else c.what = 'shards'; }
     if (c.what === 'shards') { G.meta.shards += 40; G.meta.earned += 40; G.meta.save(); got = '+40 Sunshards'; col = paint.GOLD; }
     retake();
@@ -660,9 +674,9 @@
     const b = G.run.offer[s.i], own = b.relicReward ? 0 : G.boon(b.id), mine = mineI(s.i);
     el.className = 'item card focus show t-' + b.tag.toLowerCase();
     document.body.classList.toggle('pad', G.input.device === 'gamepad');
-    el.querySelector('.ctag').textContent = b.relicReward ? 'A second relic' : b.pair ? 'Pair · ' + b.of.map((id) => G.boonDef(id).name).join(' + ') : b.tag;
+    el.querySelector('.ctag').textContent = b.relicReward ? 'A second relic' : b.pair ? 'Pair · ' + b.of.map((id) => G.boonDef(id).name).join(' + ') : G.ui.boonTag(b);
     el.querySelector('.cname').textContent = b.name;
-    el.querySelector('.cdesc').innerHTML = G.ui.esc(b.desc) + (own && !mine ? ' You hold ' + own + '.' : '') + (mine || b.relicReward ? '' : G.ui.pairNote(b))
+    el.querySelector('.cdesc').innerHTML = G.ui.esc(b.desc) + (own && !mine ? ' You hold ' + own + '.' : '') + (mine || b.relicReward ? '' : G.ui.pairNote(b) + G.ui.setNote(b))
       + (b.cursed ? '<span class="bane">' + G.ui.esc(b.bane) + '</span>' : '');
     el.querySelector('.cuse').textContent = mine ? 'Yours for the run' : closed() ? 'You have taken one'
       : (G.input.device === 'gamepad' ? 'LB' : G.input.label('heal')) + '  take it';

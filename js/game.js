@@ -83,7 +83,7 @@
     G.setBoss('dummy');
     G.arena.reset(); G.hazards.clear(); F.reset();
     G.hub.offer(); // the relics on the reliquary's plinths for this visit
-    G.player.reset(); G.flow.reset(); G.boss.reset(); G.moments.reset();
+    G.player.reset(); G.flow.reset(); G.boss.reset(); G.moments.reset(); G.sets.reset();
     G.player.x = G.hub.spawn(where); G.player.facing = where === 'gate' ? -1 : 1;
     G.cam.x = G.hub.camTarget(); G.cam.y = 0; // the view starts on the hero, it does not slide there
     G.player.ember = G.PLAYER.SEG * G.player.segs; // the special can be tried freely here
@@ -102,7 +102,7 @@
     G.run.ult = G.player.ult || 0; // the Dawnbreak meter carries over
     G.setBoss('rest');
     G.arena.reset(); G.hazards.clear(); F.reset();
-    G.player.reset(); G.flow.reset(); G.boss.reset(); G.moments.reset();
+    G.player.reset(); G.flow.reset(); G.boss.reset(); G.moments.reset(); G.sets.reset();
     G.rest.enter();
     G.player.x = G.rest.spawn(); G.player.facing = 1;
     G.cam.x = G.rest.camTarget(); G.cam.y = 0;
@@ -133,7 +133,7 @@
     G.cam.x = 0; G.cam.y = 0; // the camp scrolls; an arena does not
     G.run.rollOmens(); // before the boss works out its health
     G.arena.reset(); G.hazards.clear(); F.reset();
-    G.player.reset(); G.flow.reset(); G.boss.reset(); G.moments.reset(); G.feats.reset(); G.hexes.reset(); G.boss.intro();
+    G.player.reset(); G.flow.reset(); G.boss.reset(); G.moments.reset(); G.sets.reset(); G.feats.reset(); G.hexes.reset(); G.boss.intro();
     G.state = 'fight'; G.paused = false;
     G.time = 0; G.hitstop = 0; G.slowT = 0; G.deadT = 0; G.wonT = 0; G.endShown = false;
     G.ui.close(); G.ui.resetHud(); G.ui.buildHp(G.player.maxHp); G.ui.buildRun(); G.ui.bossIntro(); G.ui.hud(true); G.ui.keysHint();
@@ -150,7 +150,7 @@
     G.setBoss('warden');
     G.arena.reset(); G.hazards.clear(); F.reset();
     G.player.reset(); G.flow.reset(); G.player.hidden = true;
-    G.boss.attract(); G.moments.reset();
+    G.boss.attract(); G.moments.reset(); G.sets.reset();
     G.state = 'title'; G.paused = false; G.hitstop = 0; G.slowT = 0;
     G.ui.resetHud(); G.ui.hud(false); G.ui.close(); G.ui.show('title');
     G.ui.fade(); G.ui.mood('menu');
@@ -263,7 +263,8 @@
     G.player.update(sdt);
     G.input.endStep();
     // while a Dawnbreak plays, the boss and everything it has thrown all but stand still
-    const bdt = G.player.ulting ? sdt * G.flow.SLOW : sdt;
+    // (and a soaked boss runs slower: sets.js)
+    const bdt = (G.player.ulting ? sdt * G.flow.SLOW : sdt) * G.sets.bossK();
     G.boss.update(bdt);
     G.hazards.update(bdt);
     G.corrupt.update(bdt);
@@ -276,6 +277,7 @@
       if (B.active && !B.invuln && !B.dying && B.phase === G.practice.phase - G.practice.left) { G.practice.left--; G.debug.nextPhase(); }
     }
     G.moments.update(sdt);
+    G.sets.update(sdt);
     G.updateShots(sdt);
     F.update(sdt);
     // the view leans a little towards the hero
@@ -327,8 +329,10 @@
     if (G.state === 'hub') G.hub.drawBack(ctx); else if (G.state === 'rest') G.rest.drawBack(ctx); else G.arena.drawBack(ctx);
     G.flow.drawVeil(ctx);
     G.moments.drawGloom(ctx);
+    G.sets.drawBack(ctx); // Nightfall's dark
     F.drawDecals(ctx);
     G.boss.drawGround(ctx);
+    G.sets.drawGround(ctx);
     G.player.drawShadow(ctx);
     // the Warden looms behind the platforms; the duelling bosses stand among them.
     // A boss that has just been struck shivers for the length of the hit-freeze.
@@ -340,6 +344,7 @@
     if (G.state === 'rest') G.rest.draw(ctx);
     if (G.boss.kit) drawBoss();
     G.moments.draw(ctx);
+    G.sets.draw(ctx);
     if (G.boss.drawOver) G.boss.drawOver(ctx); // e.g. the Veil's darkness: over the arena and the boss, under the hero
     G.drawShots(ctx);
     G.player.draw(ctx);

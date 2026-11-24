@@ -107,28 +107,32 @@
       if (G.moments.wardHit(B, amount, info)) stagger();
       return true;
     }
+    amount = G.sets.amp(amount, info); // (the Gloam mark: sets.js)
     let mult = t.kind === 'core' ? 1.5 : 1;
     if (B.staggered) mult *= G.relic('eye') ? 1.82 : 1.4;
     if (B.hands.some((h) => h.alive && h.broken > 0)) mult *= 1.25; // exposed while a hand lies broken
     const dmg = Math.round(amount * mult);
     const floorHp = B.phase === 1 ? Math.floor(B.maxHp * 2 / 3) : B.phase === 2 ? Math.floor(B.maxHp / 3) : 0;
     B.hp = Math.max(floorHp, B.hp - dmg);
-    G.player.stats.dmg += dmg; G.flow.dealt(dmg);
-    if (t.kind === 'core') B.core.flash = 1; else t.ref.flash = 1;
-    // struck parts recoil away from the blow
-    const push = (info.dir || G.sign(t.cx - G.player.x) || 1) * (info.lance ? 16 : info.heavy ? 12 : 7);
-    if (t.kind === 'core') B.core.kick = Math.min(1, (B.core.kick || 0) + (info.heavy ? 0.9 : 0.5));
-    else if (t.ref) t.ref.kx = G.clamp((t.ref.kx || 0) + push, -22, 22);
-    if (G.settings.numbers) {
-      G.fx.text(info.x + G.rand(-12, 12), info.y - 16, String(dmg), {
-        color: (t.kind === 'core' || B.staggered || info.finisher) ? '255,226,140' : '255,255,255',
-        size: info.finisher ? 28 : info.heavy ? 23 : 17, life: info.finisher ? 0.8 : 0.65, pop: true,
-      });
-    }
-    if (!B.staggered) {
-      // heroes differ in how hard they stagger (info.poise); the Sunstone relic speeds it for everyone
-      B.poise += (amount * (t.kind === 'hand' ? 1.5 : (B.phase === 3 ? 1.35 : 0.9)) * (info.poise || 1) + (info.lance ? 60 : 0))
-        * (G.relic('sunstone') ? 1.4 : 1);
+    G.player.stats.dmg += dmg; G.flow.dealt(dmg); G.sets.dealt(amount, info);
+    // (an ember burning, info.tick, hurts without a flinch, a number or any stagger)
+    if (!info.tick) {
+      if (t.kind === 'core') B.core.flash = 1; else t.ref.flash = 1;
+      // struck parts recoil away from the blow
+      const push = (info.dir || G.sign(t.cx - G.player.x) || 1) * (info.lance ? 16 : info.heavy ? 12 : 7);
+      if (t.kind === 'core') B.core.kick = Math.min(1, (B.core.kick || 0) + (info.heavy ? 0.9 : 0.5));
+      else if (t.ref) t.ref.kx = G.clamp((t.ref.kx || 0) + push, -22, 22);
+      if (G.settings.numbers) {
+        G.fx.text(info.x + G.rand(-12, 12), info.y - 16, String(dmg), {
+          color: (t.kind === 'core' || B.staggered || info.finisher) ? '255,226,140' : '255,255,255',
+          size: info.finisher ? 28 : info.heavy ? 23 : 17, life: info.finisher ? 0.8 : 0.65, pop: true,
+        });
+      }
+      if (!B.staggered) {
+        // heroes differ in how hard they stagger (info.poise); the Sunstone relic speeds it for everyone
+        B.poise += (amount * (t.kind === 'hand' ? 1.5 : (B.phase === 3 ? 1.35 : 0.9)) * (info.poise || 1) + (info.lance ? 60 : 0))
+          * (G.relic('sunstone') ? 1.4 : 1);
+      }
     }
     if (B.hp <= 0) die();
     else if (B.phase < 3 && B.hp <= floorHp) beginPhase(B.phase + 1);

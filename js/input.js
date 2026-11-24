@@ -12,6 +12,7 @@
     flare: ['KeyL', 'KeyV'],
     heal: ['KeyE', 'KeyF'],
     ult: ['KeyQ', 'KeyI'],
+    crown: ['KeyU'], // a set's crown (v2.3a)
     taunt: ['KeyT', 'KeyG'],
     pause: ['Escape', 'KeyP'],
     moves: ['Tab'],
@@ -79,7 +80,7 @@
   window.addEventListener('blur', releaseAll);
 
   // ---- rebinding (Settings, Controls)
-  I.REBIND = ['left', 'right', 'up', 'down', 'jump', 'attack', 'dash', 'flare', 'heal', 'ult'];
+  I.REBIND = ['left', 'right', 'up', 'down', 'jump', 'attack', 'dash', 'flare', 'heal', 'ult', 'crown'];
   const FIXED = ['Escape', 'Enter', 'NumpadEnter'];
   // Make `code` the first key for an action. A key does one thing, so it is taken from whatever had it.
   I.bind = function (action, code) {
@@ -143,7 +144,8 @@
     ult: (g) => btn(g, 7),
     taunt: (g) => btn(g, 8) || btn(g, 11),
     flare: (g) => btn(g, 3),
-    heal: (g) => btn(g, 4) || btn(g, 6),
+    heal: (g) => btn(g, 4),
+    crown: (g) => btn(g, 6), // LT (mend keeps LB)
     pause: (g) => btn(g, 9),
   };
   function btn(g, i) { return !!(g.buttons[i] && g.buttons[i].pressed); }
