@@ -2,7 +2,7 @@
 
 A side-on boss rush for the browser: four heroes, seven three-phase bosses, played as a run of
 ever-harder trials. You pick a hero and a relic before the run and win a boon after each victory.
-Version 2.4a.
+Version 2.4b.
 
 This is an early slice of a planned boss-rush roguelite (short runs, a boon after each boss,
 bosses drawn from a pool). A run meets the four bosses in a shuffled order, then meets them again, harder.
@@ -129,6 +129,20 @@ so each run leaves one boss out; the portals were spaced closer to fit (`js/rest
 | I · Sparring | Punch combos, the Sunwell Wave (a blue beam from both hands), Hailfire (10-15 energy balls from the air), the spin throw. Keep away and he flies at you knee first; ride over his head and he drives a palm straight up | Every combo opens the same way; the **third punch** shows the ending. Hips turning with a sharp breath: kicks (the last rises over your head; dash through to his back). A hand dropped glowing to his hip with a hum: a short beam. Nothing: he hops back, open. A leap with **open hands** is the throw: a dash does not save you, a jump over him does |
 | II · Risen | A gold aura with lightning in it, everything faster. The Wave can **warp** behind you; combos can fire a one-hand beam; Flare Up (six seconds of blinks and a quarter more damage taken, then a gasp), Meteor Smash, Twin Comets. His heavy blows crack the ridge | Warp: the charge hum cuts off with a crack. Meteor Smash: a shadow grows where he will land (he is off screen, so the mark is fair) |
 | III · Still Sky | He falls as if beaten and rises with three quarters of his health back, the phase marks gone from his bar, in a thin white aura. The **Gathered Sun** opens it. Standing still between attacks he slips blows to his front and answers with a palm. Empty Hand, the Sweeping Wave, Meteor Heel. Below 12%, once: the **Last Wave** | Empty Hand: eyes shut, nothing moving; strike him and he is behind you. Sweeping Wave: which hand is on top as he draws back says which way it sweeps (the lead hand: up) |
+
+**The punch combos** (v2.4b) come out of wind-ups you can see: each punch starts with the fist drawn back,
+the opener is measured, the middle ones quick, and the punch that shows the ending is held a beat longer. The
+kick tell (hips turned, back heel up) is now drawn; before it was only the breath. The beam ending has a real
+charge: he skids back off the last punch, sinks low with the glowing hand right back at his hip and light
+drawn into it, a point of light at the hand, then the shot, which drives him back. In phase I he only ever
+dashes in, never blinks, and his Wave never warps, even when fierce; his blows come a quarter slower than
+before and he waits longer between attacks, like the Knight.
+
+**Risen** (v2.4b): after the laugh he sinks low, fists clenched and shaking. The music falls away, stones lift
+off the ridge and hang round him, dust is drawn in, and his heartbeat thumps through the air four times, each
+sooner than the last. Then he throws his head back and the aura erupts over twice his height in a burst of
+lightning, the hanging stones are blown across the canyon, the slab under him goes, and it roars on for a
+second before settling into the burn he fights in.
 
 **The Sunwell Wave** follows you until it holds, then plays out for most of a second; a dash alone does
 not outlast it. Be in the air when it holds and it goes over you as you land, or get round behind him: it

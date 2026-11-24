@@ -2,7 +2,7 @@
 // the user's brief (the Claude Doc "Solfall boss brief"). He comes to spar and ends up fighting for
 // his life: each phase he powers up and takes the hero more seriously.
 //   I   The duel. Punch combos that all open the same way and show their ending on the third punch,
-//       the Sunwell Wave, the Hailfire barrage, the spin throw. He blinks only to move about.
+//       the Sunwell Wave, the Hailfire barrage, the spin throw. He never blinks or warps yet.
 //   II  Risen: a gold aura with lightning in it, everything faster. The Wave can warp behind you,
 //       combos can fire a one-hand beam, and Flare Up, Meteor Smash and Twin Comets join. His blows
 //       crack the ridge (eight slabs of rock) and a slab cracked three times falls away.
@@ -183,7 +183,7 @@
     hudCols: [null, ['#ff9a56', '#ffe0b8'], ['#ffd040', '#fff4c4'], ['#c8dcff', '#ffffff']],
     BASE_HP: 2700, poise0: 330, w: 40, h: 88,
     answer: 'knee', antiAir: 'palm', finale: 'lastwave',
-    gaps: [0, 0.8, 0.62, 0.52],
+    gaps: [0, 1.0, 0.8, 0.64],
     bags: {
       1: ['combo', 'combo', 'combo', 'combo', 'throw', 'throw', 'wave', 'wave', 'hailfire'],
       2: ['combo', 'combo', 'combo', 'combo', 'throw', 'throw', 'wave', 'wave', 'hailfire', 'flare', 'meteor', 'comets'],
@@ -197,6 +197,8 @@
   };
   // how long each punish window lasts, by phase: about two thirds in II, half in III
   const PW = () => [0, 1, 0.67, 0.5][B.phase];
+  // how long his close blows take to come, by phase: slowest in the sparring phase
+  const SP = () => [0, 1.25, 1.02, 0.9][B.phase];
 
   // ------------------------------------------------------------------ poses
   // lean, hip height, front foot (x, y), back foot (x, y), lead fist (x, y), rear fist (x, y), look
@@ -213,6 +215,12 @@
     hips: [-0.05, -44, 13, 0, -14, -7, 20, -74, -2, -66, 0], // the kick's tell: hips turned, back heel up
     spinKick: [-0.25, -41, -5, 0, 54, -26, -11, -70, 9, -63, 0],
     riseKick: [-0.55, -49, -2, 0, 20, -112, -12, -72, 11, -66, 0],
+    // the wind-ups his punches come out of: the fist drawn back, the shoulder turned away
+    jabC: [0.04, -43, 16, 0, -16, 0, 13, -75, 7, -66, 0],
+    crossC: [-0.04, -42, 19, 0, -18, 0, 27, -72, -11, -63, 0],
+    jabLC: [0.04, -43, 16, 0, -16, 0, 13, -75, -8, -49, 0],
+    // the beam ending's charge: low and wide, the lead hand out to aim, the glowing hand right back at the hip
+    beamC: [-0.16, -37, 27, 0, -27, 0, 31, -64, -25, -45, 0],
     palmShot: [0.3, -41, 22, 0, -20, 0, 16, -68, 48, -58, 0],
     cup: [-0.18, -41, 22, 0, -24, 0, -18, -54, -22, -50, 0],
     cupUp: [-0.18, -41, 22, 0, -24, 0, -20, -60, -20, -46, 0],  // (the sweep's tell: lead hand on top, it sweeps up)
@@ -235,6 +243,7 @@
     knee: [0.25, -49, 27, -41, -13, 0, 16, -76, -9, -68, 0],
     fly: [0.75, -52, 11, -30, -27, -23, 20, -76, -13, -72, 0],
     roar: [-0.25, -40, 25, 0, -25, 0, 27, -52, -22, -52, -0.35],
+    powerC: [0.2, -33, 21, 0, -21, 0, 13, -41, -9, -41, 0.45], // gathering himself: low, fists clenched at his sides, head down
     crossArms: [0.0, -43, 14, 0, -15, 0, -7, -77, 9, -79, 0],
     fling: [-0.05, -44, 14, 0, -15, 0, 45, -90, -38, -88, 0],
     hammer: [0.0, -50, 9, -9, -11, -5, 9, -118, 2, -115, 0],
@@ -458,7 +467,14 @@
       x: b.x + f * 6, y: b.y + ay, r: o.r || 100, a0: m(o.a0 != null ? o.a0 : -0.25), a1: m(o.a1 != null ? o.a1 : 0.62),
       tele: o.tele, active: 0.08, fade: 0.12, owner: b, dmg: o.dmg || 1, tint: o.tint,
       follow(h) { if (!h.fired) { h.x = b.x + b.face * 6; h.y = b.y + ay; } },
-      onFire() { b.fast = true; b.pose = o.pose; G.audio.play('kSnap', { vol: o.soft ? 0.45 : 1 }); if (!who) G.fx.kick(f * 1.6, 0); },
+      onFire() {
+        b.fast = true; b.pose = o.pose; G.audio.play('kSnap', { vol: o.soft ? 0.45 : 1 });
+        if (who) return;
+        G.fx.kick(f * (o.heavy ? 2.4 : 1.6), 0);
+        // weight: the front foot drives into the ground on a cross, and the last of a string thumps
+        if (o.heavy) G.fx.dust(b.x + f * 20, FLOOR, o.last ? 4 : 2, { dir: -f, speed: [40, 170], size: [4, 8], up: 16 });
+        if (o.last) { G.fx.shake(3); G.fx.lines(b.x + f * 70, b.y + ay, 5, G.pal().hot, { r0: 10, speed: [200, 420] }); }
+      },
     });
     // (the Shadow Partner, corrupted: a dark copy of him makes the same blow half a second later from the hero's other side)
     if (B.partnerOn && !who) partnerEcho(o);
@@ -520,7 +536,8 @@
     const b = B.body, ox = b.x + b.face * 34, oy = b.y + (y || -40);
     G.audio.play('kWave', { vol: 0.5, dur: 0.4 });
     G.fx.shake(6);
-    return H.beam({ ox, oy, ang: b.face > 0 ? 0 : Math.PI, width: 26, tele: 0.1, lock: 0.1, active: life, fade: 0.18, maxLen: len, clip: false, tint: WAVE, sfx: false, shake: 5 });
+    return H.beam({ ox, oy, ang: b.face > 0 ? 0 : Math.PI, width: 26, tele: 0.1, lock: 0.1, active: life, fade: 0.18, maxLen: len, clip: false, tint: WAVE, sfx: false, shake: 5,
+      follow(h) { h.ox = b.x + b.face * 34; } }); // (it stays in his palm as the shot drives him back)
   }
 
   // ------------------------------------------------------------------ the punch combo
@@ -539,31 +556,37 @@
     let end = K.chance(corrupt ? 0.5 : 0.3, 'beam') ? 'beam' : K.chance(0.45, 'kick') ? 'kick' : 'plain';
     if (ph === 3 && end === 'plain' && K.chance(0.35, 'warp')) end = 'warp';
     const oneHand = ph === 2 && end !== 'beam' && K.chance(0.35, 'onehand') ? 2 + ((G.rng() * (n - 2)) | 0) : -1;
-    const kickAt = ph === 3 ? n : 3, beamAt = ph === 3 ? n : 2, speed = [0, 1, 0.82, 0.74][ph];
+    const kickAt = ph === 3 ? n : 3, beamAt = ph === 3 ? n : 2, speed = SP();
     facePlayer();
-    // in: a dash, or now and then (and always while flaring) a short blink
+    // in: a dash; from phase II now and then (and always while flaring) a short blink. In phase I he
+    // only ever dashes: the warping is the power he finds when he rises.
     const d = Math.abs(P.x - b.x);
     if (d > 120) {
       const side = G.sign(P.x - b.x) || 1;
-      if (B.flare > 0 || G.rng() < 0.3) yield* blinkTo(P.x - side * 105);
-      else yield* dashTo(P.x - side * 80, 1100);
+      if (ph >= 2 && (B.flare > 0 || G.rng() < 0.3)) yield* blinkTo(P.x - side * 105);
+      else yield* dashTo(P.x - side * 80, ph === 1 ? 820 : 950);
     }
     facePlayer();
     // the feeler: a tap of the lead fist with nothing behind it
     b.pose = 'tap'; b.fast = true; G.audio.play('kSnap', { vol: 0.3 });
     if (oneHand >= 0) { b.handHip = 1; b.glow = 0.35; G.audio.play('kHum', { dur: 0.3, vol: 0.5 }); }
-    yield* wait(0.2 * T);
+    yield* wait(0.26 * T);
     b.fast = false;
     let side0 = b.face;
+    // the rhythm: a measured opener, quick ones after, and a held beat on the punch that shows the ending
+    const tellAt = Math.min(n, ph === 3 ? n : 3);
     for (let i = 1; i <= n; i++) {
       if (P.dead) return;
       facePlayer(); side0 = b.face;
-      if (end === 'beam' && i === beamAt) { b.handHip = 1; b.glow = 0.5; G.audio.play('kHum', { dur: (n - i + 1) * 0.2 * T + 0.3, vol: ph === 3 ? 0.5 : 1 }); }
+      const base = i === 1 ? 0.28 : i === tellAt ? 0.34 : 0.2;
+      const tele = base * T * speed, lead = i % 2 === 1, last = i === n;
+      if (end === 'beam' && i === beamAt) { b.handHip = 1; b.glow = 0.5; G.audio.play('kHum', { dur: (n - i + 1) * 0.24 * T * speed + 0.5, vol: ph === 3 ? 0.5 : 1 }); }
       if (end === 'kick' && i === kickAt) { b.hips = 1; G.audio.play('kBreath'); }
-      const tele = (i === 1 ? 0.3 : 0.18) * T * speed;
-      punch({ tele, pose: b.handHip ? 'jabL' : (i % 2 ? 'jab' : 'cross'), soft: ph === 3 });
-      yield* stepIn(tele, 12);
-      yield* wait(0.06);
+      // the wind-up he punches out of: the fist drawn back (the kick tell: hips turned, back heel up)
+      b.pose = b.hips ? 'hips' : b.handHip ? 'jabLC' : lead ? 'jabC' : 'crossC';
+      punch({ tele, pose: b.handHip ? 'jabL' : (lead ? 'jab' : 'cross'), soft: ph === 3, r: last ? 112 : 100, heavy: !lead || last, last });
+      yield* stepIn(tele, lead ? 10 : 18);
+      yield* wait(last ? 0.1 : 0.06);
       b.fast = false;
       // the turn grab: the hero went through to his back
       if (wentThrough(side0) && K.chance(0.35, 'turngrab')) { b.handHip = 0; b.hips = 0; yield* turnGrab(); return; }
@@ -578,18 +601,45 @@
       b.exposed = true; yield* wait(0.6 * PW()); b.exposed = false;
     }
   }
+  // the light gathering into the hand at his hip: sparks drawn in from round it, more as it fills (k 0..1)
+  function gatherFx(b, dt, k) {
+    const hx = b.x + b.face * b.p[8], hy = b.y + b.p[9];
+    if (Math.random() < dt * (24 + 60 * k)) {
+      const a = Math.random() * G.TAU, r = G.rand(38, 78), life = G.rand(0.16, 0.26);
+      G.fx.spawn({ kind: 'spark', x: hx + Math.cos(a) * r, y: hy + Math.sin(a) * r, vx: -Math.cos(a) * r / life, vy: -Math.sin(a) * r / life, life, size: G.rand(1.3, 2.4), color: WAVE.hot, len: 0.04 });
+    }
+    if (Math.random() < dt * 8 * k) G.fx.dust(b.x + G.rand(-24, 24), FLOOR, 1, { speed: [20, 70], size: [4, 7], up: 26, a: 0.25 });
+  }
+  // the charge both hand beams come out of: sunk into the wide stance, the glow at his hip swelling,
+  // a point of light at the hand, then the shot
+  function* chargeHand(dur) {
+    const b = B.body;
+    b.pose = 'beamC'; b.handHip = 1; b.fast = false;
+    G.audio.play('kCharge', { dur: dur + 0.08, vol: 0.6 });
+    let e = 0;
+    while (e < dur) { const dt = yield; e += dt; const k = Math.min(1, e / dur); b.glow = 0.5 + 1.5 * k; gatherFx(b, dt, k); }
+    G.fx.glint(b.x + b.face * b.p[8], b.y + b.p[9], 28, WAVE.hot, 0.2);
+    G.audio.play('kHum', { dur: 0.12, vol: 0.7 });
+    yield* wait(0.08);
+  }
+  // driven back by his own shot, his heels ploughing the dust
+  function* recoil(dist, dur) {
+    const b = B.body, x0 = b.x, x1 = clampX(b.x - b.face * dist);
+    G.fx.dust(b.x + b.face * 14, FLOOR, 4, { dir: -b.face, speed: [60, 240], size: [5, 10], up: 20 });
+    let e = 0;
+    while (e < dur) { const dt = yield; e += dt; b.x = G.lerp(x0, x1, E.outQuad(Math.min(1, e / dur))); b.y = gy(b.x); }
+  }
   function* handBeam() {
-    const b = B.body, T = K.T();
-    b.glow = 1; G.audio.play('kHum', { dur: 0.22 * T });
-    G.fx.glint(b.x - b.face * 6, b.y - 50, 20, WAVE.hot, 0.2);
-    yield* wait(0.22 * T);
+    const b = B.body, T = K.T() * SP();
+    yield* chargeHand(0.3 * T);
     b.pose = 'palmShot'; b.fast = true;
     shortBeam(360, 0.22, -44);
-    yield* wait(0.3);
+    yield* recoil(14, 0.16);
+    yield* wait(0.14);
     b.handHip = 0; b.glow = 0; b.fast = false;
   }
   function* kicks() {
-    const b = B.body, T = K.T();
+    const b = B.body, T = K.T() * SP();
     b.hips = 0;
     // a wide spinning kick, low and long, round in front of him
     kick({ r: 150, a0: -0.2, a1: 0.95, tele: 0.16 * T, pose: 'spinKick', y: -40 });
@@ -601,13 +651,18 @@
     b.fast = false; b.pose = 'land';
     b.exposed = true; yield* wait(0.8 * PW()); b.exposed = false;
   }
+  // The beam ending: off the last punch he skids back a step, sinks into a wide stance with the glowing
+  // hand drawn right back to his hip and the light gathering into it, then fires and is driven back.
   function* quickBeam() {
-    const b = B.body;
-    b.glow = 1;
-    yield* wait(0.08);
+    const b = B.body, T = K.T() * SP();
+    b.pose = 'land'; b.fast = false;
+    yield* recoil(44, 0.16);
+    yield* chargeHand(0.46 * T);
     b.pose = 'palmShot'; b.fast = true;
-    shortBeam(420, 0.3, -40);
-    yield* wait(0.36);
+    shortBeam(460, 0.34, -40);
+    G.fx.shake(4);
+    yield* recoil(22, 0.2);
+    yield* wait(0.16);
     b.handHip = 0; b.glow = 0;
     b.exposed = true; yield* wait(1.0 * PW()); b.exposed = false;
     b.fast = false;
@@ -641,7 +696,7 @@
     const b = B.body, P = G.player, T = K.T();
     facePlayer();
     b.pose = 'land';
-    yield* wait(0.34 * T);
+    yield* wait(0.34 * T * SP());
     const dir = G.sign(P.x - b.x) || b.face, dist = Math.min(430, Math.abs(P.x - b.x) + 40);
     const x0 = b.x, x1 = clampX(x0 + dir * dist), wall = Math.abs(x1 - (x0 + dir * dist)) > 1;
     const dur = 0.2 + Math.abs(x1 - x0) / 1500;
@@ -708,7 +763,7 @@
   // for most of a second. The lower his health the wider it is (to a cap). Bait it to one side, get
   // round him, strike him while it plays.
   //   held (one in four): the orb pulses twice and he keeps it 0.7 s longer, still following you.
-  //   warp (phase II on, one in three; any phase when fierce): half way through the charge the hum cuts
+  //   warp (phase II on, one in three; a little more when fierce): half way through the charge the hum cuts
   //     off with a crack and he is gone, the charge's outline left where he was; he appears behind the
   //     hero and 0.45 s later fires point-blank. Corrupted, he can warp twice.
   //   sweep (phase III, the Sweeping Wave): the wave sweeps up or down through an arc in front of him.
@@ -716,7 +771,7 @@
   function* atkWave(o) {
     o = o || {};
     const b = B.body, P = G.player, T = K.T(), ph = B.phase;
-    const warp = o.warp || (!o.sweep && (ph >= 2 || K.hard()) && K.chance(ph >= 2 ? 0.34 : 0.2, 'warp'));
+    const warp = o.warp || (!o.sweep && ph >= 2 && K.chance(K.hard() ? 0.42 : 0.34, 'warp'));
     const held = !warp && !o.sweep && K.chance(0.25, 'held');
     const up = o.sweep ? K.chance(0.5, 'sweepup') : false;
     facePlayer();
@@ -1345,20 +1400,70 @@
       yield* wait(0.55);
       b.pose = 'laugh'; G.audio.play('kLaugh');
       yield* wait(0.65);
-      // rocks lift, his hair rises, the gold aura roars up crackling, and the slab under him goes
-      b.pose = 'roar';
-      G.audio.play('kRumble', { dur: 1.4 }); G.audio.play('kRoar', { dur: 1.6 });
-      let e = 0;
-      while (e < 1.3) {
+      const GC = G.PAL[2];
+      // the gathering: he sinks low, fists clenched at his sides and head down, shaking with it. The
+      // music falls away; stones lift off the ridge round him and hang in the air, dust is drawn in
+      // along the ground, gold catches on him in flickers, and his heartbeat thumps through the air,
+      // each beat sooner than the last
+      b.pose = 'powerC'; G.audio.duck(0.12);
+      G.audio.play('kRumble', { dur: 2.4 });
+      const beats = [0.55, 1.1, 1.5, 1.78];
+      let e = 0, beat = 0;
+      while (e < 2.0) {
         const dt = yield;
-        e += dt; b.risen = Math.min(1, e / 1.0); G.fx.shake(2 + 4 * b.risen);
-        if (Math.random() < dt * 24) G.fx.spawn({ kind: 'chunk', x: b.x + G.rand(-120, 120), y: FLOOR - 4, vx: G.rand(-30, 30), vy: -G.rand(60, 240), life: G.rand(0.9, 1.6), size: G.rand(4, 10), color: '34,26,20', grav: 40 });
-        if (Math.random() < dt * 8) G.audio.play('kBolt');
+        e += dt;
+        const k = Math.min(1, e / 2.0);
+        G.fx.shake(1 + 3 * k);
+        for (let i = 6; i < 10; i++) b.p[i] += G.rand(-0.7, 0.7) * (0.4 + k); // the strain in his fists
+        b.flick = Math.max(b.flick, 0.15 + 0.35 * k * (0.5 + 0.5 * Math.sin(e * 23)));
+        if (Math.random() < dt * (8 + 16 * k)) {
+          const d = G.rand(-1, 1) < 0 ? -1 : 1;
+          G.fx.spawn({ kind: 'chunk', tag: 'klift', x: b.x + d * G.rand(40, 230), y: FLOOR - 4, vx: G.rand(-12, 12), vy: -G.rand(60, 150), life: G.rand(3, 4), size: G.rand(3, 9), color: '34,26,20', grav: 0, drag: 1.3, vr: G.rand(-2, 2) });
+        }
+        if (Math.random() < dt * 14) { const d = Math.random() < 0.5 ? -1 : 1; G.fx.dust(b.x + d * G.rand(110, 230), FLOOR, 1, { dir: -d, speed: [90, 220], size: [5, 9], up: 6, a: 0.3 }); }
+        if (Math.random() < dt * (20 + 50 * k)) {
+          const a = Math.random() * G.TAU, r = G.rand(60, 120), life = G.rand(0.2, 0.32), cx = b.x, cy = b.y - 46;
+          G.fx.spawn({ kind: 'spark', x: cx + Math.cos(a) * r, y: cy + Math.sin(a) * r, vx: -Math.cos(a) * r / life, vy: -Math.sin(a) * r / life, life, size: G.rand(1.4, 2.6), color: GC.hot, len: 0.05 });
+        }
+        if (beat < beats.length && e >= beats[beat]) {
+          beat++;
+          G.audio.play('stomp', { vol: 0.5 + 0.12 * beat }); G.audio.play('kBolt', { vol: 0.4 });
+          G.fx.ripple(b.x, b.y - 46, 160 + 70 * beat, 0.4, 0.5 + 0.25 * beat);
+          G.fx.ring(b.x, b.y - 46, { r0: 18, r1: 110 + 40 * beat, life: 0.38, width: 3, color: GC.hot, alpha: 0.45 });
+          b.flick = 1; b.pv[1] += 60; G.fx.kick(0, 1.2);
+          for (const s of B.slabs) if (Math.abs((s.l + s.r) / 2 - b.x) < 260) s.quake = Math.max(s.quake, 0.5);
+        }
       }
+      // the eruption: head thrown back and arms flung wide, the aura bursting up three times his height,
+      // the hanging stones blown out across the canyon and the slab under him gone
+      b.pose = 'roar'; b.fast = true; b.risen = 1; b.surge = 1; b.flick = 0;
+      G.audio.duck(1);
+      G.audio.play('kRoar', { dur: 2.0 }); G.audio.play('boom'); G.audio.play('kBolt');
+      G.fx.stop(0.1); G.fx.slow(0.5, 0.35);
+      G.fx.impact(b.x, b.y - 50, 0.07); G.fx.punch(0.04); G.fx.shake(16);
+      G.fx.ripple(b.x, b.y - 50, 560, 0.6, 1.4);
+      G.fx.ring(b.x, FLOOR - 6, { r0: 30, r1: 460, life: 0.6, width: 6, color: GC.hot, alpha: 0.55 });
+      G.fx.lines(b.x, b.y - 50, 22, GC.hot, { r0: 50, speed: [900, 1600] });
+      G.fx.burst(b.x, b.y - 50, { n: 40, color: GC.boss, kind: 'spark', speed: [300, 1000], life: [0.3, 0.8], size: [2, 4], drag: 1.6 });
+      for (const d of [-1, 1]) G.fx.dust(b.x + d * 30, FLOOR, 8, { dir: d, speed: [200, 560], size: [8, 16], life: [0.6, 1.2], up: 30, a: 0.45 });
+      for (const p of G.fx.parts) if (p.tag === 'klift') { const d = G.sign(p.x - b.x) || 1; p.vx = d * G.rand(500, 1100); p.vy = -G.rand(80, 380); p.grav = 1300; p.drag = 0.2; p.vr = G.rand(-10, 10); }
+      for (const s of B.slabs) s.quake = 1;
       breakUnder(b.x);
       b.y = gy(b.x);
-      yield* wait(0.45);
-      G.audio.duck(1);
+      // and it roars on, settling down to the steady burn he fights in
+      e = 0;
+      while (e < 1.2) {
+        const dt = yield;
+        e += dt;
+        b.surge = 1 - E.inQuad(Math.min(1, e / 1.2));
+        G.fx.shake(2 + 6 * b.surge);
+        if (Math.random() < dt * 30 * b.surge) G.fx.spawn({ kind: 'chunk', x: b.x + G.rand(-160, 160), y: FLOOR - 4, vx: G.rand(-40, 40), vy: -G.rand(120, 360), life: G.rand(0.8, 1.4), size: G.rand(3, 8), color: '34,26,20', grav: 300 });
+        if (Math.random() < dt * 40 * b.surge) K.aura(b.x, b.y, GC.boss, 30, 150, 1);
+        if (e > 0.25) b.fast = false;
+      }
+      b.surge = 0;
+      b.pose = 'idle';
+      yield* wait(0.35);
     } else {
       // he falls as if beaten; the music stops
       G.audio.setIntensity(0);
@@ -1402,7 +1507,7 @@
     if (!b.noTurn) facePlayer();
     const d = Math.abs(P.x - b.x);
     if (b.held) return;
-    if (d > 240) { b.x = clampX(b.x + b.face * 170 * dt); b.pose = 'walk'; }
+    if (d > 240) { b.x = clampX(b.x + b.face * 140 * dt); b.pose = 'walk'; }
     else if (d < 70) { b.x = clampX(b.x - b.face * 90 * dt); b.pose = 'idle'; }
     else b.pose = 'idle';
     b.air = false;
@@ -1443,7 +1548,8 @@
       B.boltT = 0.07;
       B.bolts = [];
       const on = b.risen > 0.3 || (B.flare > 0 && B.phase >= 2);
-      if (on && !b.hidden) for (let i = 0; i < 2; i++) if (Math.random() < 0.6) B.bolts.push(jag(b.x + G.rand(-22, 22), b.y - G.rand(10, 86), G.rand(14, 34)));
+      const sg = b.surge || 0;
+      if (on && !b.hidden) for (let i = 0; i < 2 + 5 * sg; i++) if (Math.random() < 0.6) B.bolts.push(jag(b.x + G.rand(-22, 22) * (1 + sg), b.y - G.rand(10, 86 + 90 * sg), G.rand(14, 34) * (1 + sg)));
       if (on && !b.hidden && Math.random() < 0.06) G.audio.play('kBolt');
     }
     // Flare Up's six seconds
@@ -1607,16 +1713,17 @@
   // tongues of flame licking up round his body, each its own height, lean and flicker, none sharing a
   // base line (so the whole never reads as a box of light)
   function flames(ctx, b, col, k, front) {
+    const sg = b.surge || 0; // (the transformation's eruption: taller, wider, faster)
     const N = front ? 7 : 14, t = G.t, hot = '255,246,214';
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
-    if (!front) D.glow(ctx, col, b.x, b.y - 50, 80, 0.16 * k);
+    if (!front) D.glow(ctx, col, b.x, b.y - 50 - 30 * sg, 80 * (1 + 0.7 * sg), 0.16 * k);
     for (let i = 0; i < N; i++) {
       const seed = i * 2.399 + (front ? 0.7 : 0), u = Math.sin(seed * 3.1) * 0.5;
-      const cyc = (t * (1.6 + (i % 3) * 0.35) + seed) % 1; // each tongue rises, thins and is replaced
-      const x = b.x + u * (front ? 30 : 46) + Math.sin(t * 6 + seed) * 3;
+      const cyc = (t * (1.6 + (i % 3) * 0.35) * (1 + 0.8 * sg) + seed) % 1; // each tongue rises, thins and is replaced
+      const x = b.x + u * (front ? 30 : 46) * (1 + 0.5 * sg) + Math.sin(t * 6 + seed) * 3;
       const base = b.y - 6 - (1 - Math.abs(u) * 2) * 26 - cyc * 18;
-      const hgt = (front ? 54 : 96) * k * (0.55 + 0.45 * Math.sin(Math.PI * cyc)) * (1 - Math.abs(u) * 0.5);
+      const hgt = (front ? 54 : 96) * k * (1 + 1.7 * sg) * (0.55 + 0.45 * Math.sin(Math.PI * cyc)) * (1 - Math.abs(u) * 0.5);
       const w = (front ? 9 : 15) * (1 - cyc * 0.5), sway = Math.sin(t * 9 + seed * 2) * 7 - u * 10;
       const a = (front ? 0.3 : 0.5) * k * Math.sin(Math.PI * Math.min(1, cyc * 1.4));
       if (hgt < 4 || a < 0.01) continue;
