@@ -76,21 +76,22 @@
     {
       id: 'eos', name: 'Eos', title: 'The Sheathed Dawn', col: '255,146,172', hot: '255,238,242', css: '#ff92ac',
       cloak: ['#5e2238', '#200a12'], build: 0.98, scarf: 10, scarfW: 0.8,
-      hp: 0, run: 322, air: 1, weapon: 'blade', draw: true, reach: 1.08, thick: 1.1, poise: 1.1,
-      // only the flick uses these; the draws are in G.PLAYER (FOCUS, DRAW_DMG and the rest)
+      hp: 0, run: 338, air: 1, weapon: 'blade', draw: true, reach: 1.12, thick: 1.1, poise: 1.1,
+      // only the string of presses uses these; the draws are in G.PLAYER (FOCUS, DRAW_DMG and the rest)
+      // (v2.1b: a string of three, from three flicks of 11 every 0.36 s)
       combo: [
-        { dmg: 11, cd: 0.36, dur: 0.22, wind: 0.04, act: 0.1 },
-        { dmg: 11, cd: 0.36, dur: 0.22, wind: 0.04, act: 0.1 },
-        { dmg: 11, cd: 0.36, dur: 0.22, wind: 0.04, act: 0.1 },
+        { dmg: 11, cd: 0.27, dur: 0.22, wind: 0.04, act: 0.1 },  // out of the sheath, rising
+        { dmg: 13, cd: 0.29, dur: 0.24, wind: 0.05, act: 0.1 },  // back across, falling
+        { dmg: 27, cd: 0.5, dur: 0.36, wind: 0.08, act: 0.14 },  // the finisher, wide, stepping in
       ],
       down: 11, special: 'guard', specialName: 'Still Point', verb: 'guard',
       blurb: 'Patient and exact. One cut, when it counts.',
-      lines: ['Sheathed blade: hold the attack to gather Focus, let go to draw through the foe', 'The draw passes through attacks; its cut lands when the blade is home', 'Still Point: turn a blow aside and the next press is a full draw'],
+      lines: ['Sheathed blade: a string of three cuts, each that lands a mark on the sheath; hold the attack to gather Focus, let go to draw through the foe', 'The draw passes through attacks; its cut lands when the blade is home. Focus gathers in the air too', 'Still Point: turn a blow aside and the next press is a full draw'],
       how: {
-        attack: 'His blade stays in its sheath. A press is a flick: out, across and home (11). Keep the button held and he sets his feet: Focus gathers while he stands on the ground, one mark on the sheath at a time, up to three (0.45, 0.95 and 1.5 seconds). Let go to draw: he crosses the ground in a blink and cuts whatever he passes through, for 18, 46 or 100. The cut lands a moment later, when the blade clicks home.',
+        attack: 'His blade stays in its sheath. Press for a string: a rising cut out of the sheath (11), a falling cut back across (13), then a wide finisher that steps in (27). Keep the button held after any of them and he sets his feet: Focus gathers, one mark on the sheath at a time, up to three (0.3, 0.65 and 1.05 seconds). Every cut of the string that landed is a mark already: hit, hit and hold starts at two; all three and hold is the third mark at once. Let go to draw: he crosses the ground in a blink and cuts whatever he passes through, for 18, 46 or 100. The cut lands a moment later, when the blade clicks home.',
         aim: 'The draw goes where you aim it: at the mouse, or the way you hold, straight up included. A press with down held in the air strikes below and bounces off what it hits.',
-        dash: 'A dash or a jump keeps the Focus you have; being hit loses it, and he walks slowly while he holds it. The draw passes through attacks as a dash does, so a draw through a blow is a perfect dodge, and the cut that follows is its Riposte.',
-        special: 'Still Point: he sets the sheath across his body and waits, for under half a second. A blow that lands in that time is turned: it does no harm, the swing is stopped, and all three marks light at once, so your next press is a full draw (100). They stay lit for two and a half seconds without the button held. If nothing lands, the Starlight is gone.',
+        dash: 'A dash or a jump keeps the Focus you have; being hit loses it, and he walks slowly while he holds it. In the air he can hold the stance too, for about a second a jump, drifting down while Focus gathers a little slower: draw up at what flies. The draw passes through attacks as a dash does, so a draw through a blow is a perfect dodge, and the cut that follows is its Riposte.',
+        special: 'Still Point: he sets the sheath across his body and waits, for about two thirds of a second. A blow that lands in that time is turned: it does no harm, the swing is stopped, and all three marks light at once, so your next press is a full draw (100). They stay lit for two and a half seconds without the button held. If nothing lands, half the Starlight comes back.',
         ult: 'Horizon: one cut from one side of the arena to the other, for 250. It lands when the blade is home.',
       },
     },

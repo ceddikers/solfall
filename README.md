@@ -2,7 +2,7 @@
 
 A side-on boss rush for the browser: four heroes, four three-phase bosses, played as a run of
 ever-harder trials. You pick a hero and a relic before the run and win a boon after each victory.
-Version 2.1a.
+Version 2.1b.
 
 This is an early slice of a planned boss-rush roguelite (short runs, a boon after each boss,
 bosses drawn from a pool). A run meets the four bosses in a shuffled order, then meets them again, harder.
@@ -112,6 +112,79 @@ hero (`tools/feel-check.js`).
 - Settings, Reset progress erases Sunshards, upgrades, trophies and records (it has to be chosen twice).
 
 Not done: touch controls, a colour-blind alternative to red-orange warnings, gamepad rebinding.
+
+## Hitboxes, tuned to what is drawn (v2.1b)
+
+Asked for: "make sure all hitboxes are finely tuned to what they should be for both players and bosses".
+A new tool, `tools/hitbox-check.js`, plays every attack and puts the hero at every spot in the arena to see
+where it would be hit, then measures how far each hit can come from anything drawn; it does the same for
+what of each boss can be struck, and for each hero's box, cuts and shots. What it found, and what changed:
+
+- **The heroes' cuts.** Each cut is drawn as a tall crescent, but struck only within a box at chest height:
+  the top of the crescent passed through a foe overhead (the Warden's core, the Leviathan's head) and did
+  nothing. A cut along the side now strikes along its whole crescent, above and below the box
+  (`atkBoxes` in `player.js`), and the up and down cuts are as wide as the crescents drawn for them.
+  The crescent wave (Vesper's, and the Crescent boons) struck with a small square behind its arc; it now
+  strikes with the arc.
+- **Every boss's sword swings** (`H.arc`) cut their whole slice from the first frame, ahead of the drawn
+  blade; they now cut only as far round as the crescent has come, just behind its tapering tip. Pools burn
+  only as high as their flames stand, blasts stop once they have burned away, a meteor's landing grows with
+  its ring, columns and tides grow with their drawing, and a ring stops cutting once it has faded.
+- **Each boss** (each had its own pass):
+  - *The Wolf*: what can be struck now follows its pose, and its neck and head can be struck (they could not);
+    its body in flight hurts along its spine, not through the air under its belly; its breath, tail, fires
+    and pack hurt only where and while they are drawn.
+  - *The Leviathan*: its head's box is drawn round the skull, jaw and teeth (45 px of jaw could not be
+    struck); spouts, the maw, the tail's fall, barnacle spines, the breaker and the hydra's heads hurt only
+    where they are drawn (several hit to the sky from their first frame).
+  - *The Veil*: what can be struck follows its pose (crouched, dashing, laid out, in the air), for its
+    shadows too; Moonfall's blades no longer cut far above themselves; its landing cuts only as high as it
+    lies.
+  - *The Knight*: a row of grave-blades cuts only where a blade stands, as high as it has risen; its spin
+    and its slams hurt only as high as they are drawn.
+  - *The Magus*: rime and frost spikes, the firewall, the storm cloud and the Foresight burst hurt only where
+    they are drawn; what can be struck follows its recoil and lean and reaches its hat.
+  - *The Warden*: the whole drawn core can be struck (its rim was out of reach) and the hands' boxes take in
+    the thumb and fingertips; its landings, the clap, Flare, the sunspot and the spears hurt only where they
+    are drawn.
+- **Left as they are, on purpose**: a swing still cuts near the hilt, inside its drawn crescent, so nobody can
+  stand pressed against a boss and never be hit; the Magus's lightning cuts the whole column its warning
+  marked; a spinning blade cuts all round it.
+
+Measured: `tools/boss-tests.js` loses 10 over 446 runs (11 before); with the scripted hero fighting as Eos,
+79 (103 before: fairer hits, and a little more of each boss to strike); `tools/dodge-tests.js` passes all
+136.
+
+## Eos, sharpened (v2.1b)
+
+After playing v2.1a: Eos "feels kinda weak". What made him so: "no attack string, just simple left
+clicks", the charge took too long, he was slow, his counter was unreliable, and foes that fly or sit high
+(the Warden's core, the Leviathan's head) were rough. Measured, his presses dealt about 30 a second against
+the others' 40-55, and a full draw took 1.5 s of standing still on the ground.
+
+- **A string.** Presses now chain three different cuts, as the others' do: a rising cut out of the sheath
+  (11), a falling cut back across along its weight (13), and a wide finisher drawn low behind him that
+  sweeps up and over and steps in (27, gold). Holding the button after any of them is still the stance.
+  Measured against a boss standing still: 42 a second (Vesper 39, Aster 57 in the same test).
+- **Faster Focus.** The three marks come at 0.3, 0.65 and 1.05 s (from 0.45, 0.95 and 1.5), and he walks
+  faster while holding the stance (62% of his speed, from 45%). He also runs a little faster (338).
+  Back-to-back full draws: 45 a second.
+- **The stance in the air.** Holding the attack in the air sets the stance there too: he drifts down
+  slowly while Focus gathers (a little slower than on the ground), for about a second each jump, and a
+  draw from the air carries a quarter further. A jump and two marks drawn upward now reaches the Warden's
+  core in every phase (69 to the core).
+- **Still Point** waits two thirds of a second for a blow (from 0.45 s), so a delayed blow can still be
+  turned; if nothing comes, half its Starlight comes back.
+- **The string charges the sheath.** Each cut of the string that lands is a mark: hit, hit and hold starts
+  the stance at two marks and gathers on to the third; all three landed and hold is the gold mark at once.
+  The marks light once the button has stayed down 0.17 s after the press, so tapping is still just the
+  string. A cut that misses lights nothing, and a draw or a hit taken spends them. Against a boss standing
+  still, three cuts into a gold draw, over and over, does 75 a second (58 without the marks; the string
+  alone 50, Aster's 58 and Vesper's 46 in the same test).
+
+Measured: `tools/dodge-tests.js` as Eos passes all 136; `tools/boss-tests.js` with the scripted hero
+fighting as Eos loses 104 over 446 runs, against 106 before the change (that mode stays close to hit,
+so it always loses more), so the step-in finisher does not get him hit more.
 
 ## What the great bosses do (v2.1a)
 
@@ -1259,6 +1332,7 @@ To use these in a new attack, call the ready-made mixes in `js/fx.js`: `G.fx.hit
 | `tools/feel-check.js` | whole fights played by a scripted hero, to measure Dawnbreak, Flow and Reckonings |
 | `docs/boss-study.md` | the v2.1a study of bosses in other games, and what Solfall took from it |
 | `tools/motion-check.js` | every attack, whole fights and every hero, drawn frame by frame, to find motion that pops, flickers or stops dead (see v1.9c) |
+| `tools/hitbox-check.js` | every hitbox against what is drawn: where a boss's attacks hit, what of a boss can be struck, each hero's own box, cuts and shots (see v2.1b) |
 | `js/input.js` | keyboard, mouse and gamepad mapped to actions |
 | `js/audio.js` | every sound and the music, synthesised in code (no audio files) |
 | `js/fx.js` | particles, smoke, shards, cut marks, floor cracks and scorch marks, screen shake and kick, flashes, hit-freeze, slow motion |
@@ -1284,6 +1358,13 @@ Open the browser console on the running game.
   runs each of the Warden's attacks against a simple scripted player and reports health lost. There are
   52 tests (15 of them for the corrupted Warden's two attacks, since v1.9b) and all lose 0. Set `window.TEST_HERO = 'aster'` (or `'lune'`) to test another hero
   and `window.TEST_SEED = 2` for a different, repeatable set of boss choices.
+- **Hitboxes:** `fetch('/tools/hitbox-check.js').then(r => r.text()).then(t => console.log((0, eval)(t)))`
+  plays each boss's attacks and puts the hero at every spot in the arena to see where it would be hit, then
+  compares that with what is drawn there ("over": how far from anything drawn a hit can come; "under": how
+  deep into a hazard's drawing a hero can stand unhurt), and does the same for what of each boss can be
+  struck and for each hero's box, cuts and shots. One boss takes about a minute: set
+  `window.HB_PART = 'bosses'`, `window.HB_BOSSES = ['knight']` (or `HB_PART = 'heroes'`). The options are
+  at the top of the file.
 - **Tests for the other three bosses:** `fetch('/tools/boss-tests.js').then(r => r.text()).then(t => console.log((0, eval)(t)))`
   runs every attack of the Magus, the Veil and the Knight in every phase that uses it (158 runs since v1.2a) against one
   scripted player that follows plain rules: step off marked ground, jump low things, leave a swing's reach,

@@ -22,15 +22,20 @@
     CHARGE_T: 0.9,   // how long Aster's smash takes to charge fully
     CHARGE_DMG: 0.8, // how much a full charge adds to the smash (0.8 = 40 becomes 72)
     // Eos keeps her blade in its sheath. Holding the attack gathers Focus; letting go is the draw.
-    FOCUS: [0.45, 0.95, 1.5],     // seconds of stance for the first, second and third mark
+    FOCUS: [0.3, 0.65, 1.05],     // seconds of stance for the first, second and third mark (v2.1b: from 0.45, 0.95, 1.5)
     DRAW_DMG: [18, 46, 100],      // what the draw is worth at one, two and three marks: patience is paid for, the third mark most of all
     DRAW_STEP: [170, 230, 300],   // how far it carries her
     DRAW_T: 0.1,                  // how long that takes
     DRAW_WAIT: [0.2, 0.32, 0.46], // how long after it the cut lands: the blade going home
     DRAW_GAIN: [12, 24, 44],      // Starlight for each thing a draw cut
-    STANCE_SLOW: 0.45,            // her speed while she holds the stance
+    STANCE_SLOW: 0.62,            // her speed while she holds the stance (v2.1b: from 0.45)
+    AIR_STANCE: 0.95,             // seconds she can hold the stance in the air in one jump, drifting down as she gathers
+    AIR_FALL: 85,                 // how fast she drifts down while she does
+    AIR_GATHER: 0.9,              // Focus gathers this much slower in the air
+    AIR_REACH: 1.25,              // a draw from the air carries this much further (what flies is further away)
     ARC_DMG: 40, ARC_SPEED: 1500, // the crescent of light (Second Light throws one when a blow is turned)
-    GUARD_T: 0.45,                // how long Still Point waits for a blow
+    BANK_HOLD: 0.17,              // how long the button must stay down after a press before the cuts that landed light marks (a tap is a cut, not a stance)
+    GUARD_T: 0.65,                // how long Still Point waits for a blow (v2.1b: from 0.45; half its Starlight back if none comes)
     EDGE_T: 2.5,                  // how long a turned blow keeps all three marks lit without the button held
   };
   const GOLD = '255,214,140'; // the finisher's colour
@@ -75,7 +80,7 @@
       cast: null, // a special's body motion: Vesper's throw, Lune's release, Aster's slam (see castPose)
       recov: null, // how the weapon comes back to rest after the last attack (see recoverPose)
       // Eos: the stance she is holding, the Focus gathered in it, the draw carrying her, and the cuts made but not yet landed
-      hold: null, focus: 0, drawT: 0, drawV: null, owed: [], arc2: null, hush: null,
+      hold: null, focus: 0, strung: 0, drawT: 0, drawV: null, owed: [], arc2: null, hush: null,
       pad: 0, grazeCd: 0, streakN: 0, streakT: 0, fallT: 0, edge: 0,
       rig: {}, // pose memory for drawing (see drawBody)
       scarf: [], ghosts: [], slashes: [], bolts: [],
@@ -173,7 +178,11 @@
       const c = P.cast;
       c.t += dt;
       if (!c.thrown && c.t >= c.wind) { c.thrown = true; if (c.kind === 'lance') throwLance(c); else if (c.kind === 'arc') throwArc(c); }
-      if (c.t >= c.dur) { P.cast = null; if (c.kind === 'arc') G.audio.play('sheath', { soft: true }); }
+      if (c.t >= c.dur) {
+        P.cast = null;
+        if (c.kind === 'arc') G.audio.play('sheath', { soft: true });
+        if (c.kind === 'guard' && !c.hit) P.ember = Math.min(C.SEG * P.segs, P.ember + C.SEG * 0.5); // nothing came: half of it back
+      }
     }
     // Starfall's plunge passes through attacks until it lands
     if (P.plunge) P.iframes = Math.max(P.iframes, 0.1);
@@ -584,7 +593,7 @@
     if (P.onGround && a.kind === 'side' && (a.heavy || a.thrust)) G.fx.dust(P.x - a.dir * 8, P.y, 3, { dir: -a.dir, speed: [40, 160], size: [5, 9] });
     if (a.kind === 'side' && P.stun <= 0) {
       if (a.thrust) P.vx = a.dir * Math.max(Math.abs(P.vx), 560);
-      else if (P.onGround && !a.flick) P.vx += a.dir * (a.heavy ? 330 : 100);
+      else if (P.onGround && (!a.flick || a.heavy)) P.vx += a.dir * (a.heavy ? (a.flick ? 260 : 330) : 100);
       else if (a.heavy) P.vx += a.dir * 150;
     }
     if (a.heavy && a.kind === 'up' && !P.onGround) P.vy = Math.min(P.vy, -240);
@@ -617,11 +626,13 @@
 
   function atkBox(a) {
     const r = (1 + 0.3 * G.boon('reach')) * H.reach; // reach stretches each box away from the hero
+    // (v2.1b: as wide as the crescents drawn for them, from 42/54 and 36)
+    const rs = (1 + 0.25 * G.boon('reach')) * H.reach * (1 + 0.25 * (a.charge || 0)); // the drawn crescent's scale
     if (a.kind === 'up') {
       const hh = (a.heavy ? 57 : 46) * r;
-      return { cx: P.x + a.dir * 6, cy: P.y - 34 - hh, hw: (a.heavy ? 54 : 42) * (0.6 + 0.4 * H.reach), hh };
+      return { cx: P.x + a.dir * 6, cy: P.y - 34 - hh, hw: (a.heavy ? 82 : 62) * rs * 0.82, hh };
     }
-    if (a.kind === 'down') return { cx: P.x, cy: P.y - 28 + 42 * r, hw: 36, hh: 42 * r };
+    if (a.kind === 'down') return { cx: P.x, cy: P.y - 28 + 42 * r, hw: 58 * rs * 0.8, hh: 42 * r };
     // the maul's sweep: wide and tall, but only on the side the maul is swung to
     if (a.sweep) { const hw = (a.thrust ? 64 : 54) * r; return { cx: P.x + a.dir * (hw - 6), cy: P.y - 30, hw, hh: 42 }; }
     // side: the finisher is bigger, a thrust is longer and narrower
@@ -629,6 +640,22 @@
     return { cx: P.x + a.dir * (hw - (a.heavy ? 4 : 0)), cy: P.y - 26, hw, hh: a.thrust ? 32 : a.heavy ? 48 : 36 };
   }
   P.atkBox = atkBox;
+  // A cut along the side is drawn as a crescent that rises well over the box in front of the hero and
+  // falls well under it (see drawSlashes): what the blade is drawn passing through there is struck too.
+  // (v2.1b: the box alone left a foe overhead untouched by a blade drawn right through it.)
+  function atkBoxes(a) {
+    const main = atkBox(a);
+    if (a.kind !== 'side' || a.thrust) return [main];
+    const R = (a.heavy ? 102 : 70) * (1 + 0.25 * G.boon('reach')) * H.reach * (1 + 0.25 * (a.charge || 0));
+    const x0 = 6 + R * (a.heavy ? -0.2 : 0.25), x1 = 6 + R * 0.95, ext = R * (a.heavy ? 0.95 : 0.9);
+    const hw = (x1 - x0) / 2, cx = P.x + a.dir * (x0 + hw);
+    const top = P.y - 35 - ext, bot = P.y - 35 + ext, mTop = main.cy - main.hh, mBot = main.cy + main.hh;
+    const out = [main];
+    if (top < mTop) out.push({ cx, cy: (top + mTop) / 2, hw, hh: (mTop - top) / 2 });
+    if (bot > mBot) out.push({ cx, cy: (bot + mBot) / 2, hw, hh: (bot - mBot) / 2 });
+    return out;
+  }
+  P.atkBoxes = atkBoxes;
 
   function touch(hb, t) {
     return t.r ? G.circleRect(t.cx, t.cy, t.r, hb) : G.rectsOverlap(hb, t);
@@ -688,7 +715,7 @@
 
   function checkHits(a) {
     clash(a);
-    const boxes = [atkBox(a)];
+    const boxes = atkBoxes(a);
     if (a.quake) boxes.push({ cx: P.x + a.dir * (100 + 20 * (a.charge || 0)), cy: FLOOR - 26, hw: 130 + 55 * (a.charge || 0), hh: 30 });
     let bounced = false;
     for (const hb of boxes) {
@@ -701,6 +728,7 @@
         const res = G.boss.damage(Math.round(a.dmg * em.mult), t, { x: c.x, y: c.y, heavy: a.heavy || a.thrust, finisher: a.heavy || em.mult > 1, dir: a.dir, poise: H.poise });
         if (res) {
           P.gain(a.heavy ? C.GAIN_HEAVY : C.GAIN_HIT);
+          if (a.flick && !a.banked) { a.banked = true; P.strung = Math.min(3, (P.strung || 0) + 1); } // Eos: a cut that lands is a mark on the sheath
           // the freeze, the shake and the kick all scale with the blow; the maul's are heavier
           G.fx.stop((a.heavy ? 0.11 : a.thrust ? 0.06 : 0.032 * H.thick) + 0.07 * (a.charge || 0) + (a.sweep ? 0.02 : 0));
           G.fx.shake((a.heavy ? 9 : a.thrust ? 4.5 : 1.8 * H.thick) + 7 * (a.charge || 0) + (a.sweep ? 2 : 0));
@@ -904,6 +932,7 @@
 
   function stance(dt, ctl, mx, up, down, free) {
     const I = G.input;
+    if (P.onGround || P.airStance == null) P.airStance = C.AIR_STANCE; // (each jump gets its own time in the air stance)
     if (!ctl || P.stun > 0) { P.hold = null; P.focus = 0; P.edge = 0; return; }
     const can = free && P.healT === 0 && P.flT === 0;
     // a turned blow keeps all three marks lit for a while, button or no button
@@ -928,7 +957,22 @@
     const h = P.hold;
     h.t += dt;
     if (I.down.attack && !h.go) {
-      if (P.onGround && P.dashT <= 0 && can) gather(dt);
+      if (P.dashT <= 0 && can) {
+        if (P.strung > 0 && h.t >= C.BANK_HOLD && P.focus < C.FOCUS[P.strung - 1]) {
+          // every cut of the string that landed is a mark already: hit, hit and hold starts at two
+          const was = focusMark();
+          P.focus = C.FOCUS[P.strung - 1];
+          markUp(was);
+        }
+        if (P.onGround) gather(dt);
+        else if (P.airStance > 0) {
+          // in the air she sets herself all the same, and drifts down while the light gathers, so a
+          // foe up high can be drawn on from under it
+          P.airStance -= dt;
+          gather(dt * C.AIR_GATHER);
+          if (P.vy > C.AIR_FALL) P.vy = Math.max(C.AIR_FALL, P.vy - 2600 * dt * 2); // (caught quickly, not in one frame)
+        }
+      }
       return;
     }
     // let go (mid-throw it waits for the throw)
@@ -950,6 +994,12 @@
       G.fx.spawn({ x: hx + Math.cos(ang) * r, y: hy + Math.sin(ang) * r, vx: -Math.cos(ang) * r * 3.2, vy: -Math.sin(ang) * r * 3.2, life: 0.3, size: G.rand(1.6, 3.2), color: m >= 3 ? GOLD : m ? HOT : STAR });
     }
     if (m >= 3 && Math.random() < dt * 12) G.fx.dust(P.x + G.rand(-26, 26), P.y, 1, { speed: [10, 40], size: [3, 7], up: 50, a: 0.26 });
+    markUp(was);
+  }
+
+  // a new mark lit on the sheath: its sound, and light at the mouth (the third in gold, and the ground shakes)
+  function markUp(was) {
+    const m = focusMark(), hx = mouthX(), hy = mouthY();
     if (m > was) {
       G.audio.play('focus', { n: m });
       G.fx.glint(hx, hy, 18 + 9 * m, m >= 3 ? GOLD : HOT, 0.26);
@@ -961,7 +1011,9 @@
     }
   }
 
-  // The flick: one quick cut from the sheath, rising, and straight back in.
+  // The string (v2.1b): a press is a cut from the sheath, rising; the next, if it comes in time, falls
+  // back across along the weight of the first; the third is a wide cut that steps in with it, the
+  // finisher. The blade goes home after each, so holding the button after any of them is the stance.
   function flick(mx, up, down) {
     const I = G.input;
     let kind = up ? 'up' : (down && !P.onGround ? 'down' : 'side');
@@ -972,13 +1024,15 @@
       kind = steep && ay < 0 ? 'up' : (steep && ay > 0 && !P.onGround ? 'down' : 'side');
       if (Math.abs(ax) > 6) P.facing = ax > 0 ? 1 : -1;
     }
-    const st = H.combo[0];
-    P.combo = -1; P.comboT = 0;
+    const idx = nextStep(kind !== 'down'), heavy = idx === 2;
+    if (idx === 0) P.strung = 0; // a new string: nothing landed yet
+    const st = H.combo[Math.max(0, idx)];
     P.atk = {
-      kind, idx: 1, heavy: false, thrust: false, flick: true, t: 0, dur: st.dur, a0: st.wind, a1: st.wind + st.act,
+      kind, idx, heavy, thrust: false, flick: true, t: 0, dur: st.dur, a0: st.wind, a1: st.wind + st.act,
       hit: new Set(), dir: P.facing, swung: false, quake: false, sweep: false, canCharge: false, hold: 0, charge: 0,
-      dmg: Math.round((kind === 'down' ? H.down : st.dmg) * weaponMult(false)),
+      dmg: Math.round((kind === 'down' ? H.down : st.dmg) * weaponMult(heavy)),
     };
+    if (heavy) G.fx.burst(P.x - P.facing * 8, P.y - 34, { n: 5, color: GOLD, speed: [30, 140], life: [0.15, 0.35], kind: 'spark', size: [2, 3] });
     P.atkCd = st.cd * haste();
     slashArc(P.atk, -st.wind);
   }
@@ -988,7 +1042,7 @@
     const d = aim(mx, up, down, G.input.aim.attack), k = lvl - 1, heavy = lvl >= 3;
     // from the ground, a line that is nearly level is level
     if (P.onGround && Math.abs(d.y) < 0.26) { d.x = G.sign(d.x) || P.facing; d.y = 0; }
-    const dist = C.DRAW_STEP[k] * (1 + 0.3 * G.boon('reach')), spd = dist / C.DRAW_T;
+    const dist = C.DRAW_STEP[k] * (1 + 0.3 * G.boon('reach')) * (P.onGround ? 1 : C.AIR_REACH), spd = dist / C.DRAW_T;
     if (P.dashT > 0) { P.dashT = 0; P.dashCd = P.dashCdMax; P.sinceDash = 0; } // straight out of a dash
     const owe = {
       t: C.DRAW_T + C.DRAW_WAIT[k], lvl, heavy, cuts: [], dir: G.sign(d.x) || P.facing, ang: Math.atan2(d.y, d.x),
@@ -1004,7 +1058,7 @@
     // it passes through attacks, as a dash does: drawn through one, it is a perfect dodge
     P.iframes = Math.max(P.iframes, C.DRAW_T + 0.06 + 0.02 * lvl); P.pdDone = false;
     P.atkCd = C.DRAW_T + C.DRAW_WAIT[k] + 0.03;
-    P.cast = null; P.recov = null; P.healT = 0; P.squash = -0.07; P.dashHit.clear(); P.edge = 0;
+    P.cast = null; P.recov = null; P.healT = 0; P.squash = -0.07; P.dashHit.clear(); P.edge = 0; P.strung = 0;
     G.audio.play('draw');
     G.fx.kick(d.x * (3 + 2 * lvl), d.y * (3 + 2 * lvl));
     const hx = mouthX(), hy = mouthY();
@@ -1266,7 +1320,7 @@
     const braced = !!(P.atk && P.atk.canCharge && !P.atk.swung && P.atk.hold > 0.12) && P.hp > 0;
     const dir = G.sign(P.x - srcX) || -P.facing;
     P.inv = C.HURT_INV; P.dashT = 0; P.healT = 0; P.hurtFlash = 1; P.plunge = false;
-    P.drawT = 0; if (!braced) { P.hold = null; P.focus = 0; P.edge = 0; } // and whatever Focus Eos had gathered is gone
+    P.drawT = 0; if (!braced) { P.hold = null; P.focus = 0; P.edge = 0; P.strung = 0; } // and whatever Focus Eos had gathered is gone
     P.streakT = 0;
     if (P.flT > 0) { P.flT = 0; P.flCd = 2; } // caught showing off
     G.feats.bump('hurt');
@@ -1333,10 +1387,10 @@
       // step in two halves so a fast shot cannot skip through a thin target
       for (let k = 0; k < 2 && !s.dead; k++) {
         s.x += s.vx * dt * 0.5; s.y += s.vy * dt * 0.5;
-        const half = (s.arrow ? 11 : 16) * (s.big || 1);
+        const half = (s.arrow ? 11 : 16) * (s.big || 1), hb = shotBox(s, half);
         for (const t of G.boss.targets()) {
           if (s.dead || s.hit.has(t.id)) continue;
-          if (!touch({ cx: s.x, cy: s.y, hw: half, hh: half }, t)) continue;
+          if (!touch(hb, t)) continue;
           s.hit.add(t.id);
           if (s.arrow) {
             // arrows hit harder the less distance they have flown: +60% within 120px, nothing extra past 300px...
@@ -1388,6 +1442,17 @@
       if (s.dead || s.x < G.cam.x - 100 || s.x > G.cam.x + G.W + 100 || s.y < -200 || s.t > (s.life || 2)) G.shots.splice(i, 1);
     }
   };
+
+  // what a shot strikes with. A crescent wave is drawn as an arc standing across its flight, ahead of
+  // its centre and as tall as a hero and a half: it strikes with all of that (v2.1b; it used to strike
+  // with a small square behind the arc). Anything else: a square on its head.
+  function shotBox(s, half) {
+    if (!s.wave) return { cx: s.x, cy: s.y, hw: half, hh: half };
+    const L = Math.hypot(s.vx, s.vy) || 1, ux = s.vx / L, uy = s.vy / L, b = s.big || 1;
+    const along = 14 * b, across = 36 * b;
+    return { cx: s.x + ux * 10 * b, cy: s.y + uy * 10 * b, hw: Math.abs(ux) * along + Math.abs(uy) * across, hh: Math.abs(uy) * along + Math.abs(ux) * across };
+  }
+  P.shotBox = shotBox;
 
   G.drawShots = function (ctx) {
     ctx.globalCompositeOperation = 'lighter';
@@ -1675,9 +1740,17 @@
     else if (a.kind === 'down') { w0 = -0.4; a0 = 0.2; a1 = 2.7; }
     else if (a.heavy) { w0 = -1.7; a0 = -2.7; a1 = 1.5; }
     else if (a.idx === 1) { w0 = 1.95; a0 = 1.5; a1 = -1.6; }
-    // Eos's flick starts in the sheath behind her and rises
-    if (a.flick && a.kind === 'side') { w0 = 2.6; a0 = 1.6; a1 = -1.0; }
-    else if (a.flick && a.kind === 'up') { w0 = 2.6; a0 = 0.8; a1 = -2.2; }
+    // Eos's string: the first cut starts in the sheath behind her and rises; the second falls back
+    // across from where that one ended; the finisher is drawn low behind her and sweeps up and over
+    if (a.flick && a.kind === 'side') {
+      if (a.heavy) { w0 = 2.9; a0 = 2.3; a1 = -2.1; }
+      else if (a.idx === 1) { w0 = -1.5; a0 = -1.25; a1 = 1.15; }
+      else { w0 = 2.6; a0 = 1.6; a1 = -1.0; }
+    } else if (a.flick && a.kind === 'up') {
+      if (a.heavy) { w0 = 2.8; a0 = 1.3; a1 = -3.1; }
+      else if (a.idx === 1) { w0 = -2.5; a0 = -2.3; a1 = 0.2; }
+      else { w0 = 2.6; a0 = 0.8; a1 = -2.2; }
+    }
     if (a.t < a.a0) return G.lerp(w0, a0, G.ease.outCubic(G.clamp(a.t / a.a0, 0, 1))) + (a.heavy ? G.rand(-0.06, 0.06) : 0);
     // the cut itself, inside the active window. A blade that is falling gathers speed and then is
     // caught; one that is rising leaves fast and slows as it climbs. Gravity decides which.
@@ -1865,7 +1938,7 @@
     }
     if (a) {
       const ang = swingAngle(a), k = G.clamp(a.t / Math.max(0.01, a.a0), 0, 1);
-      return freeBlade(1.5 + Math.cos(ang) * 11.5, SH + 1 + Math.sin(ang) * 11.5, ang, [sx - 3, sy + 0.5, 2.95], { vis: KAT * (0.45 + 0.55 * k) });
+      return freeBlade(1.5 + Math.cos(ang) * 11.5, SH + 1 + Math.sin(ang) * 11.5, ang, [sx - 3, sy + 0.5, 2.95], { vis: a.idx > 0 ? KAT : KAT * (0.45 + 0.55 * k) });
     }
     if (s.hold && s.focus > 0.12) {
       // the stance: sheath drawn forward and levelled, hand closed on the grip, the guard thumbed clear

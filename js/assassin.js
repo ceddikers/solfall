@@ -513,7 +513,7 @@
     G.audio.play('streak');
     yield* tween(b, { y: FLOOR }, 0.13, E.inQuad);
     m.dead = true; b.hurt = false;
-    K.crush(b.x, FLOOR - 40, 58, 44, 1);
+    K.crush(b.x, FLOOR - 24, 42, 24, 1); // (v2.1b: from 58 by 44 at FLOOR - 40: it lands laid out low, and that blow reached well over it)
     K.impact(b.x, false);
     if (K.hard()) { H.shockwave(b.x - 20, -1, 380, 36); H.shockwave(b.x + 20, 1, 380, 36); }
     b.pose = 'stuck'; b.exposed = true;
@@ -1736,6 +1736,7 @@
       hits(Pl) {
         if (!this.launched || this.end >= 0) return false;
         const bx = Pl.box(), cy = bx.cy;
+        if (cy + bx.hh < MOON_TOP) return false; // (v2.1b: above the top of the crescent there is no blade)
         if (Math.abs(Pl.x - this.xAt(cy)) > 16 + bx.hw) return false;
         const g = this.gapAt();
         return !(cy - bx.hh >= g[0] && cy + bx.hh <= g[1]);
@@ -2493,15 +2494,33 @@
       }
     }
     const touch = (a) => {
-      const low = a.pose === 'dash';
-      return G.rectsOverlap(P.box(), { cx: a.x, cy: a.y - (low ? 28 : 40), hw: low ? 26 : 16, hh: low ? 26 : 38 });
+      const f = a.face || 1;
+      // (v2.1b) the high draw is laid out on a slant, so only the middle of it is a box it fills
+      if (a.pose === 'drawHi') return G.rectsOverlap(P.box(), { cx: a.x + f * 6, cy: a.y - 40, hw: 14, hh: 26 });
+      if (a.pose === 'dash') return G.rectsOverlap(P.box(), { cx: a.x, cy: a.y - 28, hw: 26, hh: 26 });
+      return G.rectsOverlap(P.box(), { cx: a.x, cy: a.y - 40, hw: 16, hh: 38 });
     };
     if (b.hurt && !b.hidden && touch(b)) P.tryHit(1, b.x, b);
     for (const c of B.clones) if (c.hurt && touch(c)) P.tryHit(1, c.x, c);
   };
 
+  // Where a blow can strike it, or one of its shadows (v2.1b). The box follows the pose as it is drawn:
+  // standing, its hood rises over a plain 84-high box; low and lunging (dash, skid, kneel, streak) its
+  // head leads well ahead of its feet and its cape trails behind; laid out on the floor after the
+  // Ambush it is long and low; diving, it is upside down and its head is below its feet. A fixed box
+  // let blows pass through its head in all of those. Each: [forward, behind, top, bottom] from its feet.
+  const BODY = {
+    stand: [22, 18, 96, 0], low: [48, 32, 80, 0], drawHi: [56, 36, 78, 0], stuck: [60, 32, 56, 0],
+    dive: [20, 20, 84, -20], air: [34, 18, 88, 0],
+  };
+  const BODY_OF = { dash: 'low', skid: 'low', kneel: 'low', streak: 'low', drawHi: 'drawHi', stuck: 'stuck', dive: 'dive', air: 'air' };
+  function bodyAt(a) {
+    const [fw, bk, top, bot] = BODY[BODY_OF[a.pose] || 'stand'], f = a.face || 1;
+    const l = f > 0 ? a.x - bk : a.x - fw, r = f > 0 ? a.x + fw : a.x + bk;
+    return { cx: (l + r) / 2, cy: a.y - (top + bot) / 2, hw: (r - l) / 2, hh: (top - bot) / 2 };
+  }
   B.extraTargets = function (out) {
-    for (const c of B.clones) out.push({ id: c.id, kind: 'extra', ref: c, cx: c.x, cy: c.y - 40, hw: 18, hh: 40 });
+    for (const c of B.clones) out.push(Object.assign({ id: c.id, kind: 'extra', ref: c }, bodyAt(c)));
   };
 
   // ------------------------------------------------------------------ drawing
@@ -2805,4 +2824,5 @@
   }
 
   G.makeBoss(B);
+  B.bodyBox = function () { return bodyAt(B.body); };
 })();

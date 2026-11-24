@@ -372,10 +372,19 @@
         }
         if (this.t > this.tele + this.active + 0.45) this.dead = true;
       },
-      hits(P) { return this.t >= this.tele && this.t < this.tele + this.active && Math.abs(P.x - this.x) < this.w / 2 - 4; },
+      hits(P) { return this.t >= this.tele && this.t < this.tele + this.active && inColumn(P, this.x, this.w, this.t - this.tele); },
       danger() { return this.t < this.tele + this.active ? [this.x, this.w / 2 + 16, this.tele - this.t] : null; },
       draw(ctx) { drawColumn(ctx, this.x, this.w, this.t, this.tele, this.active, this.dim); },
     });
+  }
+  // Where a column (a spout, the maw) is water, for its hit: as high as it has been torn up so far
+  // (it reaches the top of the sky in 0.08 s), and across the part of its width that is drawn as water
+  // (its edges fade to nothing: about the middle seven tenths shows). It used to cut the whole width
+  // to the top of the sky from its first frame (v2.1b).
+  function inColumn(P, x, w, e) {
+    const up = Math.min(1, e / 0.08), cw = w * (0.5 + 0.5 * up);
+    const top = G.lerp(level(0) - 1, -60, E.outCubic(up)) - 14;
+    return P.y - 2 > top && Math.abs(P.x - x) < cw * 0.36 + 4;
   }
   function drawColumn(ctx, x, w, t, tele, active, dim) {
     const P = G.pal(), F = level(0) - 1;
@@ -429,7 +438,9 @@
         if (this.t < this.tele && Math.random() < dt * 30) G.fx.spawn({ kind: 'spark', x: this.x + G.rand(-this.w * 0.4, this.w * 0.4), y: -10, vx: 0, vy: G.rand(500, 800), life: 1.2, size: G.rand(1.2, 2.2), color: WATER, grav: 900, a: 0.5 });
         if (this.t > this.tele + this.active) this.dead = true;
       },
-      hits(Pl) { return this.t >= this.tele && Math.abs(Pl.x - this.x) < this.w / 2 - 4; },
+      // the fluke lies flat across the whole width on the floor; above it, only the tail itself cuts
+      // (it used to cut a column the whole width up to the top of the sky, mostly empty air: v2.1b)
+      hits(Pl) { return this.t >= this.tele && ((B.tail.tipY > FLOOR - 50 && Math.abs(Pl.x - this.x) < Math.min(this.w / 2 - 4, 70) && Pl.y > FLOOR - 43) || tailTouches(Pl)); },
       danger() { return [this.x, this.w / 2 + 18, this.tele - this.t]; },
       draw(ctx) {
         if (this.t >= this.tele) return;
@@ -443,6 +454,19 @@
         ctx.fillStyle = g; ctx.fillRect(this.x - this.w / 2, -60, this.w, F + 60);
       },
     });
+  }
+
+  // Whether the near part of the tail (what is drawn among the platforms) is on the hero.
+  function tailTouches(Pl) {
+    const pts = B.tailPts;
+    if (!B.tail.on) return false;
+    for (let i = 1; i < pts.length; i++) {
+      const a = pts[i - 1], c = pts[i];
+      if (a.z > ZS || c.z > ZS) continue;
+      const pa = proj(a.x, a.y, a.z), pc = proj(c.x, c.y, c.z), r = (a.w * pa.s + c.w * pc.s) / 4;
+      for (const py of [Pl.y - 21, Pl.y - 39, Pl.y - 3]) if (G.distPointSeg(Pl.x, py, pa.x, pa.y, pc.x, pc.y) < r + 9) return true;
+    }
+    return false;
   }
 
   // A loop of its body that breaks the surface and rolls along the floor (jump it). If its spines
@@ -486,7 +510,7 @@
         if (this.t < this.tele && Math.random() < dt * 26) G.fx.spawn({ x: this.x + G.rand(-this.w, this.w), y: level(0) - 2, vx: G.rand(-20, 20), vy: -G.rand(40, 140), life: G.rand(0.2, 0.5), size: G.rand(1.6, 3), color: WATER, a: 0.5 });
         if (this.t > this.tele + this.active + 0.4) this.dead = true;
       },
-      hits(Pl) { return this.t >= this.tele && this.t < this.tele + this.active && Math.abs(Pl.x - this.x) < this.w - 6; },
+      hits(Pl) { return this.t >= this.tele && this.t < this.tele + this.active && inColumn(Pl, this.x, this.w * 2, this.t - this.tele); },
       danger() { return this.t < this.tele + this.active ? [this.x, this.w + 18, this.tele - this.t] : null; },
       draw(ctx) {
         const F = level(0) - 1, Pp = G.pal();
@@ -546,7 +570,8 @@
       hits(P) {
         if (this.crash || this.rise < 0.45) return false;
         const b = P.box(), a = this.x - this.dir * back, c = this.x + this.dir * 12;
-        return b.cx + b.hw > Math.min(a, c) && b.cx - b.hw < Math.max(a, c) && b.cy + b.hh > FLOOR - this.hgt * this.rise * (tall ? 1 : 0.85);
+        // (as high as its lip is drawn: the tall one's whole height was 40 px of air over its crest, v2.1b)
+        return b.cx + b.hw > Math.min(a, c) && b.cx - b.hw < Math.max(a, c) && b.cy + b.hh > FLOOR - this.hgt * this.rise * (tall ? 0.9 : 0.85);
       },
       // (the breaker, for the scripted dodger: the ground just ahead of it is unsafe, so it gets behind it)
       danger(P) {
@@ -729,8 +754,23 @@
         if (this.side) return { cx: this.x + this.side * 48, cy: this.y, hw: 52, hh: 46 };
         return { cx: this.x, cy: this.y + 6 - 48, hw: 50, hh: 56 };
       },
-      // (only the spines hurt: a shell still in the air is no blow)
-      hits(P) { return this.state === 'burst' && G.rectsOverlap(P.box(), this.area()); },
+      // (only the spines hurt: a shell still in the air is no blow.) They reach as far as they are drawn,
+      // a fan out from the shell that is grown in 0.06 s; a box round the fan cut the empty corners
+      // past its tips, and the whole fan from the first frame (v2.1b)
+      hits(P) {
+        if (this.state !== 'burst') return false;
+        const out = E.outCubic(Math.min(1, this.bt / 0.06)), b = P.box();
+        const rot = this.side > 0 ? Math.PI / 2 : this.side < 0 ? -Math.PI / 2 : 0, cr = Math.cos(rot), sr = Math.sin(rot), oy = this.side ? 0 : 6;
+        for (let i = 0; i < 9; i++) {
+          const a = -Math.PI / 2 + (i - 4) * 0.3, L = spineL(i) * out;
+          for (let u = 5; u <= L; u += 6) {
+            const lx = Math.cos(a) * u, ly = -6 + Math.sin(a) * u;
+            const wx = this.x + lx * cr - ly * sr, wy = this.y + oy + lx * sr + ly * cr;
+            if (Math.abs(wx - b.cx) < b.hw + 2 && Math.abs(wy - b.cy) < b.hh + 2) return true;
+          }
+        }
+        return false;
+      },
       danger() {
         if (this.state === 'fly') {
           // where it will come down on the floor (a little wider: it may stick to the wreckage instead)
@@ -751,6 +791,7 @@
       draw(ctx) { drawBarnacle(ctx, this); },
     });
   }
+  const spineL = (i) => 48 + (i % 3) * 18 - Math.abs(i - 4) * 4; // the length of each of a barnacle's nine spines
   function drawBarnacle(ctx, h) {
     const P = G.pal(), vo = G.corrupt.active(), warn = vo ? BLOOD : DANGER;
     const fade = h.state === 'spent' ? Math.max(0, 1 - (h.bt - 0.16) / 0.34) : 1;
@@ -772,7 +813,7 @@
       const out = h.state === 'burst' ? E.outCubic(Math.min(1, h.bt / 0.06)) : 1 - E.inQuad(Math.min(1, (h.bt - 0.16) / 0.3));
       ctx.lineCap = 'round';
       for (let i = 0; i < 9; i++) {
-        const a = -Math.PI / 2 + (i - 4) * 0.3, L = (48 + (i % 3) * 18 - Math.abs(i - 4) * 4) * out;
+        const a = -Math.PI / 2 + (i - 4) * 0.3, L = spineL(i) * out;
         ctx.strokeStyle = vo ? 'rgba(60,8,22,0.95)' : 'rgba(196,204,190,0.95)'; ctx.lineWidth = 3.2;
         ctx.beginPath(); ctx.moveTo(Math.cos(a) * 5, -6 + Math.sin(a) * 5); ctx.lineTo(Math.cos(a) * L, -6 + Math.sin(a) * L); ctx.stroke();
         ctx.strokeStyle = G.rgba(vo ? BLOOD : P.hot, 0.6); ctx.lineWidth = 1.2;
@@ -863,7 +904,12 @@
       // how far open: it eases open over the warning, and eases shut at the end
       k() { return E.outCubic(Math.min(1, this.t / this.tele)) * (1 - E.inOutQuad(this.shut)); },
       // the head tearing up through it
-      hits(P) { return this.t >= this.tele && this.t < this.tele + 0.22 && Math.abs(P.x - this.x) < 60 && P.y > FLOOR - 260; },
+      // (only as high as the head has come up through it: it used to cut to 260 from the first frame, v2.1b)
+      hits(P) {
+        if (!(this.t >= this.tele && this.t < this.tele + 0.22 && B.vh)) return false;
+        const V = B.vh; // (the skull, and the neck under it down into the crack)
+        return headHits(V, P) || (Math.abs(P.x - V.x) < 36 && P.y > V.y - HH + 30);
+      },
       danger() { return this.t < this.tele + 0.22 ? [this.x, 78, this.tele - this.t] : null; },
       draw(ctx) {
         const k = this.k();
@@ -904,7 +950,14 @@
     return H.add({
       kind: 'fang', x: src, srcX: src, l: src, r: src, top: FLOOR - 150, bot: FLOOR + 40, live: false, show: false, at: 1,
       update() { this.x = (this.l + this.r) / 2; },
-      hits(P) { return this.live && P.x + 11 > this.l && P.x - 11 < this.r && P.y > this.top && P.y - 43 < this.bot; },
+      // only as far as the jaws have come (the head drawn through it); it used to take the whole sweep
+      // from the first frame of the bite, ahead of the head (v2.1b)
+      hits(P) {
+        if (!this.live) return false;
+        let l = this.l, r = this.r, top = this.top, bot = this.bot;
+        if (this.head) return headHits(this.head, P); // (the head itself, where it has got to)
+        return P.x + 11 > l && P.x - 11 < r && P.y > top && P.y - 43 < bot;
+      },
       danger() { return this.show ? [this.x, (this.r - this.l) / 2 + 14, this.at - this.t] : null; },
     });
   }
@@ -1179,7 +1232,7 @@
       G.audio.play('hiss');
       const m = (a) => (ff > 0 ? a : Math.PI - a);
       H.arc({
-        x: b.x + f * 50, y: b.y - HH, r: 185, a0: m(-1.15), a1: m(1.05), tele, active: 0.12, owner: b,
+        x: b.x + f * 50, y: b.y - HH, r: 185, r0: 80, a0: m(-1.15), a1: m(1.05), tele, active: 0.12, owner: b, // (r0: where its crescent is drawn from)
         follow(h) { if (!h.fired) { h.x = b.x + ff * 50; h.y = Math.max(b.y - HH, FLOOR - 120); } },
         onFire() { b.chatter = 0; G.fx.shake(6); },
       });
@@ -2003,7 +2056,7 @@
   function* lungeBite(h, tip, yb, f, dir, d) {
     const hx = G.clamp(tip - dir * 100, WL + 60, WR - 60), x0 = h.x, y0 = h.y;
     h.direct = true; h.jawT = 1.1; h.ta = aim(dir, 0.12);
-    f.live = true;
+    f.live = true; f.head = h; f.dir = dir;
     G.audio.play('lunge');
     let e = 0;
     while (e < d) {
@@ -3360,5 +3413,32 @@
   };
 
   G.makeBoss(B);
+  // What is struck is the head, where it is drawn and however it is turned: a box round the skull from
+  // the back of the brow to the tip of the snout, turned and pitched with it and carried out to sea with
+  // it. (v2.1b: the frame's box sat round the head's pivot, so the jaws and teeth, 40-odd px of the
+  // snout, could be cut through for nothing, more so with the head pitched up or down.)
+  B.bodyBox = () => skullBox(B.body);
+  // Whether a head's bite is on the hero: the skull as drawn, in two parts (the cranium, and the
+  // narrower snout), turned with the head (sampled over the hero's box)
+  function headHits(h, P) {
+    const pr = proj(h.x, h.y - HH, h.z || 0), s = pr.s, c = Math.cos(h.ang), sn = Math.sin(h.ang), re = c < 0 ? -1 : 1, b = P.box();
+    for (let i = 0; i <= 4; i++) for (let j = 0; j <= 8; j++) {
+      const wx = b.cx - b.hw + i * b.hw / 2 - pr.x, wy = b.cy - b.hh + j * b.hh / 4 - pr.y;
+      const lx = (c * wx + sn * wy) / s, ly = (-sn * wx + c * wy) / s * re;
+      if ((lx > -66 && lx < 40 && ly > -40 && ly < 28) || (lx >= 40 && lx < 108 && ly > -26 && ly < 20)) return true;
+    }
+    return false;
+  }
+  // (the same for any head: the void head's bites and its coming up out of the floor use it too)
+  function skullBox(b) {
+    const pr = proj(b.x, b.y - HH, b.z || 0), s = pr.s;
+    const c = Math.cos(b.ang), sn = Math.sin(b.ang), re = c < 0 ? -1 : 1;
+    const x0 = -72, x1 = 106, y0 = -38, y1 = 32; // (the skull in its own frame, at its drawing scale)
+    const mx = (x0 + x1) / 2, my = (y0 + y1) / 2 * re, hx = (x1 - x0) / 2, hy = (y1 - y0) / 2;
+    return {
+      cx: pr.x + s * (c * mx - sn * my), cy: pr.y + s * (sn * mx + c * my),
+      hw: s * (Math.abs(c) * hx + Math.abs(sn) * hy), hh: s * (Math.abs(sn) * hx + Math.abs(c) * hy),
+    };
+  }
   G.BOSS_IDS.push('leviathan');
 })();

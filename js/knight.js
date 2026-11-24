@@ -384,7 +384,7 @@
     b.fast = true; b.pose = 'slam'; b.burn = 0;
     yield* wait(0.07);
     m.dead = true;
-    K.crush(m.x, FLOOR - 70, 60, 80, 2);
+    K.crush(m.x, FLOOR - 24, 54, 28, 2); // (the burst on the floor, where it is drawn; v2.1b, from 160 px tall)
     K.impact(m.x, true);
     H.shockwave(m.x - 50, -1, 450, 46);
     H.shockwave(m.x + 50, 1, 450, 46);
@@ -545,7 +545,7 @@
     b.fast = true; b.pose = 'slam';
     yield* wait(0.07);
     K.impact(b.x + b.face * 60, false);
-    K.crush(b.x + b.face * 60, FLOOR - 50, 50, 56, 1);
+    K.crush(b.x + b.face * 60, FLOOR - 24, 48, 28, 1);
     const have = H.list.filter((h) => h.kind === 'pool').length;
     const n = Math.max(0, Math.min((B.phase === 3 ? 4 : 3) + (K.hard() ? 1 : 0), 5 - have));
     const xs = [G.clamp(P.x, WL + 100, WR - 100)];
@@ -568,7 +568,8 @@
     H.add({
       kind: 'whirl', layer: 'under', t: 0, r: R,
       update() { this.srcX = b.x; if (this.t > tele + dur) this.dead = true; },
-      hits(Pl) { return this.t >= tele && this.t < tele + dur && Math.abs(Pl.x - b.x) < R + 4 && Pl.y > FLOOR - TOP + 6; },
+      // (the rings it draws reach 88 px up: a hero whose feet are over them is clear; v2.1b, from TOP - 6)
+      hits(Pl) { return this.t >= tele && this.t < tele + dur && Math.abs(Pl.x - b.x) < R + 4 && Pl.y > FLOOR - 88; },
       draw(ctx) {
         // no box and no red: the wind gathering round the blade, then the blade itself
         const x = b.x, pal = G.pal();
@@ -1368,7 +1369,7 @@
     yield* wait(0.08);
     m.dead = true;
     const x = G.clamp(b.x + b.face * reach, WL + 30, WR - 30);
-    K.crush(x, FLOOR - 80, 64, 92, 2);
+    K.crush(x, FLOOR - 24, 58, 28, 2);
     K.impact(x, true);
     G.fx.impact(x, FLOOR - 60, 0.06);
     if (b.pv) b.pv[1] += 40;
@@ -1575,9 +1576,9 @@
   // seams in the floor show where each row will come, and where it will not.
   // Then it pulls the sword free, and for a moment it is open.
   function graveRow(x0, x1, fromL, tele, tint) {
-    const xs = [];
-    for (let x = x0 + 14; x < x1 - 6; x += 30) xs.push({ x, len: G.rand(260, 320), w: G.rand(7, 10), lean: G.rand(-0.05, 0.05) });
-    const span = Math.max(1, x1 - x0), RIP = 0.16, active = 0.34;
+    const xs = [], span = Math.max(1, x1 - x0), RIP = 0.16, active = 0.34;
+    // (a short stretch, between a gap and a wall, still gets its blade: it used to cut with none drawn)
+    for (let x = x0 + Math.min(14, span / 2); x < x1 - 6 || !xs.length; x += 30) xs.push({ x, len: G.rand(260, 320), w: G.rand(7, 10), lean: G.rand(-0.05, 0.05) });
     const off = (x) => (fromL ? (x - x0) / span : (x1 - x) / span) * RIP;
     return H.add({
       kind: 'graverow', layer: 'over', x: (x0 + x1) / 2, x0, x1, tele, active, tint, played: false,
@@ -1591,10 +1592,18 @@
         }
         if (this.t > this.tele + RIP + this.active + 0.35) this.dead = true;
       },
+      // each blade cuts while it stands, as high as it has risen (v2.1b; the row used to cut on its
+      // ripple, ahead of the blades on a short row, and 300 px high from the first frame)
       hits(Pl) {
-        if (Pl.x < x0 - 2 || Pl.x > x1 + 2) return false;
-        const at = this.tele + off(G.clamp(Pl.x, x0, x1));
-        return this.t >= at && this.t < at + this.active && Pl.y > FLOOR - 300;
+        if (this.t < this.tele) return false;
+        for (const bl of xs) {
+          if (Math.abs(Pl.x - bl.x) > 17) continue;
+          const e = this.t - this.tele - off(bl.x);
+          if (e < 0 || e >= this.active) continue;
+          const up = E.outCubic(Math.min(1, e / 0.08)), tip = (bl.len + 30) * up - 30; // (as graveBlade is drawn below)
+          if (tip > 4 && Pl.y > FLOOR - tip) return true;
+        }
+        return false;
       },
       draw(ctx) {
         if (this.t < this.tele) {

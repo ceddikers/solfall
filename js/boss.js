@@ -68,23 +68,29 @@
   const usableHands = () => B.hands.filter(usable);
 
   // ------------------------------------------------------------------ targets and damage
-  function handBox(h) {
-    const oy = G.lerp(-18, 6, h.curl), hw = 62, hh = G.lerp(92, 62, h.curl);
+  // strike: the box a hero's blows can land in, which also takes in the thumb and the fingertips of an
+  // open hand (v2.1b: they were drawn up to 30 px outside it). Without it, the box its blows hurt with.
+  function handBox(h, strike) {
+    const o = strike ? 1 - h.curl : 0;
+    const ox = -16 * o * h.side, oy = G.lerp(-18, 6, h.curl) - 4 * o, hw = 62 + 16 * o, hh = G.lerp(92, 62, h.curl) + 4 * o;
     const s = Math.sin(h.rot), c = Math.cos(h.rot);
     return {
-      cx: h.x - oy * s, cy: h.y + oy * c,
+      cx: h.x + ox * c - oy * s, cy: h.y + ox * s + oy * c,
       hw: Math.abs(c) * hw + Math.abs(s) * hh, hh: Math.abs(s) * hw + Math.abs(c) * hh,
     };
   }
+
+  B.handBox = handBox; // (read by tools/hitbox-check.js)
 
   B.targets = function () {
     const out = [];
     if (!B.active || B.dead || (B.dying && !B.toppled)) return out;
     const c = B.core;
-    out.push({ id: 'core', kind: 'core', cx: c.x, cy: c.y, r: c.r * 0.96 });
+    // the whole drawn disc and its burning rim (v2.1b: r * 0.96 left the rim, 13 px all round, untouchable)
+    out.push({ id: 'core', kind: 'core', cx: c.x, cy: c.y, r: (c.r + 9) * (1 + (c.swell || 0)) });
     for (const h of B.hands) {
       if (!usable(h) || h.sunk >= 1) continue; // (a hand sunk into the floor, the Afterhands, cannot be reached)
-      const b = handBox(h);
+      const b = handBox(h, true);
       out.push({ id: h.id, kind: 'hand', ref: h, cx: b.cx, cy: b.cy, hw: b.hw, hh: b.hh });
     }
     return out;
@@ -559,6 +565,16 @@
       hits(P) { return G.rectsOverlap(P.box(), { cx: x, cy, hw, hh }); },
     });
   }
+  // The core landing: round, as the core is (v2.1b: a box round it reached 60 px past the drawn disc
+  // along the floor; the shockwaves that follow carry the blow out along it).
+  function crushCore(dmg) {
+    const c = B.core, x = c.x, y = c.y, r = c.r + 12;
+    H.add({
+      kind: 'crush', x, dmg,
+      update() { if (this.t > 0.07) this.dead = true; },
+      hits(P) { return G.circleRect(x, y, r, P.box()); },
+    });
+  }
 
   function impactFx(x, big) {
     const P = G.pal();
@@ -712,8 +728,10 @@
     L.ctrl = R.ctrl = true;
     let cx = G.clamp(P.x, 240, 1040);
     yield* par(
-      tween(L, { x: cx - 340, y: FLOOR - 125, curl: 0, rot: 0.3 }, 0.5),
-      tween(R, { x: cx + 340, y: FLOOR - 125, curl: 0, rot: -0.3 }, 0.5)
+      // (v2.1b: 16 px lower, from FLOOR - 125, so the palms meet at the head of a hero standing under
+      // them, as the blow does: they used to close a hand's breadth above it and hurt all the same)
+      tween(L, { x: cx - 340, y: FLOOR - 109, curl: 0, rot: 0.3 }, 0.5),
+      tween(R, { x: cx + 340, y: FLOOR - 109, curl: 0, rot: -0.3 }, 0.5)
     );
     const m = columnMark(cx, 236);
     G.audio.play('charge', { dur: 0.95 * T });
@@ -736,7 +754,7 @@
     }
     yield* par(tween(L, { x: cx - 60, rot: 0 }, 0.1, E.inQuad), tween(R, { x: cx + 60, rot: 0 }, 0.1, E.inQuad));
     m.dead = true;
-    crush(cx, FLOOR - 125, 112, 128, 2);
+    crush(cx, FLOOR - 107, 112, 112, 2); // (from the tips of the longest fingers, 8 px under them, to the floor)
     const pal = G.pal();
     G.audio.play('clap');
     G.fx.shake(18); G.fx.punch(0.025); G.fx.flash(pal.hot, 0.2, 0.2);
@@ -957,7 +975,7 @@
     yield* tween(c, { y: FLOOR - c.r + 16 }, 0.16, E.inQuad);
     m.dead = true;
     impactFx(c.x, true);
-    crush(c.x, FLOOR - 70, 128, 80, 2);
+    crushCore(2);
     H.shockwave(c.x - 90, -1, 600, 54);
     H.shockwave(c.x + 90, 1, 600, 54);
     // debris always lands in the same two rings, so staying close to the core is the safe choice
@@ -1831,7 +1849,7 @@
     yield* tween(c, { y: FLOOR - c.r + 16 }, 0.17, E.inQuad);
     m.dead = true; body.dead = true;
     impactFx(c.x, true);
-    crush(c.x, FLOOR - 70, 112, 80, 2);
+    crushCore(2);
     G.fx.impact(c.x, FLOOR - 60, 0.07);
     G.fx.crack(c.x, 2, VCOL().blood);
     yield* wait(0.08);
@@ -2099,8 +2117,12 @@
       },
       hits(P) {
         if (this.crest) return G.rectsOverlap(P.box(), { cx: this.crestX, cy: FLOOR - 24, hw: 15, hh: 22 });
-        if (this.falling) return Math.abs(P.x - this.tx) < 58 && P.y > this.ty - 140 && P.y - 44 < this.ty + 24;
-        if (this.impactT > 0) return Math.abs(P.x - this.tx) < 70 && P.y > FLOOR - 90;
+        // falling: the burning tip, and the stretch it has just come down through (v2.1b: a box 116 wide
+        // and 180 tall round it, where nothing of the lash is drawn)
+        if (this.falling) return Math.abs(P.x - this.tx) < 19 && P.y > this.ty - 20 && P.y - 43 < this.ty + 8;
+        // landing: the tip where it strikes the floor and the burst of sparks off it (v2.1b: from 70
+        // either side and 90 up, where nothing is drawn but the scorch on the floor)
+        if (this.impactT > 0) return Math.abs(P.x - this.tx) < 26 && P.y > FLOOR - 36;
         return false;
       },
       draw(ctx) {
@@ -2266,7 +2288,7 @@
         this.x += this.svx * dt;
       },
       land(R, dmg, big) {
-        this.st = 'boom'; this.e = 0; this.R = R; this.dmg = dmg; this.mk = 0;
+        this.st = 'boom'; this.e = 0; this.R = R; this.dmg = dmg; this.mk = 0; this.big = big;
         const Pl = G.pal();
         G.audio.play(big ? 'slam' : 'boom');
         G.fx.shake(big ? 15 : 5); G.fx.kick(0, big ? 4 : 1.5);
@@ -2282,7 +2304,14 @@
         G.fx.burst(this.x, this.y, { n: 6, color: '10,6,16', speed: [40, 160], life: [0.3, 0.6], size: [4, 8] });
       },
       hits(Pp) {
-        if (this.st === 'boom') return G.circleRect(this.x, FLOOR - 8, this.R - 8, Pp.box());
+        // the burst reaches as far as the ring drawn for it has spread (see land: F.ring eases out over
+        // its life), at most R - 8 (v2.1b: it was all of R - 8 from its first frame, while the ring had
+        // barely left the orb)
+        if (this.st === 'boom') {
+          const k = Math.min(1, (this.e + 1 / 120) / (this.big ? 0.36 : 0.26));
+          const ring = G.lerp(this.r, this.R * 1.05, G.ease.outCubic(k)) + 8;
+          return G.circleRect(this.x, FLOOR - 8, Math.min(ring, this.R - 8), Pp.box());
+        }
         return G.circleRect(this.x, this.y, this.r * 0.8, Pp.box());
       },
       draw(ctx) {
@@ -2563,8 +2592,11 @@
         // the band of the heads
         const hx = this.x - this.dir * 10;
         if (Math.abs(b.cx - hx) > b.hw + 16) return false;
-        // hurt unless the hero's whole body is inside the gap
-        return b.cy - b.hh < this.gapTop || b.cy + b.hh > this.gapBot;
+        // hurt by any head drawn across the hero (v2.1b: it was anywhere outside the gap, so a low core
+        // left a strip on the floor under the gap that cut with no spear in it, and the air over the top)
+        const top = b.cy - b.hh, bot = b.cy + b.hh;
+        for (const y of SP_ROWS) if (y > top - 8 && y < bot + 8 && this.here(y) > 0.3) return true;
+        return false;
       },
       draw(ctx) {
         const Pl = G.pal(), d = this.dir, N = SP_ROWS.length;
@@ -2672,7 +2704,7 @@
       const ix = c.x, iy = floor ? FLOOR : c.y;
       impactFx(floor ? ix : ix + wall * c.r * 0.8, true);
       if (floor) {
-        crush(ix, FLOOR - 70, 92, 80, 2); // (the core's own breadth: it lands where it is)
+        crushCore(2); // (the core's own breadth: it lands where it is)
         if (B.phase >= 2) { H.shockwave(ix - 90, -1, 560, 50); H.shockwave(ix + 90, 1, 560, 50); }
         G.fx.ripple(ix, FLOOR - 40, 300, 0.36, 1);
       } else {

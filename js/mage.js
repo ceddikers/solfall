@@ -229,7 +229,14 @@
       hits(P) {
         if (P.y < FLOOR - this.hgt + 8) return false;
         for (const c of this.cells) {
-          if (this.t >= c.at && this.t < c.at + this.active && Math.abs(P.x - c.x) < cw / 2 + 5) { this.srcX = c.x; return true; }
+          const e = this.t - c.at;
+          if (e < 0 || e >= this.active) continue;
+          // as high as the spikes are drawn: the tall middle one, the shorter pair beside it, and only
+          // as far up as they have come (v2.1b; it was the full height across the cell from the first frame)
+          const dx = Math.abs(P.x - c.x), up = Math.min(1, e / 0.05), lift = FLOOR - P.y;
+          if (dx >= cw / 2 + 5) continue;
+          const tall = dx < 22 ? this.hgt : this.hgt * (0.62 + 0.07 * c.seed);
+          if (lift < tall * up - 8) { this.srcX = c.x; return true; }
         }
         return false;
       },
@@ -278,7 +285,11 @@
         if (this.x < WL - 60 || this.x > WR + 60) this.dead = true;
       },
       hits(P) {
-        return this.started && G.rectsOverlap(P.box(), { cx: this.x, cy: FLOOR - this.hgt / 2, hw: this.hw - 4, hh: this.hgt / 2 - 4 });
+        if (!this.started) return false;
+        // the flame is tall in the middle and low at its edges (v2.1b; it was one tall box)
+        const q = P.box(), rise = 0.25 + 0.75 * (1 - Math.pow(1 - G.clamp((this.t - tele) / 0.12, 0, 1), 2));
+        return G.rectsOverlap(q, { cx: this.x, cy: FLOOR - this.hgt * rise * 0.45, hw: 15, hh: this.hgt * rise * 0.45 - 2 })
+          || G.rectsOverlap(q, { cx: this.x, cy: FLOOR - this.hgt * rise * 0.3, hw: this.hw - 4, hh: this.hgt * rise * 0.3 });
       },
       draw(ctx) {
         if (!this.started) return;
@@ -320,7 +331,8 @@
         if (m.t >= m.tele + 0.33) { this.mark = null; this.next = 1.0; this.left--; }
         this.srcX = m.x;
       },
-      hits(Pl) { const m = this.mark; return !!m && m.fired && m.t < m.tele + 0.13 && Math.abs(Pl.x - m.x) < 34 + 7; },
+      // (the bolt runs from under the cloud to the floor: nothing above the cloud is struck)
+      hits(Pl) { const m = this.mark; return !!m && m.fired && m.t < m.tele + 0.13 && Math.abs(Pl.x - m.x) < 34 + 7 && Pl.y > this.y + 20; },
       draw(ctx) {
         const m = this.mark, a = Math.min(1, this.t / 0.5) * (1 - this.out / 0.6);
         if (m && !m.fired) strikeWarn(ctx, m.x, 68, m.t / m.tele, m.t);
@@ -993,7 +1005,9 @@
       },
       hits(Pl) {
         if (this.fired && !this.burst) return touches(Pl, this.hx, this.hy, 9);
-        return this.burst && this.t < fire + FLY + 0.1 && touches(Pl, this.ax, this.ay, BURST_R);
+        // (the sphere as big as it is drawn: it swells out over a few frames, v2.1b; it hit at full size at once)
+        const e = this.t - fire - FLY, f = Math.max(0, 1 - e / 0.36);
+        return this.burst && e < 0.1 && touches(Pl, this.ax, this.ay, BURST_R * (0.35 + 0.65 * E.outCubic(Math.min(1, Math.max(0, e) / 0.07))) * (0.55 + 0.45 * f));
       },
       danger(Pl) {
         const t = this.t;
@@ -1146,7 +1160,13 @@
       },
       hits(P) {
         for (const c of this.cells) {
-          if (this.t >= c.at && this.t < c.at + this.active && Math.abs(P.x - c.x) < cw / 2 + 5 && P.y > FLOOR - c.h + 8) { this.srcX = c.x; return true; }
+          const e = this.t - c.at;
+          if (e < 0 || e >= this.active) continue;
+          // as high as its spikes are drawn, and only as far up as they have come (v2.1b, as in rime)
+          const dx = Math.abs(P.x - c.x), up = Math.min(1, e / 0.045);
+          if (dx >= cw / 2 + 5) continue;
+          const tall = dx < 17 ? c.h : c.h * (0.58 + 0.05 * c.seed);
+          if (FLOOR - P.y < tall * up - 8) { this.srcX = c.x; return true; }
         }
         return false;
       },
@@ -2738,4 +2758,13 @@
   };
 
   G.makeBoss(B);
+  // Where blows land on it: the figure as it is drawn (see B.draw), from the hem to the brim of the hat,
+  // carried with its recoil and tilted with its lean (v2.1b; the kit's box stood still and upright while
+  // the figure leaned out of it). The cape that trails behind it is not part of it.
+  B.bodyBox = function () {
+    const b = B.body, down = B.staggered || b.spent || B.dying;
+    const th = (b.lean ? G.clamp(b.lean, -0.35, 0.4) : 0) + (down ? 0.28 : 0), fx = K.faceX(b);
+    const top = 126, s = Math.sin(th), c = Math.cos(th);
+    return { cx: b.x + (b.kx || 0) + fx * s * top / 2, cy: b.y - c * top / 2, hw: B.w / 2 + Math.abs(s) * 18, hh: top / 2 };
+  };
 })();

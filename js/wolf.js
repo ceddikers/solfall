@@ -611,7 +611,11 @@
         if (Math.random() < dt * 22) G.fx.spawn({ x: this.x + G.rand(-this.cw / 2, this.cw / 2), y: FLOOR - G.rand(4, 30), vx: G.rand(-20, 20), vy: -G.rand(60, 170), life: G.rand(0.4, 1), size: G.rand(1.4, 3), color: G.pal().boss, wob: 70 });
         if (this.lit && Math.random() < dt * 3) G.fx.dust(this.x + G.rand(-this.cw / 2, this.cw / 2), FLOOR - 20, 1, { speed: [5, 30], size: [10, 16], life: [0.9, 1.5], up: 90, a: 0.3, color: '30,16,12' });
       },
-      hits(P) { return this.lit && !this.ending && P.y > FLOOR - 36 && Math.abs(P.x - this.x) < this.cw / 2 - 8; },
+      hits(P) {
+        if (!this.lit || this.ending || this.t < this.ign + 0.05) return false;
+        const up = Math.min(1, (this.t - this.ign) / 0.12); // (the flames stand up over a tenth of a second: v2.1b)
+        return P.y > FLOOR - Math.max(10, 30 * up) && Math.abs(P.x - this.x) < this.cw / 2 - 8;
+      },
       danger(P) { if (this.ending || P.y < FLOOR - 60) return null; return [this.x, this.w / 2 + 16, this.ign - this.t]; },
       draw(ctx) {
         // (catching, it flares up over a tenth of a second rather than standing up whole in one frame)
@@ -871,7 +875,19 @@
         }
         if (this.t > this.tele + this.active + 0.3) this.dead = true;
       },
-      hits(P) { return this.t >= this.tele && this.t < this.tele + this.active && Math.abs(P.x - b.x) < R && P.y > FLOOR - 54; },
+      hits(P) {
+        if (this.t < this.tele || this.t >= this.tele + this.active || P.y <= FLOOR - 54) return false;
+        // only where the tail has come round to: it starts on its side (from) and sweeps across (v2.1b;
+        // it used to strike the whole floor from its first frame)
+        // and only where it is drawn now: the last 2.4 of its turn (it leaves the floor behind it clear)
+        const span = Math.PI * 2 * E.outCubic(Math.min(1, (this.t - this.tele + 1 / 120) / this.active)), lo = Math.max(0, span - 2.4);
+        if (Math.abs(P.x - b.x) >= R) return false;
+        const q = (P.x - b.x) * this.from / (R - 10), m = 11 / (R - 10);
+        const a0 = Math.acos(G.clamp(q + m, -1, 1)), a1 = Math.acos(G.clamp(q - m, -1, 1)); // near side; the far side is 2 pi less these
+        // (the first half of its turn is the near side, drawn low along the floor; the second the far
+        // side, drawn higher: a hero just over the near side is clear of it)
+        return ((a0 <= span && a1 >= lo) && P.y > FLOOR - 28) || (G.TAU - a1 <= span && G.TAU - a0 >= lo);
+      },
       danger(P) { if (this.t >= this.tele + this.active || P.y < FLOOR - 100) return null; return [b.x, R + 22, this.tele - this.t]; },
       draw(ctx) {
         if (this.t < this.tele) return; // (no warning: the tail lifting is the warning)
@@ -1094,7 +1110,9 @@
         G.fx.shake(1.6);
       },
       hits(P) {
-        return G.distPointSeg(P.x, P.y - 22, this.mx, this.my, this.ix, FLOOR - 6) < 22 || (Math.abs(P.x - this.ix) < 36 && P.y > FLOOR - 52);
+        // (not before it has caught, nor once it is guttering out: v2.1b)
+        if (this.t < 0.025 || this.hold > 0.08) return false;
+        return G.distPointSeg(P.x, P.y - 22, this.mx, this.my, this.ix, FLOOR - 6) < 22 || (Math.abs(P.x - this.ix) < 36 && P.y > FLOOR - 40);
       },
       danger(P) {
         const near = this.mx + (this.ix - this.mx) * 0.45;
@@ -1960,8 +1978,15 @@
         }
         if (this.t > endT + 0.5) this.dead = true;
       },
-      lit(x) { const f = this.front(); return this.t >= t0 && this.t < endT && (x - x0) * dir >= -6 && (f - x) * dir >= 0; },
-      hits(P) { return P.y > FLOOR - 100 && this.lit(P.x); },
+      lit(x) { const f = this.front(); return this.t >= t0 + 0.08 && this.t < endT && (x - x0) * dir >= -6 && (f - x) * dir >= 0; },
+      hits(P) {
+        if (!this.lit(P.x)) return false;
+        // as tall as it is drawn: the burning floor behind the front stands about 75 high, the front itself
+        // about 140 (v2.1b; it used to burn 100 high all the way back, over the tips of its flames)
+        // (and while the run is still short, its flames are short: they taper at its ends)
+        const atFront = this.t < t0 + dur && (this.front() - P.x) * dir < 90, grow = G.clamp(Math.abs(this.front() - x0) / 80, 0.3, 1);
+        return P.y > FLOOR - (atFront ? 110 : 70) * grow;
+      },
       danger(P) {
         if (this.t >= endT || P.y < FLOOR - 120) return null;
         const lo = Math.min(x0, x1), hi = Math.max(x0, x1);
@@ -2169,8 +2194,14 @@
           G.fx.dust(far - dir * 30, f.y - 20, 3, { dir: -dir, speed: [20, 90], size: [10, 16], up: 40, a: 0.4, color: VOID });
         }
       },
-      box() { return { cx: this.x + dir * 12, cy: FLOOR - this.h - (leap ? 34 : 28), hw: 46, hh: leap ? 22 : 20 }; },
-      hits(P) { return this.out && G.rectsOverlap(P.box(), this.box()); },
+      // (a leaper's from its pose, v2.1b: the old box hung under its belly at the top of each bound)
+      box() { return { cx: this.x + dir * 12, cy: FLOOR - this.h - 28, hw: 46, hh: 20 }; },
+      // (only while it is drawn: not in the moment it comes out of the dark, nor as it fades into the far
+      // edge; and a leaper by its body along its spine, as it is pitched through its bound; v2.1b)
+      hits(P) {
+        if (!this.out || this.t - eyeT < 0.055 || (far - this.x) * dir <= 40) return false;
+        return leap ? spineHits(this.fig, P.box()) : G.rectsOverlap(P.box(), this.box());
+      },
       // (for the scripted player in tools/boss-tests.js) where it is unsafe to stand
       danger(P) {
         const lead = this.out ? 0 : eyeT - this.t, x = this.out ? this.x : x0;
@@ -2739,10 +2770,7 @@
     }
     tickEmbers(dt);
     // its body in flight hurts (b.air: a leap, a dive, the flat run across; never on the ground)
-    if (b.air && !b.hidden && G.canHurt()) {
-      const c = centre(b);
-      if (G.rectsOverlap(P.box(), { cx: c.x + b.face * 14, cy: c.y, hw: 68 * B.size, hh: 32 * B.size })) P.tryHit(1, b.x, b);
-    }
+    if (b.air && !b.hidden && G.canHurt() && B.contactHits(P.box())) P.tryHit(1, b.x, b);
   };
 
   // ------------------------------------------------------------------ the ember bed (phase III)
@@ -3310,10 +3338,64 @@
   }
 
   G.makeBoss(B);
-  // Its body is long and can stand on a wall: the target is wherever the body actually is.
+  // Where it is drawn, from its pose (v2.1b). A box round points of its own frame (x forward, y up
+  // negative), taken through the same steps drawWolf takes: its facing, the turn, its pitch, its size,
+  // and smaller about its feet far back in the dark. It used to be one fixed box about its middle,
+  // which left its neck and head outside (a blow to the head did nothing) and hung under its belly in
+  // a leap.
+  function poseAt(b) {
+    const tfv = b.tf == null ? 1 : b.tf, sx = Math.abs(tfv) < 0.15 ? 0.15 * (tfv < 0 ? -1 : 1) : tfv;
+    const S = B.size * (b.sc || 1), fx = b.face * sx * S, c = Math.cos(b.rot || 0), s = Math.sin(b.rot || 0);
+    const k = b.back > 0.01 ? 1 - 0.42 * b.back : 1;
+    return (lx, ly) => { lx *= fx; ly *= S; return [b.x + (lx * c - ly * s) * k, b.y + (lx * s + ly * c) * k]; };
+  }
+  function poseBox(b, pts) {
+    const at = poseAt(b);
+    let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9;
+    for (let i = 0; i < pts.length; i += 2) {
+      const [x, y] = at(pts[i], pts[i + 1]);
+      if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y;
+    }
+    return { cx: (x0 + x1) / 2, cy: (y0 + y1) / 2, hw: (x1 - x0) / 2, hh: (y1 - y0) / 2 };
+  }
+  const spun = (b) => !!(b.spin || b.comet); // (turning about its middle, or balled up in its comet)
+  // its body and legs: hip to shoulder, the back to the belly, down to its lowest paw
+  function bodyPts(p) {
+    const [shX, shY, hpX, hpY] = p, top = Math.min(shY, hpY) - 22, low = Math.max(p[5], p[7], p[9], p[11], Math.max(shY, hpY) + 26);
+    return [hpX - 26, top, shX + 24, top, hpX - 26, low, shX + 24, low];
+  }
   B.bodyBox = function () {
-    const b = B.body, c = centre(b), vert = Math.abs(Math.sin(b.rot)) > 0.7;
-    return { cx: c.x, cy: c.y, hw: (vert ? 52 : B.w / 2) * B.size, hh: (vert ? 86 : B.h / 2) * B.size };
+    const b = B.body;
+    if (spun(b)) { const c = centre(b); return { cx: c.x, cy: c.y, hw: 70 * B.size, hh: 70 * B.size }; }
+    return poseBox(b, bodyPts(b.pd || b.p));
   };
+  // its neck and head, out in front of the body: struck as the same target (one blow, one hit)
+  function headBox(b) {
+    const p = b.pd || b.p, a = p[12], len = p[13];
+    const hx = p[0] + 18 + Math.cos(a) * len, hy = p[1] - 8 + Math.sin(a) * len, hr = a * 0.75;
+    const mx = hx + Math.cos(hr) * 54 - Math.sin(hr) * 4, my = hy + Math.sin(hr) * 54 + Math.cos(hr) * 4;
+    return poseBox(b, [p[0] + 18, Math.min(hy, p[1]) - 22, hx, hy - 24, hx, hy + 18, mx + 2, my - 14, mx + 2, my + 16]);
+  }
+  B.extraTargets = function (out) {
+    const b = B.body;
+    if (b.hidden || spun(b)) return;
+    const h = headBox(b);
+    out.push({ id: 'body', kind: 'body', ref: b, cx: h.cx, cy: h.cy, hw: h.hw, hh: h.hh });
+  };
+  // What hurts when it flies: its body, hip to shoulder, as a row of discs along its spine, so a body
+  // pitched up or down hurts where it is drawn and not in the corners of a box round it (and not in the
+  // air under its belly, as the old box did). box: the hero's box. (Read by tools/hitbox-check.js.)
+  B.contactHits = function (box) {
+    const b = B.body;
+    if (spun(b)) { const c = centre(b); return G.rectsOverlap(box, { cx: c.x + b.face * 14, cy: c.y, hw: 68 * B.size, hh: 32 * B.size }); }
+    return spineHits(b, box);
+  };
+  function spineHits(w, box) {
+    const [shX, shY, hpX, hpY] = w.pd || w.p, at = poseAt(w);
+    const [ax, ay] = at(hpX - 8, hpY + 3), [bx, by] = at(shX + 10, shY + 3);
+    const r = 22 * B.size * (w.sc || 1) * (w.back > 0.01 ? 1 - 0.42 * w.back : 1);
+    for (let i = 0; i <= 5; i++) if (G.circleRect(G.lerp(ax, bx, i / 5), G.lerp(ay, by, i / 5), r, box)) return true;
+    return false;
+  }
   G.BOSS_IDS.push('wolf');
 })();

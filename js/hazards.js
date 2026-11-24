@@ -258,7 +258,13 @@
       },
       hits(P) {
         if (!this.firing) return false;
-        return G.rectsOverlap(P.box(), { cx: this.x + this.w / 2, cy: this.y + this.h / 2, hw: this.w / 2 - 5, hh: this.h / 2 - 2 });
+        // it grows to its full width (a column) or height (a tide) over its first 0.05 s, as drawn (v2.1b)
+        const f = Math.min(1, (this.t - this.tele) / 0.05);
+        if (this.style === 'tide') {
+          const top = this.y + this.h * (1 - f);
+          return G.rectsOverlap(P.box(), { cx: this.x + this.w / 2, cy: (top + this.y + this.h) / 2, hw: this.w / 2 - 5, hh: Math.max(0, (this.y + this.h - top) / 2 - 2) });
+        }
+        return G.rectsOverlap(P.box(), { cx: this.x + this.w / 2, cy: this.y + this.h / 2, hw: Math.max(0, this.w / 2 * f - 5), hh: this.h / 2 - 2 });
       },
       draw(ctx) {
         const P = pal(this);
@@ -320,7 +326,8 @@
         if (this.t >= this.tele + this.boom) this.dead = true;
       },
       hits(P) {
-        return this.fired && G.circleRect(this.x, this.y, this.r - 6, P.box());
+        // (only while it is drawn bright: its fill burns away over the last of its moment; v2.1b)
+        return this.fired && this.t - this.tele < this.boom * 0.7 && G.circleRect(this.x, this.y, this.r - 6, P.box());
       },
       draw(ctx) {
         if (this.fired) {
@@ -366,6 +373,7 @@
         if (this.r > this.maxR) this.dead = true;
       },
       hits(P) {
+        if (this.maxR - this.r < 90) return false; // (it fades out over its last 200 px: past the bright half of that, it is spent; v2.1b)
         const d = G.dist(P.x, P.y - 22, this.x, this.y);
         return Math.abs(d - this.r) < this.thick / 2 + 8;
       },
@@ -414,7 +422,11 @@
         this.srcX = this.x;
       },
       hits(P) {
-        if (this.boomT > 0) return G.circleRect(this.x, G.FLOOR - 8, this.blastR - 8, P.box());
+        if (this.boomT > 0) {
+          // the burst reaches as far as its ring has spread (v2.1b; it used to have its whole radius at once)
+          const k = G.ease.outCubic(Math.min(1, (0.08 - this.boomT) / 0.3 + 0.03));
+          return G.circleRect(this.x, G.FLOOR - 8, Math.min(this.blastR - 8, G.lerp(10, this.blastR * 1.3, k) + 8), P.box());
+        }
         if (this.t >= this.tele) return G.circleRect(this.x, this.oy, 16, P.box());
         return false;
       },
@@ -513,12 +525,20 @@
       },
       hits(P) {
         if (!this.firing) return false;
-        const lo = Math.min(this.a0, this.a1), span = Math.abs(this.a1 - this.a0);
+        // only as far round as the blade has come: the drawn crescent sweeps from a0 on the same curve
+        // (v2.1b; it used to cut the whole slice from its first frame, ahead of what was drawn)
+        const span = Math.abs(this.a1 - this.a0), sg = this.a1 >= this.a0 ? 1 : -1;
+        // (a touch behind the drawn tip, which tapers to a point: where it is thick enough to see)
+        const k = Math.min(1, (this.t - this.tele) / Math.max(0.01, this.active));
+        const swept = span * Math.max(0, Math.min(1, G.ease.outCubic(k) - 0.08 * (1 - k)));
+        // and the crescent is drawn from under half its radius out: inside a third of it, near the
+        // hilt, there is only whoever swings it (and its own body hurts when it means to)
+        const rin = this.mark ? this.r0 : Math.max(this.r0, this.r * 0.3);
         for (const py of [P.y - 21, P.y - 39, P.y - 3]) {
           const dx = P.x - this.x, dy = py - this.y, d = Math.hypot(dx, dy);
-          if (d > this.r + 6 || d < this.r0 - 6) continue;
-          const a = ((Math.atan2(dy, dx) - lo) % G.TAU + G.TAU) % G.TAU;
-          if (a <= span) return true;
+          if (d > this.r + 6 || d < rin - 6) continue;
+          const a = (((Math.atan2(dy, dx) - this.a0) * sg) % G.TAU + G.TAU) % G.TAU;
+          if (a <= swept) return true;
         }
         return false;
       },
@@ -590,7 +610,12 @@
       },
       hits(P) {
         if (!this.firing) return false;
-        return P.y > G.FLOOR - this.hgt && Math.abs(P.x - this.x) < this.w / 2 - 6;
+        const dx = P.x - this.x;
+        if (Math.abs(dx) >= this.w / 2 - 6) return false;
+        // the flames stand tallest in the middle and are low at the edges: as high as they are drawn
+        // (v2.1b; it used to burn its full height right out to the edge)
+        const edge = Math.sin(Math.PI * (dx + this.w / 2) / this.w);
+        return P.y > G.FLOOR - Math.max(8, this.hgt * 0.8 * edge);
       },
       draw(ctx) {
         const P = pal(this), x = this.x, w = this.w, F = G.FLOOR;
