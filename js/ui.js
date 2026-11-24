@@ -678,6 +678,8 @@
         b.classList.toggle('done', i + 1 < B.phase);
       });
     }
+    // (a boss that has thrown off its phases: Kairo's third, kairo.js)
+    if (!!B.unbound !== H.unbound) { H.unbound = !!B.unbound; document.getElementById('bhud').classList.toggle('unbound', H.unbound); }
     const po = Math.round(G.clamp(B.poise / B.poiseMax, 0, 1) * 100);
     if (po !== H.poise) { H.poise = po; el.pfill.style.width = po + '%'; }
     if (B.staggered !== H.broken) { H.broken = B.staggered; el.pbar.classList.toggle('broken', B.staggered); }

@@ -106,6 +106,7 @@
     F.kx = F.ky = F.kvx = F.kvy = 0; F.rattleA = 0; F.joltCd = 0;
     F.glints.length = 0; F.imp = null;
     F.dimA = 0; F.ripples.length = 0;
+    F.cine.k = 0; F.cine.to = 0;
   };
 
   // kind: 'glow' (soft light), 'spark' (a streak along its motion), 'chunk' (tumbling debris),
@@ -188,6 +189,16 @@
   // hero and boss are at close quarters (set in game.js).
   F.zoomBase = 0;
   F.zoomNow = () => 1 + F.zoom + F.zoomBase;
+  // A slow push in on a point (v2.4a: Kairo's transformations). to: 0 or 1; k eases towards it.
+  // F.view() is the view in use: its zoom and the world point at the middle of the screen.
+  F.cine = { x: 640, y: 360, k: 0, to: 0 };
+  F.view = function () {
+    const ck = F.cine.k, z = F.zoomNow() * (1 + 0.3 * ck);
+    if (ck < 0.001) return { z, fx: G.W / 2, fy: G.H / 2 };
+    const hw = G.W / (2 * z), hh = G.H / (2 * z);
+    const fx = G.lerp(G.W / 2, G.clamp(F.cine.x, hw - 40, G.W - hw + 40), ck), fy = G.lerp(G.H / 2, G.clamp(F.cine.y, hh - 40, G.H - hh + 40), ck);
+    return { z, fx, fy };
+  };
   // Knock the view about (dx, dy) pixels; it springs back. Unlike shake, it has a direction.
   F.kick = function (dx, dy) {
     F.kvx = G.clamp(F.kvx + dx * 60, -1100, 1100); F.kvy = G.clamp(F.kvy + dy * 60, -1100, 1100);
@@ -495,6 +506,8 @@
     if (F.flashA > 0) F.flashA = Math.max(0, F.flashA - F.flashDecay * dt);
     if (F.vigA > 0) F.vigA = Math.max(0, F.vigA - F.vigDecay * dt);
     F.zoom *= Math.exp(-7 * dt);
+    F.cine.k += (F.cine.to - F.cine.k) * (1 - Math.exp(-2.6 * dt));
+    if (F.cine.to === 0 && F.cine.k < 0.001) F.cine.k = 0;
     if (F.zoom < 0.0005) F.zoom = 0;
     if (F.joltCd > 0) F.joltCd -= dt;
     if (F.imp) { F.imp.t -= dt; if (F.imp.t <= 0) F.imp = null; }
@@ -506,13 +519,13 @@
   // picture is drawn again a little larger about the ring's centre, so everything behind it bends.
   F.drawRipples = function (ctx, canvas, k) {
     if (!F.ripples.length) return;
-    const z = F.zoomNow();
+    const v = F.view(), z = v.z;
     ctx.save();
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
     for (const r of F.ripples) {
       const u = 1 - r.life / r.max, e = G.ease.outCubic(u);
-      const cx = ((r.x - G.cam.x - G.W / 2) * z + G.W / 2 + F.shakeX) * k, cy = ((r.y - G.cam.y - G.H / 2) * z + G.H / 2 + F.shakeY) * k;
+      const cx = ((r.x - G.cam.x - v.fx) * z + G.W / 2 + F.shakeX) * k, cy = ((r.y - G.cam.y - v.fy) * z + G.H / 2 + F.shakeY) * k;
       const R = (20 + r.r * e) * k, w = (10 + 26 * r.p * (1 - u)) * k, s = 1 + 0.045 * r.p * (1 - u);
       ctx.save();
       ctx.beginPath();

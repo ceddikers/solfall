@@ -46,6 +46,7 @@
     { id: 'oath', boss: 'knight', name: 'Unburied Oath', desc: 'On your last point of health, everything you do deals 50% more.' },
     { id: 'pelt', boss: 'wolf', name: 'Cinder Pelt', desc: 'A dash fills Starlight as a hit does, and dashes recover 20% faster.' },
     { id: 'pearl', boss: 'leviathan', name: 'Drowned Pearl', desc: 'One more health, and Starlight fills 25% faster.' },
+    { id: 'wraps', boss: 'kairo', name: 'Sparring Wraps', desc: 'After a perfect dodge, your next attack blinks you behind the foe and deals 50% more.' },
   ];
   for (const t of TROPHIES) { G.RELICS.push(t); }
   G.TROPHIES = TROPHIES;

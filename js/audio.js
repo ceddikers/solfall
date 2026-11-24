@@ -461,8 +461,13 @@
     o.start(t); o.stop(t + dur + 0.03);
   }
 
+  // A boss may bring its own music (v2.4a): G.boss.music(step, t, sd, I, MH) plays each sixteenth in a
+  // fight in place of the shared loop, at its own tempos (G.boss.bpm[I]), with these to play it on.
+  const MH = { tone: (o) => tone(o), noise: (o) => noise(o), mtof: (m) => mtof(m), kick: (t) => kick(t), snare: (t, v) => snare(t, v), hat: (t, v) => hat(t, v), bass: (m, t, d) => bass(m, t, d), pad: (bar, t, d, I) => pad(bar, t, d, I), get dest() { return A.musGain; } };
+  const own = () => M.intensity > 0 && G.state === 'fight' && G.boss && G.boss.music;
   function playStep(step, t, sd) {
     const I = M.intensity;
+    if (own()) { G.boss.music(step, t, sd, I, MH); return; }
     const bar = BARS[(step >> 4) & 3];
     const s = step & 15;
     if (s === 0) pad(bar, t, sd * 16, I);
@@ -495,7 +500,7 @@
     const now = A.ctx.currentTime;
     if (M.next < now - 0.05) M.next = now + 0.06; // tab was asleep: skip ahead rather than burst
     while (M.next < now + 0.14) {
-      const sd = 60 / BPM[M.intensity] / 4;
+      const sd = 60 / (own() && G.boss.bpm ? G.boss.bpm[M.intensity] : BPM[M.intensity]) / 4;
       playStep(M.step, M.next, sd);
       M.next += sd;
       M.step = (M.step + 1) % 64;

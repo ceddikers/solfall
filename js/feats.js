@@ -16,12 +16,13 @@
     knight: { k: 'own', name: 'Disarmed', desc: 'Strike it eight times while its sword is away', pay: 20, ok: (c) => (c.unarmed || 0) >= 8 },
     wolf: { k: 'own', name: 'Floored', desc: 'Throw it onto its back three times in one fight', pay: 20, ok: (c) => (c.stagger || 0) >= 3 },
     leviathan: { k: 'own', name: 'Hold fast', desc: 'Win without using Dawnbreak', pay: 20, ok: (c) => !c.ult },
+    kairo: { k: 'own', name: 'Sunbreaker', desc: 'Break the Gathered Sun within three seconds', pay: 20, ok: (c) => (c.sunbreak || 0) >= 1 },
   };
   const CAMP = [
     { id: 'camp.bell', name: 'Bellringer', desc: 'Ring the old bell five times without letting it fall quiet', pay: 10 },
     { id: 'camp.keep', name: 'Lamplighter', desc: 'Keep the lantern off the ground for ten blows', pay: 10 },
   ];
-  const BOSSES = ['warden', 'mage', 'assassin', 'knight', 'wolf', 'leviathan'];
+  const BOSSES = ['warden', 'mage', 'assassin', 'knight', 'wolf', 'leviathan', 'kairo'];
 
   const FE = G.feats = { c: {} };
   FE.BOSSES = BOSSES; FE.CAMP = CAMP;

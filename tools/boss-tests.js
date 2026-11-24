@@ -24,6 +24,8 @@
   // Where is it unsafe to stand? Each entry: [centre x, half width, seconds until it hurts].
   function dangers(B) {
     const out = [], py = P.y - 22;
+    // an open pit in the floor (Kairo's ridge): never stand over one
+    for (const p of G.arena.pits || []) out.push([(p.l + p.r) / 2, (p.r - p.l) / 2 + 16, 0.1]);
     for (const h of G.hazards.list) {
       if (h.dead) continue;
       switch (h.kind) {

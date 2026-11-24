@@ -229,7 +229,8 @@
   // Boons and relics, the Shrine's Whetstone, the Flow rank, and the two trophies that depend on the moment.
   G.dmgMult = () => (1 + 0.35 * G.boon('glass')) * (G.relic('crown') ? 1.4 : 1) * (G.boon('whisper') ? 1.3 : 1)
     * (1 + 0.04 * G.up('edge')) * (1 + 0.03 * G.flow.rank)
-    * (G.relic('shroud') && G.player.shroudT > 0 ? 1.5 : 1) * (G.relic('oath') && G.player.hp === 1 ? 1.5 : 1);
+    * (G.relic('shroud') && G.player.shroudT > 0 ? 1.5 : 1) * (G.relic('oath') && G.player.hp === 1 ? 1.5 : 1)
+    * (G.relic('wraps') && G.player.wrapsHit > 0 ? 1.5 : 1); // Sparring Wraps (Kairo's trophy)
 
   G.roman = function (n) {
     const t = [[10, 'X'], [9, 'IX'], [5, 'V'], [4, 'IV'], [1, 'I']];

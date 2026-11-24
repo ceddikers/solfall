@@ -322,10 +322,10 @@
     ctx.fillStyle = '#000';
     ctx.fillRect(0, 0, G.W, G.H);
     ctx.save();
-    const z = F.zoomNow();
+    const v = F.view(), z = v.z; // (v.fx, v.fy: the middle of the view, moved by a cinematic push in: fx.js)
     ctx.translate(G.W / 2 + F.shakeX, G.H / 2 + F.shakeY);
     ctx.scale(z, z);
-    ctx.translate(-G.W / 2 - G.cam.x, -G.H / 2 - G.cam.y);
+    ctx.translate(-v.fx - G.cam.x, -v.fy - G.cam.y);
     if (G.state === 'hub') G.hub.drawBack(ctx); else if (G.state === 'rest') G.rest.drawBack(ctx); else G.arena.drawBack(ctx);
     G.flow.drawVeil(ctx);
     G.moments.drawGloom(ctx);
@@ -359,7 +359,7 @@
       ctx.translate(G.cam.x, 0);
     } else {
       // the floor takes a faint reflection of whatever is bright above it (see post.js)
-      G.post.reflect(ctx, canvas, ((G.FLOOR - G.cam.y - G.H / 2) * z + G.H / 2 + F.shakeY) * k, k);
+      G.post.reflect(ctx, canvas, ((G.FLOOR - G.cam.y - v.fy) * z + G.H / 2 + F.shakeY) * k, k);
     }
     G.arena.drawFront(ctx);
     if (G.debug.boxes) G.boss.drawDebug(ctx);

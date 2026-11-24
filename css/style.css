@@ -104,6 +104,8 @@ kbd {
 }
 #bphase b.on { color: #120c08; background: var(--bcol2); border-color: var(--bcol2); box-shadow: 0 0 10px var(--bcol1); }
 #bphase b.done { color: var(--dim); border-color: rgba(255, 255, 255, 0.4); text-decoration: line-through; }
+#bphase { transition: opacity 1.4s, filter 1.4s; }
+#bhud.unbound #bphase { opacity: 0; filter: blur(3px); }
 .bbar {
   position: relative; height: 14px; margin-top: 7px;
   background: rgba(0, 0, 0, 0.66); border: 1px solid rgba(255, 255, 255, 0.26);

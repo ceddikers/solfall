@@ -82,6 +82,7 @@
       // Eos: the stance she is holding, the Focus gathered in it, the draw carrying her, and the cuts made but not yet landed
       hold: null, focus: 0, strung: 0, sun: 0, hangs: [], pin: null, stars: null, faults: [], drawT: 0, drawV: null, owed: [], arc2: null, hush: null,
       pad: 0, grazeCd: 0, streakN: 0, streakT: 0, fallT: 0, edge: 0, fadeT: 0, castN: 0,
+      grabbed: null, wraps: 0, wrapsHit: 0, // (held by Kairo; Sparring Wraps' blink and its blow)
       rig: {}, // pose memory for drawing (see drawBody)
       scarf: [], ghosts: [], slashes: [], bolts: [],
       stats: { dmg: 0, hits: 0, perfect: 0, heals: 0, lances: 0 },
@@ -149,12 +150,25 @@
     if (P.ulting) { G.flow.ultStep(dt); return; }
     // and so does the finishing blow at the end of a fight (finish.js)
     if (P.finishing) { G.finish.step(dt); return; }
+    // held (v2.4a, kairo.js: the spin throw's grip, the Last Wave's struggle): carried where the hold
+    // is, and nothing the hero does counts but what the hold listens for
+    if (P.grabbed) {
+      const g = P.grabbed;
+      if (g.mash) { if (I.pressed.attack) g.presses = (g.presses || 0) + 1; if (I.pressed.ult && P.ult >= 100) g.ult = true; }
+      P.x = g.x; P.y = g.y; P.vx = 0; P.vy = 0; P.onGround = g.y >= FLOOR - 1; P.plat = null;
+      P.atk = null; P.cast = null; P.dashT = 0; P.healT = 0; P.drawT = 0; P.plunge = false; P.hold = null; P.flT = 0; P.recov = null;
+      if (g.face) P.facing = g.face;
+      P.inv = Math.max(P.inv, 0.05);
+      return;
+    }
 
     P.inv = Math.max(0, P.inv - dt);
     P.iframes = Math.max(0, P.iframes - dt);
     // Ember Ward (a pair): the ward a mend gives lasts 4 seconds
     if (P.wardT > 0) { P.wardT -= dt; if (P.wardT <= 0) { P.wardT = 0; P.ward = false; } }
     P.grazeCd = Math.max(0, P.grazeCd - dt);
+    if (P.wraps > 0) P.wraps -= dt;
+    if (P.wrapsHit > 0) P.wrapsHit -= dt;
     P.streakT = Math.max(0, P.streakT - dt);
     P.dashCd = Math.max(0, P.dashCd - dt);
     P.atkCd = Math.max(0, P.atkCd - dt);
@@ -381,12 +395,15 @@
       } else { P.y = P.plat.y; P.vy = 0; }
     }
     if (!P.plat) {
-      if (P.y >= FLOOR) {
+      // (an open hole in the floor has no floor: arena.js)
+      const pit = G.arena.pits.length ? G.arena.inPit(P.x) : null;
+      if (P.y >= FLOOR && !pit) {
         P.y = FLOOR;
         if (!P.onGround) landed = true;
         ground();
       } else {
         if (P.onGround) { P.onGround = false; }
+        if (pit && P.y > FLOOR + 6) { P.x = G.clamp(P.x, pit.l + 7, pit.r - 7); if (P.y > FLOOR + 190) G.arena.fell(); }
         if (P.vy >= 0 && P.dropT <= 0) {
           for (const pl of G.arena.platforms) {
             if (pl.rise > 0.05 && P.x >= pl.x - 9 && P.x <= pl.x + pl.w + 9 && prevY <= pl.y + 4 && P.y >= pl.y) {
@@ -439,6 +456,7 @@
     if (H.draw) stance(dt, ctl, mx, up, down, free);
     else if (P.atkBuf > 0 && free && P.atkCd <= 0 && P.dashT <= 0 && P.stun <= 0 && P.healT === 0 && !charging) {
       P.atkBuf = 0; P.cast = null;
+      if (P.wraps > 0 && G.state === 'fight') wrapsBlink(); // Sparring Wraps (Kairo's trophy)
       if (H.weapon === 'bow') startShot(mx, up, down);
       else startSwing(mx, up, down);
     }
@@ -1478,6 +1496,25 @@
     }
     if (H.draw) hush();
     G.sets.perfect(); // (the Dash slot's set boon: sets.js)
+    if (G.relic('wraps')) P.wraps = 2; // Sparring Wraps: the next attack within two seconds blinks
+  }
+
+  // Sparring Wraps (Kairo's trophy): after a perfect dodge, the next attack starts with a blink to the
+  // foe's back (the side it is not facing), and that blow deals half again (see G.dmgMult).
+  function wrapsBlink() {
+    const B = G.boss;
+    P.wraps = 0;
+    if (!B.active || B.dead || B.dying || !B.core) return;
+    const body = B.kit && B.body && !B.body.hidden ? B.body : null, bx = body ? body.x : B.core.x;
+    const side = body && body.face ? -body.face : (G.sign(bx - P.x) || 1);
+    let x = G.clamp(bx + side * 58, G.WALL_L + 24, G.WALL_R - 24);
+    if (G.arena.inPit(x)) x = G.arena.solidNear(x);
+    G.fx.burst(P.x, P.y - 22, { n: 10, color: STAR, speed: [60, 240], life: [0.15, 0.35], kind: 'spark', size: [1.5, 3] });
+    P.ghosts.push({ x: P.x, y: P.y, f: P.facing, life: 0.3 });
+    P.x = x; P.vx = 0; P.facing = G.sign(bx - x) || P.facing;
+    P.wrapsHit = 0.45;
+    G.audio.play('blink');
+    G.fx.ring(P.x, P.y - 22, { r0: 44, r1: 8, life: 0.2, color: HOT, width: 3 });
   }
 
   // Eos drew through a blow (or slipped one while a cut of hers was still on its way): that cut is

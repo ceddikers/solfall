@@ -1,8 +1,8 @@
 # Solfall
 
-A side-on boss rush for the browser: four heroes, four three-phase bosses, played as a run of
+A side-on boss rush for the browser: four heroes, seven three-phase bosses, played as a run of
 ever-harder trials. You pick a hero and a relic before the run and win a boon after each victory.
-Version 2.3a.
+Version 2.4a.
 
 This is an early slice of a planned boss-rush roguelite (short runs, a boon after each boss,
 bosses drawn from a pool). A run meets the four bosses in a shuffled order, then meets them again, harder.
@@ -113,6 +113,70 @@ hero (`tools/feel-check.js`).
 - Settings, Reset progress erases Sunshards, upgrades, trophies and records (it has to be chosen twice).
 
 Not done: touch controls, a colour-blind alternative to red-orange warnings, gamepad rebinding.
+
+## Kairo, the Canyon Fist (v2.4a)
+
+Asked for: the boss from the boss brief (the Claude Doc "Solfall boss brief"), with the parts left open
+filled in and approved. A martial artist a head taller than the hero, on a ridge of rock above a canyon.
+He comes to spar and ends up fighting for his life: each phase he powers up and takes you more
+seriously. He is `js/kairo.js`, and brings his own backdrop, weather, sounds and music.
+
+There are now seven bosses at the crossroads. A run is still six trials won, chosen from the portals,
+so each run leaves one boss out; the portals were spaced closer to fit (`js/rest.js`).
+
+| Phase | What he does | The tells |
+|---|---|---|
+| I · Sparring | Punch combos, the Sunwell Wave (a blue beam from both hands), Hailfire (10-15 energy balls from the air), the spin throw. Keep away and he flies at you knee first; ride over his head and he drives a palm straight up | Every combo opens the same way; the **third punch** shows the ending. Hips turning with a sharp breath: kicks (the last rises over your head; dash through to his back). A hand dropped glowing to his hip with a hum: a short beam. Nothing: he hops back, open. A leap with **open hands** is the throw: a dash does not save you, a jump over him does |
+| II · Risen | A gold aura with lightning in it, everything faster. The Wave can **warp** behind you; combos can fire a one-hand beam; Flare Up (six seconds of blinks and a quarter more damage taken, then a gasp), Meteor Smash, Twin Comets. His heavy blows crack the ridge | Warp: the charge hum cuts off with a crack. Meteor Smash: a shadow grows where he will land (he is off screen, so the mark is fair) |
+| III · Still Sky | He falls as if beaten and rises with three quarters of his health back, the phase marks gone from his bar, in a thin white aura. The **Gathered Sun** opens it. Standing still between attacks he slips blows to his front and answers with a palm. Empty Hand, the Sweeping Wave, Meteor Heel. Below 12%, once: the **Last Wave** | Empty Hand: eyes shut, nothing moving; strike him and he is behind you. Sweeping Wave: which hand is on top as he draws back says which way it sweeps (the lead hand: up) |
+
+**The Sunwell Wave** follows you until it holds, then plays out for most of a second; a dash alone does
+not outlast it. Be in the air when it holds and it goes over you as you land, or get round behind him: it
+only aims in front of him. If the orb pulses twice he is holding it.
+
+**The ridge breaks.** The floor is eight slabs. His heavy blows crack them; in phase II a slab cracked three
+times falls away and leaves a pit (never under you, never two side by side, never more than two, never the
+slabs at the walls). Falling costs 2 health, and is death on Merciless, from the fifth trial on, and against
+a corrupted Kairo. He opens phase II by breaking the slab under himself. In phase III only the Sun cracks
+anything.
+
+**The Gathered Sun.** One hand to the sky, the arena darkening towards his palm, and a Sun growing over him
+for up to seven seconds. His stagger bar becomes the Sun's bar. Break it and he must throw it at once, at
+the size it has reached: small, a dash clears its burst, and he kneels spent for three seconds; large, only
+distance does. Left to grow, it covers the arena and kills outright. A hero with no boons striking without
+pause breaks it in about four seconds.
+
+**The Last Wave** cannot be dodged. You meet it with your weapon raised and the two push: every press of
+attack pushes it back, and Dawnbreak, if ready, wins at once. Lose, and it is 2 health (3 when fierce) and a
+combo. Win, and his own wave throws him down.
+
+**Stagger** (*WINDED*): short, but blows deal 1.6x. Blows on his back, or while he is open after an attack,
+build twice the stagger.
+
+**Corrupted** he has three of his own: the Scorched Wave (low along the floor, leaving it burning in
+lengths), the Black Sun (opens phase II: five seconds, smaller, red-black) and the Shadow Partner (a dark copy
+repeats every blow of a combo from your other side half a second later; listen for a second set of footsteps).
+Still Sky starts in phase II.
+
+**Trophy:** Sparring Wraps: after a perfect dodge, your next attack blinks you behind the foe and deals 50%
+more. **Feat:** Sunbreaker: break the Gathered Sun within three seconds.
+
+**His music** is his own, written in code: D dorian, hand drums, a flute and plucked bass in phase I, taiko
+and brass in II, a driving snare in III, and only a drone and a heartbeat while the Sun gathers.
+
+**For other bosses**, the engine gained: pits in the floor (`G.arena.pits`, falling with `G.arena.fell()`),
+holding the hero (`G.player.grabbed`, which can count presses for a struggle), a slow camera push-in
+(`G.fx.cine`), a boss's own music (`B.music`, `B.bpm`), and hiding the phase marks (`B.unbound`).
+
+**Checked:** every attack in every phase, and his three corrupted ones, run without errors for all four
+heroes (`tools/boss-tests.js`, which now steps off open pits). The scripted player there loses 1-2 health
+in most of his attacks, because it has no answer to them: no rule for beams across the floor (the Waves),
+for a leap that must be jumped (the throw), for Empty Hand's rush, for striking the Black Sun, or for
+pressing in the Last Wave. Each of those was then checked by hand with a scripted move: an early jump or
+getting behind him beats the Wave; a jump as he leaps (not during his crouch) beats the throw; a dash or a
+jump as his eyes open beats Empty Hand; steady blows break the Sun; pressing wins the Last Wave. His look,
+the auras, the Sun, the Last Wave and the corrupted Shadow Partner were checked as still frames.
+**Nobody has played him yet**, and his music has not been heard.
 
 ## Sets and crowns (v2.3a)
 
@@ -1490,6 +1554,7 @@ To use these in a new attack, call the ready-made mixes in `js/fx.js`: `G.fx.hit
 | `js/bosskit.js` | the frame the other bosses share (`G.makeBoss`), and `G.setBoss` |
 | `js/mage.js`, `js/assassin.js`, `js/knight.js` | the Magus, the Veil and the Knight |
 | `js/wolf.js`, `js/leviathan.js` | the Cinder Wolf and the Drowned Leviathan, each bringing its own backdrop, weather, platforms and sounds |
+| `js/kairo.js` | Kairo, the Canyon Fist: his attacks, the breaking ridge, his drawing and his own music (v2.4a) |
 | `js/ui.js` | menus, health bars, result screens |
 | `js/game.js` | main loop, game states, draw order |
 

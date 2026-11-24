@@ -129,6 +129,7 @@
     platforms: [ // (filled in by A.layout, per boss and phase)
     ],
     bgs: [], theme: 'warden', cache: {},
+    pits: [], // open holes in the floor, { l, r } (Kairo's ridge: kairo.js)
     moteT: 0,
     flakes: [], birds: [], blades: [], twinkles: [], birdT: 6, startleCd: 0,
   };
@@ -587,7 +588,7 @@
 
   A.reset = function () {
     A.phase = 1; A.prevPhase = 1; A.fade = 1;
-    A.platforms.length = 0;
+    A.platforms.length = 0; A.pits.length = 0;
     A.birds.length = 0; A.birdT = rnd(3, 8); A.startleCd = 0;
   };
 
@@ -602,6 +603,34 @@
   };
 
   A.dropPlatform = function (p, secs) { p.target = 0; p.downT = secs; };
+
+  // Holes in the floor (v2.4a: Kairo's ridge breaks, kairo.js). A pit is { l, r }: the floor is open
+  // between them. The hero falls through one (player.js); past the bottom of the screen A.fell puts
+  // them back on the nearest solid floor, for a price: two health, or everything when fierce.
+  A.inPit = function (x) {
+    for (const p of A.pits) if (x > p.l + 5 && x < p.r - 5) return p;
+    return null;
+  };
+  A.solidNear = function (x) {
+    const p = A.inPit(x);
+    if (!p) return x;
+    const cands = [p.l - 26, p.r + 26].filter((c) => c > G.WALL_L + 20 && c < G.WALL_R - 20 && !A.inPit(c));
+    if (!cands.length) return G.clamp(x, G.WALL_L + 20, G.WALL_R - 20);
+    return cands.reduce((a, c) => (Math.abs(c - x) < Math.abs(a - x) ? c : a));
+  };
+  A.fell = function () {
+    const P = G.player, pit = A.inPit(P.x), mid = pit ? (pit.l + pit.r) / 2 : P.x, x = A.solidNear(P.x);
+    P.x = x; P.y = G.FLOOR; P.vx = 0; P.vy = 0; P.onGround = true; P.plat = null; P.dashT = 0; P.plunge = false;
+    G.fx.dust(x, G.FLOOR, 6, { speed: [40, 200], size: [7, 13], up: 50, a: 0.4 });
+    G.fx.ring(x, G.FLOOR - 22, { r0: 50, r1: 12, life: 0.3, color: G.COL.star, width: 4 });
+    G.audio.play('land');
+    if (G.canHurt()) {
+      P.iframes = 0; P.inv = 0;
+      P.tryHit(G.fierce() ? 99 : 2, mid, { kind: 'pit', popVy: -380 });
+    }
+    P.inv = Math.max(P.inv, 1);
+    if (G.boss.onPitFall) G.boss.onPitFall();
+  };
 
   A.update = function (dt) {
     if (A.fade < 1) A.fade = Math.min(1, A.fade + dt / A.fadeDur);

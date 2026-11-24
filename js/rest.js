@@ -10,7 +10,7 @@
 (function () {
   const FLOOR = G.FLOOR, F = G.fx, rnd = G.rand, W = G.W, TAU = G.TAU;
   const RW = 3820, WALL_L = 120, WALL_R = RW - 110, PAD = 48;
-  const ARCH_X = 210, FIRE_X = 600, ALTAR_X = 1090, STONE_X = 1400, FOUNT_X = 1610, EVENT_X = 1900, PORTAL_X = 2180, PORTAL_GAP = 210, SEVENTH_X = 3540;
+  const ARCH_X = 210, FIRE_X = 600, ALTAR_X = 1090, STONE_X = 1400, FOUNT_X = 1610, EVENT_X = 1900, PORTAL_X = 2160, PORTAL_GAP = 192, SEVENTH_X = 3560;
   const TAG_COL = { movement: '127,227,176', weapon: '255,186,92', starlight: '150,225,255', survival: '255,154,166', risk: '255,96,56', pair: '255,210,122', relic: '255,224,138', corrupted: '235,30,80' };
   // (a hero's own boons are in the hero's colour)
   const colOf = (b) => (b.tag === 'Signature' ? G.hero().col : b.set ? G.SETS[b.set].col : TAG_COL[b.tag.toLowerCase()] || '255,214,140');
@@ -1012,7 +1012,7 @@
       return ['The Omen Altar', done ? 'Pledged. An omen more walks with you into the next trial.' : 'Pledge yourself: an omen more in the next trial, and a second boon from this offering.', done ? '' : 'pledge'];
     }
     if (s.id === 'duel') return ['The Duelling Shade', 'It dashes at you, six times at most. Strike it three times before its blade touches you and it leaves a relic.', 'duel'];
-    if (s.id === 'seventh') return ['The Seventh Portal', run.runWon() ? 'It stirs, but does not open. Not yet.' : 'Dormant. It waits for the other six (' + run.beaten.length + ' of ' + G.BOSS_IDS.length + ').', run.runWon() ? 'touch it' : ''];
+    if (s.id === 'seventh') return ['The Seventh Portal', run.runWon() ? 'It stirs, but does not open. Not yet.' : 'Dormant. It waits for six trials won (' + run.beaten.length + ' of ' + G.RUN_FIGHTS + ').', run.runWon() ? 'touch it' : ''];
     if (s.id === 'portal') {
       const B = G.bosses[s.boss], st = portalState(s.boss), ready = offerTaken();
       if (st === 'corrupt') return ['Corrupted: ' + B.name, 'Optional. Far stronger, and it does not count as a trial. Win it for a second relic and triple Sunshards.', ready ? 'enter, if you dare' : 'take from the offering first'];
