@@ -244,9 +244,10 @@
     ],
     hudCols: [null, ['#3ad6c0', '#cffff6'], ['#ffb44a', '#ffe8c4'], ['#a896ff', '#ece6ff']],
     BASE_HP: 2900, poise0: 400, w: 128, h: 80,
+    teleK: 0.9, // its warnings, against the difficulty's (v2.4d: they were easy to read)
     answer: 'volley',
     antiAir: 'breach', // (the kit: a hero riding over its head is answered by this)
-    gaps: [0, 0.95, 0.8, 0.65],
+    gaps: [0, 0.84, 0.7, 0.57], // (v2.4d: 0.95, 0.8, 0.65)
     bags: {
       1: ['lunge', 'snap', 'slam', 'spouts', 'snap', 'volley', 'breaker', 'jet', 'barnacles', 'thrash', 'gyre'],
       2: ['lunge', 'snap', 'slam', 'spouts', 'sweep', 'volley', 'snap', 'breaker', 'jet', 'barnacles', 'thrash', 'gyre'],

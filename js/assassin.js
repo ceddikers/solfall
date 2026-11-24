@@ -20,9 +20,10 @@
     ],
     hudCols: [null, ['#a070ff', '#e4d4ff'], ['#40e0a8', '#c8ffe8'], ['#d8d8f0', '#ffffff']],
     BASE_HP: 3000, poise0: 340, w: 36, h: 84,
+    teleK: 0.9, // its warnings, against the difficulty's (v2.4d: they were easy to read)
     answer: 'hunt',
     antiAir: 'skyhook', // (bosskit: a hero who keeps riding over its head)
-    gaps: [0, 0.8, 0.62, 0.5],
+    gaps: [0, 0.7, 0.55, 0.44], // (v2.4d: 0.8, 0.62, 0.5)
     bags: {
       1: ['lunge', 'flurry', 'knives', 'ambush', 'backstab', 'echo', 'stance', 'crescent', 'snare', 'dance', 'moonfall'],
       2: ['pincer', 'flurry', 'knives', 'ambush', 'backstab', 'mirror', 'rain', 'cross', 'echo', 'stance', 'crescent', 'snare', 'dance', 'moonfall'],

@@ -29,7 +29,8 @@
     if (v) return v !== 'plain' && String(v).split(',').includes(tag);
     return G.rng() < p;
   };
-  K.T = () => G.diff().tele;
+  // (a boss may set teleK to shorten or lengthen its own warnings: v2.4d)
+  K.T = () => { const t = G.diff().tele, k = (G.boss && G.boss.teleK) || 1; return k < 1 ? Math.max(Math.min(t, 0.6), t * k) : t * k; }; // (never below 0.6 for it)
 
   // One-step damage check for an impact.
   K.crush = function (x, cy, hw, hh, dmg) {

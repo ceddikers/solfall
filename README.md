@@ -2,7 +2,7 @@
 
 A side-on boss rush for the browser: four heroes, seven three-phase bosses, played as a run of
 ever-harder trials. You pick a hero and a relic before the run and win a boon after each victory.
-Version 2.4c.
+Version 2.4d.
 
 This is an early slice of a planned boss-rush roguelite (short runs, a boon after each boss,
 bosses drawn from a pool). A run meets the four bosses in a shuffled order, then meets them again, harder.
@@ -113,6 +113,24 @@ hero (`tools/feel-check.js`).
 - Settings, Reset progress erases Sunshards, upgrades, trophies and records (it has to be chosen twice).
 
 Not done: touch controls, a colour-blind alternative to red-orange warnings, gamepad rebinding.
+
+## The easy three, a little quicker (v2.4d)
+
+Asked for: rather than easing Kairo further, make the other bosses "a tad harder", since a 100% clear rate is odd.
+
+- The Mage, the Leviathan and the Assassin wait about 12% less between attacks (Mage 0.84 / 0.66 / 0.53 s by
+  phase, was 0.95 / 0.75 / 0.6; Leviathan 0.84 / 0.7 / 0.57, was 0.95 / 0.8 / 0.65; Assassin 0.7 / 0.55 / 0.44,
+  was 0.8 / 0.62 / 0.5), and their warnings are 10% shorter. A boss can now set its own `teleK` against the
+  difficulty's warning length (`K.T` in `bosskit.js`); a shorter one never takes the warning scale below 0.6 (Standard is 1.0).
+- The Knight is unchanged: it already sits near 90%.
+
+**What the scripted hero says, and why it is not the whole story.** Neither change moved it. With gaps 20%
+shorter it still cleared these three 98-99%; with warnings 15% shorter as well, 98-100% (the Knight fell to 90%,
+the reason it was left alone). Its dodging rules were written against exactly these bosses (`tools/boss-tests.js`
+checks every one of their attacks with them), so it has an answer to nearly everything they do, and a little
+less time does not trouble a script. Its 100% means "every attack has a clean answer", not "a person cannot
+lose". What would move its number is harder hits (two health for a signature blow) or new patterns, and that is
+worth deciding from play, not from the script. These changes are the gentle version, for a person to feel.
 
 ## Clear rates, Kairo eased, the heroes retuned (v2.4c)
 
