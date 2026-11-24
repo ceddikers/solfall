@@ -232,7 +232,10 @@ kbd {
 }
 .panel.wide { width: 1040px; }
 .panel.narrow { width: 420px; }
-.panel.result { width: 740px; text-align: center; }
+.panel.result { width: 900px; text-align: center; }
+/* (v2.4c: the result screens' buttons are long ("Again, with Feather Cloak"): smaller, and they wrap rather than spill out of the panel) */
+.panel.result nav.row { flex-wrap: wrap; gap: 4px 6px; }
+.panel.result nav.row:not(.cards) .item { font-size: 15px; letter-spacing: 0.18em; padding: 8px 26px; }
 @keyframes pop { 0% { opacity: 0; transform: translateY(10px) scale(0.98); } 100% { opacity: 1; transform: none; } }
 .panel h2 { margin: 0 0 20px; text-align: center; font: 400 28px var(--display); letter-spacing: 0.32em; padding-left: 0.32em; }
 .panel h3 { margin: 0 0 12px; font-size: 13px; font-weight: 600; letter-spacing: 0.32em; color: var(--gold); text-transform: uppercase; }
@@ -256,7 +259,7 @@ ul.tips b { color: var(--ink); font-weight: 600; }
 .over { margin: 0 0 6px; font-size: 12px; letter-spacing: 0.56em; padding-left: 0.56em; color: var(--danger); text-transform: uppercase; }
 .win .over { color: var(--gold); }
 .panel.result h2 { font-size: 33px; letter-spacing: 0.24em; padding-left: 0.24em; margin-bottom: 10px; white-space: nowrap; }
-.lead { margin: 0; font-size: 15px; color: var(--dim); }
+.lead { margin: 0; font-size: 15px; color: var(--dim); text-wrap: balance; }
 .prog { position: relative; height: 10px; margin: 24px 30px 34px; background: rgba(0, 0, 0, 0.55); border: 1px solid rgba(255, 255, 255, 0.24); }
 #deadFill { position: absolute; left: 0; top: 0; bottom: 0; background: linear-gradient(90deg, #ff8a3c, #ffd07a); transition: width 0.9s cubic-bezier(0.2, 0.8, 0.2, 1); }
 .prog .pl { position: absolute; top: 15px; transform: translateX(-50%); font: 400 11px var(--display); letter-spacing: 0.1em; color: var(--faint); }

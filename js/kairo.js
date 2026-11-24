@@ -6,7 +6,7 @@
 //   II  Risen: a gold aura with lightning in it, everything faster. The Wave can warp behind you,
 //       combos can fire a one-hand beam, and Flare Up, Meteor Smash and Twin Comets join. His blows
 //       crack the ridge (eight slabs of rock) and a slab cracked three times falls away.
-//   III Still Sky: he falls as if beaten and rises with three quarters of his strength back and the
+//   III Still Sky: he falls as if beaten and rises with half his strength back and the
 //       phase marks gone, in a thin white aura. The Gathered Sun first (break its bar and he throws it
 //       early, smaller); standing still he slips blows aimed at his front; Empty Hand, the Sweeping
 //       Wave, Meteor Heel; and at the end the Last Wave, a beam struggle.
@@ -18,7 +18,7 @@
   const WAVE = { boss: '120,190,255', hot: '232,246,255' }; // the Sunwell Wave's blue
   const SUN = { boss: '255,196,104', hot: '255,248,226' };  // the Gathered Sun
   const ROCK = { boss: '150,118,92', hot: '226,204,176' };  // rock torn up and thrown down
-  const SUN_BAR = 200; // the Gathered Sun's own bar: steady hits from a bare hero break it in about four seconds
+  const SUN_BAR = 170; // the Gathered Sun's own bar: steady hits from a bare hero break it in about three and a half seconds (v2.4c: was 200)
 
   // ------------------------------------------------------------------ sounds
   const AU = G.audio, S = AU.synth;
@@ -183,7 +183,7 @@
     hudCols: [null, ['#ff9a56', '#ffe0b8'], ['#ffd040', '#fff4c4'], ['#c8dcff', '#ffffff']],
     BASE_HP: 2700, poise0: 330, w: 40, h: 88,
     answer: 'knee', antiAir: 'palm', finale: 'lastwave',
-    gaps: [0, 1.0, 0.8, 0.64],
+    gaps: [0, 1.0, 0.8, 0.72], // (v2.4c: phase III 0.64 -> 0.72)
     bags: {
       1: ['combo', 'combo', 'combo', 'combo', 'throw', 'throw', 'wave', 'wave', 'hailfire'],
       2: ['combo', 'combo', 'combo', 'combo', 'throw', 'throw', 'wave', 'wave', 'hailfire', 'flare', 'meteor', 'comets'],
@@ -870,7 +870,8 @@
     yield* tween(b, { y: FLOOR - (risen ? 190 : 165) }, 0.3, E.outCubic);
     b.pose = 'gather';
     yield* wait(0.3 * T);
-    const n = risen ? 18 + ((G.rng() * 5) | 0) : 10 + ((G.rng() * 6) | 0);
+    // (v2.4c: fewer and slower: the Risen barrage was 18-22 every 0.13 s, Hailfire 10-15)
+    const n = risen ? 13 + ((G.rng() * 4) | 0) : 8 + ((G.rng() * 5) | 0);
     for (let i = 0; i < n; i++) {
       if (P.dead) break;
       facePlayer();
@@ -879,7 +880,7 @@
       const ang = Math.atan2(P.y - 24 - hy, P.x - hx) + G.rrand(-0.3, 0.3);
       ball(hx, hy, ang, risen ? 450 : 520, risen);
       G.audio.play('kShot');
-      yield* wait((risen ? 0.13 : 0.16) * Math.max(0.75, T));
+      yield* wait((risen ? 0.15 : 0.17) * Math.max(0.75, T));
     }
     b.fast = false; b.pose = 'hover';
     yield* tween(b, { y: gy(b.x) }, 0.35, E.inQuad);
@@ -1107,7 +1108,7 @@
       if (e > 1.1) G.fx.cine.to = 0; // and back out, so the fight can be read
       rockT -= dt;
       if (rockT <= 0) {
-        rockT = G.rrand(0.6, 0.95);
+        rockT = G.rrand(0.8, 1.2); // (v2.4c: was 0.6-0.95)
         H.meteor({ x: clampX(P.x + G.rrand(-200, 200)), tele: 0.85, blastR: 34, tint: ROCK, fallSpeed: 1300 });
       }
       if (Math.random() < dt * 18) {
@@ -1471,7 +1472,8 @@
       yield* wait(0.5);
       yield* fallDown();
       yield* wait(1.3);
-      // and rises, his strength coming back to three quarters, the phase marks gone
+      // and rises, his strength coming back to half, the phase marks gone
+      // (v2.4c: was three quarters; the scripted clear-rate runs lost most of their Kairo fights in this phase)
       b.pose = 'lie';
       G.audio.play('kRumble', { dur: 1.8 });
       const hp0 = B.hp;
@@ -1481,10 +1483,10 @@
         e += dt;
         const k = Math.min(1, e / 1.6);
         b.lie = 1 - E.inOutQuad(k);
-        B.hp = Math.round(G.lerp(hp0, B.maxHp * 0.75, E.outQuad(k)));
+        B.hp = Math.round(G.lerp(hp0, B.maxHp * 0.5, E.outQuad(k)));
         if (k > 0.5) b.pose = 'kneel';
       }
-      b.lie = 0; B.hp = Math.round(B.maxHp * 0.75); B.unbound = true;
+      b.lie = 0; B.hp = Math.round(B.maxHp * 0.5); B.unbound = true;
       b.pose = 'idle';
       // the gold aura burns out to nothing; a beat of silence; then a thin white aura settles close
       e = 0;

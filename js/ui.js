@@ -707,7 +707,8 @@
   U.showDead = function () {
     const P = G.player, B = G.boss;
     const pct = Math.max(1, Math.ceil(B.hp / B.maxHp * 100));
-    el.deadLead.textContent = (G.practice ? 'Practice. ' : 'You fell in trial ' + G.roman(G.run.trial) + '. ') + felledBy(P, B) + ' ' + B.short + ' endured with ' + pct + '% of its strength, in phase ' + ROMAN[B.phase] + '.';
+    el.deadLead.textContent = [G.practice ? 'Practice.' : 'You fell in trial ' + G.roman(G.run.trial) + '.', felledBy(P, B),
+      B.short + ' endured with ' + pct + '% of its strength, in phase ' + ROMAN[B.phase] + '.'].filter(Boolean).join(' ');
     el.deadFill.style.transition = 'none';
     el.deadFill.style.width = '100%';
     void el.deadFill.offsetWidth;

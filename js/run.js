@@ -38,37 +38,39 @@
       cloak: ['#1f4a3a', '#08160f'], build: 1.24, scarf: 6, scarfW: 1.7,
       hp: 1, run: 300, air: 1, weapon: 'maul', reach: 1.28, thick: 1.55, poise: 1.35, chain: 2, heavy: true, accel: 0.74,
       combo: [
-        { dmg: 20, cd: 0.44, dur: 0.36, wind: 0.08, act: 0.14 }, // the sweep
-        { dmg: 20, cd: 0.44, dur: 0.36, wind: 0.08, act: 0.14 },
-        { dmg: 40, cd: 0.66, dur: 0.5, wind: 0.16, act: 0.16 },  // the smash
+        // (v2.4c: 20, 20, 40 before; she cleared the most fights and killed fastest of the four)
+        { dmg: 18, cd: 0.44, dur: 0.36, wind: 0.08, act: 0.14 }, // the sweep
+        { dmg: 18, cd: 0.44, dur: 0.36, wind: 0.08, act: 0.14 },
+        { dmg: 36, cd: 0.66, dur: 0.5, wind: 0.16, act: 0.16 },  // the smash
       ],
       down: 15, special: 'starfall', specialName: 'Starfall', verb: 'starfall',
       blurb: 'Slow, heavy and hard to kill. Every swing counts.',
       lines: ['Maul: a wide sweep, then a smash you can hold to charge', 'Starfall: slam down for a blast around you, passing through attacks as you fall', 'One more health; she cannot be knocked back while charging'],
       how: {
-        attack: 'Maul. A wide sweep in front of you (20), then a smash that shakes the ground (40). Keep the button held on the smash to charge it, up to 72; fully charged it also throws a wave along the floor (20). While you charge you move slowly, but a blow cannot knock you back or stop you.',
+        attack: 'Maul. A wide sweep in front of you (18), then a smash that shakes the ground (36). Keep the button held on the smash to charge it, up to 65; fully charged it also throws a wave along the floor (18). While you charge you move slowly, but a blow cannot knock you back or stop you.',
         aim: 'Hold up to heave the maul overhead. In the air, hold down to strike below and bounce off what you hit.',
         dash: 'She is slower to start and stop than the others. A sweep thrown straight out of a dash hits 40% harder.',
-        special: 'Starfall: a blast of 46 around your feet. In the air you plunge first, passing through attacks until you land.',
+        special: 'Starfall: a blast of 42 around your feet. In the air you plunge first, passing through attacks until you land.',
         ult: 'Worldbreaker: you rise and come down for 250, and the whole floor splits.',
       },
     },
     {
       id: 'lune', name: 'Lune', title: 'The Moonbow', col: '214,170,255', hot: '246,236,255', css: '#d6aaff',
       cloak: ['#3c2a5e', '#120a20'], build: 0.88, scarf: 14, scarfW: 0.7,
-      hp: -1, run: 352, air: 2, weapon: 'bow', reach: 1, thick: 1, poise: 0.7,
+      hp: -2, run: 352, air: 2, weapon: 'bow', // (v2.4c: two less health, for more damage: was -1 with arrows of 4, 5, 10)
+      reach: 1, thick: 1, poise: 0.7,
       combo: [
-        { dmg: 4, cd: 0.28, wind: 0.03 },
         { dmg: 5, cd: 0.28, wind: 0.03 },
-        { dmg: 10, cd: 0.56, wind: 0.1 },
+        { dmg: 6, cd: 0.28, wind: 0.03 },
+        { dmg: 13, cd: 0.56, wind: 0.1 },
       ],
       down: 4, special: 'volley', specialName: 'Moon Volley', verb: 'volley',
       blurb: 'Fragile and nimble. Fights from range, hits hardest up close.',
-      lines: ['Moonbow: arrows in any direction, strongest up close and weaker at long range; she slows while firing', 'Moon Volley: a fan of five arrows and a leap backwards', 'Triple jump; firing downward in the air lifts you; one less health'],
+      lines: ['Moonbow: arrows in any direction, strongest up close and weaker at long range; she slows while firing', 'Moon Volley: a fan of five arrows and a leap backwards', 'Triple jump; firing downward in the air lifts you; two less health'],
       how: {
-        attack: 'Moonbow. Arrows wherever you aim (4, 5), then a heavy arrow that pierces (10). Up to 60% stronger within 120 pixels, up to 30% weaker past 240. You slow down while firing.',
+        attack: 'Moonbow. Arrows wherever you aim (5, 6), then a heavy arrow that pierces (13). Up to 60% stronger within 120 pixels, up to 30% weaker past 240. You slow down while firing.',
         aim: 'Aim with the mouse, or hold a direction; with no direction held she fires the way she faces. Firing downward in the air lifts you.',
-        dash: 'Three jumps instead of two. She has one less health than the others.',
+        dash: 'Three jumps instead of two. She has two less health than the others.',
         special: 'Moon Volley: a fan of five arrows, and a leap back from where you aimed. Like her other arrows they hit harder from close in, but they earn no Starlight back.',
         ult: 'Moonfall: a moon rises behind you. One great arrow for 26, fourteen moonbeams for 11 each, then the cut that ends it, for 70.',
       },

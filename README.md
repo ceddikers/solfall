@@ -2,7 +2,7 @@
 
 A side-on boss rush for the browser: four heroes, seven three-phase bosses, played as a run of
 ever-harder trials. You pick a hero and a relic before the run and win a boon after each victory.
-Version 2.4b.
+Version 2.4c.
 
 This is an early slice of a planned boss-rush roguelite (short runs, a boon after each boss,
 bosses drawn from a pool). A run meets the four bosses in a shuffled order, then meets them again, harder.
@@ -114,6 +114,83 @@ hero (`tools/feel-check.js`).
 
 Not done: touch controls, a colour-blind alternative to red-orange warnings, gamepad rebinding.
 
+## Clear rates, Kairo eased, the heroes retuned (v2.4c)
+
+Asked for: a full test run of every boss with every hero at every trial, then "nerf kairo a bit" (then: "have
+him just jump to 50% hp in phase 3"), "aster feels v strong", "lune could use a dps buff but 1 less hp", "test eos
+draws", and the defeat screen's buttons, which ran out of the panel.
+
+`tools/clear-rates.js` plays whole fights with a scripted hero: it closes on the nearest part of the boss it
+can hit, attacks, mends when low and safe, spends spare Starlight, fires Dawnbreak and crowns, and dodges by
+the same rules as `tools/boss-tests.js`, plus three answers those miss (a platform for the Warden's tide, a
+double jump on Kairo's crouch for the throw, behind him for the sweeping wave). Each fight gets a random relic,
+a random boon per trial before it, and that trial's omens. Run it from the page console:
+
+```
+fetch('/tools/clear-rates.js').then(r => r.text()).then(t => (0, eval)(t)); CLEAR.start({ runs: 10 })
+```
+
+then `CLEAR.status()` and `CLEAR.table()`. It puts the save data back when it finishes. It is a steady,
+mediocre player, so its numbers compare bosses, heroes and trials; they are not what a person will see.
+
+**v2.4b, Standard, 1,680 fights** (10 per boss, hero and trial), win rate:
+
+| Boss | I | II | III | IV | V | VI | All | Vesper | Aster | Lune | Eos |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| Leviathan | 100 | 100 | 100 | 98 | 100 | 100 | 100 | 100 | 100 | 98 | 100 |
+| Assassin | 98 | 98 | 98 | 100 | 98 | 100 | 98 | 100 | 100 | 95 | 98 |
+| Mage | 93 | 98 | 100 | 100 | 93 | 93 | 96 | 98 | 98 | 93 | 93 |
+| Knight | 93 | 95 | 90 | 93 | 85 | 90 | 91 | 93 | 97 | 92 | 82 |
+| Wolf | 100 | 78 | 75 | 70 | 80 | 78 | 80 | 92 | 100 | 48 | 80 |
+| Warden | 75 | 75 | 53 | 70 | 68 | 70 | 68 | 73 | 87 | 52 | 62 |
+| Kairo | 43 | 30 | 40 | 50 | 15 | 20 | 33 | 38 | 50 | 17 | 27 |
+
+Kairo hit the scripted hero 5.1 times a fight (the others 1.7 to 4.3), and 9 in 10 of its losses to him came
+in phase III. So, for Kairo:
+
+- Still Sky: he rises with half his health back, not three quarters, and waits a little longer
+  between attacks (0.72 s against 0.64).
+- The Risen barrage that opens phase II: 13 to 16 shots every 0.15 s (was 18 to 22 every 0.13 s).
+- Hailfire: 8 to 12 balls, a little slower (was 10 to 15).
+- The Gathered Sun's bar is 170 (was 200), so it is thrown smaller more often, and rocks fall from it less
+  often (every 0.8 to 1.2 s, was 0.6 to 0.95).
+
+Against him the same scripted hero now wins about 48% (240 fights; Vesper 53, Aster 55, Lune 33, Eos 48),
+takes about 4.3 hits a fight, and ends its wins on half its health (was 35%). He is still the hardest boss; nothing he does reads differently.
+
+**Eos's draws.** The scripted hero now plays Eos as he is meant to be played: a short string up close, then the
+stance, let go at three marks with the boss in reach, or at once with a lit mark as a way out. Unhurtable and
+with no boons it kills in 67 s on average against 94 s on the string alone, the fastest of the four, and in
+full fights it is hit the least (2.0 a fight). The draw works; nothing about Eos was changed.
+
+**The heroes:**
+
+- Aster: sweep 18 (was 20), smash 36 (was 40), so a full charge is 65 (was 72) and its floor wave 18 (was 20);
+  Starfall 42 (was 46). The charge still adds 80%, so holding the smash stays a little ahead of not holding it.
+- Lune: two less health than the others (was one: 3 on Standard), arrows of 5, 6 and a piercing 13 (were 4, 5, 10).
+
+Time to win, unhurtable, no boons, trial I (seconds, all seven bosses): Vesper 77, Aster 84 (was 74), Lune 90
+(was 103), Eos 67 (draws). Full fights, 1,680 again (Kairo at 50%): overall 84%.
+
+| Hero | Clear rate | was | Hits taken a fight | Weakest boss |
+|---|---|---|---|---|
+| Vesper | 86% | 85% | 2.6 | Kairo 47% |
+| Aster | 86% | 90% | 3.3 | Kairo 43% |
+| Lune | 71% | 71% | 2.9 | Kairo 33%, Warden 38%, Wolf 47% |
+| Eos (now drawing) | 92% | 77% | 2.0 | Kairo 62% |
+
+By boss: Mage 100, Leviathan 99, Assassin 98, Knight 93, Wolf 79, Warden 71, Kairo 46.
+
+A correction found after: the scripted hero never pressed anything in the Last Wave's struggle, so it lost every
+one (2 health, 3 when fierce) at the very end of the fight. Taught to mash at a person's pace (eight presses a
+second), it beats Kairo **69%** of the time (240 fights; Vesper 77, Aster 60, Lune 60, Eos 80): level with the
+Warden. The Kairo numbers above are from before this and read low.
+
+**The defeat screen.** Its buttons are a little smaller and the result panels a little wider (900 px, as the
+victory screen already was), so "Again, with Feather Cloak" fits on one line with the other two; they wrap
+rather than spill out if a name is ever longer. The summary line no longer leaves a word alone on its last line,
+and loses the double space when there is no last blow to name.
+
 ## Kairo, the Canyon Fist (v2.4a)
 
 Asked for: the boss from the boss brief (the Claude Doc "Solfall boss brief"), with the parts left open
@@ -126,9 +203,9 @@ so each run leaves one boss out; the portals were spaced closer to fit (`js/rest
 
 | Phase | What he does | The tells |
 |---|---|---|
-| I · Sparring | Punch combos, the Sunwell Wave (a blue beam from both hands), Hailfire (10-15 energy balls from the air), the spin throw. Keep away and he flies at you knee first; ride over his head and he drives a palm straight up | Every combo opens the same way; the **third punch** shows the ending. Hips turning with a sharp breath: kicks (the last rises over your head; dash through to his back). A hand dropped glowing to his hip with a hum: a short beam. Nothing: he hops back, open. A leap with **open hands** is the throw: a dash does not save you, a jump over him does |
+| I · Sparring | Punch combos, the Sunwell Wave (a blue beam from both hands), Hailfire (8-12 energy balls from the air), the spin throw. Keep away and he flies at you knee first; ride over his head and he drives a palm straight up | Every combo opens the same way; the **third punch** shows the ending. Hips turning with a sharp breath: kicks (the last rises over your head; dash through to his back). A hand dropped glowing to his hip with a hum: a short beam. Nothing: he hops back, open. A leap with **open hands** is the throw: a dash does not save you, a jump over him does |
 | II · Risen | A gold aura with lightning in it, everything faster. The Wave can **warp** behind you; combos can fire a one-hand beam; Flare Up (six seconds of blinks and a quarter more damage taken, then a gasp), Meteor Smash, Twin Comets. His heavy blows crack the ridge | Warp: the charge hum cuts off with a crack. Meteor Smash: a shadow grows where he will land (he is off screen, so the mark is fair) |
-| III · Still Sky | He falls as if beaten and rises with three quarters of his health back, the phase marks gone from his bar, in a thin white aura. The **Gathered Sun** opens it. Standing still between attacks he slips blows to his front and answers with a palm. Empty Hand, the Sweeping Wave, Meteor Heel. Below 12%, once: the **Last Wave** | Empty Hand: eyes shut, nothing moving; strike him and he is behind you. Sweeping Wave: which hand is on top as he draws back says which way it sweeps (the lead hand: up) |
+| III · Still Sky | He falls as if beaten and rises with half his health back, the phase marks gone from his bar, in a thin white aura. The **Gathered Sun** opens it. Standing still between attacks he slips blows to his front and answers with a palm. Empty Hand, the Sweeping Wave, Meteor Heel. Below 12%, once: the **Last Wave** | Empty Hand: eyes shut, nothing moving; strike him and he is behind you. Sweeping Wave: which hand is on top as he draws back says which way it sweeps (the lead hand: up) |
 
 **The punch combos** (v2.4b) come out of wind-ups you can see: each punch starts with the fist drawn back,
 the opener is measured, the middle ones quick, and the punch that shows the ending is held a beat longer. The
@@ -1200,8 +1277,8 @@ All four share movement, the dash, Starlight and mending. Weapon and special dif
 
 | | Vesper, the Starblade | Aster, the Starmaul | Lune, the Moonbow |
 |---|---|---|---|
-| Health (Standard) | 5 | 6 | 4 |
-| Weapon | sword: 10 down, 12 back up, then a 26 finisher | maul: a wide sweep in front (20), then a smash that shakes the ground (40). Hold the smash to charge it, up to 72; fully charged it also throws a wave along the floor (20) | bow: arrows of 4, 5, then a piercing 10, in any direction; up to 60% stronger within 120px, up to 30% weaker past 240px |
+| Health (Standard) | 5 | 6 | 3 |
+| Weapon | sword: 10 down, 12 back up, then a 26 finisher | maul: a wide sweep in front (18), then a smash that shakes the ground (36). Hold the smash to charge it, up to 65; fully charged it also throws a wave along the floor (18) | bow: arrows of 5, 6, then a piercing 13, in any direction; up to 60% stronger within 120px, up to 30% weaker past 240px |
 | Special | Star Lance: a piercing shot at any range | Starfall: a blast around her; from the air she plunges first and passes through attacks | Moon Volley: a fan of five arrows and a leap backwards |
 | Extra | a slash out of a dash is a thrust | fills the stagger bar 35% faster; a little slower on foot | triple jump; firing downward in the air lifts her; moves at 60% speed while firing; arrows give less Starlight than melee hits |
 

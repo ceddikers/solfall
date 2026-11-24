@@ -16,11 +16,11 @@
     ARROW_SPEED: 1350, ARROW_LIFE: 0.4, VOLLEY_DMG: 10,
     ARROW_GAIN: 6, ARROW_GAIN_HEAVY: 12, // Starlight per arrow hit: less than a melee hit
     BOW_SLOW: 0.6,                       // Lune's speed while she is drawing and loosing
-    STARFALL_DMG: 46, STARFALL_R: 165,
+    STARFALL_DMG: 42, STARFALL_R: 165, // (v2.4c: 46)
     // (v1.7b: 0.9 s for +80% and a wave of 20. At 1.05 s for +50% and a wave of 14, holding the smash
     // dealt less in a second than not holding it; before v1.4a, at 0.9 s for double and 24, it was too much.)
     CHARGE_T: 0.9,   // how long Aster's smash takes to charge fully
-    CHARGE_DMG: 0.8, // how much a full charge adds to the smash (0.8 = 40 becomes 72)
+    CHARGE_DMG: 0.8, // how much a full charge adds to the smash (0.8 = 36 becomes 65; v2.4c trimmed the smash, not the charge)
     // Eos keeps her blade in its sheath. Holding the attack gathers Focus; letting go is the draw.
     FOCUS: [0.3, 0.65, 1.05],     // seconds of stance for the first, second and third mark (v2.1b: from 0.45, 0.95, 1.5)
     DRAW_DMG: [18, 46, 100],      // what the draw is worth at one, two and three marks: patience is paid for, the third mark most of all
@@ -630,7 +630,7 @@
       G.fx.thud(P.x + a.dir * 90, FLOOR, 1.15 + 0.8 * ck, { col: STAR });
       // fully charged: the blow runs on along the floor as a wave of light
       if (ck >= 1) {
-        G.shots.push({ wave: true, x: P.x + a.dir * 120, y: FLOOR - 30, vx: a.dir * 980, vy: 0, t: 0, life: 0.5, hit: new Set(), dmg: Math.round(20 * G.dmgMult()) });
+        G.shots.push({ wave: true, x: P.x + a.dir * 120, y: FLOOR - 30, vx: a.dir * 980, vy: 0, t: 0, life: 0.5, hit: new Set(), dmg: Math.round(18 * G.dmgMult()) }); // (v2.4c: 20)
         G.fx.thud(P.x + a.dir * 200, FLOOR, 1.2, { col: GOLD });
         if (G.boon('fault')) fault(P.x + a.dir * 110, a.dir);
       }
