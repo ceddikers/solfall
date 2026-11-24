@@ -303,6 +303,7 @@ ul.tips b { color: var(--ink); font-weight: 600; }
 .t-survival { --tagc: #ff9aa6; }
 .t-risk { --tagc: #ff6038; }
 .t-pair { --tagc: #ffd27a; }
+.t-signature { --tagc: var(--herocol, #ffd6a0); }
 /* a pair named in a boon's text: underlined, and its effect as a tooltip. The tooltip opens beside
    the card or list it is in (they are its positioned parent), never over the text you are reading. */
 .item.card, .boonlist { position: relative; }
@@ -495,3 +496,5 @@ ul.tips b { color: var(--ink); font-weight: 600; }
 #boons .t-corrupted.clean { --tagc: #aadcff; }
 .panel.fountain .item.up .uname { color: #ff8aa4; }
 .panel.fountain nav .item.up { grid-template-columns: 190px 1fr 84px; }
+.panel.smith .item.up .uname { color: #ffba5c; }
+.panel.smith nav .item.up { grid-template-columns: 190px 1fr 84px; }

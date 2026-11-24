@@ -2,7 +2,7 @@
 
 A side-on boss rush for the browser: four heroes, four three-phase bosses, played as a run of
 ever-harder trials. You pick a hero and a relic before the run and win a boon after each victory.
-Version 2.1c.
+Version 2.2a.
 
 This is an early slice of a planned boss-rush roguelite (short runs, a boon after each boss,
 bosses drawn from a pool). A run meets the four bosses in a shuffled order, then meets them again, harder.
@@ -112,6 +112,57 @@ hero (`tools/feel-check.js`).
 - Settings, Reset progress erases Sunshards, upgrades, trophies and records (it has to be chosen twice).
 
 Not done: touch controls, a colour-blind alternative to red-orange warnings, gamepad rebinding.
+
+## Hero boons, and who you meet on the road (v2.2a)
+
+Asked for: hero-specific boons, "maybe 2 per character with a max of one appearing in a set of 3 boons",
+and "events/random npcs that give stuff".
+
+**Signature boons.** Each hero has two of their own (tag *Signature*, in the hero's colour). They are
+offered only to that hero, and an offering never holds more than one hero boon (old or new). They change
+how the hero plays rather than adding to a number (`player.js`, "signature boons"; each has its own sound).
+
+| Hero | Boon | What it does |
+|---|---|---|
+| Vesper | Pinning Lance | A Star Lance that strikes stays fixed in the foe (drawn there, 8 s); her next finisher on it bursts the lance for 40. |
+| Vesper | Constellation | Each finisher that lands sets a star on the foe; the third links them with lines of light and bursts for 60. |
+| Aster | Fault Line | A fully charged smash cracks the floor where it lands; a second later the crack erupts for 45. |
+| Aster | Unbroken | A blow taken while she charges the smash fills the charge at once, and the smash comes (she still takes the damage). |
+| Lune | Splitting Arrow | The heavy arrow splits into three where it first strikes (each a fifth of its damage). |
+| Lune | Moonglide | Holding the attack in the air, she falls slowly (at most 130 a second) while she fires. |
+| Eos | Hanging Cut | The line of a full draw hangs in the air, shedding gold, and a second later cuts again for half. |
+| Eos | Second Sun | After a full (gold) draw, the next hold within 3 s starts at two marks. |
+
+Through-Thrust, first pitched for Vesper, was swapped for Constellation at the user's word.
+
+**Who you meet on the road.** On a little over half the roads (55%), between the fountain and the portals,
+someone is waiting; never the same one two roads running, and none once the run is won or on the road of
+spoils after a corrupted portal (`rest.js`, "who you meet on the road"). The road is 360 wider for it.
+
+- **The fortune-teller.** Three face-down cards on a cloth: one is a boon (not on the offering), one 40
+  Sunshards, one a corrupted boon. Turn one; the others turn over after it so you see what you missed.
+- **The wandering smith.** Hammering at an anvil by a small forge. For Sunshards he tempers a boon you
+  hold: one more of it, even one past its limit (Keen Edge ×4, Steady Heart ×4...). Only boons that grow
+  with each one held (a limit of 2 or more) can be tempered. 50 Sunshards, then twice the last each time
+  in a run. Its own panel, like the fountain's.
+- **The omen altar.** A black altar with an omen's flame over it. Pledge yourself: one omen more walks
+  with you into the next trial, and you take a second boon from this offering ("choose two").
+- **The duelling shade.** A shade of the Veil's kneels in a ring of blades. Ask for the duel and it fades
+  in around you, sets itself to dash, sets its aim on your spot 0.15 s before it goes, and dashes there,
+  six times at most (from the third, sometimes out of the air). Strike it three times before its blade
+  touches you and it leaves a relic you do not hold (60 Sunshards if there is none). Touched, the duel is
+  lost: you are knocked back but not hurt (nothing on the road can hurt you). Struck, it is gone at once
+  and comes again from somewhere else; a dash through it is a dodge.
+
+Also: standing at the fire, the fountain or another place no longer draws its small name over the label.
+
+Measured: each boon tested in a fight against the Knight (Constellation's third finisher 60, the pinned
+lance 40, the crack 45, Unbroken's smash 0.15 s after the blow instead of 0.77, Moonglide's fall 1.1 s
+instead of 0.3, the hanging cut 50 after a 100 draw, Second Sun's hold at two marks in 0.25 s).
+`tools/boss-tests.js` with the scripted hero fighting back and all eight boons held, against the Knight and
+the Magus: no errors, and the same health lost as without them (Vesper 35, Lune 50 against 49, over 194
+runs). Each event played through on the road: the duel won by all four heroes by stepping off the aimed
+spot and striking in its recovery, and lost on the first dash by a hero who stands still.
 
 ## The Veil's Echo, reworked (v2.1c)
 

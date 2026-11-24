@@ -139,6 +139,15 @@
     { id: 'heart', name: 'Steady Heart', tag: 'Survival', max: 3, desc: 'One more health.' },
     { id: 'dawn', name: 'Second Dawn', tag: 'Survival', max: 1, desc: 'Once per trial, a killing blow leaves you on 1 health.' },
     { id: 'glass', name: 'Glass Star', tag: 'Risk', max: 1, desc: 'All damage +35%, but one less health.' },
+    // signature boons (v2.2a): two for each hero that change how they play (player.js, "signature boons")
+    { id: 'pinlance', name: 'Pinning Lance', tag: 'Signature', max: 1, heroes: ['vesper'], desc: 'A Star Lance that strikes stays fixed in the foe. Your next finisher on it bursts the lance for 40.' },
+    { id: 'stars', name: 'Constellation', tag: 'Signature', max: 1, heroes: ['vesper'], desc: 'Each finisher that lands sets a star on the foe. The third links them and bursts for 60.' },
+    { id: 'fault', name: 'Fault Line', tag: 'Signature', max: 1, heroes: ['aster'], desc: 'A fully charged smash cracks the floor, and a second later the crack erupts for 45.' },
+    { id: 'unbroken', name: 'Unbroken', tag: 'Signature', max: 1, heroes: ['aster'], desc: 'A blow taken while you charge the smash fills the charge at once, and the smash comes.' },
+    { id: 'splitarrow', name: 'Splitting Arrow', tag: 'Signature', max: 1, heroes: ['lune'], desc: 'The heavy arrow splits into three where it first strikes.' },
+    { id: 'glide', name: 'Moonglide', tag: 'Signature', max: 1, heroes: ['lune'], desc: 'Hold the attack in the air and you fall slowly while you fire.' },
+    { id: 'hanging', name: 'Hanging Cut', tag: 'Signature', max: 1, heroes: ['eos'], desc: 'The cut of a full draw hangs in the air, and a second later cuts again for half.' },
+    { id: 'secondsun', name: 'Second Sun', tag: 'Signature', max: 1, heroes: ['eos'], desc: 'After a full draw, holding again starts at two marks.' },
   ];
   // Pairs: a boon only offered once you hold both of the boons it joins. When one is open to you it
   // takes the place of one of the cards on half the offers, and a card that would open one says so.
@@ -200,6 +209,9 @@
     R.beaten = []; R.current = null; R.corrupt = false; R.corrupted = []; R.cleansed = []; R.extraRelics = [];
     R.offerKind = 'boon';
     R.purged = []; R.cleanses = 0; // corrupted boons cleansed at the fountain, and how often it has been used
+    // who was met on the road last (rest.js), boons tempered by the smith, and an omen pledged at the altar
+    R.lastEvent = null; R.tempers = 0; R.pledge = false;
+    if (typeof document !== 'undefined') document.documentElement.style.setProperty('--herocol', G.hero().css); // (a hero's own boons wear the hero's colour)
   };
 
   // A run is six fights, then (to come) a seventh that is always the same final one. The first is
@@ -250,7 +262,14 @@
     // a redraw shows different boons where there are enough left to do so
     const fresh = avoid ? pool.filter((b) => !avoid.includes(b)) : pool;
     if (fresh.length >= n) pool = fresh;
-    R.offer = G.shuffle(pool.slice()).slice(0, n);
+    // never more than one of the hero's own in an offering (v2.2a)
+    R.offer = [];
+    let own = false;
+    for (const b of G.shuffle(pool.slice())) {
+      if (R.offer.length >= n) break;
+      if (b.heroes) { if (own) continue; own = true; }
+      R.offer.push(b);
+    }
     R.offerKind = 'boon';
     // a pair you have earned takes one card's place, on half the offers
     const open = openPairs().filter((p) => !avoid || !avoid.includes(p));
@@ -271,6 +290,34 @@
     G.meta.shards -= cost; G.meta.save();
     R.purged.push(id); R.cleanses++;
     return true;
+  };
+  // The wandering smith (rest.js): one more of a boon you hold, even past its limit (one past at most),
+  // for Sunshards. Only boons that grow with each one held can be tempered. The price doubles each time.
+  R.temperCost = () => 50 * Math.pow(2, R.tempers || 0);
+  R.temperable = () => R.held().filter((h) => h.def.max >= 2 && !h.def.cursed && !h.def.pair && h.n < h.def.max + 1).map((h) => h.def);
+  R.temper = function (id) {
+    const cost = R.temperCost(), b = boonById[id];
+    if (!b || !R.temperable().includes(b) || G.meta.shards < cost) return false;
+    G.meta.shards -= cost; G.meta.save();
+    R.boons[id] = G.boon(id) + 1; R.order.push(id); R.tempers = (R.tempers || 0) + 1;
+    return true;
+  };
+  // The fortune-teller's cards (rest.js): a boon not on the offering, or a corrupted one not held.
+  R.freeBoon = function () {
+    const ids = (R.offer || []).map((b) => b.id);
+    const pool = G.BOONS.filter((b) => G.boon(b.id) < b.max && !ids.includes(b.id) && (!b.heroes || b.heroes.includes(R.hero)) && b.id !== 'glass');
+    if (!pool.length) return null;
+    const b = G.pick(pool);
+    R.boons[b.id] = G.boon(b.id) + 1; R.order.push(b.id);
+    return b;
+  };
+  R.freeCurse = function () {
+    const ids = (R.offer || []).map((b) => b.id);
+    const pool = G.CURSED.filter((b) => !G.boon(b.id) && !ids.includes(b.id));
+    if (!pool.length) return null;
+    const b = G.pick(pool);
+    R.boons[b.id] = 1; R.order.push(b.id);
+    return b;
   };
   // Second Thoughts (the Shrine): draw the offer again.
   R.reroll = function () {

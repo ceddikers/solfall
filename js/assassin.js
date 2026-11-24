@@ -233,6 +233,8 @@
     smoke(x, y - 40);
   }
   // quiet: it fades in (c.vis, from 0) instead of bursting out of smoke
+  // (the duelling shade on the road between trials is drawn as one of these: rest.js)
+  G.veilShade = { pose: (name) => (POSES[name] || POSES.idle).slice(), draw: (ctx, a, alpha) => figure(ctx, a, alpha) };
   function clone(x, y, face, pose, quiet) {
     const c = {
       id: 'shade' + (B.serial++), x, y, face, pose: pose || 'crouch', hurt: false, clone: true, runT: 0, p: null,

@@ -42,7 +42,7 @@
       'hint', 'lowhp', 'lbTop', 'lbBot', 'diffNote', 'bestLine', 'ver', 'deadLead', 'deadFill', 'deadStats',
       'pauseBoons', 'boons', 'trial', 'winOver', 'winPick', 'winCards', 'heroName', 'heroCards', 'relicCards', 'relicOver',
       'deadTip', 'winStats', 'winBest', 'gradeLetter', 'gradeTitle', 'gradeSub', 'stage',
-      'practiceOver', 'keyList', 'resetItem', 'movesOver', 'movesTitle', 'movesBody', 'movesFoot', 'ult', 'ultFill', 'ultKey', 'flow', 'flowRank', 'flowFill', 'omen', 'shardCount', 'shrineLead', 'shrineList', 'shrineTrophies', 'rerollItem', 'featsLead', 'featsBody', 'helpBody', 'helpTabs', 'fountainLead', 'fountainList']) el[id] = $(id);
+      'practiceOver', 'keyList', 'resetItem', 'movesOver', 'movesTitle', 'movesBody', 'movesFoot', 'ult', 'ultFill', 'ultKey', 'flow', 'flowRank', 'flowFill', 'omen', 'shardCount', 'shrineLead', 'shrineList', 'shrineTrophies', 'rerollItem', 'featsLead', 'featsBody', 'helpBody', 'helpTabs', 'fountainLead', 'fountainList', 'smithLead', 'smithList']) el[id] = $(id);
     el.segs = Array.from(document.querySelectorAll('#ember .seg'));
     el.bbar = document.querySelector('.bbar');
     el.bname = document.getElementById('bname');
@@ -139,6 +139,7 @@
     else if (name === 'shrine') U.showShrine();
     else if (/^shrine\d$/.test(name)) buy(Number(name.slice(6)));
     else if (/^cleanse\d$/.test(name)) cleanse(Number(name.slice(7)));
+    else if (/^temper\d$/.test(name)) temper(Number(name.slice(6)));
     else if (name === 'how') U.show('how', true);
     else if (name === 'help') U.showHelp();
     else if (/^help\d$/.test(name)) U.fillHelp(Number(name.slice(4)));
@@ -257,6 +258,28 @@
     G.fx.burst(P.x, P.y - 20, { n: 22, color: '170,220,255', speed: [20, 140], life: [0.6, 1.2], size: [2, 4], grav: -200, wob: 100, jitter: 20 });
     G.fx.burst(P.x, P.y - 20, { n: 12, color: '235,30,80', speed: [60, 220], life: [0.3, 0.7], size: [2, 3], kind: 'spark' });
     if (!G.run.banes().length) { U.close(); G.input.endStep(); } else { U.fillFountain(); U.refresh(); U.setFocus(0); }
+  }
+  // ---- the Wandering Smith (rest.js): one row for each boon that can be tempered
+  U.fillSmith = function () {
+    const R = G.run, list = R.temperable(), cost = R.temperCost();
+    el.smithLead.innerHTML = 'You hold <b style="color:var(--gold)">' + G.meta.shards + '</b> Sunshards. One more of a boon you hold, even past its limit. Each tempering this run costs twice the last.';
+    Array.from(el.smithList.children).forEach((row, i) => {
+      const b = list[i];
+      row.style.display = b ? '' : 'none';
+      if (!b) return;
+      const n = G.boon(b.id);
+      row.querySelector('.uname').textContent = b.name + ' \u00d7' + n + ' \u2192 ' + (n + 1);
+      row.querySelector('.udesc').textContent = b.desc;
+      row.querySelector('.ucost').textContent = cost + ' \u25c6';
+      row.classList.toggle('poor', G.meta.shards < cost);
+    });
+  };
+  U.showSmith = function () { U.fillSmith(); U.show('smith', true); };
+  function temper(i) {
+    const b = G.run.temperable()[i];
+    if (!b || !G.run.temper(b.id)) { G.audio.play('empty'); return; }
+    G.rest.tempered();
+    if (!G.run.temperable().length) { U.close(); G.input.endStep(); } else { U.fillSmith(); U.refresh(); U.setFocus(0); }
   }
   // ---- Help: how a fight goes, and every word the game uses, by subject
   // steps: a numbered account. words: [the word, what it means].

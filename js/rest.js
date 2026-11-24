@@ -9,10 +9,11 @@
 'use strict';
 (function () {
   const FLOOR = G.FLOOR, F = G.fx, rnd = G.rand, W = G.W, TAU = G.TAU;
-  const RW = 3460, WALL_L = 120, WALL_R = RW - 110, PAD = 48;
-  const ARCH_X = 210, FIRE_X = 600, ALTAR_X = 1090, STONE_X = 1400, FOUNT_X = 1610, PORTAL_X = 1820, PORTAL_GAP = 210, SEVENTH_X = 3180;
+  const RW = 3820, WALL_L = 120, WALL_R = RW - 110, PAD = 48;
+  const ARCH_X = 210, FIRE_X = 600, ALTAR_X = 1090, STONE_X = 1400, FOUNT_X = 1610, EVENT_X = 1900, PORTAL_X = 2180, PORTAL_GAP = 210, SEVENTH_X = 3540;
   const TAG_COL = { movement: '127,227,176', weapon: '255,186,92', starlight: '150,225,255', survival: '255,154,166', risk: '255,96,56', pair: '255,210,122', relic: '255,224,138', corrupted: '235,30,80' };
-  const colOf = (b) => TAG_COL[b.tag.toLowerCase()] || '255,214,140';
+  // (a hero's own boons are in the hero's colour)
+  const colOf = (b) => (b.tag === 'Signature' ? G.hero().col : TAG_COL[b.tag.toLowerCase()] || '255,214,140');
   const BLOOD = '235,30,80';
   const bossCol = (id) => (G.THEMES[id] && G.THEMES[id][1] ? G.THEMES[id][1].boss : '236,233,244');
 
@@ -37,7 +38,10 @@
       G.bounds = { l: WALL_L, r: WALL_R }; G.wind = 0;
     },
     attract() { RB.reset(); }, intro() { }, release() { }, interrupt() { }, pushPlayer() { },
-    targets() { return []; }, damage() { return false; }, update() { },
+    // (the duelling shade, when there is one, can be struck: see "who you meet on the road")
+    targets() { return shadeOpen() ? [{ id: 'shade', cx: REST.ev.sh.x, cy: REST.ev.sh.y - 40, hw: 16, hh: 38 }] : []; },
+    damage(d, t, o) { if (!t || t.id !== 'shade' || !shadeOpen()) return false; shadeHit(o && o.x, o && o.y); return true; },
+    update() { },
     drawGround() { }, draw() { }, drawDebug() { },
   };
 
@@ -68,6 +72,7 @@
     const out = [{ id: 'fire', x: FIRE_X, reach: 90, top: 150 }].concat(altars());
     if (G.run.rerolls > 0 && REST.taken < 0 && G.run.offerKind === 'boon' && G.run.offer.length) out.push({ id: 'stone', x: STONE_X, reach: 60, top: 190 });
     out.push({ id: 'fountain', x: FOUNT_X, reach: 70, top: 200 });
+    out.push(...evPlaces());
     out.push(...portals());
     out.push({ id: 'seventh', x: SEVENTH_X, reach: 100, top: 418 });
     if (R().runWon()) out.push({ id: 'home', x: ARCH_X, reach: 90, top: 330 });
@@ -162,6 +167,8 @@
 
   REST.enter = function () {
     REST.t = 0; REST.taken = -1; REST.near = null; REST.msgT = 0;
+    REST.taken2 = -1; REST.extra = false;
+    REST.ev = rollEvent();
     initTurn();
     if (!REST.flies.length) {
       for (let i = 0; i < 40; i++) REST.flies.push({ x: WALL_L + Math.random() * (WALL_R - WALL_L), y: FLOOR - 16 - Math.random() * 160, s: 0.5 + Math.random() * 0.9, ph: Math.random() * 6.28, dx: (Math.random() - 0.5) * 14 });
@@ -184,10 +191,11 @@
     const p = P(), run = R();
     if (s.id === 'boon') {
       if (turning(s.i)) { startTurn(); return; } // (nothing can be taken while it turns)
-      if (REST.taken >= 0) { G.audio.play('uiMove'); say(REST.taken === s.i ? 'Yours for the run' : 'One each rest'); return; }
+      if (mineI(s.i) || closed()) { G.audio.play('uiMove'); say(mineI(s.i) ? 'Yours for the run' : 'One each rest'); return; }
       const b = run.offer[s.i], c = colOf(b);
       if (b.relicReward) run.extraRelics.push(b.id); else run.take(s.i);
-      REST.taken = s.i; retake();
+      if (REST.taken < 0) REST.taken = s.i; else REST.taken2 = s.i;
+      retake();
       G.audio.play('segment'); G.audio.play('heal');
       F.flash(c, 0.16, 0.3); F.shake(4);
       F.shatter(s.x, FLOOR - 104, c, 14, { r: 240, r0: 24 });
@@ -219,10 +227,382 @@
       if (!run.banes().length) { G.audio.play('uiMove'); say(run.order.some((id) => G.boonDef(id).cursed) ? 'Nothing left to cleanse' : 'Nothing here needs cleansing'); return; }
       G.audio.play('uiSelect');
       G.ui.showFountain();
-    } else if (s.id === 'fire') {
+    } else if (s.id === 'card') turnCard(s);
+    else if (s.id === 'smith') smith();
+    else if (s.id === 'pledge') pledge(s);
+    else if (s.id === 'duel') startDuel();
+    else if (s.id === 'fire') {
       G.audio.play('whoosh');
       F.burst(FIRE_X, FLOOR - 30, { n: 24, color: '255,170,90', speed: [60, 260], angle: -Math.PI / 2, spread: 1.2, life: [0.4, 1], size: [1.6, 3.4], grav: -120 });
       say('The fire is warm');
+    }
+  }
+
+  // ------------------------------------------------------------------ who you meet on the road (v2.2a)
+  // On a little over half the roads someone waits between the fountain and the portals: a
+  // fortune-teller with three face-down cards, a wandering smith, an altar that takes a pledge, or a
+  // shade that wants a duel. Never the same one two roads running.
+  const EVENT_CHANCE = 0.55;
+  const EV_COL = { fortune: '214,170,255', smith: '255,170,90', pledge: '235,30,80', duel: '170,160,210' };
+  REST.ev = null; REST.taken2 = -1; REST.extra = false;
+  // (with the altar's pledge made, a second boon may be taken from the offering)
+  const mineI = (i) => REST.taken === i || REST.taken2 === i;
+  const closed = () => REST.taken >= 0 && !(REST.extra && REST.taken2 < 0);
+  {
+    const S = G.audio.synth;
+    // a card turned on cloth
+    G.audio.define('cardflip', () => {
+      S.noise({ dur: 0.07, vol: 0.18, type: 'bandpass', f0: 2600, q: 1.5 });
+      S.tone({ type: 'sine', f0: 660, f1: 990, dur: 0.16, vol: 0.05, delay: 0.04 });
+    });
+    // the smith's hammer on the anvil
+    G.audio.define('anvil', (o) => {
+      const k = (o && o.k) || 1;
+      S.noise({ dur: 0.03, vol: 0.2 * k, type: 'highpass', f0: 3000 });
+      S.tone({ type: 'triangle', f0: 1870, f1: 1840, dur: 0.5, vol: 0.06 * k });
+      S.tone({ type: 'sine', f0: 2810, f1: 2790, dur: 0.35, vol: 0.03 * k });
+    });
+    // a pledge taken: a low drone and a bell struck under it
+    G.audio.define('pledge', () => {
+      S.tone({ type: 'sawtooth', f0: 55, f1: 52, dur: 1.1, vol: 0.06, attack: 0.1 });
+      S.tone({ type: 'sine', f0: 311, f1: 300, dur: 1.2, vol: 0.08 });
+      S.tone({ type: 'sine', f0: 466, f1: 452, dur: 0.9, vol: 0.04 });
+    });
+    // the shade, drawing in the dark: a thin hiss, then a dry snap as it goes
+    G.audio.define('duelprep', () => { S.noise({ dur: 0.3, vol: 0.08, type: 'highpass', f0: 5200, attack: 0.2 }); });
+    G.audio.define('dueldash', () => {
+      S.noise({ dur: 0.12, vol: 0.28, type: 'bandpass', f0: 2200, f1: 900, q: 1.2 });
+      S.tone({ type: 'triangle', f0: 1500, f1: 600, dur: 0.1, vol: 0.05 });
+    });
+    G.audio.define('duelhit', () => {
+      S.noise({ dur: 0.05, vol: 0.3, type: 'highpass', f0: 3400 });
+      S.tone({ type: 'square', f0: 880, f1: 1320, dur: 0.09, vol: 0.05 });
+      S.tone({ type: 'sine', f0: 1320, dur: 0.4, vol: 0.05, delay: 0.05 });
+    });
+  }
+  function rollEvent() {
+    const run = R();
+    if (G.debug.event) return makeEvent(G.debug.event);
+    if (run.runWon() || run.offerKind !== 'boon' || Math.random() >= EVENT_CHANCE) return null;
+    const kinds = ['fortune', 'smith', 'pledge', 'duel'].filter((k) => k !== run.lastEvent && (k !== 'smith' || run.temperable().length));
+    return makeEvent(G.pick(kinds));
+  }
+  function makeEvent(kind) {
+    R().lastEvent = kind;
+    const ev = { kind, done: false, t: 0 };
+    if (kind === 'fortune') ev.cards = G.shuffle(['boon', 'shards', 'curse']).map((what, i) => ({ what, i, flip: 0 }));
+    if (kind === 'duel') { ev.state = 'wait'; ev.sh = shade(EVENT_X + 30, FLOOR, -1, 'kneel'); ev.hits = 0; ev.dashes = 0; }
+    if (kind === 'smith') ev.beat = 0;
+    return ev;
+  }
+  function evPlaces() {
+    const ev = REST.ev;
+    if (!ev) return [];
+    if (ev.kind === 'fortune') return ev.cards.map((c) => ({ id: 'card', i: c.i, x: EVENT_X + (c.i - 1) * CARD_GAP, reach: 34, top: 150 }));
+    if (ev.kind === 'smith') return [{ id: 'smith', x: EVENT_X, reach: 80, top: 190 }];
+    if (ev.kind === 'pledge') return [{ id: 'pledge', x: EVENT_X, reach: 70, top: 220 }];
+    if (ev.kind === 'duel' && ev.state === 'wait') return [{ id: 'duel', x: ev.sh.x, reach: 90, top: 150 }];
+    return [];
+  }
+
+  // -- the fortune-teller: three cards face down; one is a boon, one Sunshards, one a corrupted boon
+  const CARD_GAP = 74;
+  function turnCard(s) {
+    const ev = REST.ev, run = R(), c = ev.cards[s.i];
+    if (ev.done) { G.audio.play('uiMove'); say('The cards are spent'); return; }
+    ev.done = true; ev.pick = c.i;
+    for (const k of ev.cards) k.flip = k === c ? 0.001 : -0.25 - 0.15 * Math.abs(k.i - c.i); // (the others turn a moment later)
+    let got = '', col = EV_COL.fortune;
+    if (c.what === 'boon') { const b = run.freeBoon(); if (b) { got = b.name; col = colOf(b); } else c.what = 'shards'; }
+    if (c.what === 'curse') { const b = run.freeCurse(); if (b) { got = b.name; col = BLOOD; } else c.what = 'shards'; }
+    if (c.what === 'shards') { G.meta.shards += 40; G.meta.earned += 40; G.meta.save(); got = '+40 Sunshards'; col = paint.GOLD; }
+    retake();
+    G.audio.play('cardflip'); G.audio.play(c.what === 'curse' ? 'shatter' : 'segment');
+    F.shake(c.what === 'curse' ? 6 : 3);
+    F.ring(s.x, FLOOR - 74, { r0: 8, r1: 120, life: 0.45, color: col, width: 5 });
+    F.burst(s.x, FLOOR - 74, { n: 14, color: col, speed: [40, 200], life: [0.5, 1], size: [2, 4], grav: -160, wob: 90 });
+    if (c.what === 'curse') F.shatter(s.x, FLOOR - 74, BLOOD, 10, { r: 200, r0: 14 });
+    say(got);
+  }
+
+  // -- the wandering smith: Sunshards for one more of a boon you hold (ui.js shows the choice)
+  function smith() {
+    if (!R().temperable().length) { G.audio.play('uiMove'); say('Nothing you hold can be tempered'); return; }
+    G.audio.play('uiSelect');
+    G.ui.showSmith();
+  }
+  REST.tempered = function () {
+    const x = EVENT_X;
+    G.audio.play('anvil', { k: 1.4 }); G.audio.play('segment');
+    F.shake(4);
+    F.burst(x, FLOOR - 62, { n: 22, color: '255,186,92', speed: [120, 520], angle: -Math.PI / 2, spread: 1.6, life: [0.2, 0.6], kind: 'spark', size: [1.5, 3], grav: 900 });
+    retake();
+  };
+
+  // -- the omen altar: an omen more in the next trial, for a second boon from this offering
+  function pledge(s) {
+    const ev = REST.ev, run = R();
+    if (ev.done) { G.audio.play('uiMove'); say('Your pledge is made'); return; }
+    ev.done = true; run.pledge = true; REST.extra = true; cardFor = null;
+    G.audio.play('pledge'); F.shake(5);
+    F.ring(s.x, FLOOR - 120, { r0: 10, r1: 170, life: 0.6, color: BLOOD, width: 5 });
+    F.burst(s.x, FLOOR - 120, { n: 20, color: '16,3,10', speed: [40, 200], life: [0.6, 1.2], size: [4, 8], grav: -80, wob: 50 });
+    F.burst(P().x, P().y - 30, { n: 12, color: BLOOD, speed: [60, 220], life: [0.3, 0.7], size: [2, 3], kind: 'spark' });
+    say(REST.taken >= 0 ? 'Take a second boon' : 'Take two from the offering');
+  }
+
+  // -- the duelling shade: it dashes at you, six times at most. Strike it three times before its blade
+  // touches you and it leaves a relic. Touched, the duel is lost (nothing on the road can hurt you).
+  const SH_IN = 0.22, SH_PREP = 0.55, SH_LOCK = 0.15, SH_SPEED = 1300, SH_REST = 0.6, SH_DASHES = 6, SH_WIN = 3;
+  function shade(x, y, face, pose) { return { x, y, face, pose, p: G.veilShade.pose(pose), to: null, clone: true, tilt: 0, vis: 0.85, flash: 0, vy: 0 }; }
+  function setPose(sh, name) { sh.pose = name; sh.to = G.veilShade.pose(name); }
+  function startDuel() {
+    const ev = REST.ev;
+    ev.state = 'fight'; ev.step = 'out'; ev.t = 0;
+    setPose(ev.sh, 'idle');
+    G.audio.play('uiSelect'); G.audio.play('duelprep');
+  }
+  const shadeOpen = () => { const ev = REST.ev; return ev && ev.kind === 'duel' && ev.state === 'fight' && ev.step !== 'out' && ev.sh.vis > 0.5; };
+  function shadeHit(x, y) {
+    const ev = REST.ev, sh = ev.sh;
+    ev.hits++; sh.flash = 1;
+    G.audio.play('duelhit'); F.stop(0.06); F.shake(4);
+    F.ring(sh.x, sh.y - 40, { r0: 6, r1: 70, life: 0.25, color: EV_COL.duel, width: 4 });
+    F.burst(sh.x, sh.y - 40, { n: 10, color: EV_COL.duel, speed: [80, 320], life: [0.2, 0.5], size: [2, 4], kind: 'spark' });
+    if (ev.hits >= SH_WIN) { duelOver(true); return; }
+    ev.step = 'out'; ev.t = 0; ev.locked = false; // (struck, it is gone, and comes again from somewhere else)
+  }
+  function duelOver(won) {
+    const ev = REST.ev, sh = ev.sh, run = R();
+    ev.state = won ? 'won' : 'lost'; ev.done = true; ev.t = 0; sh.tilt = 0;
+    setPose(sh, won ? 'kneel' : 'sheathe');
+    if (!won) { G.audio.play('uiBack'); say('Not this time'); return; }
+    const pool = G.RELICS.filter((r) => G.meta.unlocked(r) && !G.relic(r.id) && r.id !== 'crown' && r.id !== 'phoenix');
+    G.audio.play('pulse'); G.audio.play('heal');
+    F.ring(sh.x, sh.y - 40, { r0: 10, r1: 160, life: 0.5, color: paint.GOLD, width: 6 });
+    F.burst(P().x, P().y - 10, { n: 16, color: paint.GOLD, speed: [20, 130], life: [0.6, 1.2], size: [2, 4], grav: -220, wob: 130, jitter: 22 });
+    if (pool.length) { const r = G.pick(pool); run.extraRelics.push(r.id); retake(); say(r.name); }
+    else { G.meta.shards += 60; G.meta.earned += 60; G.meta.save(); say('+60 Sunshards'); }
+  }
+  function shadeSpot() {
+    const ev = REST.ev, p = P();
+    const side = p.x < WALL_L + 420 ? 1 : p.x > WALL_R - 420 ? -1 : Math.random() < 0.5 ? -1 : 1;
+    const air = ev.dashes >= 2 && Math.random() < 0.35;
+    return { x: G.clamp(p.x + side * rnd(250, 340), WALL_L + 50, WALL_R - 50), y: air ? FLOOR - rnd(140, 180) : FLOOR, air };
+  }
+  function updateDuel(dt) {
+    const ev = REST.ev, sh = ev.sh, p = P();
+    if (sh.to) for (let i = 0; i < sh.p.length; i++) sh.p[i] += (sh.to[i] - sh.p[i]) * Math.min(1, dt * 18);
+    sh.flash = Math.max(0, sh.flash - dt * 5);
+    ev.t += dt;
+    if (ev.state === 'wait') {
+      sh.face = G.sign(p.x - sh.x) || -1;
+      if (Math.random() < dt * 3) F.spawn({ x: sh.x + rnd(-20, 20), y: FLOOR - rnd(0, 50), vx: rnd(-10, 10), vy: -rnd(20, 50), life: rnd(0.6, 1.1), size: rnd(4, 8), color: '20,17,32', wob: 30, rot: rnd(0, 6) });
+      return;
+    }
+    if (ev.state !== 'fight') {
+      // the end: a bow (won) or the blades put away (lost), then it is gone
+      if (sh.y < FLOOR) { sh.vy += 2400 * dt; sh.y = Math.min(FLOOR, sh.y + sh.vy * dt); }
+      if (ev.t > 0.9) sh.vis = Math.max(0, sh.vis - dt / 0.4);
+      return;
+    }
+    if (ev.step === 'out') {
+      sh.vis = Math.max(0, sh.vis - dt / 0.16);
+      if (sh.vis > 0) return;
+      if (ev.dashes >= SH_DASHES) { duelOver(false); return; }
+      const s = shadeSpot();
+      sh.x = s.x; sh.y = s.y; sh.vy = 0; sh.tilt = 0; sh.face = G.sign(p.x - sh.x) || 1;
+      sh.p = G.veilShade.pose(s.air ? 'air' : 'crouch'); setPose(sh, s.air ? 'air' : 'crouch');
+      ev.step = 'in'; ev.t = 0; ev.locked = false;
+      F.dust(sh.x, sh.y - 30, 6, { speed: [20, 120], size: [8, 16], life: [0.3, 0.7], up: 40, a: 0.45, color: '20,17,32', jitter: 12 });
+    } else if (ev.step === 'in') {
+      sh.vis = Math.min(1, ev.t / SH_IN);
+      if (ev.t >= SH_IN) { ev.step = 'prep'; ev.t = 0; G.audio.play('duelprep'); }
+    } else if (ev.step === 'prep') {
+      if (!ev.locked) sh.face = G.sign(p.x - sh.x) || sh.face;
+      if (!ev.locked && ev.t >= SH_PREP - SH_LOCK) {
+        ev.locked = true; ev.tx = p.x; ev.ty = Math.min(FLOOR, p.y);
+        F.glint(sh.x + sh.face * 18, sh.y - 40, 20, '236,233,244', 0.18);
+      }
+      if (ev.t >= SH_PREP) {
+        ev.step = 'go'; ev.t = 0; ev.dashes++;
+        const dx = ev.tx - sh.x, dy = ev.ty - sh.y;
+        sh.face = G.sign(dx) || sh.face;
+        sh.tilt = Math.atan2(dy, Math.abs(dx) || 1) * 0.8;
+        setPose(sh, 'dash'); sh.p = sh.to.slice();
+        G.audio.play('dueldash');
+      }
+    } else if (ev.step === 'go') {
+      const dx = ev.tx - sh.x, dy = ev.ty - sh.y, d = Math.hypot(dx, dy), stepD = SH_SPEED * dt;
+      const k = d <= stepD ? 1 : stepD / d;
+      sh.x += dx * k; sh.y += dy * k;
+      if (Math.random() < 0.9) F.spawn({ x: sh.x + rnd(-6, 6), y: sh.y - 40 + rnd(-14, 14), vx: -dx / (d || 1) * 60, vy: -dy / (d || 1) * 60, life: 0.25, size: rnd(5, 9), color: '20,17,32', wob: 10 });
+      // its blade on the hero ends the duel; a dash through it is a dodge
+      if (Math.abs(sh.x - p.x) < 26 && sh.y - 76 < p.y && sh.y > p.y - 76 && p.iframes <= 0) {
+        const dir = G.sign(p.x - sh.x) || sh.face;
+        p.vx = dir * 320; p.vy = -260; p.onGround = false; p.plat = null;
+        F.shake(6); F.flash('170,160,210', 0.12, 0.25);
+        F.burst(p.x, p.y - 30, { n: 10, color: EV_COL.duel, speed: [80, 300], life: [0.2, 0.5], size: [2, 3.5], kind: 'spark' });
+        duelOver(false); return;
+      }
+      if (k >= 1) { ev.step = 'rest'; ev.t = 0; sh.tilt = 0; setPose(sh, 'skid'); F.dust(sh.x, sh.y, 4, { speed: [30, 120], size: [5, 9], up: 30 }); }
+    } else if (ev.step === 'rest') {
+      if (sh.y < FLOOR) { sh.vy += 2400 * dt; sh.y = Math.min(FLOOR, sh.y + sh.vy * dt); }
+      if (ev.t >= SH_REST) { ev.step = 'out'; ev.t = 0; setPose(sh, 'idle'); }
+    }
+  }
+  function updateEvent(dt) {
+    const ev = REST.ev;
+    if (!ev) return;
+    if (ev.kind === 'duel') updateDuel(dt);
+    if (ev.kind === 'fortune') for (const c of ev.cards) if (c.flip !== 0 && c.flip < 1) c.flip = Math.min(1, c.flip + dt / 0.35);
+    if (ev.kind === 'smith') {
+      // the smith's hammer comes down every so often, whether or not anyone is watching
+      ev.beat += dt;
+      if (ev.beat >= 1.5) {
+        ev.beat = 0;
+        if (seen(EVENT_X, 100)) G.audio.play('anvil', { k: 0.35 });
+        F.burst(EVENT_X - 4, FLOOR - 62, { n: 7, color: '255,186,92', speed: [80, 300], angle: -Math.PI / 2, spread: 1.5, life: [0.15, 0.4], kind: 'spark', size: [1.2, 2.2], grav: 900 });
+      }
+    }
+    if (ev.kind === 'pledge' && !ev.done && Math.random() < dt * 10) F.spawn({ kind: 'spark', x: EVENT_X + rnd(-12, 12), y: FLOOR - 120 + rnd(-10, 10), vx: rnd(-20, 20), vy: -rnd(60, 160), life: rnd(0.2, 0.5), size: rnd(1.2, 2.2), color: BLOOD, len: 0.05 });
+  }
+
+  // -- drawing them
+  function drawEvent(ctx, t) {
+    const ev = REST.ev;
+    if (!ev || !seen(EVENT_X, 500)) return;
+    const { poly, glow, pool, block, diamond, STONE, STONE2, DARK, RIM } = paint, x = EVENT_X;
+    if (ev.kind === 'fortune') {
+      const c = EV_COL.fortune;
+      glow(ctx, c, x, FLOOR - 110, 190, 0.16 + 0.03 * Math.sin(t * 2));
+      // the teller: hooded, seated behind a cloth-covered table, a lantern hung beside
+      poly(ctx, [x - 34, FLOOR - 50, x - 30, FLOOR - 150, x - 16, FLOOR - 178, x, FLOOR - 186, x + 16, FLOOR - 178, x + 30, FLOOR - 150, x + 34, FLOOR - 50], '#2a2048', G.rgba(c, 0.25));
+      ctx.fillStyle = DARK; ctx.beginPath(); ctx.ellipse(x, FLOOR - 162, 10, 12, 0, 0, TAU); ctx.fill();
+      ctx.globalCompositeOperation = 'lighter';
+      for (const e of [-1, 1]) { ctx.fillStyle = G.rgba(c, 0.6 + 0.3 * Math.sin(t * 1.3 + e)); ctx.fillRect(x + e * 4 - 1.5, FLOOR - 165, 3, 2); }
+      ctx.globalCompositeOperation = 'source-over';
+      const lx = x + 96, ly = FLOOR - 150 + Math.sin(t * 1.4) * 2;
+      ctx.strokeStyle = G.rgba(RIM, 0.3); ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(x + 96, FLOOR - 200); ctx.lineTo(lx, ly - 10); ctx.stroke();
+      poly(ctx, [x + 96, FLOOR - 200, x + 96, FLOOR, x + 100, FLOOR, x + 100, FLOOR - 200], STONE);
+      glow(ctx, '255,214,160', lx, ly, 60, 0.3 + 0.05 * Math.sin(t * 9));
+      poly(ctx, [lx - 7, ly - 10, lx + 7, ly - 10, lx + 5, ly + 8, lx - 5, ly + 8], '#2a2048');
+      ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = 'rgba(255,214,160,0.8)'; ctx.fillRect(lx - 2.5, ly - 6, 5, 10); ctx.globalCompositeOperation = 'source-over';
+      // the table and its cloth
+      poly(ctx, [x - 128, FLOOR - 52, x + 128, FLOOR - 52, x + 116, FLOOR, x - 116, FLOOR], '#1d1436');
+      poly(ctx, [x - 128, FLOOR - 52, x + 128, FLOOR - 52, x + 122, FLOOR - 30, x + 70, FLOOR - 24, x, FLOOR - 32, x - 70, FLOOR - 24, x - 122, FLOOR - 30], '#2c1d4c');
+      ctx.fillStyle = G.rgba(c, 0.35); ctx.fillRect(x - 128, FLOOR - 53, 256, 2);
+      // the three cards, standing on the cloth
+      for (const k of ev.cards) {
+        const cx = x + (k.i - 1) * CARD_GAP, picked = ev.pick === k.i, on = REST.near && REST.near.id === 'card' && REST.near.i === k.i && !ev.done;
+        const f = Math.max(0, k.flip), face = f >= 0.5, wk = Math.abs(Math.cos(f * Math.PI)), lift = (picked ? 14 * Math.min(1, f * 2) : 0) + (on ? 6 : 0) + Math.sin(t * 1.6 + k.i * 2) * 1.5;
+        const cy = FLOOR - 82 - lift, hw = 17 * Math.max(0.06, wk), hh = 25;
+        const col = !face ? c : k.what === 'curse' ? BLOOD : k.what === 'shards' ? paint.GOLD : G.hero().col;
+        if (on || (face && picked)) glow(ctx, col, cx, cy, 60, on ? 0.3 : 0.4);
+        poly(ctx, [cx - hw, cy - hh, cx + hw, cy - hh, cx + hw, cy + hh, cx - hw, cy + hh], face ? (k.what === 'curse' ? '#16040c' : '#191230') : '#231a40');
+        ctx.strokeStyle = G.rgba(col, face && !picked ? 0.45 : 0.85); ctx.lineWidth = 1.5; ctx.strokeRect(cx - hw + 2, cy - hh + 2, hw * 2 - 4, hh * 2 - 4);
+        if (wk < 0.15) continue;
+        ctx.globalCompositeOperation = 'lighter';
+        const a = face && !picked ? 0.5 : 0.95;
+        if (!face) { diamond(ctx, cx, cy, 5 * wk, 9, G.rgba(c, 0.8)); ctx.fillStyle = G.rgba(c, 0.5); ctx.fillRect(cx - 1 * wk, cy - 18, 2 * wk, 4); ctx.fillRect(cx - 1 * wk, cy + 14, 2 * wk, 4); }
+        else if (k.what === 'boon') { diamond(ctx, cx, cy, 7 * wk, 13, G.rgba(col, a)); diamond(ctx, cx, cy, 3 * wk, 7, 'rgba(255,255,255,' + a + ')'); }
+        else if (k.what === 'shards') { for (const [ox, oy] of [[-5, 4], [5, 4], [0, -6]]) diamond(ctx, cx + ox * wk, cy + oy, 3.5 * wk, 6, G.rgba(col, a)); }
+        else {
+          ctx.globalCompositeOperation = 'source-over';
+          diamond(ctx, cx, cy, 7 * wk, 13, G.rgba(BLOOD, a)); diamond(ctx, cx, cy, 3 * wk, 7, 'rgba(10,0,6,' + a + ')');
+        }
+        ctx.globalCompositeOperation = 'source-over';
+      }
+      pool(ctx, c, x, 150, 0.2);
+    } else if (ev.kind === 'smith') {
+      const c = EV_COL.smith, k = ev.beat / 1.5, up = k < 0.75 ? Math.min(1, k / 0.6) : 1 - (k - 0.75) / 0.25; // the hammer: raised slowly, brought down fast
+      // the forge: a low stone box with coals in its mouth
+      glow(ctx, c, x + 82, FLOOR - 40, 150, 0.32 + 0.05 * Math.sin(t * 7));
+      poly(ctx, [x + 46, FLOOR, x + 50, FLOOR - 70, x + 118, FLOOR - 70, x + 122, FLOOR], STONE);
+      poly(ctx, [x + 66, FLOOR - 16, x + 66, FLOOR - 46, x + 102, FLOOR - 46, x + 102, FLOOR - 16], '#2a0e06');
+      ctx.globalCompositeOperation = 'lighter';
+      for (let i = 0; i < 5; i++) { ctx.fillStyle = G.rgba(c, 0.5 + 0.3 * Math.sin(t * 5 + i * 1.7)); ctx.fillRect(x + 70 + i * 6, FLOOR - 24 - (i % 2) * 4, 5, 4); }
+      ctx.globalCompositeOperation = 'source-over';
+      // the anvil
+      poly(ctx, [x - 30, FLOOR - 50, x + 26, FLOOR - 50, x + 36, FLOOR - 58, x + 22, FLOOR - 64, x - 34, FLOOR - 64, x - 46, FLOOR - 58], '#2b2440');
+      poly(ctx, [x - 14, FLOOR - 50, x + 10, FLOOR - 50, x + 16, FLOOR, x - 20, FLOOR], '#1f1a33');
+      ctx.fillStyle = G.rgba(RIM, 0.45); ctx.fillRect(x - 34, FLOOR - 64, 56, 2);
+      // a glowing blank on it, cooling between blows
+      ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = G.rgba(c, 0.5 + 0.4 * (1 - k)); ctx.fillRect(x - 16, FLOOR - 68, 22, 4); ctx.globalCompositeOperation = 'source-over';
+      // the smith: broad and hooded, one arm raising the hammer
+      const sx = x - 62, sy = FLOOR;
+      poly(ctx, [sx - 26, sy, sx - 30, sy - 70, sx - 22, sy - 112, sx - 6, sy - 132, sx + 12, sy - 128, sx + 24, sy - 104, sx + 26, sy - 70, sx + 22, sy], '#17122c');
+      ctx.fillStyle = DARK; ctx.beginPath(); ctx.ellipse(sx + 6, sy - 116, 8, 10, 0, 0, TAU); ctx.fill();
+      const sh = [sx + 18, sy - 100], ang = -0.4 - 1.6 * up, hx = sh[0] + Math.cos(ang) * 40, hy = sh[1] + Math.sin(ang) * 40;
+      ctx.strokeStyle = '#17122c'; ctx.lineWidth = 9; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(sh[0], sh[1]); ctx.lineTo(hx, hy); ctx.stroke();
+      ctx.strokeStyle = '#3a2a1c'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(hx, hy); ctx.lineTo(hx + Math.cos(ang) * 16, hy + Math.sin(ang) * 16); ctx.stroke(); ctx.lineCap = 'butt';
+      const hd = [hx + Math.cos(ang) * 18, hy + Math.sin(ang) * 18];
+      ctx.save(); ctx.translate(hd[0], hd[1]); ctx.rotate(ang + Math.PI / 2); ctx.fillStyle = '#3c3658'; ctx.fillRect(-9, -5, 18, 10); ctx.restore();
+      pool(ctx, c, x + 20, 140, 0.24);
+    } else if (ev.kind === 'pledge') {
+      const c = ev.done ? paint.GOLD : BLOOD, cy = FLOOR - 120 + Math.sin(t * 1.5) * 3;
+      if (!ev.done) {
+        const g = ctx.createRadialGradient(x, cy, 10, x, cy, 180);
+        g.addColorStop(0, 'rgba(6,0,4,0.5)'); g.addColorStop(1, 'rgba(6,0,4,0)');
+        ctx.fillStyle = g; ctx.fillRect(x - 180, cy - 180, 360, 360);
+      }
+      glow(ctx, c, x, cy, ev.done ? 90 : 140, ev.done ? 0.12 : 0.24 + 0.06 * Math.sin(t * 5));
+      // the altar: a black block with horns of stone at its corners
+      poly(ctx, [x - 50, FLOOR, x - 46, FLOOR - 74, x + 46, FLOOR - 74, x + 50, FLOOR], STONE);
+      poly(ctx, [x - 52, FLOOR - 74, x - 60, FLOOR - 112, x - 40, FLOOR - 80], STONE2);
+      poly(ctx, [x + 52, FLOOR - 74, x + 60, FLOOR - 112, x + 40, FLOOR - 80], STONE2);
+      ctx.fillStyle = G.rgba(c, 0.4); ctx.fillRect(x - 46, FLOOR - 75, 92, 2);
+      // its face: an eye cut in the stone, open until the pledge is made
+      const open = ev.done ? 0.05 : 1 - Math.max(0, Math.sin(t * 0.9)) ** 8;
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.fillStyle = G.rgba(c, 0.85); ctx.beginPath(); ctx.ellipse(x, FLOOR - 40, 16, 4 * open + 0.6, 0, 0, TAU); ctx.fill();
+      // over it, the omen's flame (black at the heart), or once pledged a small gold ember
+      if (!ev.done) {
+        ctx.globalCompositeOperation = 'source-over';
+        for (const [s, col] of [[1, G.rgba(BLOOD, 0.75)], [0.55, 'rgba(10,0,6,0.95)']]) {
+          ctx.fillStyle = col; ctx.beginPath();
+          ctx.moveTo(x - 14 * s, cy + 16 * s);
+          ctx.quadraticCurveTo(x - 16 * s, cy - 6 * s, x + Math.sin(t * 7) * 4 * s, cy - 34 * s);
+          ctx.quadraticCurveTo(x + 16 * s, cy - 6 * s, x + 14 * s, cy + 16 * s);
+          ctx.closePath(); ctx.fill();
+        }
+      } else diamond(ctx, x, cy, 4, 7, G.rgba(c, 0.7));
+      ctx.globalCompositeOperation = 'source-over';
+      pool(ctx, c, x, 110, ev.done ? 0.1 : 0.3);
+    } else if (ev.kind === 'duel') {
+      const sh = ev.sh;
+      if (ev.state === 'wait') {
+        // where it waits: a ring of blades driven into the road
+        for (let i = 0; i < 5; i++) {
+          const bx = sh.x + (i - 2) * 26, lean = (i - 2) * 0.12;
+          ctx.strokeStyle = '#2b2440'; ctx.lineWidth = 3;
+          ctx.beginPath(); ctx.moveTo(bx, FLOOR); ctx.lineTo(bx + Math.sin(lean) * 34, FLOOR - 34); ctx.stroke();
+          ctx.strokeStyle = G.rgba(EV_COL.duel, 0.35); ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(bx + 1, FLOOR - 4); ctx.lineTo(bx + 1 + Math.sin(lean) * 30, FLOOR - 32); ctx.stroke();
+        }
+      }
+    }
+  }
+  // the shade itself, over the portals and the rest of the road (REST.draw)
+  function drawShade(ctx) {
+    const ev = REST.ev;
+    if (!ev || ev.kind !== 'duel') return;
+    const { glow, diamond, RIM } = paint, sh = ev.sh;
+    {
+      if (sh.vis > 0 && seen(sh.x, 200)) {
+        if (ev.state === 'fight' && ev.step === 'prep') {
+          // set to dash: a pale light gathers on it
+          const k = Math.min(1, ev.t / SH_PREP);
+          glow(ctx, EV_COL.duel, sh.x, sh.y - 40, 60 + 20 * k, 0.12 + 0.12 * k);
+        }
+        G.veilShade.draw(ctx, sh, sh.vis * (ev.state === 'wait' ? 0.8 : 0.9));
+        if (sh.flash > 0) { ctx.globalCompositeOperation = 'lighter'; ctx.drawImage(F.glow(EV_COL.duel), sh.x - 40, sh.y - 80, 80, 80); ctx.globalCompositeOperation = 'source-over'; }
+        // the strikes landed so far, as marks over it
+        if (ev.state === 'fight' && ev.hits) {
+          ctx.globalCompositeOperation = 'lighter';
+          for (let i = 0; i < SH_WIN; i++) diamond(ctx, sh.x + (i - 1) * 12, sh.y - 98, 3, 5, G.rgba(i < ev.hits ? paint.GOLD : RIM, (i < ev.hits ? 0.95 : 0.25) * sh.vis));
+          ctx.globalCompositeOperation = 'source-over';
+        }
+      }
     }
   }
 
@@ -238,6 +618,7 @@
     }
     REST.near = best;
     updateTurn(dt);
+    updateEvent(dt);
     if (best && G.playerControl() && !p.ulting && (I.pressed.heal || I.pressed.confirm)) use(best);
     showCard(best && best.id === 'boon' && !G.ui.current && !(turning(best.i) && REST.turn.t < TURN_SNAP) ? best : null);
 
@@ -272,18 +653,18 @@
   function showCard(s) {
     const el = document.getElementById('restCard');
     if (!el) return;
-    const key = s ? s.i + ':' + G.run.offer[s.i].id + ':' + REST.taken : null;
+    const key = s ? s.i + ':' + G.run.offer[s.i].id + ':' + REST.taken + ':' + REST.taken2 + ':' + REST.extra : null;
     if (key === cardFor) return;
     cardFor = key;
     if (!s) { el.classList.remove('show'); return; }
-    const b = G.run.offer[s.i], own = b.relicReward ? 0 : G.boon(b.id), mine = REST.taken === s.i;
+    const b = G.run.offer[s.i], own = b.relicReward ? 0 : G.boon(b.id), mine = mineI(s.i);
     el.className = 'item card focus show t-' + b.tag.toLowerCase();
     document.body.classList.toggle('pad', G.input.device === 'gamepad');
     el.querySelector('.ctag').textContent = b.relicReward ? 'A second relic' : b.pair ? 'Pair · ' + b.of.map((id) => G.boonDef(id).name).join(' + ') : b.tag;
     el.querySelector('.cname').textContent = b.name;
     el.querySelector('.cdesc').innerHTML = G.ui.esc(b.desc) + (own && !mine ? ' You hold ' + own + '.' : '') + (mine || b.relicReward ? '' : G.ui.pairNote(b))
       + (b.cursed ? '<span class="bane">' + G.ui.esc(b.bane) + '</span>' : '');
-    el.querySelector('.cuse').textContent = mine ? 'Yours for the run' : REST.taken >= 0 ? 'You have taken one'
+    el.querySelector('.cuse').textContent = mine ? 'Yours for the run' : closed() ? 'You have taken one'
       : (G.input.device === 'gamepad' ? 'LB' : G.input.label('heal')) + '  take it';
   }
   REST.leave = function () { cardFor = null; const el = document.getElementById('restCard'); if (el) el.classList.remove('show'); };
@@ -313,6 +694,7 @@
     drawAltars(ctx, t);
     drawStone(ctx, t);
     drawFountain(ctx, t);
+    drawEvent(ctx, t);
     drawPortals(ctx, t);
     drawSeventh(ctx, t);
   };
@@ -355,11 +737,11 @@
     poly(ctx, [x0, FLOOR, x0 + 8, FLOOR - 126, x0 + 50, FLOOR - 150, x1 - 50, FLOOR - 150, x1 - 8, FLOOR - 126, x1, FLOOR], STONE);
     ctx.fillStyle = G.rgba(RIM, 0.45); ctx.fillRect(x0 + 50, FLOOR - 150, x1 - x0 - 100, 2);
     for (const s of st) {
-      const b = shownDef(s.i), tk = turnK(s.i), turn = turning(s.i) && REST.turn.t >= 0, mine = REST.taken === s.i, on = REST.near === s;
+      const b = shownDef(s.i), tk = turnK(s.i), turn = turning(s.i) && REST.turn.t >= 0, mine = mineI(s.i), on = REST.near === s;
       const c = turn && REST.turn.t < TURN_SNAP ? mixRgb(colOf(REST.turn.mask), BLOOD, tk * tk) : colOf(b);
       // while it turns its light stutters, and the stone shakes harder and harder
       const stutter = turn && REST.turn.t < TURN_SNAP && Math.random() < 0.12 + 0.3 * tk ? 0.35 : 1;
-      const lit = (mine ? 1 : REST.taken >= 0 ? 0.3 : 0.78) * stutter, bob = Math.sin(t * 1.8 + s.i * 1.7) * 4;
+      const lit = (mine ? 1 : closed() ? 0.3 : 0.78) * stutter, bob = Math.sin(t * 1.8 + s.i * 1.7) * 4;
       const jit = turn && REST.turn.t < TURN_SNAP ? tk * tk * 3 : 0, cy = FLOOR - 104 + bob + rnd(-jit, jit);
       ctx.fillStyle = DARK;
       ctx.beginPath(); ctx.moveTo(s.x - 30, FLOOR - 8); ctx.lineTo(s.x - 30, FLOOR - 110); ctx.arc(s.x, FLOOR - 110, 30, Math.PI, 0); ctx.lineTo(s.x + 30, FLOOR - 8); ctx.closePath(); ctx.fill();
@@ -589,6 +971,7 @@
       ctx.drawImage(img, f.x - 7, f.y - 7, 14, 14);
     }
     ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
+    drawShade(ctx);
   };
   REST.drawFore = function () { };
 
@@ -602,6 +985,19 @@
       return ['The Cleansing Fountain', n ? 'Purge a corrupted boon\u2019s drawback: ' + cost + ' Sunshards (you hold ' + G.meta.shards + ')'
         : 'Its water purges the drawback of a corrupted boon. You carry none.', n ? 'cleanse' : ''];
     }
+    if (s.id === 'card') {
+      const done = REST.ev.done;
+      return ['A Face-Down Card', done ? 'Turned. The fortune-teller has nothing more for you.' : 'Turn one of the three: a boon, Sunshards, or a corrupted boon. You will not know which.', done ? '' : 'turn it'];
+    }
+    if (s.id === 'smith') {
+      const n = run.temperable().length, cost = run.temperCost();
+      return ['The Wandering Smith', n ? 'Temper a boon you hold: one more of it, even past its limit. ' + cost + ' Sunshards (you hold ' + G.meta.shards + ')' : 'Nothing you hold can be tempered.', n ? 'temper' : ''];
+    }
+    if (s.id === 'pledge') {
+      const done = REST.ev.done;
+      return ['The Omen Altar', done ? 'Pledged. An omen more walks with you into the next trial.' : 'Pledge yourself: an omen more in the next trial, and a second boon from this offering.', done ? '' : 'pledge'];
+    }
+    if (s.id === 'duel') return ['The Duelling Shade', 'It dashes at you, six times at most. Strike it three times before its blade touches you and it leaves a relic.', 'duel'];
     if (s.id === 'seventh') return ['The Seventh Portal', run.runWon() ? 'It stirs, but does not open. Not yet.' : 'Dormant. It waits for the other six (' + run.beaten.length + ' of ' + G.BOSS_IDS.length + ').', run.runWon() ? 'touch it' : ''];
     if (s.id === 'portal') {
       const B = G.bosses[s.boss], st = portalState(s.boss), ready = offerTaken();
@@ -613,8 +1009,9 @@
   }
   function shortName(s) {
     if (s.id === 'boon') return shownDef(s.i).name;
+    if (s.id === 'card') return s.i === 1 ? 'The Fortune-Teller' : '';
     if (s.id === 'portal') { const B = G.bosses[s.boss]; return B ? (portalState(s.boss) === 'corrupt' ? 'Corrupted' : B.short) : ''; }
-    return { fire: 'The Fire', stone: 'Second Thoughts', seventh: 'The Seventh', home: 'The Way Home', fountain: 'The Fountain' }[s.id];
+    return { fire: 'The Fire', stone: 'Second Thoughts', seventh: 'The Seventh', home: 'The Way Home', fountain: 'The Fountain', smith: 'The Smith', pledge: 'The Omen Altar', duel: 'The Shade' }[s.id];
   }
 
   // names over each place, what the nearest one does; in front of everything
@@ -624,17 +1021,17 @@
     for (const s of places()) {
       // (the offering's plinths carry no names: a boon is read by standing at it, on its card, so a
       // corrupted one gives nothing away until you are there)
-      if (s === near || s.id === 'boon' || !seen(s.x, 200)) continue;
+      if ((near && s.id === near.id && s.x === near.x) || s.id === 'boon' || !seen(s.x, 200)) continue;
       const name = shortName(s);
       if (!name) continue;
-      const mine = s.id === 'boon' && REST.taken === s.i, dim = (s.id === 'boon' && REST.taken >= 0 && !mine) || (s.id === 'portal' && portalState(s.boss) === 'sealed');
+      const mine = s.id === 'boon' && mineI(s.i), dim = (s.id === 'boon' && closed() && !mine) || (s.id === 'portal' && portalState(s.boss) === 'sealed') || (s.id === 'card' && REST.ev.done);
       const cursed = s.id === 'boon' && shownDef(s.i).cursed;
       const col = mine ? paint.GOLD : cursed || (s.id === 'portal' && portalState(s.boss) === 'corrupt') ? '255,90,120' : '236,233,244';
       text(ctx, name.toUpperCase(), s.x, FLOOR - s.top, s.id === 'boon' ? 11 : 12, col, mine ? 0.95 : dim ? 0.3 : 0.6);
     }
     if (seen(ALTAR_X, 200) && altars().length && !(near && near.id === 'boon')) {
       const what = run.offerKind === 'relic' ? 'THE SPOILS' : 'THE OFFERING';
-      text(ctx, REST.taken >= 0 ? what : what + '  ·  CHOOSE ONE', ALTAR_X, FLOOR - 200, 12, REST.taken >= 0 ? '236,233,244' : paint.GOLD, REST.taken >= 0 ? 0.55 : 0.6 + 0.25 * Math.sin(REST.t * 3));
+      text(ctx, closed() ? what : what + (REST.taken >= 0 ? '  ·  CHOOSE ONE MORE' : REST.extra ? '  ·  CHOOSE TWO' : '  ·  CHOOSE ONE'), ALTAR_X, FLOOR - 200, 12, closed() ? '236,233,244' : paint.GOLD, closed() ? 0.55 : 0.6 + 0.25 * Math.sin(REST.t * 3));
     }
     if (near && near.id !== 'boon' && !G.ui.current) {
       const Lb = label(near), x = G.clamp(near.x, cam + 260, cam + W - 260), y = FLOOR - near.top - 40;

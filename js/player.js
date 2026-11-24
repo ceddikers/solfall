@@ -80,7 +80,7 @@
       cast: null, // a special's body motion: Vesper's throw, Lune's release, Aster's slam (see castPose)
       recov: null, // how the weapon comes back to rest after the last attack (see recoverPose)
       // Eos: the stance she is holding, the Focus gathered in it, the draw carrying her, and the cuts made but not yet landed
-      hold: null, focus: 0, strung: 0, drawT: 0, drawV: null, owed: [], arc2: null, hush: null,
+      hold: null, focus: 0, strung: 0, sun: 0, hangs: [], pin: null, stars: null, faults: [], drawT: 0, drawV: null, owed: [], arc2: null, hush: null,
       pad: 0, grazeCd: 0, streakN: 0, streakT: 0, fallT: 0, edge: 0,
       rig: {}, // pose memory for drawing (see drawBody)
       scarf: [], ghosts: [], slashes: [], bolts: [],
@@ -144,6 +144,7 @@
       o.t -= dt;
       if (o.t <= 0) { P.owed.splice(i, 1); landCut(o); }
     }
+    sigStep(dt); // (the signature boons that keep time: see below)
     // a Dawnbreak takes the hero over until it is done
     if (P.ulting) { G.flow.ultStep(dt); return; }
     // and so does the finishing blow at the end of a fight (finish.js)
@@ -361,6 +362,7 @@
       // a little hang at the top of a held jump, and a slightly quicker fall
       const hang = !P.onGround && Math.abs(P.vy) < 110 && ctl && I.down.jump ? 0.55 : 1;
       P.vy = Math.min(C.MAXFALL, P.vy + C.GRAV * hang * (P.vy > 0 ? 1.1 : 1) * dt);
+      if (G.boon('glide') && !P.onGround && ctl && I.down.attack && P.vy > 130) P.vy = 130; // Moonglide: firing, she falls slowly
     }
     const fallSpeed = P.vy;
     P.x += (P.vx + G.wind) * dt;
@@ -608,6 +610,7 @@
       if (ck >= 1) {
         G.shots.push({ wave: true, x: P.x + a.dir * 120, y: FLOOR - 30, vx: a.dir * 980, vy: 0, t: 0, life: 0.5, hit: new Set(), dmg: Math.round(20 * G.dmgMult()) });
         G.fx.thud(P.x + a.dir * 200, FLOOR, 1.2, { col: GOLD });
+        if (G.boon('fault')) fault(P.x + a.dir * 110, a.dir);
       }
       G.fx.burst(P.x + a.dir * 90, FLOOR - 4, { n: 8, color: STAR, speed: [150, 520], angle: -Math.PI / 2, spread: 2.2, life: [0.2, 0.5], kind: 'spark', size: [2, 3.5], grav: 900 });
       G.fx.burst(P.x + a.dir * 90, FLOOR - 4, { n: 6, color: '22,18,32', speed: [150, 460], angle: -Math.PI / 2, spread: 2, life: [0.5, 1], size: [5, 9], kind: 'chunk', grav: 1500 });
@@ -729,6 +732,7 @@
         if (res) {
           P.gain(a.heavy ? C.GAIN_HEAVY : C.GAIN_HIT);
           if (a.flick && !a.banked) { a.banked = true; P.strung = Math.min(3, (P.strung || 0) + 1); } // Eos: a cut that lands is a mark on the sheath
+          if (a.heavy && !a.thrust && (G.boon('pinlance') || G.boon('stars'))) finisherLanded(t, c);
           // the freeze, the shake and the kick all scale with the blow; the maul's are heavier
           G.fx.stop((a.heavy ? 0.11 : a.thrust ? 0.06 : 0.032 * H.thick) + 0.07 * (a.charge || 0) + (a.sweep ? 0.02 : 0));
           G.fx.shake((a.heavy ? 9 : a.thrust ? 4.5 : 1.8 * H.thick) + 7 * (a.charge || 0) + (a.sweep ? 2 : 0));
@@ -832,7 +836,7 @@
     for (const a of angles) {
       const c = Math.cos(a), s = Math.sin(a);
       const vx = dx * c - dy * s, vy = dx * s + dy * c;
-      G.shots.push({ x: P.x + vx * 18, y: P.y - 36 + vy * 18, vx: vx * C.LANCE_SPEED, vy: vy * C.LANCE_SPEED, t: 0, hit: new Set(), dmg });
+      G.shots.push({ lance: true, x: P.x + vx * 18, y: P.y - 36 + vy * 18, vx: vx * C.LANCE_SPEED, vy: vy * C.LANCE_SPEED, t: 0, hit: new Set(), dmg });
     }
   }
 
@@ -958,11 +962,13 @@
     h.t += dt;
     if (I.down.attack && !h.go) {
       if (P.dashT <= 0 && can) {
-        if (P.strung > 0 && h.t >= C.BANK_HOLD && P.focus < C.FOCUS[P.strung - 1]) {
+        const bank = Math.max(P.strung || 0, P.sun > 0 ? 2 : 0);
+        if (bank > 0 && h.t >= C.BANK_HOLD && P.focus < C.FOCUS[bank - 1]) {
           // every cut of the string that landed is a mark already: hit, hit and hold starts at two
           const was = focusMark();
-          P.focus = C.FOCUS[P.strung - 1];
+          P.focus = C.FOCUS[bank - 1];
           markUp(was);
+          P.sun = 0; // (a Second Sun is spent on the hold it lights)
         }
         if (P.onGround) gather(dt);
         else if (P.airStance > 0) {
@@ -1059,6 +1065,7 @@
     P.iframes = Math.max(P.iframes, C.DRAW_T + 0.06 + 0.02 * lvl); P.pdDone = false;
     P.atkCd = C.DRAW_T + C.DRAW_WAIT[k] + 0.03;
     P.cast = null; P.recov = null; P.healT = 0; P.squash = -0.07; P.dashHit.clear(); P.edge = 0; P.strung = 0;
+    P.sun = heavy && G.boon('secondsun') ? 3 : 0; // (Second Sun: the next hold starts at two marks)
     G.audio.play('draw');
     G.fx.kick(d.x * (3 + 2 * lvl), d.y * (3 + 2 * lvl));
     const hx = mouthX(), hy = mouthY();
@@ -1091,6 +1098,7 @@
   // The draw is over: the line of the cut hangs in the air until the blade is home.
   function drawn(a) {
     const o = a.owe, len = G.dist(a.x0, a.y0, P.x, P.y), cx = (a.x0 + P.x) / 2, cy = (a.y0 + P.y) / 2 - 30;
+    o.line = { cx, cy, ang: o.ang, len: len + 170 }; // (for a Hanging Cut)
     G.fx.cut(cx, cy, o.ang, len + 110, 6 + 3 * a.lvl, STAR, HOT, 0.13);
     G.fx.cut(cx, cy, o.ang, len + 170, 1.4 + 0.5 * a.lvl + (o.counter ? 1.6 : 0), a.heavy || o.counter ? GOLD : HOT, HOT, o.t + 0.1);
     if (o.counter && !o.cuts.length) { P.hush = null; G.slowT = Math.min(G.slowT || 0, 0.12); } // it cut nothing: no counter to wait for
@@ -1100,6 +1108,7 @@
   // The blade is home, and what it cut finds out.
   function landCut(o) {
     G.audio.play('sheath');
+    if (o.heavy && !o.echo && G.boon('hanging') && o.cuts.length) hang(o);
     if (P.hush === o) P.hush = null;
     for (const c of o.cuts) {
       const t = G.boss.targets().find((q) => q.id === c.id);
@@ -1128,6 +1137,190 @@
       if (counter) counterLand(x, y, o);
       struck(t, x, y);
       G.moments.landed(em, x, y, o.ang, o.heavy);
+    }
+  }
+
+  // ---------------------------------------------------------------- signature boons (v2.2a)
+  // their own sounds
+  {
+    const S = G.audio.synth;
+    // a star set on the foe: a small high chime
+    G.audio.define('sigstar', () => {
+      S.tone({ type: 'sine', f0: 1760, f1: 1800, dur: 0.18, vol: 0.06 });
+      S.tone({ type: 'triangle', f0: 2640, f1: 2600, dur: 0.12, vol: 0.03 });
+    });
+    // the third star: the chord rings out and breaks
+    G.audio.define('sigburst', () => {
+      S.tone({ type: 'sine', f0: 880, f1: 860, dur: 0.5, vol: 0.07 });
+      S.tone({ type: 'sine', f0: 1320, f1: 1300, dur: 0.45, vol: 0.05 });
+      S.tone({ type: 'sine', f0: 1760, f1: 1720, dur: 0.4, vol: 0.04 });
+      S.noise({ dur: 0.14, vol: 0.22, type: 'highpass', f0: 2400 });
+      S.tone({ type: 'triangle', f0: 220, f1: 80, dur: 0.25, vol: 0.14 });
+    });
+    // a pinned lance bursting: a hard crack and a falling whine
+    G.audio.define('sigpin', () => {
+      S.noise({ dur: 0.08, vol: 0.32, type: 'bandpass', f0: 1800, q: 2 });
+      S.tone({ type: 'square', f0: 1400, f1: 300, dur: 0.22, vol: 0.06 });
+      S.tone({ type: 'sine', f0: 160, f1: 60, dur: 0.3, vol: 0.2 });
+    });
+    // the floor cracking under a full smash: a dry grind
+    G.audio.define('sigcrack', () => {
+      S.noise({ dur: 0.35, vol: 0.2, type: 'lowpass', f0: 900, f1: 260 });
+      S.tone({ type: 'triangle', f0: 90, f1: 70, dur: 0.4, vol: 0.12 });
+    });
+    // the crack erupting: rock thrown up
+    G.audio.define('sigerupt', () => {
+      S.tone({ type: 'sine', f0: 110, f1: 38, dur: 0.5, vol: 0.32 });
+      S.noise({ dur: 0.4, vol: 0.32, type: 'lowpass', f0: 1600, f1: 300 });
+      S.noise({ dur: 0.06, vol: 0.2, type: 'highpass', f0: 3000 });
+    });
+    // a blow taken while braced filling the charge: a deep swell
+    G.audio.define('sigbrace', () => {
+      S.tone({ type: 'triangle', f0: 180, f1: 360, dur: 0.22, vol: 0.14 });
+      S.tone({ type: 'sine', f0: 720, f1: 1080, dur: 0.2, vol: 0.05 });
+    });
+    // the heavy arrow breaking into three: a split crack
+    G.audio.define('sigsplit', () => {
+      S.noise({ dur: 0.05, vol: 0.24, type: 'highpass', f0: 3600 });
+      S.tone({ type: 'triangle', f0: 1900, f1: 1300, dur: 0.09, vol: 0.05 });
+      S.tone({ type: 'triangle', f0: 2300, f1: 1600, dur: 0.09, vol: 0.04, delay: 0.02 });
+    });
+    // a hanging cut cutting again: steel hissing out of the air
+    G.audio.define('sighang', () => {
+      S.noise({ dur: 0.16, vol: 0.24, type: 'highpass', f0: 2800, f1: 6000 });
+      S.tone({ type: 'sine', f0: 2100, f1: 1500, dur: 0.18, vol: 0.05 });
+    });
+  }
+  // Two for each hero, offered only to that hero and never two in one offering (run.js). They change
+  // how the hero plays rather than adding to a number.
+  function sigStep(dt) {
+    if (P.sun > 0) P.sun = Math.max(0, P.sun - dt);
+    if (P.pin && (P.pin.t -= dt) <= 0) P.pin = null;
+    if (P.stars && (P.stars.t -= dt) <= 0) P.stars = null;
+    // Eos's Hanging Cut: the line of a full draw stays in the air, shedding gold, and cuts again
+    for (let i = P.hangs.length - 1; i >= 0; i--) {
+      const h = P.hangs[i], L = h.line;
+      h.t -= dt;
+      if (Math.random() < dt * 30) {
+        const q = G.rand(-0.5, 0.5);
+        G.fx.spawn({ x: L.cx + Math.cos(L.ang) * L.len * q, y: L.cy + Math.sin(L.ang) * L.len * q, vx: G.rand(-10, 10), vy: G.rand(10, 40), life: G.rand(0.3, 0.6), size: G.rand(1.2, 2.4), color: GOLD });
+      }
+      if (h.t > 0) continue;
+      P.hangs.splice(i, 1);
+      G.fx.cut(L.cx, L.cy, L.ang, L.len, 8, GOLD, HOT, 0.3);
+      G.audio.play('sighang');
+      landCut({ cuts: h.cuts, lvl: 2, heavy: false, echo: true, dmg: h.dmg, dir: h.dir, ang: L.ang });
+    }
+    // Aster's Fault Line: the crack a full smash leaves glows, then erupts
+    for (let i = P.faults.length - 1; i >= 0; i--) {
+      const f = P.faults[i];
+      f.t -= dt;
+      if (Math.random() < dt * 40) G.fx.spawn({ kind: 'spark', x: f.x + G.rand(-90, 90), y: FLOOR - 2, vx: G.rand(-30, 30), vy: -G.rand(60, 200), life: G.rand(0.15, 0.35), size: G.rand(1.4, 2.4), color: GOLD, grav: 600 });
+      if (f.t > 0) continue;
+      P.faults.splice(i, 1);
+      const hb = { cx: f.x, cy: FLOOR - 60, hw: 110, hh: 60 };
+      for (const t of G.boss.targets()) {
+        if (!touch(hb, t)) continue;
+        const c = contact(hb, t);
+        if (G.boss.damage(f.dmg, t, { x: c.x, y: c.y, heavy: true, dir: f.dir, poise: H.poise })) { P.gain(C.GAIN_HEAVY); struck(t, c.x, c.y); }
+      }
+      G.audio.play('sigerupt'); G.fx.shake(8); G.fx.thud(f.x, FLOOR, 1.3, { col: GOLD });
+      G.fx.burst(f.x, FLOOR - 6, { n: 18, color: GOLD, speed: [200, 620], angle: -Math.PI / 2, spread: 0.9, life: [0.2, 0.5], kind: 'spark', size: [2, 4], grav: 900 });
+      G.fx.burst(f.x, FLOOR - 4, { n: 8, color: '22,18,32', speed: [150, 460], angle: -Math.PI / 2, spread: 1.4, life: [0.5, 1], size: [5, 9], kind: 'chunk', grav: 1500 });
+    }
+  }
+  // Vesper's Pinning Lance: the lance that strikes stays fixed where it went in
+  function pinLance(s, t) {
+    P.pin = { id: t.id, ox: s.x - t.cx, oy: s.y - t.cy, ang: Math.atan2(s.vy, s.vx), t: 8 };
+  }
+  // A finisher of Vesper's that lands: a lance pinned in that foe bursts (Pinning Lance), and a star
+  // is set on it; the third links them and bursts (Constellation)
+  function finisherLanded(t, c) {
+    if (P.pin && P.pin.id === t.id && G.boon('pinlance')) {
+      const x = t.cx + P.pin.ox, y = t.cy + P.pin.oy;
+      P.pin = null;
+      G.boss.damage(Math.round(40 * G.dmgMult()), t, { x, y, heavy: true, lance: true, poise: H.poise });
+      G.audio.play('sigpin'); G.fx.shake(7);
+      G.fx.ring(x, y, { r0: 8, r1: 110, life: 0.3, color: HOT, width: 6 });
+      G.fx.lines(x, y, 10, HOT, { r0: 14 });
+      G.fx.burst(x, y, { n: 12, color: STAR, speed: [150, 600], life: [0.15, 0.45], kind: 'spark', size: [2, 4] });
+    }
+    if (G.boon('stars')) {
+      const st = P.stars && P.stars.id === t.id ? P.stars : (P.stars = { id: t.id, pts: [], t: 0 });
+      const n = st.pts.length, rr = t.r ? t.r * 0.6 : Math.min(t.hw, t.hh) * 0.75, a = -Math.PI / 2 + n * G.TAU / 3;
+      st.t = 8; st.pts.push([Math.cos(a) * rr, Math.sin(a) * rr]);
+      G.fx.glint(t.cx + Math.cos(a) * rr, t.cy + Math.sin(a) * rr, 22, STAR, 0.3); G.audio.play('sigstar');
+      if (st.pts.length >= 3) {
+        P.stars = null;
+        const pts = st.pts.map(([ox, oy]) => [t.cx + ox, t.cy + oy]);
+        for (let i = 0; i < 3; i++) {
+          const p = pts[i], q = pts[(i + 1) % 3];
+          G.fx.cut((p[0] + q[0]) / 2, (p[1] + q[1]) / 2, Math.atan2(q[1] - p[1], q[0] - p[0]), Math.hypot(q[0] - p[0], q[1] - p[1]) + 24, 5, STAR, HOT, 0.4);
+        }
+        const mx = t.cx, my = t.cy;
+        G.boss.damage(Math.round(60 * G.dmgMult()), t, { x: mx, y: my, heavy: true, finisher: true, poise: H.poise });
+        G.audio.play('sigburst'); G.fx.shake(9);
+        G.fx.ring(mx, my, { r0: 10, r1: 140, life: 0.35, color: STAR, width: 7 });
+        G.fx.burst(mx, my, { n: 16, color: STAR, speed: [150, 640], life: [0.15, 0.5], kind: 'spark', size: [2, 4.5] });
+      }
+    }
+  }
+  // Aster's Fault Line: where a full smash meets the floor it cracks, and a second later the crack erupts
+  function fault(x, dir) {
+    x = G.clamp(x, G.WALL_L + 40, G.WALL_R - 40);
+    P.faults.push({ x, dir, t: 1, dmg: Math.round(45 * G.dmgMult()) });
+    G.fx.crack(x, 1.4, GOLD); G.audio.play('sigcrack');
+  }
+  // Aster's Unbroken: a blow taken while she charges fills the charge, and the smash comes at once
+  function unbroken(a) {
+    if (!a.canCharge || a.swung) return;
+    a.hold = C.CHARGE_T; a.charge = 1;
+    G.audio.play('sigbrace'); G.fx.shake(4);
+    G.fx.ring(P.x - a.dir * 14, P.y - 78, { r0: 70, r1: 12, life: 0.25, color: GOLD, width: 5 });
+  }
+  // Lune's Splitting Arrow: the heavy arrow breaks into three where it first strikes
+  function splitArrow(s) {
+    s.split = true;
+    const base = Math.atan2(s.vy, s.vx);
+    for (const da of [-0.34, 0, 0.34]) {
+      const a = base + da;
+      G.shots.push({ arrow: true, heavy: false, spent: true, split: true, x: s.x + Math.cos(a) * 14, y: s.y + Math.sin(a) * 14, ox: s.x, oy: s.y,
+        vx: Math.cos(a) * C.ARROW_SPEED, vy: Math.sin(a) * C.ARROW_SPEED, t: 0, hit: new Set(), dmg: Math.round(s.dmg * 0.2), life: 0.45 });
+    }
+    G.audio.play('sigsplit');
+    G.fx.burst(s.x, s.y, { n: 8, color: GOLD, speed: [120, 420], life: [0.1, 0.3], kind: 'spark', size: [1.5, 2.5] });
+  }
+  // Eos's Hanging Cut: the line of a full draw hangs where it was cut
+  function hang(o) {
+    const L = o.line || { cx: P.x, cy: P.y - 30, ang: o.ang, len: 300 };
+    P.hangs.push({ t: 1, cuts: o.cuts.slice(), dmg: Math.round(o.dmg * 0.5), dir: o.dir, line: L });
+    G.fx.cut(L.cx, L.cy, L.ang, L.len, 2.4, STAR, GOLD, 1.05);
+  }
+  // what the signature boons leave on a foe: a pinned lance, the stars set so far
+  function drawSigs(ctx) {
+    if (!P.pin && !P.stars) return;
+    const ts = G.boss.targets();
+    if (P.pin) {
+      const t = ts.find((q) => q.id === P.pin.id);
+      if (t) {
+        const x = t.cx + P.pin.ox, y = t.cy + P.pin.oy, k = Math.min(1, P.pin.t / 1.5);
+        ctx.save(); ctx.translate(x, y); ctx.rotate(P.pin.ang);
+        ctx.strokeStyle = G.rgba(HOT, 0.9 * k); ctx.lineWidth = 4;
+        ctx.beginPath(); ctx.moveTo(-34, 0); ctx.lineTo(-6, 0); ctx.stroke();
+        ctx.fillStyle = G.rgba(HOT, k); poly(ctx, [-6, -5, 8, 0, -6, 5]); ctx.fill();
+        ctx.restore();
+        ctx.drawImage(G.fx.glow(STAR), x - 22, y - 22, 44, 44);
+      }
+    }
+    if (P.stars) {
+      const t = ts.find((q) => q.id === P.stars.id);
+      if (t) for (const [ox, oy] of P.stars.pts) {
+        const x = t.cx + ox, y = t.cy + oy, s = 7 + 2 * Math.sin(G.t * 9);
+        ctx.fillStyle = G.rgba(HOT, 0.95);
+        poly(ctx, [x, y - s, x + s * 0.3, y, x, y + s, x - s * 0.3, y]); ctx.fill();
+        poly(ctx, [x - s, y, x, y - s * 0.3, x + s, y, x, y + s * 0.3]); ctx.fill();
+        ctx.drawImage(G.fx.glow(STAR), x - 16, y - 16, 32, 32);
+      }
     }
   }
 
@@ -1320,7 +1513,8 @@
     const braced = !!(P.atk && P.atk.canCharge && !P.atk.swung && P.atk.hold > 0.12) && P.hp > 0;
     const dir = G.sign(P.x - srcX) || -P.facing;
     P.inv = C.HURT_INV; P.dashT = 0; P.healT = 0; P.hurtFlash = 1; P.plunge = false;
-    P.drawT = 0; if (!braced) { P.hold = null; P.focus = 0; P.edge = 0; P.strung = 0; } // and whatever Focus Eos had gathered is gone
+    P.drawT = 0; if (!braced) { P.hold = null; P.focus = 0; P.edge = 0; P.strung = 0; P.sun = 0; } // and whatever Focus Eos had gathered is gone
+    if (braced && G.boon('unbroken') && P.atk) unbroken(P.atk);
     P.streakT = 0;
     if (P.flT > 0) { P.flT = 0; P.flCd = 2; } // caught showing off
     G.feats.bump('hurt');
@@ -1408,6 +1602,7 @@
               if (s.heavy) G.fx.ring(s.x, s.y, { r0: 6, r1: 70, life: 0.25, color: GOLD, width: 5 });
               struck(t, s.x, s.y);
               G.moments.landed(em, s.x, s.y, Math.atan2(s.vy, s.vx), s.heavy);
+              if (s.heavy && !s.split && G.boon('splitarrow')) splitArrow(s);
             } else G.audio.play('tink');
             if (!s.heavy) s.dead = true; // only the heavy arrow pierces
             continue;
@@ -1417,6 +1612,7 @@
             G.fx.stop(0.03); G.audio.play('hit');
             G.fx.hit(s.x, s.y, Math.atan2(s.vy, s.vx), { thrust: true, col: STAR, hot: HOT });
           } else if (res) {
+            if (s.lance && G.boon('pinlance')) pinLance(s, t);
             G.fx.stop(0.07); G.fx.shake(9);
             G.audio.play('flareHit');
             G.fx.ring(s.x, s.y, { r0: 10, r1: 120, life: 0.35, color: HOT, width: 8 });
@@ -1493,6 +1689,7 @@
       ctx.restore();
       ctx.drawImage(G.fx.glow(STAR), x - 34, y - 34, 68, 68);
     }
+    drawSigs(ctx);
     ctx.globalCompositeOperation = 'source-over';
   };
 
