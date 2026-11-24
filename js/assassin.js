@@ -73,6 +73,13 @@
       S.tone({ type: 'triangle', f0: 184, f1: 176, dur: dur * 0.8, vol: 0.04 });
       S.noise({ dur, vol: 0.05, type: 'lowpass', f0: 600, f1: 240 });
     });
+    // the echo's working: a low held note under a breath of dark air, the shadows being drawn out
+    G.audio.define('veilchannel', (o) => {
+      const dur = o.dur || 3;
+      S.tone({ type: 'sine', f0: 110, f1: 103, dur, vol: 0.07 });
+      S.tone({ type: 'triangle', f0: 331, f1: 309, dur: dur * 0.9, vol: 0.022 });
+      S.noise({ dur, vol: 0.035, f0: 900, f1: 480, q: 4 });
+    });
     G.audio.define('veilwhirr', (o) => {
       const dur = o.dur || 1.4, n = Math.round(dur / 0.075);
       for (let i = 0; i < n; i++) S.noise({ dur: 0.055, vol: 0.03 + 0.07 * Math.sin(Math.PI * (i + 0.5) / n), f0: 1500 + 600 * Math.sin(Math.PI * i / n), q: 3, delay: i * 0.075 });
@@ -135,6 +142,8 @@
     // the dance: blade laid against blade at the chest, once for each cut to come
     tapUp: [0.16, -36, 0, 15, 0, -14, 0, 17, -80, -1.25, 7, -52, -0.15],
     tapDown: [0.24, -35, 0, 15, 0, -14, 0, 9, -54, 0.55, 7, -52, -0.15],
+    // the echo's working: down on one knee, both blades crossed upright before its face
+    channel: [0.32, -22, 0, 15, 0, -20, 0, 9, -60, -2.05, 5, -58, -1.05],
   };
   // poses it snaps into rather than eases (the rest follow at the usual rate)
   const SNAP = { dash: 60, dive: 60, streak: 60, drawHi: 60, throwOver: 44, throwSide: 44, parry: 50, heel: 60, flickUnder: 46, pull: 46 };
@@ -160,8 +169,8 @@
     B.lights = true; B.dark = 0; B.wires = []; B.wireHit = 0;
     B.pinned = null; B.strings = 0;
   };
-  B.onRelease = function () { const b = B.body; b.fading = false; b.hurt = false; b.pose = 'idle'; b.hidden = false; B.pinned = null; B.strings = 0; b.still = false; b.held = false; B.guard = null; B.moon = false; };
-  B.onInterrupt = function () { const b = B.body; b.fading = false; for (const c of B.clones) smoke(c.x, c.y - 40); B.clones.length = 0; B.pinned = null; B.strings = 0; b.still = false; b.held = false; B.guard = null; B.moon = false; };
+  B.onRelease = function () { B.steadfast = false; const b = B.body; b.fading = false; b.hurt = false; b.pose = 'idle'; b.hidden = false; B.pinned = null; B.strings = 0; b.still = false; b.held = false; B.guard = null; B.moon = false; };
+  B.onInterrupt = function () { B.steadfast = false; const b = B.body; b.fading = false; for (const c of B.clones) smoke(c.x, c.y - 40); B.clones.length = 0; B.pinned = null; B.strings = 0; b.still = false; b.held = false; B.guard = null; B.moon = false; };
   // In its stance a blow is caught, not taken (see atkStance). Dawnbreak is not caught.
   B.blocked = function (t, info) {
     const g = B.guard;
@@ -223,7 +232,8 @@
     for (const p of B.scarf) { p.x = x; p.y = y - 70; }
     smoke(x, y - 40);
   }
-  function clone(x, y, face, pose) {
+  // quiet: it fades in (c.vis, from 0) instead of bursting out of smoke
+  function clone(x, y, face, pose, quiet) {
     const c = {
       id: 'shade' + (B.serial++), x, y, face, pose: pose || 'crouch', hurt: false, clone: true, runT: 0, p: null,
       onHit() {
@@ -236,7 +246,7 @@
     };
     c.p = (POSES[c.pose] || POSES.idle).slice();
     B.clones.push(c);
-    smoke(x, y - 40);
+    if (!quiet) smoke(x, y - 40);
     return c;
   }
 
@@ -685,64 +695,142 @@
     yield* wait(0.9);
   }
 
-  // Echo: the Veil kneels at the far side and sets the hero's own shadow on them. The shadow runs
-  // the exact path the hero took, a second or so behind, and cuts what it touches. Standing still
-  // lets it arrive; so does turning back into it, unless you jump it or dash through.
+  // Echo (v2.1c; it used to set the hero's own shadow running the path they took). The Veil kneels at
+  // the far wall with its blades crossed before its face and lets its shadows out. One after another
+  // they fade in around the hero, on the floor or hanging in the air, and set themselves to dash, low,
+  // blade forward, the eye on the hero. A breath before each goes its aim sets on the spot the hero is
+  // in (on the floor or in the air), and it dashes straight to that spot and stops there, then fades.
+  // Keep moving: a hero still on that spot is cut; one who has moved on is not.
+  // The channel cannot be broken: it can be struck all the while, but no blow stops it, and a stagger
+  // waits until it is done (B.steadfast). Then it is spent, and slow to rise.
+  //   II: four, and they come before the last has gone; one of them out of the air
+  //   III: two at once from either side, one out of the air, and the last is the Veil itself: the
+  //        kneeling figure goes to smoke, and it is the one that comes, and stays, open
+  const ECHO_LOCK = 0.15, ECHO_FADE = 0.22, ECHO_SPEED = 1300;
+  function shadeSpot(P, side, used) {
+    for (let i = 0; i < 10; i++) {
+      const x = G.clamp(P.x + side * G.rrand(230, 380), WL + 50, WR - 50);
+      if (Math.abs(x - P.x) > 170 && used.every((u) => Math.abs(u - x) > 90)) return x;
+      side = -side;
+    }
+    return G.clamp(P.x + side * 260, WL + 50, WR - 50);
+  }
+  // One shadow: it fades in at (sx, sy), sets itself with its eye on the hero, takes aim on the spot they
+  // are in, and dashes there. real: it is the Veil itself (out of the channel, hidden), and it stays.
+  function* shadeCut(sx, sy, prep, real) {
+    const P = G.player, b = B.body, air = sy < FLOOR - 4;
+    let c;
+    if (real) { appear(sx, sy, air ? 'air' : 'crouch'); c = b; } else { c = clone(sx, sy, G.sign(P.x - sx) || 1, air ? 'air' : 'crouch', true); c.vis = 0; c.echo = true; }
+    c.face = G.sign(P.x - sx) || 1;
+    const aim = { x: P.x, y: P.y, set: false, left: prep };
+    // (nothing drawn: the shadow set to go is the warning; the tests read danger())
+    H.add({
+      kind: 'shadeaim',
+      update(dt) { aim.left -= dt; if (c.gone || aim.left < -0.5) this.dead = true; },
+      danger() { return aim.set && aim.left > -0.3 ? [aim.x, 46, Math.max(0, aim.left)] : null; },
+    });
+    let e = 0;
+    while (e < prep && !c.gone) {
+      const dt = yield;
+      e += dt;
+      if (!real) c.vis = Math.min(1, e / ECHO_FADE);
+      if (air) c.y = sy - 5 * Math.sin(e * 8); // hanging in the air
+      c.pose = air ? 'air' : 'crouch';
+      if (!aim.set) { aim.x = P.x; aim.y = P.y; if (Math.abs(P.x - c.x) > 10) c.face = P.x > c.x ? 1 : -1; }
+      if (!aim.set && prep - e <= ECHO_LOCK) {
+        // the eye settles and the blade catches the light: from here it goes where the hero is now
+        aim.set = true;
+        const hx = c.x + c.face * c.p[7], hy = c.y + c.p[8];
+        G.fx.glint(hx, hy, real ? 24 : 18, real ? G.pal().hot : '170,160,210', 0.2); G.audio.play('glint');
+      }
+    }
+    if (c.gone) return;
+    // straight to the spot, laid along the line, and it stops on it
+    const x0 = c.x, y0 = c.y, dx = aim.x - x0, dy = aim.y - y0, dist = Math.hypot(dx, dy);
+    if (Math.abs(dx) > 4) c.face = dx > 0 ? 1 : -1;
+    c.pose = 'dash'; c.p = POSES.dash.slice(); c.tilt = G.clamp(Math.atan2(dy, Math.abs(dx) + 1), -1.25, 1.25); c.hurt = true;
+    G.audio.play('streak');
+    const dur = Math.max(0.14, dist / ECHO_SPEED), tint = real ? G.pal().boss : '20,16,34';
+    let f = 0;
+    while (f < dur && !c.gone) {
+      f += yield;
+      const k = E.outQuad(Math.min(1, f / dur));
+      c.x = x0 + dx * k; c.y = y0 + dy * k;
+      if (k > 0.92) c.hurt = false;
+      G.fx.spawn({ x: c.x - c.face * 18, y: c.y - G.rand(10, 56), vx: -c.face * G.rand(40, 180), vy: G.rand(-30, 30), life: 0.25, size: G.rand(4, 9), color: tint });
+    }
+    c.hurt = false; c.tilt = 0;
+    if (c.gone) return;
+    c.pose = c.y < FLOOR - 4 ? 'air' : 'skid';
+    if (c.y >= FLOOR - 4) G.fx.dust(c.x, FLOOR, 4, { dir: c.face, speed: [60, 220], size: [6, 11], up: 26 });
+    if (real) {
+      // out of the working, down onto its heels: open
+      if (c.y < FLOOR - 4) { yield* tween(c, { y: FLOOR }, 0.2, E.inQuad); G.fx.thud(c.x, FLOOR, 0.45, { noCrack: true }); }
+      c.pose = 'skid'; b.exposed = true;
+      yield* wait(0.85);
+      b.exposed = false;
+      return;
+    }
+    yield* wait(0.08);
+    for (let g = 0; g < ECHO_FADE && !c.gone;) { g += yield; c.vis = Math.max(0, 1 - g / ECHO_FADE); }
+    c.gone = true;
+  }
   function* atkEcho() {
-    const b = B.body, P = G.player, T = K.T();
+    const b = B.body, P = G.player, T = K.T(), ph = B.phase;
     yield* vanish();
     yield* wait(0.25);
-    appear(P.x < 640 ? WR - 150 : WL + 150, FLOOR, 'crouch');
-    G.ui.hint('echo', 'Your own shadow follows the path you took. Keep moving; jump it or dash through it when you turn back');
-    G.audio.play('pull');
-    const delay = Math.max(0.95, 1.2 * T), dur = B.phase === 1 ? 4 : B.phase === 2 ? 5 : 6;
-    const shade = { x: P.x, y: P.y, face: P.facing, pose: 'dash', p: POSES.dash.slice(), clone: true, hurt: true };
-    H.add({
-      kind: 'echo', delay, dur, trail: [], live: false, x: P.x, y: P.y, shade,
-      update(dt) {
-        const tr = this.trail;
-        tr.push({ x: P.x, y: P.y, t: this.t });
-        while (tr.length > 1 && tr[1].t <= this.t - this.delay) tr.shift();
-        if (this.t >= this.delay) {
-          this.live = true;
-          const s = tr[0];
-          if (Math.abs(s.x - this.x) > 0.5) shade.face = s.x > this.x ? 1 : -1;
-          this.x = s.x; this.y = s.y;
+    appear(P.x < 640 ? WR - 110 : WL + 110, FLOOR, 'kneel');
+    b.face = P.x > b.x ? 1 : -1;
+    B.steadfast = true;
+    const prep = 0.5 * T, gap = [0, 0.85, 0.62, 0.58][ph] * T;
+    // what comes, and when (from the start of the channel)
+    const plan = [];
+    if (ph === 1) for (let i = 0; i < 3; i++) plan.push({ at: 0.35 + i * gap, kind: 'cut' });
+    else if (ph === 2) for (let i = 0; i < 4; i++) plan.push({ at: 0.35 + i * gap, kind: i === 2 ? 'air' : 'cut' });
+    else {
+      plan.push({ at: 0.35, kind: 'cut' });
+      plan.push({ at: 0.35 + gap, kind: 'pair' });
+      plan.push({ at: 0.35 + gap * 2.2, kind: 'air' });
+      plan.push({ at: 0.35 + gap * 3.3, kind: 'real' });
+    }
+    const end = plan[plan.length - 1].at + prep + 0.6;
+    G.audio.play('veilchannel', { dur: end });
+    const running = [], used = [];
+    let e = 0, side = G.rng() < 0.5 ? -1 : 1, next = 0, real = false;
+    while ((next < plan.length || running.length) && e < end + 3) {
+      const dt = yield;
+      e += dt;
+      if (!real) {
+        // the working: kneeling, blades crossed before the face, the dark drawn up out of the floor into it
+        b.pose = 'channel';
+        if (Math.random() < dt * 20) {
+          const x = b.x + G.rand(-70, 70);
+          G.fx.spawn({ x, y: FLOOR - G.rand(0, 8), vx: (b.x - x) * 1.2, vy: -G.rand(60, 150), life: G.rand(0.4, 0.8), size: G.rand(3, 7), color: '24,18,40', drag: 1.5 });
         }
-        shade.x = this.x; shade.y = this.y; this.srcX = this.x - shade.face * 20;
-        if (this.live && Math.random() < dt * 34) G.fx.spawn({ x: this.x + G.rand(-10, 10), y: this.y - G.rand(4, 60), vx: G.rand(-20, 20), vy: -G.rand(10, 60), life: G.rand(0.3, 0.6), size: G.rand(2, 5), color: G.pal().boss });
-        if (this.t >= this.delay + this.dur) { this.dead = true; smoke(this.x, this.y - 40); G.audio.play('orbPop'); }
-      },
-      hits(Pl) { return this.live && this.t > this.delay + 0.3 && Math.abs(Pl.x - this.x) < 22 && Math.abs(Pl.y - this.y) < 44; },
-      draw(ctx) {
-        const tr = this.trail, k = Math.min(1, this.t / this.delay);
-        // the path it is about to run, in the warning colour
-        if (tr.length > 1) {
-          ctx.strokeStyle = G.rgba(DANGER, 0.55); ctx.lineWidth = 3; ctx.lineJoin = 'round'; ctx.lineCap = 'round';
-          ctx.setLineDash([10, 8]); ctx.lineDashOffset = -this.t * 90;
-          ctx.beginPath();
-          for (let i = 0; i < tr.length; i += 3) { if (i) ctx.lineTo(tr[i].x, tr[i].y - 22); else ctx.moveTo(tr[i].x, tr[i].y - 22); }
-          ctx.stroke(); ctx.setLineDash([]);
-        }
-        if (!this.live) {
-          // it is still tearing loose from where the hero stood
-          ctx.strokeStyle = G.rgba(DANGER, 0.5 + 0.4 * k); ctx.lineWidth = 2.5;
-          ctx.beginPath(); ctx.arc(this.x, this.y - 30, G.lerp(64, 18, k), 0, G.TAU); ctx.stroke();
-          ctx.fillStyle = G.rgba(DANGER, 0.1 + 0.2 * k);
-          ctx.beginPath(); ctx.arc(this.x, this.y - 30, 18, 0, G.TAU); ctx.fill();
+      }
+      while (next < plan.length && e >= plan[next].at) {
+        const s = plan[next++], live = used.slice(-3);
+        if (s.kind === 'cut' || s.kind === 'air') {
+          const x = shadeSpot(P, side, live), y = s.kind === 'air' ? FLOOR - G.rrand(150, 210) : FLOOR;
+          used.push(x); side = -side;
+          running.push(shadeCut(x, y, prep));
+        } else if (s.kind === 'pair') {
+          // from either side at once
+          for (const d of [-1, 1]) { const x = G.clamp(P.x + d * G.rrand(260, 340), WL + 50, WR - 50); used.push(x); running.push(shadeCut(x, FLOOR, prep)); }
         } else {
-          D.glow(ctx, DANGER, this.x, this.y - 40, 46, 0.5);
-          figure(ctx, shade, 0.9);
-          ctx.fillStyle = G.rgba(DANGER, 0.95);
-          ctx.beginPath(); ctx.arc(this.x + shade.face * 5, this.y - 67, 2.6, 0, G.TAU); ctx.fill();
+          // the last is the Veil itself: the kneeling figure goes to smoke
+          real = true;
+          const x = shadeSpot(P, side, live);
+          running.push((function* () { yield* vanish(); B.steadfast = false; yield* shadeCut(x, FLOOR, prep - 0.06, true); })());
         }
-      },
-    });
-    b.pose = 'crouch';
-    yield* wait(delay + dur + 0.2);
-    // the working spent: the Veil is slow to rise
+      }
+      for (let i = running.length - 1; i >= 0; i--) if (running[i].next(dt).done) running.splice(i, 1);
+    }
+    B.steadfast = false;
+    if (real) return;
+    // the working spent: it is slow to rise
     b.pose = 'kneel'; b.exposed = true;
-    yield* wait(1.0);
+    yield* wait(0.9);
     b.exposed = false;
   }
 
@@ -813,7 +901,7 @@
   // The draw: across the floor through the hero to `toX`. Low, it goes as a lunge goes; high, it
   // springs first and then crosses laid out flat at a leaping height. Returns its line, for the
   // trail it leaves when the blade goes home.
-  function* iaiDraw(a, high, toX) {
+  function* iaiDraw(a, high, toX, speed) {
     const dir = G.sign(toX - a.x) || a.face, sh = !!a.clone;
     a.face = dir; a.still = false;
     const trailCol = sh ? '60,50,96' : G.pal().boss;
@@ -829,7 +917,7 @@
     a.hurt = true;
     G.audio.play('streak'); G.audio.play('blade');
     a.pose = high ? 'drawHi' : 'dash';
-    const x0 = a.x, y0 = a.y, dist = Math.abs(toX - x0), dur = Math.max(0.15, dist / 1500);
+    const x0 = a.x, y0 = a.y, dist = Math.abs(toX - x0), dur = Math.max(0.15, dist / (speed || 1500));
     let e = 0;
     while (e < dur && !a.gone) {
       e += yield;
@@ -2547,6 +2635,7 @@
     ctx.globalAlpha = alpha;
     ctx.lineJoin = 'round'; ctx.lineCap = 'round';
     if (p[2]) { ctx.translate(0, hip); ctx.rotate(p[2]); ctx.translate(0, -hip); }
+    if (a.tilt) { ctx.translate(0, hip); ctx.rotate(a.tilt); ctx.translate(0, -hip); } // laid along a line it dashes down (the echo's shadows)
     if (!sh) D.glow(ctx, col, 0, -44, 70, 0.22);
 
     const shx = Math.sin(lean) * 34, shy = hip - Math.cos(lean) * 34; // shoulders
@@ -2753,8 +2842,10 @@
       }
     }
     for (const c of B.clones) {
-      D.glow(ctx, col, c.x, c.y - 44, 60, 0.25);
-      figure(ctx, c, 0.78);
+      const v = c.vis == null ? 1 : c.vis;
+      if (v <= 0) continue;
+      D.glow(ctx, col, c.x, c.y - 44, 60, 0.25 * v);
+      figure(ctx, c, 0.78 * v);
       if (c.held) heldCrescent(ctx, c, 0.8);
     }
     if (b.hidden) return;

@@ -129,8 +129,6 @@
           const ln = list.find((l) => l.kind === 'lane' && l.dur - l.t < 0.12);
           if (ln && Math.abs(P.x - h.x) < 300) jump = true;
         }
-      } else if (h.kind === 'echo') {
-        st.echo = h;
       } else if (h.kind === 'orb' && !h.grav) {
         const dx = P.x - h.x, big = Math.max(0, (h.r || 21) - 21); // a bigger orb is jumped sooner
         if (Math.abs(h.y - (P.y - 22)) < 44 + big * 2 && Math.abs(dx) < 170 + big * 4 && dx * h.vx > 0 && Math.abs(h.vx) > 300) { jump = true; if (big > 8) high = true; } // the great fireball takes a double jump
@@ -145,7 +143,7 @@
     } else st.over = 0;
     // a charging or lunging body: jump it (twice if it is tall)
     if (b.hurt && !b.hidden && Math.abs(b.x - P.x) < 330 && Math.abs(b.y - FLOOR) < 4) { jump = true; if (B.h > 100) high = true; }
-    for (const c of (B.clones || [])) if (c.hurt && Math.abs(c.x - P.x) < 330 && Math.abs(c.y - P.y) < 30) jump = true;
+    for (const c of (B.clones || [])) if (c.hurt && !c.echo && Math.abs(c.x - P.x) < 330 && Math.abs(c.y - P.y) < 30) jump = true; // (an echo's shadow goes to a spot: step off it instead)
 
     // movement: leave unsafe ground by the shortest way, otherwise keep a little distance from the boss
     let goal = null;
@@ -163,14 +161,7 @@
       if (!unsafe(want, ds) && Math.abs(want - P.x) > 26) goal = want;
     }
     if (st.over) { goal = P.x + st.over * 200; jump = true; high = true; }
-    // the Veil's echo: keep running one way; at a wall turn round, and dash through the shadow when it is close ahead
-    if (st.echo && !st.echo.dead) {
-      const e = st.echo;
-      if (!st.runDir) st.runDir = P.x < (lo + hi) / 2 ? 1 : -1;
-      if ((st.runDir > 0 ? hi - P.x : P.x - lo) < 30) st.runDir = -st.runDir;
-      goal = P.x + st.runDir * 200;
-      if (e.live && (e.x - P.x) * st.runDir > 0 && Math.abs(e.x - P.x) < 130 && Math.abs(e.y - P.y) < 50) st.dashDir = st.runDir;
-    } else { st.echo = null; st.runDir = 0; }
+    // (the Veil's echo, since v2.1c: each shadow's danger() is the spot it has taken aim on; step off it)
     if (goal != null && Math.abs(goal - P.x) > 5) hold(goal < P.x, goal > P.x); else hold(0, 0);
 
     // no time to walk out: dash towards safety

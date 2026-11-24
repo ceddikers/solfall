@@ -220,7 +220,7 @@
       if (B.onHit) B.onHit(dmg, info);
       if (B.hp <= 0) die();
       else if (B.phase < 3 && B.hp <= floorHp) beginPhase(B.phase + 1);
-      else if (!B.staggered && B.poise >= B.poiseMax) stagger();
+      else if (!B.staggered && B.poise >= B.poiseMax && !B.steadfast) stagger(); // (B.steadfast: a working that no blow stops; the stagger waits for the next blow after it)
       return true;
     };
 

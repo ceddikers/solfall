@@ -2,7 +2,7 @@
 
 A side-on boss rush for the browser: four heroes, four three-phase bosses, played as a run of
 ever-harder trials. You pick a hero and a relic before the run and win a boon after each victory.
-Version 2.1b.
+Version 2.1c.
 
 This is an early slice of a planned boss-rush roguelite (short runs, a boon after each boss,
 bosses drawn from a pool). A run meets the four bosses in a shuffled order, then meets them again, harder.
@@ -112,6 +112,30 @@ hero (`tools/feel-check.js`).
 - Settings, Reset progress erases Sunshards, upgrades, trophies and records (it has to be chosen twice).
 
 Not done: touch controls, a colour-blind alternative to red-orange warnings, gamepad rebinding.
+
+## The Veil's Echo, reworked (v2.1c)
+
+The Echo used to set the hero's own shadow running the path they took, a second behind; it felt "a bit
+weird". Now, as asked: the Veil kneels at the far wall and channels, and its shadows come out at different
+places, each preps for half a second and dashes to where the hero was standing, so the hero has to keep
+moving. The channel cannot be broken, but the Veil can be struck all through it.
+
+- **The channel.** It kneels with its blades crossed upright before its face, and the dark is drawn up out
+  of the floor into it (its own sound, `veilchannel`). Blows land as usual; none stops the working, and a
+  stagger earned in it waits for the first blow after it (`B.steadfast`, read in `bosskit.js`). After it
+  the Veil is spent and slow to rise, open for 0.9 s.
+- **The shadows.** Each fades in (no burst of smoke) around the hero, on the floor or hanging in the air,
+  and sets itself low to dash, blade forward, its eye on the hero. 0.15 s before it goes, the blade catches
+  the light and its aim sets on the spot the hero is in (in the air too). It dashes straight there, laid
+  along the line, stops on the spot and fades. A hero who has moved on is not touched; one still there is.
+  No line is drawn: the shadow set to go is the warning. A shadow can be struck down while it waits.
+- **By phase.** I: three, one after another (0.85 s apart). II: four, 0.62 s apart, one of them out of the
+  air. III: one, then two at once from either side, one out of the air, and the last is the Veil itself:
+  the kneeling figure goes to smoke, it comes as the shadows do, and it stays where it stops, open.
+
+Measured: `tools/boss-tests.js` (its scripted hero steps off each shadow's spot) loses 3 to the Echo over
+30 runs across five seeds, and the Veil as a whole 1 over 92, as before. Twelve heavy blows into the
+channel (five times what staggers it) do not break it; the next blow after it staggers.
 
 ## Hitboxes, tuned to what is drawn (v2.1b)
 
