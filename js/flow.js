@@ -186,7 +186,7 @@
     const t = main();
     if (!t) return aim;
     aim = { x: t.cx, y: t.cy };
-    G.boss.damage(Math.round(dmg * G.dmgMult()), t, Object.assign({ x: t.cx, y: t.cy, heavy: true }, o));
+    G.boss.damage(Math.round(dmg * G.dmgMult()), t, Object.assign({ x: t.cx, y: t.cy, heavy: true, flow: true }, o)); // (flow: for the recap)
     return aim;
   }
 

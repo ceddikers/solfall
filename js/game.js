@@ -46,6 +46,7 @@
     const r = G.run.relicOffer[i];
     if (!r) return;
     G.run.relic = r.id;
+    G.settings.lastRelic = r.id; G.saveSettings(); // (v2.7a: for Quick start on the title)
     G.startFight();
   };
   // After a fall (or Restart run): same hero and the same relic, straight into a new first trial.
@@ -57,6 +58,45 @@
     G.run.reset(); G.run.relic = relic;
     G.startFight();
   };
+  // (v2.7a) A run is saved as it goes, so closing the page does not lose it: on the road (every half
+  // second, with the road's own state), at the start of each fight, and once a fight is won. Continue on
+  // the title picks it up: back on the road where you stood, or the fight you were in, from its start.
+  // A fall, or walking home from the road, ends the run and its save. Practice, tests and the Champion's
+  // duel (the road saved before it stands) are never saved.
+  const SAVE_V = 1;
+  G.saveRun = function (at) {
+    const R = G.run;
+    if (G.practice || G.debug.freeze || G.debug.boss || !R.relic || R.champFight) return;
+    if (at === 'rest') R.ult = G.player.ult || 0; // (the Dawnbreak meter, as it stands on the road)
+    G.store.save('run', { v: SAVE_V, at, hero: R.hero, diff: G.settings.difficulty, ver: G.VERSION, when: Date.now(),
+      run: R.snapshot(), rest: at === 'rest' ? G.rest.snap() : null });
+  };
+  G.clearRun = function () { try { localStorage.removeItem('solfall.run'); } catch (e) { /* private mode */ } };
+  G.savedRun = function () { const s = G.store.load('run', null); return s && s.v === SAVE_V && s.run && G.relicDef(s.run.relic) ? s : null; };
+  G.continueRun = function () {
+    const s = G.savedRun();
+    if (!s) return false;
+    G.settings.hero = s.hero; G.settings.difficulty = s.diff; G.saveSettings();
+    G.practice = null;
+    G.run.reset(); G.run.restore(s.run);
+    if (s.at === 'fight') { G.startFight(); return true; }
+    // ('won': the fight was won and the result screen was up: onto a fresh road. 'rest': back on the road
+    // as it was; toRest rolls a new meeting and takes the meter from the hero, so the run is put back)
+    G.toRest();
+    if (s.at === 'rest') { G.run.restore(s.run); G.rest.restore(s.rest); }
+    G.run.ult = s.run.ult || 0; G.player.ult = G.run.ult;
+    G.ui.buildHp(G.player.maxHp); G.ui.buildRun();
+    return true;
+  };
+  // (v2.7a) Quick start on the title: the last hero and relic, straight into a first trial.
+  G.quickStart = function () {
+    const r = G.relicDef(G.settings.lastRelic);
+    if (!r || !G.meta.unlocked(r)) { G.toHub('fire'); return; }
+    G.practice = null;
+    G.run.reset(); G.run.relic = r.id;
+    G.startFight();
+  };
+
   // Practice: one boss, from the phase you choose. No relic, no omens, no rewards, nothing lost.
   G.practice = null;
   G.startPractice = function (phase, boss) {
@@ -77,6 +117,7 @@
   // The Vigil: the camp between runs, where the hero walks about (see hub.js).
   // where: 'fire' (coming from the title) or 'gate' (coming back from a run).
   G.toHub = function (where) {
+    if (where === 'gate') G.clearRun(); // (back from a run: it is over)
     G.rest.leave();
     G.practice = null;
     G.run.reset();
@@ -152,6 +193,8 @@
     G.ui.fade(); G.ui.mood('fight');
     G.audio.init(); G.audio.startMusic(); G.audio.setIntensity(1, true); G.audio.duck(1);
     G.input.endStep();
+    G.run.fight = { dealt: {}, taken: {} }; // (the recap's count for this fight)
+    G.saveRun('fight');
   };
 
   G.toTitle = function () {
@@ -189,6 +232,8 @@
     // beaten by the Champion: nothing lost but pride (the road waits, see step)
     if (G.run.champFight && !G.practice) { G.champLost = true; G.lastShards = 0; G.ui.letterbox(false); G.ui.mood('dead'); G.audio.duck(0.35); return; }
     G.lastShards = G.meta.onDefeat();
+    if (!G.practice) G.clearRun(); // (the run is over)
+    G.ui.againHint(); // (R starts again at once: v2.7a says so)
     G.ui.letterbox(false); G.ui.mood('dead');
     G.audio.duck(0.35);
   };
@@ -285,7 +330,7 @@
     G.t += sdt;
     G.arena.update(sdt);
     if (G.state === 'hub') G.hub.update(sdt);
-    if (G.state === 'rest') G.rest.update(sdt);
+    if (G.state === 'rest') { G.rest.update(sdt); if ((G.saveT = (G.saveT || 0) - dt) <= 0) { G.saveT = 0.5; G.saveRun('rest'); } }
     G.finish.update(sdt);
     G.player.update(sdt);
     G.input.endStep();
@@ -337,7 +382,8 @@
           // a practice win goes straight back to the ring it started from
           const t = G.time, name = G.boss.short;
           G.toHub('ring'); G.hub.say(name + ' beaten in ' + G.ui.fmtTime(t));
-        } else G.ui.showWin(G.run.champFight ? champResult() : result());
+        } else if (G.run.champFight) G.ui.showWin(champResult());
+        else { G.ui.showWin(result()); G.saveRun('won'); } // (a page closed now continues on the road)
       }
     }
   }

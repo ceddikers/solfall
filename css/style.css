@@ -159,7 +159,8 @@ kbd {
 #hint.show { opacity: 1; }
 
 /* ---------------------------------------------------------------- screens */
-#screens { position: absolute; inset: 0; }
+#screens { position: absolute; inset: 0; pointer-events: none; } /* (v2.7a: the HUD under it can be pointed at; an open screen takes the pointer) */
+#screens .screen.on { pointer-events: auto; }
 .screen { position: absolute; inset: 0; display: none; }
 .screen.on { display: block; }
 
@@ -530,3 +531,29 @@ ul.tips b { color: var(--ink); font-weight: 600; }
 .panel.fountain nav .item.up { grid-template-columns: 190px 1fr 84px; }
 .panel.smith .item.up .uname { color: #ffba5c; }
 .panel.smith nav .item.up { grid-template-columns: 190px 1fr 84px; }
+
+/* ---------------------------------------------------------------- v2.7a: quality of life */
+/* the run's chips say what they do when the pointer rests on one (in a fight too: the pointer is the aim,
+   but the chips sit up in the corner) */
+#boons span[data-tip] { position: relative; pointer-events: auto; cursor: help; }
+#boons span[data-tip]::after {
+  content: attr(data-tip); position: absolute; left: 0; top: calc(100% + 6px); width: 260px; padding: 8px 10px; z-index: 30;
+  font-size: 12px; line-height: 1.4; letter-spacing: 0; text-transform: none; color: #f4ecdc; white-space: normal;
+  background: rgba(10, 8, 18, 0.97); border: 1px solid var(--tagc, rgba(255, 255, 255, 0.4)); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+  opacity: 0; visibility: hidden; transition: opacity 0.12s 0.2s, visibility 0s 0.32s; pointer-events: none;
+}
+#boons span[data-tip]:hover::after { opacity: 1; visibility: visible; transition: opacity 0.12s 0.2s, visibility 0s 0.2s; }
+/* the recap under a result */
+.recap { margin: 10px auto 2px; max-width: 460px; text-align: left; font-size: 12.5px; color: var(--dim); }
+.recap:empty { display: none; }
+.recap .rbars { display: grid; gap: 3px; margin-bottom: 6px; }
+.recap .rb { display: grid; grid-template-columns: 86px 1fr 38px; align-items: center; gap: 8px; }
+.recap .rk { color: var(--ink); letter-spacing: 0.06em; }
+.recap .rt { height: 6px; background: rgba(255, 255, 255, 0.08); }
+.recap .rt i { display: block; height: 100%; background: var(--gold, #ffd27a); opacity: 0.8; }
+.recap .rv { text-align: right; font-variant-numeric: tabular-nums; }
+.recap .rline { margin: 3px 0; }
+.recap .rline b { color: var(--ink); font-weight: 600; }
+.recap .rbuild { display: flex; flex-wrap: wrap; gap: 4px; margin: 6px 0 0; }
+.recap .rbuild span { padding: 1px 6px; font-size: 10.5px; letter-spacing: 0.06em; color: var(--ink); border: 1px solid var(--tagc, rgba(255, 255, 255, 0.3)); border-left-width: 3px; background: rgba(8, 6, 14, 0.6); }
+

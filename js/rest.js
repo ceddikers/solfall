@@ -176,6 +176,23 @@
     }
   };
   REST.spawn = () => ARCH_X + 90;
+  // (v2.7a) The road's own state, for a saved run (game.js): which plinths are taken, who was met and how
+  // far that went, and where the hero stands. A duel with the shade not yet begun is set up again; one
+  // under way is let go.
+  REST.snap = function () {
+    const ev = REST.ev;
+    let e = null;
+    if (ev) e = ev.kind === 'duel' ? (ev.state === 'wait' ? { kind: 'duel' } : null) : JSON.parse(JSON.stringify(ev));
+    return { taken: REST.taken, taken2: REST.taken2, extra: REST.extra, ev: e, x: Math.round(G.player.x), f: G.player.facing };
+  };
+  REST.restore = function (s) {
+    if (!s) return;
+    REST.taken = s.taken; REST.taken2 = s.taken2; REST.extra = !!s.extra;
+    REST.ev = !s.ev ? null : s.ev.kind === 'duel' ? makeEvent('duel') : s.ev;
+    initTurn(); cardFor = null;
+    G.player.x = G.clamp(s.x || REST.spawn(), WALL_L + 20, WALL_R - 20); G.player.facing = s.f || 1;
+    G.cam.x = REST.camTarget();
+  };
 
   // Make the hero over again where they stand, so a boon or relic just taken works at once.
   REST.retake = retake;

@@ -244,7 +244,7 @@
       const dmg = Math.round(amount * mult);
       const floorHp = B.phase === 1 ? Math.floor(B.maxHp * 2 / 3) : B.phase === 2 ? Math.floor(B.maxHp / 3) : 0;
       B.hp = Math.max(floorHp, B.hp - dmg);
-      G.player.stats.dmg += dmg; G.flow.dealt(dmg); G.sets.dealt(amount, info); G.relics.dealt(amount, info);
+      G.player.stats.dmg += dmg; G.flow.dealt(dmg); G.sets.dealt(amount, info); G.relics.dealt(amount, info); G.run.tally(dmg, info);
       // (an ember burning, info.tick, hurts without a flinch, a number or any stagger)
       if (!info.tick) {
         b.flash = 1;

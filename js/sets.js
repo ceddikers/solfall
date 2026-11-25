@@ -78,7 +78,7 @@
   function hurt(dmg, info) {
     const t = main();
     if (!t) return false;
-    return G.boss.damage(Math.round(dmg * G.dmgMult()), t, Object.assign({ x: t.cx, y: t.cy, dir: G.sign(t.cx - G.player.x) || 1 }, info));
+    return G.boss.damage(Math.round(dmg * G.dmgMult()), t, Object.assign({ x: t.cx, y: t.cy, dir: G.sign(t.cx - G.player.x) || 1, set: true }, info)); // (set: for the recap)
   }
   function charge(set, amt) {
     const R = G.run;

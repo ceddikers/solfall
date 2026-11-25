@@ -286,7 +286,51 @@
     R.lastEvent = null; R.tempers = 0; R.pledge = false;
     R.champMet = false; R.champFight = false; R.champUlt = 0; // the Champion's doorway: met this run, being fought, the meter before (champion.js, rest.js)
     R.crown = 0; R.replaced = null; // the crown's charge, which carries over like Dawnbreak; the set boon a take just pushed out
+    // (v2.7a) what the run has dealt and taken, by source, for the recap on the result screens: the whole run,
+    // and the fight in hand (game.js starts it afresh)
+    R.stats = { dealt: {}, taken: {} }; R.fight = { dealt: {}, taken: {} };
     if (typeof document !== 'undefined') document.documentElement.style.setProperty('--herocol', G.hero().css); // (a hero's own boons wear the hero's colour)
+  };
+
+  // (v2.7a) A run is saved as it goes (game.js): this is what it holds, as plain data. The offering and
+  // the relics on offer are kept by id and looked up again; everything else is plain already.
+  R.snapshot = function () {
+    const out = {};
+    for (const k of Object.keys(R)) {
+      const v = R[k];
+      if (typeof v === 'function' || k === 'CORRUPT_CHANCE') continue;
+      if (k === 'offer') out.offer = (v || []).map((b) => ({ id: b.id, relic: !!b.relicReward }));
+      else if (k === 'relicOffer') out.relicOffer = (v || []).map((r) => r.id);
+      else if (k === 'replaced') out.replaced = v ? v.id : null;
+      else out[k] = v;
+    }
+    return JSON.parse(JSON.stringify(out));
+  };
+  R.restore = function (s) {
+    for (const k of Object.keys(s || {})) {
+      if (k === 'offer') R.offer = s.offer.map((o) => (o.relic ? (G.relicDef(o.id) ? Object.assign({ tag: 'Relic', relicReward: true }, G.relicDef(o.id)) : null) : G.boonDef(o.id))).filter(Boolean);
+      else if (k === 'relicOffer') R.relicOffer = s.relicOffer.map((id) => G.relicDef(id)).filter(Boolean);
+      else if (k === 'replaced') R.replaced = s.replaced ? G.boonDef(s.replaced) || null : null;
+      else R[k] = s[k];
+    }
+    // (a boon that no longer exists, from an older build, is dropped)
+    R.order = (R.order || []).filter((id) => G.boonDef(id));
+    for (const id of Object.keys(R.boons || {})) if (!G.boonDef(id)) delete R.boons[id];
+    if (!R.stats) R.stats = { dealt: {}, taken: {} };
+    if (!R.fight) R.fight = { dealt: {}, taken: {} };
+  };
+  // (v2.7a) Damage dealt, by where it came from, and blows taken, by the boss's attack: for the recap.
+  R.source = (info) => (G.player.ulting ? 'Dawnbreak' : info.crown ? 'Crown' : info.tick ? 'Embers' : info.set ? 'Set'
+    : info.relic ? 'Relic' : info.flow ? 'Flow' : info.lance ? 'Special' : info.finisher ? 'Finishers' : 'Blows');
+  R.tally = function (dmg, info) {
+    if (G.practice || !(dmg > 0)) return;
+    const k = R.source(info || {});
+    for (const o of [R.stats.dealt, R.fight.dealt]) o[k] = (o[k] || 0) + dmg;
+  };
+  R.hurtBy = function (dmg) {
+    if (G.practice || !(dmg > 0)) return;
+    const B = G.boss, k = (B.id || '?') + ':' + (B.attackName || '');
+    for (const o of [R.stats.taken, R.fight.taken]) o[k] = (o[k] || 0) + dmg;
   };
 
   // A run is seven fights (v2.6c: one for each boss; it was six), then (to come) an eighth that is

@@ -57,6 +57,8 @@
         <h1>SOLFALL</h1>
         <p class="tag">A duel beneath a dimmed sun</p>
         <nav>
+          <div class="item" data-act="continue" id="continueItem" style="display:none">Continue</div>
+          <div class="item" data-act="quick" id="quickItem" style="display:none">Quick start</div>
           <div class="item" data-act="begin">Enter the Vigil</div>
           <div class="item" data-act="help">Help</div>
           <div class="item" data-act="settings">Settings</div>
@@ -314,6 +316,7 @@
         <div class="prog"><div id="deadFill"></div><div class="notch" style="left:33.333%"></div><div class="notch" style="left:66.666%"></div>
           <span class="pl" style="left:16.6%">III</span><span class="pl" style="left:50%">II</span><span class="pl" style="left:83.3%">I</span></div>
         <div class="stats" id="deadStats"></div>
+        <div class="recap" id="deadRecap"></div>
         <p class="tip" id="deadTip"></p>
         <nav class="row">
           <div class="item" data-act="retry">New run <kbd>R</kbd></div>
@@ -329,6 +332,7 @@
         <h2>THE SUN RETURNS</h2>
         <div class="grade"><div class="ring"><span id="gradeLetter">A</span></div><div class="gtext"><b id="gradeTitle"></b><span id="gradeSub"></span></div></div>
         <div class="stats" id="winStats"></div>
+        <div class="recap" id="winRecap"></div>
         <p class="tip" id="winBest"></p>
         <p class="pick" id="winPick"></p>
         <nav class="row cards" id="winCards">

@@ -2,7 +2,7 @@
 
 A side-on boss rush for the browser: four heroes, seven three-phase bosses, played as a run of
 ever-harder trials. You pick a hero and a relic before the run and win a boon after each victory.
-Version 2.6f.
+Version 2.7a.
 
 This is an early slice of a planned boss-rush roguelite (short runs, a boon after each boss,
 bosses drawn from a pool). A run is seven trials, one for each boss, each harder than the last: the first boss
@@ -114,6 +114,46 @@ hero (`tools/feel-check.js`).
 - Settings, Reset progress erases Sunshards, upgrades, trophies and records (it has to be chosen twice).
 
 Not done: touch controls, a colour-blind alternative to red-orange warnings, gamepad rebinding.
+
+## Quality of life: saved runs, quick starts, a recap (v2.7a)
+
+Asked, from a list of quality-of-life ideas: "save run, faster restarts, 5, 6, 7, 10" (boon tooltips in the HUD,
+duo previews on offering cards, a run recap on the result screens, remembering the cursor in menus).
+
+- **A run is saved as it goes** (`G.saveRun`, game.js; `R.snapshot`/`R.restore`, run.js; `REST.snap`/`REST.restore`,
+  rest.js). On the road it is saved every half second with the road's own state (which plinths are taken, who
+  was met, where the hero stands, the Dawnbreak meter); at the start of each fight; and once a fight is won.
+  **Continue** on the title picks it up, named with the hero and how far the run has come: back on the road as
+  it was, or the fight you were in, from its start. A fall, or walking home from the road, ends the run and
+  its save. Practice, the test tools and the Champion's duel are never saved (the road saved before his door
+  stands). A shade's duel not yet begun is set up again; one under way is let go.
+- **Faster restarts.** R already started again at once, even during the fall, and few knew: as the hero falls,
+  a hint now says "R again, with (your relic)". With no run saved, the title offers **Quick start**: the last
+  hero and relic, straight into a first trial (the relic must still be unlocked).
+- **Boon tooltips.** Every chip under the health (relics, the crown, the duo, each boon) says what it does when
+  the pointer rests on it, in a fight too; a corrupted boon's bane is included. (The menu layer used to cover the
+  HUD even with no menu open; it now lets the pointer through until a screen is open.)
+- **Duo previews.** A set boon's card already said when it woke a duo; with no duo yet it now also says how
+  near it brings the nearest one: "Toward the duo Heat Lightning: 2 of 2 Ember, 1 of 2 Storm."
+- **The recap.** Under the defeat and victory screens' numbers: this fight's damage by where it came from (Blows,
+  Finishers, Special, Set, Embers, Crown, Relic, Flow, Dawnbreak; the top five as bars), and the boss's attack
+  that hurt you most. After a fall, and on the screen of the win that completes the run, also the trials won,
+  the run's damage, what hurt you most over the run (when it is not this fight's), and the build: relic, crown,
+  duo and every boon.
+- **Menus remember the cursor**: the title, pause, settings, help, controls, practice, Shrine, feats and moves
+  pages open where you left them (the result and choice screens still open on their first item).
+
+**Checked** in the preview: a run started, saved on the road with a plinth taken and the meter at 55, the page
+reloaded, and Continue put the hero back on the same spot with the same boons, plinth and meter; a fall cleared
+the save and showed the R hint and the recap; a chip's tooltip on hover; Quick start and the remembered cursor on
+the title; menu clicks still work; the duo note on cards; 28 scripted fights with no errors and no save written.
+**Not played by hand.**
+
+Playtest checklist:
+- Take a boon on the road, close the tab, open the game: does Continue put you back as you were?
+- Close it mid-fight: Continue starts that fight again. Is that fair, or should it go back to the road?
+- Is the recap worth its space on the result screens?
+- Rest the pointer on a boon chip mid-fight: useful, or in the way?
 
 ## Fixes from an audit, idle moves, and Gentle's warnings (v2.6f)
 

@@ -42,7 +42,7 @@
       'hint', 'lowhp', 'lbTop', 'lbBot', 'diffNote', 'bestLine', 'ver', 'deadLead', 'deadFill', 'deadStats',
       'pauseBoons', 'boons', 'trial', 'winOver', 'winPick', 'winCards', 'heroName', 'heroCards', 'relicCards', 'relicOver',
       'deadTip', 'winStats', 'winBest', 'gradeLetter', 'gradeTitle', 'gradeSub', 'stage',
-      'practiceOver', 'keyList', 'resetItem', 'movesOver', 'movesTitle', 'movesBody', 'movesFoot', 'ult', 'ultFill', 'ultKey', 'crown', 'crownFill', 'crownName', 'crownKey', 'flow', 'flowRank', 'flowFill', 'omen', 'shardCount', 'shrineLead', 'shrineList', 'shrineTrophies', 'rerollItem', 'featsLead', 'featsBody', 'helpBody', 'helpTabs', 'fountainLead', 'fountainList', 'smithLead', 'smithList']) el[id] = $(id);
+      'practiceOver', 'keyList', 'resetItem', 'movesOver', 'movesTitle', 'movesBody', 'movesFoot', 'ult', 'ultFill', 'ultKey', 'crown', 'crownFill', 'crownName', 'crownKey', 'flow', 'flowRank', 'flowFill', 'omen', 'shardCount', 'shrineLead', 'shrineList', 'shrineTrophies', 'rerollItem', 'featsLead', 'featsBody', 'helpBody', 'helpTabs', 'fountainLead', 'fountainList', 'smithLead', 'smithList', 'continueItem', 'quickItem', 'deadRecap', 'winRecap']) el[id] = $(id);
     el.segs = Array.from(document.querySelectorAll('#ember .seg'));
     el.bbar = document.querySelector('.bbar');
     el.bname = document.getElementById('bname');
@@ -79,10 +79,15 @@
     if (!U.current) return [];
     return Array.from(document.querySelectorAll('#s-' + U.current + ' .item')).filter((it) => it.style.display !== 'none');
   };
+  // (v2.7a) Menus you come back to open where you left the cursor (the result and choice screens always
+  // open on their first item)
+  const REMEMBER = ['title', 'pause', 'settings', 'help', 'keys', 'practice', 'shrine', 'how', 'feats', 'moves'];
+  U.mem = {};
   U.setFocus = function (i) {
     document.body.classList.toggle('pad', G.input.device === 'gamepad');
     const items = U.items();
     U.focus = G.clamp(i, 0, items.length - 1);
+    if (REMEMBER.includes(U.current)) U.mem[U.current] = U.focus;
     items.forEach((it, k) => it.classList.toggle('focus', k === U.focus));
     const act = U.current === 'help' && items[U.focus] ? items[U.focus].dataset.act || '' : '';
     if (/^help\d$/.test(act)) U.fillHelp(Number(act.slice(4)));
@@ -93,7 +98,7 @@
     $('s-' + name).classList.add('on');
     U.current = name;
     U.refresh();
-    U.setFocus(0);
+    U.setFocus(REMEMBER.includes(name) && U.mem[name] != null ? U.mem[name] : 0);
   };
   U.close = function () {
     document.querySelectorAll('.screen').forEach((s) => s.classList.remove('on'));
@@ -128,6 +133,8 @@
   function act(name) {
     G.audio.play(name === 'back' ? 'uiBack' : 'uiSelect');
     if (name === 'begin') G.toHub('fire');
+    else if (name === 'continue') { if (!G.continueRun()) { G.audio.play('empty'); U.refresh(); } }
+    else if (name === 'quick') G.quickStart();
     else if (name === 'retry' || name === 'restart') G.newRun();
     else if (name === 'heroes' || name === 'camp') G.toHub('gate');
     else if (/^hero\d$/.test(name)) G.pickHero(Number(name.slice(4)));
@@ -460,6 +467,15 @@
       } else it.querySelector('.v').textContent = def.label(v);
     });
     el.diffNote.textContent = ''; // difficulty is now chosen at the brazier in the camp
+    // (v2.7a) Continue a saved run, or (with none) Quick start with the last hero and relic
+    const sv = G.savedRun(), last = G.relicDef(G.settings.lastRelic), lastHero = G.HEROES.find((h) => h.id === G.settings.hero);
+    el.continueItem.style.display = sv ? '' : 'none';
+    if (sv) {
+      const h = G.HEROES.find((x) => x.id === sv.hero) || G.HEROES[0], tr = sv.run.trial || 1;
+      el.continueItem.textContent = 'Continue \u00b7 ' + h.name + ', ' + (sv.at === 'fight' ? 'trial ' + G.roman(tr) + ' (it starts again)' : (sv.run.beaten || []).length >= G.RUN_FIGHTS ? 'the run won' : 'after trial ' + G.roman(Math.max(1, (sv.run.beaten || []).length)));
+    }
+    el.quickItem.style.display = !sv && last && lastHero && G.meta.unlocked(last) ? '' : 'none';
+    if (last && lastHero) el.quickItem.textContent = 'Quick start \u00b7 ' + lastHero.name + ', ' + last.name;
     const best = G.store.load('best', {})[G.settings.difficulty];
     const depth = G.store.load('depth', {})[G.settings.difficulty];
     el.bestLine.textContent = depth
@@ -512,10 +528,16 @@
     el.heroName.textContent = hero.name.toUpperCase();
     // the health pips and Starlight take the hero's own colour
     el.stage.style.setProperty('--star', hero.css);
-    el.boons.innerHTML = (relic ? '<span class="t-relic">' + esc(G.relics.title(relic.id)) + '</span>' : '')
-      + (R.extraRelics || []).map((id) => G.relicDef(id)).filter(Boolean).map((r) => '<span class="t-relic">' + esc(G.relics.title(r.id)) + '</span>').join('')
-      + (R.duo() ? '<span class="t-duo">Duo · ' + esc(R.duo().name) + '</span>' : '')
-      + R.held().map((h) => '<span class="t-' + h.def.tag.toLowerCase() + (h.def.cursed && !G.bane(h.def.id) ? ' clean' : '') + '">' + h.def.name + (h.n > 1 ? ' \u00d7' + h.n : '') + '</span>').join('');
+    // (v2.7a) each chip says what it does when the pointer rests on it
+    const tip = (s) => ' data-tip="' + esc(plain(s)) + '"';
+    const relicTip = (r) => tip(G.relics.title(r.id) + ': ' + G.relics.html(r.id, { next: true }));
+    el.boons.innerHTML = (relic ? '<span class="t-relic"' + relicTip(relic) + '>' + esc(G.relics.title(relic.id)) + '</span>' : '')
+      + (R.extraRelics || []).map((id) => G.relicDef(id)).filter(Boolean).map((r) => '<span class="t-relic"' + relicTip(r) + '>' + esc(G.relics.title(r.id)) + '</span>').join('')
+      + (R.duo() ? '<span class="t-duo"' + tip('Duo: ' + R.duo().name + ' (' + R.duo().of.map((s) => G.SETS[s].name).join(' + ') + '). ' + R.duo().desc) + '>Duo · ' + esc(R.duo().name) + '</span>' : '')
+      + (R.crownSet() ? '<span class="t-crown" style="--tagc:' + G.SETS[R.crownSet()].css + '"' + tip('Crown: ' + G.SETS[R.crownSet()].crown + '. ' + G.SETS[R.crownSet()].crownDesc) + '>Crown · ' + esc(G.SETS[R.crownSet()].crown) + '</span>' : '')
+      + R.held().map((h) => '<span class="t-' + h.def.tag.toLowerCase() + (h.def.cursed && !G.bane(h.def.id) ? ' clean' : '') + '"'
+        + tip(h.def.name + (h.n > 1 ? ' \u00d7' + h.n : '') + (h.def.set ? ' (' + G.SETS[h.def.set].name + ' \u00b7 ' + G.SLOT_NAMES[h.def.slot] + ')' : '') + ': ' + h.def.desc + (h.def.cursed ? (G.bane(h.def.id) ? ' Bane: ' + h.def.bane : ' (cleansed)') : ''))
+        + '>' + h.def.name + (h.n > 1 ? ' \u00d7' + h.n : '') + '</span>').join('');
     const label = el.ember.querySelector('.elabel');
     el.ember.querySelectorAll('.seg').forEach((s) => s.remove());
     for (let i = 0; i < G.player.segs; i++) {
@@ -565,6 +587,13 @@
       : (() => { const k = (a) => '<kbd>' + G.input.label(a) + '</kbd>'; return k('left') + k('right') + ' move &middot; ' + k('jump') + ' jump &middot; ' + k('attack') + (G.input.mouse ? '' : ' or click') + ' attack &middot; ' + k('dash') + ' dash &middot; ' + k('flare') + (G.input.mouse ? '' : ' or right click') + ' special &middot; hold ' + k('heal') + ' mend &middot; ' + k('ult') + ' Dawnbreak'; })();
     el.hint.classList.add('show', 'calm');
     H.hintT = 7;
+  };
+  // (v2.7a) As the hero falls: R starts again at once, without waiting for the defeat screen
+  U.againHint = function () {
+    const keep = !G.practice && G.relicDef(G.run.relic);
+    el.hint.innerHTML = '<kbd>' + G.input.label('retry') + '</kbd> ' + (G.practice ? 'try again' : keep ? 'again, with ' + esc(keep.name) : 'new run');
+    el.hint.classList.add('show', 'calm');
+    H.hintT = 2;
   };
   // Quick fade up from black whenever the scene changes.
   U.fade = function () { retrigger(document.getElementById('fade'), 'go'); };
@@ -697,6 +726,41 @@
     return rows.map((r) => '<div><span class="n">' + r[0] + '</span><span class="l">' + r[1] + '</span></div>').join('');
   }
 
+  // (v2.7a) The recap under a result: where this fight's damage came from, what hurt most, and (at the
+  // end of a run) the build it was won or lost with and the run's own count.
+  const attackWords = (a) => (a || '').replace(/\d+$/, '').replace(/([A-Z])/g, ' $1').toLowerCase();
+  const topOf = (taken) => Object.entries(taken).sort((x, y) => y[1] - x[1])[0];
+  function hurtMost(taken, run) {
+    const top = topOf(taken);
+    if (!top) return '';
+    const [bid, atk] = top[0].split(':'), B = G.bosses[bid];
+    return '<p class="rline">' + (run ? 'This run, hurt most by ' : 'Hurt most by ') + (B ? esc(B.short.replace(/^The /, 'the ')) + '\u2019s ' : 'its ') + esc(attackWords(atk) || 'body') + ' <b>(' + top[1] + ')</b></p>';
+  }
+  function recapHtml(full) {
+    const R = G.run, f = R.fight || { dealt: {}, taken: {} };
+    const total = Object.values(f.dealt).reduce((a, b) => a + b, 0);
+    let html = '';
+    if (total > 0) {
+      html += '<div class="rbars">' + Object.entries(f.dealt).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([k, v]) => {
+        const pc = Math.round(100 * v / total);
+        return '<div class="rb"><span class="rk">' + esc(k) + '</span><span class="rt"><i style="width:' + pc + '%"></i></span><span class="rv">' + pc + '%</span></div>';
+      }).join('') + '</div>';
+    }
+    html += hurtMost(f.taken, false);
+    if (full && !G.practice) {
+      const relic = G.relicDef(R.relic), held = R.held();
+      const all = Object.values(R.stats.dealt).reduce((a, b) => a + b, 0);
+      const won = R.beaten.length, ft = topOf(f.taken), rt = topOf(R.stats.taken);
+      html += '<p class="rline">' + (won ? won + (won === 1 ? ' trial' : ' trials') + ' won' : 'No trial won') + ' \u00b7 ' + all + ' damage this run</p>';
+      if (rt && (!ft || ft[0] !== rt[0])) html += hurtMost(R.stats.taken, true); // (only when it is not this fight's)
+      html += '<p class="rbuild">' + (relic ? '<span class="t-relic">' + esc(G.relics.title(relic.id)) + '</span>' : '')
+        + (R.crownSet() ? '<span style="--tagc:' + G.SETS[R.crownSet()].css + '">Crown \u00b7 ' + esc(G.SETS[R.crownSet()].crown) + '</span>' : '')
+        + (R.duo() ? '<span class="t-duo">Duo \u00b7 ' + esc(R.duo().name) + '</span>' : '')
+        + held.map((h) => '<span class="t-' + h.def.tag.toLowerCase() + '">' + esc(h.def.name) + (h.n > 1 ? ' \u00d7' + h.n : '') + '</span>').join('') + '</p>';
+    }
+    return html;
+  }
+
   // What landed the last blow, in words: the boss's attack by name, or the omen that did it.
   function felledBy(P, B) {
     const h = P.lastHit || {}, omen = { zone: 'storm', meteor: 'embers', orb: 'hunted' }[h.kind];
@@ -725,6 +789,7 @@
       ['+' + (G.lastShards || 0), 'Sunshards'],
     ]);
     el.deadStats.lastElementChild.firstElementChild.classList.add('gold');
+    el.deadRecap.innerHTML = G.practice ? '' : recapHtml(true);
     el.deadTip.textContent = G.pick(TIPS.concat(B.tips || [], B.tips || []));
     const keep = !G.practice && G.relicDef(G.run.relic);
     document.querySelector('#s-dead [data-act=retry]').innerHTML = (G.practice ? 'Try again' : keep ? 'Again, with ' + keep.name : 'New run') + ' <kbd>R</kbd>';
@@ -738,6 +803,8 @@
   // as a tooltip over the name (on the focused card too, when playing with a gamepad)
   const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   U.esc = esc;
+  // (v2.7a) html to plain text, for a tooltip
+  function plain(s) { const d = document.createElement('div'); d.innerHTML = String(s); return d.textContent.replace(/\s+/g, ' ').trim(); }
   U.pairTip = function (p) {
     return '<u class="pairtip" data-tip="' + esc(p.name + ' (' + p.of.map((id) => G.boonDef(id).name).join(' + ') + '): ' + p.desc) + '">' + esc(p.name) + '</u>';
   };
@@ -761,6 +828,13 @@
     const after = R.duoOf((s) => R.setCount(s) + (s === b.set ? 1 : 0) - (old && G.boonDef(old).set === s ? 1 : 0));
     if (after && after !== now) return '<span class="setcrown duonote">Wakes the duo ' + esc(after.name) + ': ' + esc(after.desc) + '</span>';
     if (now && after !== now) return '<span class="setswap">Your duo ' + esc(now.name) + ' goes quiet.</span>';
+    // (v2.7a) no duo yet: how near this brings the nearest one that has this set in it
+    if (!now && !(old && G.boonDef(old).set === b.set)) {
+      const cnt = (s) => R.setCount(s) + (s === b.set ? 1 : 0) - (old && G.boonDef(old).set === s ? 1 : 0);
+      const near = G.DUOS.filter((d) => d.of.includes(b.set) && cnt(b.set) <= 2)
+        .map((d) => ({ d, other: d.of.find((s) => s !== b.set) })).sort((x, y) => cnt(y.other) - cnt(x.other))[0];
+      if (near && cnt(near.other) > 0) return '<span class="setcrown duonote">Toward the duo ' + esc(near.d.name) + ': ' + near.d.of.map((s) => Math.min(2, cnt(s)) + ' of 2 ' + G.SETS[s].name).join(', ') + '.</span>';
+    }
     return '';
   };
   U.pairNote = function (b) {
@@ -788,6 +862,7 @@
       ['+' + res.meta.shards, 'Sunshards'],
     ]);
     el.winStats.lastElementChild.firstElementChild.classList.add('gold');
+    el.winRecap.innerHTML = recapHtml(!!res.done && !res.champ && !res.corrupt);
     const R = G.run, waiting = R.corrupted.length;
     if (res.champ) {
       // the Champion's duel (champion.js): not a trial; back to the road it was found on

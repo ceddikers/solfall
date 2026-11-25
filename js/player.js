@@ -1587,7 +1587,7 @@
     }
     dmg = G.relics.blowDmg(dmg); // (Anvil Heart, Ascendant)
     if (G.bane('bloodedge')) dmg += 1; // Bloodied Edge's bane
-    P.hp -= dmg; P.stats.hits++;
+    P.hp -= dmg; P.stats.hits++; G.run.hurtBy(dmg); // (v2.7a: for the recap)
     G.relics.hurt(); // (relics.js: Thorn Crown, Rising Sun, Anvil Heart, the Pearl)
     if (G.bane('feral')) P.ember = 0; // Feral Rhythm's bane
     if (G.bane('ravenous')) G.hexes.feed(); // Ravenous Light's bane
