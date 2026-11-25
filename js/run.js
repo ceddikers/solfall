@@ -253,6 +253,7 @@
     R.purged = []; R.cleanses = 0; // corrupted boons cleansed at the fountain, and how often it has been used
     // who was met on the road last (rest.js), boons tempered by the smith, and an omen pledged at the altar
     R.lastEvent = null; R.tempers = 0; R.pledge = false;
+    R.champMet = false; R.champFight = false; R.champUlt = 0; // the Champion's doorway: met this run, being fought, the meter before (champion.js, rest.js)
     R.crown = 0; R.replaced = null; // the crown's charge, which carries over like Dawnbreak; the set boon a take just pushed out
     if (typeof document !== 'undefined') document.documentElement.style.setProperty('--herocol', G.hero().css); // (a hero's own boons wear the hero's colour)
   };

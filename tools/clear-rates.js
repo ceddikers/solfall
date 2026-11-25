@@ -137,7 +137,10 @@
         const d = Math.hypot(P.x - h.x, P.y - 22 - h.y) - h.r;
         if (d > 0 && d < 70) st.dashDir = G.sign(h.x - P.x) || 1;
       } else if (h.kind === 'blade') {
-        if (h.state !== 'stuck') {
+        if (h.state === 'wait') {
+          // a shade about to cut through (the Champion's borrowed move)
+          if (h.delay - h.t < 0.16 && (P.x - h.x) * h.dir > 0 && Math.abs(P.x - h.x) < 600) jump = true;
+        } else if (h.state !== 'stuck') {
           const d = h.state === 'out' ? h.dir : -h.dir, dx = P.x - h.x;
           if (dx * d > 0 && Math.abs(dx) < 190) jump = true;
         } else {
@@ -155,7 +158,11 @@
       if (!st.over && room < 150 && Math.abs(b.x - P.x) < 250) st.over = G.sign(b.x - P.x) || 1;
       if (st.over && (P.x - b.x) * st.over > 190) st.over = 0;
     } else st.over = 0;
-    const charging = b.hurt && !b.hidden && Math.abs(b.x - P.x) < 330 && Math.abs(b.y - FLOOR) < 4;
+    let charging = b.hurt && !b.hidden && Math.abs(b.x - P.x) < 330 && Math.abs(b.y - FLOOR) < 4;
+    // the Champion's thrust and draw: the glint as he sets is the moment to jump (his body comes through)
+    if (B.id === 'champion' && b.set && Math.abs(b.x - P.x) < (b.pose === 'thrustC' ? 470 : [0, 260, 380, 560][b.set] || 300) && (P.x - b.x) * b.face > -20) charging = true;
+    // the Warden's hands, borrowed: over them as they close
+    for (const h of list) if (h.kind === 'clap' && !h.dead) { const c = h.t - h.follow - h.hold; if (c > -0.2 && c < 0.1 && Math.abs(P.x - h.cx) < h.gap + 20) { jump = true; high = true; } }
     if (charging) { jump = true; if (B.h > 100) high = true; }
     for (const c of (B.clones || [])) if (c.hurt && !c.echo && Math.abs(c.x - P.x) < 330 && Math.abs(c.y - P.y) < 30) jump = true;
     // Kairo's spin throw: he leaps low with open hands; dashing does not save you, jumping over him does
@@ -254,7 +261,9 @@
     // anything that can be cut down, is
     let cutting = null;
     for (const o of G.hazards.slashables()) if (Math.abs(o.x - P.x) < 74 + (bow ? 120 : 0) && Math.abs(o.y - (P.y - 24)) < 60 + (bow ? 80 : 0)) { cutting = o; break; }
-    const inReach = tg && edge < reach && vgap < (bow ? 220 : 70);
+    let inReach = tg && edge < reach && vgap < (bow ? 220 : 70);
+    // the Champion's guard (all four dark, standing still): a blow on his front is turned, so wait it out
+    if (B.guardOn && (P.x - b.x) * b.face > -6) inReach = false;
     if (H.draw && st.draws && !cutting && eosDraw(st, tg, edge, vgap, inReach, danger || charging, soonest, aimAt)) {
       // (Eos's string and draw: eosDraw below)
     } else if (cutting || inReach) {
@@ -327,7 +336,8 @@
       R.relic = rel.length ? G.pick(rel).id : null;
       // the bosses met before this one, and a boon after each
       const others = G.shuffle(G.BOSS_IDS.filter((id) => id !== job.boss));
-      for (let t = 1; t < job.trial; t++) {
+      // (the Champion is met on the road after a trial is won: one more boss beaten than his trial number's road)
+      for (let t = 1; t < job.trial + (job.boss === 'champion' ? 1 : 0); t++) {
         R.beaten.push(others[(t - 1) % others.length]);
         const offer = R.rollOffer();
         if (offer && offer.length) R.take(Math.floor(Math.random() * offer.length));
@@ -346,7 +356,14 @@
     let won = false, lost = false, maxPhase = 1;
     try {
       while (t < job.maxT) {
-        if (P.grabbed && P.grabbed.mash) {
+        if (P.grabbed && P.grabbed.mash && B.bd) {
+          // the Champion's Black Dawn: one press per flash, on the beat, as a person would (a little early or late)
+          const fl = B.bd.flash;
+          if (fl && !fl.done) {
+            if (st.bdFl !== fl) { st.bdFl = fl; st.bdAt = fl.run + G.clamp((Math.random() + Math.random() + Math.random() - 1.5) * 0.17, -0.3, 0.3); }
+            if (fl.t >= st.bdAt && !st.bdDone) { I.pressed.attack = true; st.bdDone = true; }
+          } else st.bdDone = false;
+        } else if (P.grabbed && P.grabbed.mash) {
           // a struggle (Kairo's Last Wave): mash the attack at a person's pace, about eight presses a second
           st.mashT = (st.mashT || 0) - D;
           if (st.mashT <= 0) { I.pressed.attack = true; I.down.attack = true; st.mashT = 0.125; } else I.down.attack = false;

@@ -83,6 +83,7 @@
       hold: null, focus: 0, strung: 0, sun: 0, hangs: [], pin: null, stars: null, faults: [], drawT: 0, drawV: null, owed: [], arc2: null, hush: null,
       pad: 0, grazeCd: 0, streakN: 0, streakT: 0, fallT: 0, edge: 0, fadeT: 0, castN: 0,
       grabbed: null, wraps: 0, wrapsHit: 0, // (held by Kairo; Sparring Wraps' blink and its blow)
+      hiltT: 0, hiltUsed: false, hiltN: 0, // (the Offered Hilt's six seconds of echoes, once a fight: champion.js)
       rig: {}, // pose memory for drawing (see drawBody)
       scarf: [], ghosts: [], slashes: [], bolts: [],
       stats: { dmg: 0, hits: 0, perfect: 0, heals: 0, lances: 0 },
@@ -163,6 +164,7 @@
     }
 
     P.inv = Math.max(0, P.inv - dt);
+    if (P.hiltT > 0) P.hiltT -= dt;
     P.iframes = Math.max(0, P.iframes - dt);
     // Ember Ward (a pair): the ward a mend gives lasts 4 seconds
     if (P.wardT > 0) { P.wardT -= dt; if (P.wardT <= 0) { P.wardT = 0; P.ward = false; } }
@@ -599,7 +601,18 @@
   // Which way a swing is travelling when it lands (for sparks and the camera).
   const swingAng = (a) => (a.kind === 'up' ? -Math.PI / 2 : a.kind === 'down' ? Math.PI / 2 : a.dir > 0 ? 0 : Math.PI);
 
+  // The Offered Hilt (the Champion's trophy): for six seconds after a stagger, every blow also throws
+  // an echo of another hero's weapon, in that hero's light, each in turn (the maul's runs along the floor)
+  function hiltEcho(dir, dmg) {
+    if (!(P.hiltT > 0)) return;
+    const others = G.HEROES.filter((h) => h.id !== H.id);
+    P.hiltN = (P.hiltN || 0) + 1;
+    const o = others[P.hiltN % others.length], low = o.weapon === 'maul';
+    G.shots.push({ wave: true, echo: true, col: o.col, hot: o.hot, x: P.x + dir * 50, y: low ? FLOOR - 30 : P.y - 34, vx: dir * 860, vy: 0, t: 0, life: 0.45, hit: new Set(), dmg: Math.max(6, Math.round(dmg * 0.45)) });
+  }
+
   function swing(a) {
+    hiltEcho(a.dir, a.dmg);
     if (a.canCharge) {
       // a charged smash hits up to half again as hard and reaches further
       if (a.charge > 0) a.dmg = Math.round(a.dmg * (1 + C.CHARGE_DMG * a.charge));
@@ -723,6 +736,7 @@
       const cx = (P.x + o.x) / 2, cy = Math.min(P.y, o.y) - 44;
       if (o.kx != null) o.kx = G.clamp(o.kx - dir * 16, -18, 18);
       if (B.kit && !B.staggered && o === B.body) B.poise = Math.min(B.poiseMax - 1, B.poise + 46 * H.poise);
+      if (B.kit && B.onClash && o === B.body) B.onClash(); // (the Champion feels a clash more: champion.js)
       P.vx = dir * 330; P.iframes = Math.max(P.iframes, 0.16); P.pdDone = true;
       P.gain(C.GAIN_HIT); G.flow.add(8);
       G.audio.play('clash');
@@ -834,6 +848,7 @@
 
   function loose(a) {
     arrow(a.dx, a.dy, a.dmg, a.heavy);
+    hiltEcho(G.sign(a.dx) || P.facing, a.dmg);
     G.audio.play(a.heavy ? 'arrowHeavy' : 'arrow');
     // firing downward in the air lifts her
     // (each shot before she next lands lifts less than the last, so she cannot hang in the sky)
@@ -1708,9 +1723,9 @@
         ctx.save();
         ctx.translate(s.x, s.y); ctx.rotate(Math.atan2(s.vy, s.vx));
         if (s.big) ctx.scale(s.big, s.big);
-        ctx.strokeStyle = G.rgba(STAR, 0.45 * k); ctx.lineWidth = 16;
+        ctx.strokeStyle = G.rgba(s.col || STAR, 0.45 * k); ctx.lineWidth = 16;
         ctx.beginPath(); ctx.arc(-26, 0, 44, -0.85, 0.85); ctx.stroke();
-        ctx.strokeStyle = G.rgba(HOT, 0.95 * k); ctx.lineWidth = 5;
+        ctx.strokeStyle = G.rgba(s.hot || HOT, 0.95 * k); ctx.lineWidth = 5;
         ctx.beginPath(); ctx.arc(-26, 0, 44, -0.85, 0.85); ctx.stroke();
         ctx.restore();
         continue;

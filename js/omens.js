@@ -23,7 +23,7 @@
   R.rollOmens = function () {
     const forced = G.debug.omen;
     if (forced) { R.omens = String(forced).split(',').filter((id) => byId[id]); }
-    else if (G.practice) { R.omens = []; }
+    else if (G.practice || R.champFight) { R.omens = []; } // (the Champion's duel is fought clean)
     else {
       // a corrupted boss always brings two; a pledge at the omen altar (rest.js) one more
       const n = (R.corrupt || R.trial >= 6 ? 2 : R.trial >= 2 ? 1 : 0) + (R.pledge ? 1 : 0);

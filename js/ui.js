@@ -469,7 +469,7 @@
     el.pauseBoons.innerHTML = (held.length || relic || omens)
       ? '<h3>' + G.hero().name + '\u2019s run</h3>' + omens
         + (relic ? '<p><b>' + relic.name + '</b> ' + relic.desc + '</p>' : '')
-        + (G.run.extraRelics || []).map((id) => G.relicDef(id)).filter(Boolean).map((r) => '<p><b>' + r.name + '</b> ' + r.desc + ' <i>(from a corrupted portal)</i></p>').join('')
+        + (G.run.extraRelics || []).map((id) => G.relicDef(id)).filter(Boolean).map((r) => '<p><b>' + r.name + '</b> ' + r.desc + ' <i>(' + (r.id === 'hilt' ? 'his gift, for this run' : 'from a corrupted portal') + ')</i></p>').join('')
         + (G.run.crownSet() ? '<p class="crownline" style="--tagc:' + G.SETS[G.run.crownSet()].css + '"><b>Crown · ' + G.SETS[G.run.crownSet()].crown + '</b> ' + esc(G.SETS[G.run.crownSet()].crownDesc) + '</p>' : '')
         + held.map((h) => '<p' + (h.def.cursed ? ' class="cursed"' : '') + '><b>' + h.def.name + (h.n > 1 ? ' \u00d7' + h.n : '') + '</b> ' + (h.def.set ? '<i>' + G.SETS[h.def.set].name + ' · ' + G.SLOT_NAMES[h.def.slot] + '.</i> ' : '') + esc(h.def.desc) + U.pairNote(h.def)
           + (h.def.cursed ? (G.bane(h.def.id) ? '<span class="bane">' + esc(h.def.bane) + '</span>' : ' <i>(cleansed)</i>') : '') + '</p>').join('')
@@ -501,7 +501,7 @@
   // Trial label, boon list and Starlight segments for the fight that is starting.
   U.buildRun = function () {
     const R = G.run;
-    el.trial.textContent = G.practice ? 'Practice' : R.corrupt ? '' : R.trial > 1 ? 'Trial ' + G.roman(R.trial) : '';
+    el.trial.textContent = G.practice ? 'Practice' : R.corrupt || R.champFight ? '' : R.trial > 1 ? 'Trial ' + G.roman(R.trial) : '';
     el.omen.innerHTML = R.omens.map((id) => '<b>Omen \u00b7 ' + G.omenDef(id).name + '</b>' + G.omenDef(id).desc).join('');
     U.buildPrompts();
     H.ult = -1; H.ready = null; H.frank = -1; H.ffill = -1; H.cset = undefined;
@@ -776,6 +776,24 @@
     ]);
     el.winStats.lastElementChild.firstElementChild.classList.add('gold');
     const R = G.run, waiting = R.corrupted.length;
+    if (res.champ) {
+      // the Champion's duel (champion.js): not a trial; back to the road it was found on
+      const feats = res.meta.lines.filter((l) => l.indexOf('Feat: ') === 0).join(' · ');
+      el.winOver.textContent = 'The First Light, answered';
+      el.winBest.textContent = res.meta.relic ? 'Trophy won: ' + res.meta.relic.name + ' joins the relics you can be offered.' + (feats ? ' ' + feats : '')
+        : res.meta.lines.join(' · ');
+      el.winPick.textContent = (res.hilt ? 'His hilt is yours for the rest of this run' : 'He nods') + ' · trial ' + G.roman(res.trial + 1) + ' of ' + G.roman(G.RUN_FIGHTS) + ' still lies ahead';
+      document.querySelector('#s-win [data-act=endrun]').textContent = 'End the run, return to camp';
+      el.winCards.style.display = 'none';
+      Array.from(el.winCards.children).forEach((c) => { c.style.display = 'none'; });
+      el.rerollItem.style.display = 'none';
+      const ri = document.getElementById('restItem');
+      ri.style.display = ''; ri.textContent = 'Return to the road';
+      U.hud(false);
+      U.lockUntil = performance.now() + 700;
+      U.show('win');
+      return;
+    }
     el.winOver.textContent = res.corrupt ? 'The corruption is cleansed' : (res.wonNow ? 'The run is won' : 'Victory') + ' \u00b7 trial ' + G.roman(res.trial) + ' of ' + G.roman(G.RUN_FIGHTS);
     // feats done in this fight are always named, whatever else there is to say
     const feats = res.meta.lines.filter((l) => l.indexOf('Feat: ') === 0).join(' · ');

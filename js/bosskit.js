@@ -264,6 +264,8 @@
       G.fx.shatter(b.x, cy, G.pal().boss, 18, { hot: G.pal().hot, r: 300, jitter: B.w * 0.4 });
       G.fx.punch(0.022);
       G.ui.callout(B.staggerWord || 'STAGGERED');
+      // the Offered Hilt (the Champion's trophy): six seconds of echoes, once a fight
+      if (G.relic('hilt') && !G.player.hiltUsed) { G.player.hiltUsed = true; G.player.hiltT = 6; G.audio.play('segment'); }
       G.feats.bump('stagger');
       B.script = staggerScript();
     }
@@ -372,6 +374,16 @@
       const b = B.body;
       b.ctrl = true; b.hidden = false;
       while (G.finish.busy || G.player.ulting) yield; // the hero's finishing blow (or Dawnbreak) first
+      // a boss that does not die has its own ending (the Champion: champion.js)
+      if (B.deathScene) {
+        if (B.dying0) B.dying0();
+        yield* B.deathScene();
+        B.dead = true; b.jit = 0;
+        G.audio.play('victory');
+        yield* wait(1.6);
+        G.onBossDead();
+        return;
+      }
       G.fx.slow(0.12, 1.3); G.fx.shake(22);
       if (!G.finish.played) { G.fx.flash(G.COL.white, 0.8, 0.7); G.fx.stop(0.2); G.fx.impact(b.x, b.y - B.h / 2, 0.1); }
       G.audio.play('bossDie');
@@ -431,7 +443,7 @@
       G.audio.play('charge', { dur: 1.4 });
       yield* B.enter();
       G.audio.play('roar'); G.audio.play('card');
-      G.ui.card('', B.name, G.run.trial > 1 ? 'Trial ' + G.roman(G.run.trial) + ' · ' + B.taunt : B.sub);
+      G.ui.card('', B.name, B.event ? B.sub : G.run.trial > 1 ? 'Trial ' + G.roman(G.run.trial) + ' · ' + B.taunt : B.sub);
       G.fx.shake(12);
       G.fx.ring(b.x, b.y - B.h / 2, { r0: 40, r1: 700, life: 0.9, color: G.pal().boss, width: 12, alpha: 0.7 });
       for (const d of [-1, 1]) G.fx.dust(b.x + d * 30, FLOOR, 6, { dir: d, speed: [140, 520], size: [7, 14], life: [0.6, 1.1], up: 44 });

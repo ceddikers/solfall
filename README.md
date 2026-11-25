@@ -2,7 +2,7 @@
 
 A side-on boss rush for the browser: four heroes, seven three-phase bosses, played as a run of
 ever-harder trials. You pick a hero and a relic before the run and win a boon after each victory.
-Version 2.4d.
+Version 2.5a.
 
 This is an early slice of a planned boss-rush roguelite (short runs, a boon after each boss,
 bosses drawn from a pool). A run meets the four bosses in a shuffled order, then meets them again, harder.
@@ -113,6 +113,78 @@ hero (`tools/feel-check.js`).
 - Settings, Reset progress erases Sunshards, upgrades, trophies and records (it has to be chosen twice).
 
 Not done: touch controls, a colour-blind alternative to red-orange warnings, gamepad rebinding.
+
+## The Champion Who Came Before (v2.5a)
+
+Asked for: the rival from the final-boss ideas, as an optional event fight rather than the run's ending ("let's
+do 1 as an event fight chance"), built from the Claude Doc "Solfall boss brief: The Champion Who Came Before",
+made epic, with **phase II changing with the bosses you have beaten that run**. He is `js/champion.js`, with his
+own arena, sounds and music.
+
+**Where he is.** On the road before trials III to VI, about one road in five, once a run, a rock stands where
+the road's meeting would be (it takes that place), split by a crack of dawn light. **Aurel, the First Light**
+sits inside it. Walk up and press the interact key to step through, or walk on: the doorway does not come back
+this run. Win or lose, you come back out onto the same road, with the offering as you left it. Losing costs
+nothing: no Sunshards lost, and not even the Dawnbreak meter you spent in there ("He helps you up").
+There are no omens in his fight.
+
+| Phase | What he does | The tells |
+|---|---|---|
+| I · The Duel | A mirror match. Four weapons ride on his back, twins of the heroes' own, and he fights with one at a time: the **sword** string (a falling cut, a rising cut, then the finisher, or a dash-thrust if you backed off), the **maul** (a sweep, then a smash; held longer it throws a wave along the floor), the **bow** (he leaps back, then a fan or one piercing shot down a line that follows you), the **sheathed blade** (one to three marks, then he draws through you). A **guard**, and once a phase a **mend** | **Whichever weapon glows on his back is what comes next.** The finisher: his shoulders drop with a breath out (a beat later from his third string on). The thrust: the point drawn back, a glint. The draw: count the marks on the sheath (three crosses half the arena), then a glint at its mouth as his hand closes on the hilt. The guard: all four dark and he stands still; a blow on his front is turned into a counter-cut (from behind it lands). The mend: he kneels and light gathers; hit him and he is thrown open |
+| II · The Trophies | He plants his sword and holds a hand to the **standing stones** behind him, one for every boss. **Those you beat this run wake one by one**, each its own way (the Warden's sun ring, the Magus's ice, the Veil's moon, the Knight's sword, the Wolf's moon and howl, the Leviathan's wave, Kairo's flame), and send a thread of light into his rack. Then the cloth burns off his twin of **your** weapon. He fights with **one move borrowed from each boss you beat**, and phase II opens with the move of the last one. His weapons switch mid-combo, and he **feints** | A stone flares, with that boss's bell, before its move. Feint: two glows at once, the brighter is real. A switch: the rack lights again mid-string |
+| III · The Other Side | The sky over the broken arch cracks; the black behind it pours into him; he roars, a blade in each hand. **The arena goes dark** but for your own light (it grows with your Starlight), the lit stones, his eyes and the glows on his rack; lightning shows him now and then. The **Four-Fold** string (every weapon in one combo). Below 12%, once: the **Black Dawn** | In the dark, read the rack. Below a quarter he stops guarding |
+
+**The borrowed moves:** the Warden's two hands of light close on you (be over them, or out from between them);
+the Magus's arrow loosed straight up, and the sky answers it where you stand, three times; the Veil's shades of
+him step out of the air around you and cut through one after another (each pulses and rings just before it
+goes); the Knight's sword hurled along the floor into the wall, then called home; the Wolf's pounce, the ground
+burning either side where he lands; the Leviathan's spouts where you run; Kairo's beam, which tracks and then holds.
+
+**The Black Dawn** is a beam clash won on the beat. He leaps to the far side with every weapon alight and lets
+the black go; your light holds it where it reaches you. Three flashes run down the beam: **press attack as each
+meets the light** (a ring closes on the meeting point; the key is shown over it). Only the first press for each
+flash counts, so mashing loses. Two of three and his beam breaks, and so does he; fewer and it goes through you
+(2 health, 3 when fierce). A full Dawnbreak meter takes the first flash by itself.
+
+**He does not die.** At nothing he goes down on one knee, the black runs off him and out of the sky, the dawn
+comes back, and he puts his hood down, smiles, and holds his weapon out to you hilt first. Then he is gone.
+
+**Stagger** (*OPEN*): his weapon is knocked out of his hand and sticks in the floor, and he goes after it (not
+past you). Blows deal 1.5x; disarmed he takes a little more. Longest in the duel, shortest in the dark. Blows on
+his back build it faster; a clash with his swing fills a fifth of it.
+
+**Reward:** Sunshards (60 the first time, 30 after, on top of the usual pay), and **his trophy relic, The Offered
+Hilt**, held for the rest of the run and offered in later runs: once a fight, when you break a boss's stagger,
+for 6 seconds every attack also throws an echo of another hero's weapon in that hero's light. **Feat:** Read the
+rack: beat him without being caught by a feint.
+
+**His music:** the camp's own chords (Dm Bb F C) on bells, slow, in the duel; drums and a horn with the
+trophies; in the dark the chords turn (Dm Bb Gm A) and a snare drives it; only a drone and a heartbeat in the
+clash.
+
+**Open questions from the brief, as built** (say if any should change): his name is Aurel; a doorway rather than
+a person on the road; one meeting a run, no rematch; the clash is on the beat with a key shown; the relic is the
+Offered Hilt; "your own special turned on you" became the cloth burning off his twin of your weapon; whether what
+corrupted him is the final boss is left open (phase III's card says only "What the seventh door keeps"). There
+are **seven** stones, one for every boss, not six.
+
+**Checked** (scripted, not played): every move runs without errors; the phase scenes, the dark, the clash, the
+ending, the win screen, the doorway on the road and both ways back were checked as still frames and by script
+(a lost duel puts back the Dawnbreak meter and closes the doorway). The scripted player (`tools/clear-rates.js`,
+now taught his set-up glints, the guard, the borrowed hands and shades, and to press the clash on the beat with
+a person's error) **wins 80%** of 128 duels at roads II-V on Standard (Eos 91, Vesper 84, Aster 75, Lune 69).
+Its first pass found the dash-thrust unfair (its warning was 0.3 s; 24 of 31 losses): it now winds up for
+about half a second with a glint and chases less far in the duel, and the draw got its own glint. **Nobody has
+played him yet**, and his music has not been heard.
+
+**Playtest checklist**
+- Does the rack read? Can you tell which weapon is coming, and do the feints feel fair once you know the brighter glow is real?
+- Does the thrust at the end of the string feel dodgeable now? Does the draw's glint give you enough time?
+- Phase II with two, three, four, five stones: is the scene too long with many (it speeds up), and do the borrowed moves read as those bosses?
+- Phase III: is it too dark? Is your light big enough with no Starlight?
+- The Black Dawn: is the beat clear from the flash and the ring alone? Is the window (0.14 s either side on Standard) too tight?
+- One road in five, once a run: too rare, too common?
+- The ending: does it land? Is the Offered Hilt worth having?
 
 ## The easy three, a little quicker (v2.4d)
 

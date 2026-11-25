@@ -245,6 +245,11 @@
     else if (s.id === 'smith') smith();
     else if (s.id === 'pledge') pledge(s);
     else if (s.id === 'duel') startDuel();
+    else if (s.id === 'door') {
+      G.audio.play('uiSelect'); G.audio.play('charge', { dur: 0.5 });
+      F.flash('255,226,186', 0.5, 0.5);
+      G.enterChampion();
+    }
     else if (s.id === 'fire') {
       G.audio.play('whoosh');
       F.burst(FIRE_X, FLOOR - 30, { n: 24, color: '255,170,90', speed: [60, 260], angle: -Math.PI / 2, spread: 1.2, life: [0.4, 1], size: [1.6, 3.4], grav: -120 });
@@ -294,9 +299,23 @@
       S.tone({ type: 'sine', f0: 1320, dur: 0.4, vol: 0.05, delay: 0.05 });
     });
   }
+  // The Champion's doorway (v2.5a, champion.js): from the road before trial III to the one before
+  // trial VI, now and then, once a run, a crack of dawn light opens in a rock where the road's meeting
+  // would be, and he sits inside it. It takes the place of whoever else might have been met.
+  const CHAMP_CHANCE = 0.2;
+  const champDoor = () => { const run = R(); return !run.champMet && run.trial >= 2 && run.trial <= 5 && run.offerKind === 'boon' && !run.runWon() && !!G.bosses.champion && Math.random() < CHAMP_CHANCE; };
+  REST.doorX = EVENT_X;
+  // back on the road from his duel: the doorway has closed
+  REST.back = function (lost) {
+    REST.near = null;
+    if (REST.ev && REST.ev.kind === 'champion') REST.ev.done = true;
+    say(lost ? 'He helps you up. The doorway closes behind you.' : 'He nods, and the doorway closes');
+    cardFor = null;
+  };
   function rollEvent() {
     const run = R();
     if (G.debug.event) return makeEvent(G.debug.event);
+    if (champDoor()) return makeEvent('champion');
     if (run.runWon() || run.offerKind !== 'boon' || Math.random() >= EVENT_CHANCE) return null;
     const kinds = ['fortune', 'smith', 'pledge', 'duel'].filter((k) => k !== run.lastEvent && (k !== 'smith' || run.temperable().length));
     return makeEvent(G.pick(kinds));
@@ -307,6 +326,7 @@
     if (kind === 'fortune') ev.cards = G.shuffle(['boon', 'shards', 'curse']).map((what, i) => ({ what, i, flip: 0 }));
     if (kind === 'duel') { ev.state = 'wait'; ev.sh = shade(EVENT_X + 30, FLOOR, -1, 'kneel'); ev.hits = 0; ev.dashes = 0; }
     if (kind === 'smith') ev.beat = 0;
+    if (kind === 'champion') R().champMet = true;
     return ev;
   }
   function evPlaces() {
@@ -316,6 +336,7 @@
     if (ev.kind === 'smith') return [{ id: 'smith', x: EVENT_X, reach: 80, top: 190 }];
     if (ev.kind === 'pledge') return [{ id: 'pledge', x: EVENT_X, reach: 70, top: 220 }];
     if (ev.kind === 'duel' && ev.state === 'wait') return [{ id: 'duel', x: ev.sh.x, reach: 90, top: 150 }];
+    if (ev.kind === 'champion' && !ev.done) return [{ id: 'door', x: EVENT_X, reach: 80, top: 262 }];
     return [];
   }
 
@@ -479,6 +500,7 @@
         F.burst(EVENT_X - 4, FLOOR - 62, { n: 7, color: '255,186,92', speed: [80, 300], angle: -Math.PI / 2, spread: 1.5, life: [0.15, 0.4], kind: 'spark', size: [1.2, 2.2], grav: 900 });
       }
     }
+    if (ev.kind === 'champion' && !ev.done && Math.random() < dt * 9) F.spawn({ x: EVENT_X + rnd(-8, 8), y: FLOOR - rnd(20, 190), vx: rnd(-40, -5), vy: -rnd(5, 30), life: rnd(1, 2), size: rnd(1.2, 2.4), color: '255,226,186', grav: -8 });
     if (ev.kind === 'pledge' && !ev.done && Math.random() < dt * 10) F.spawn({ kind: 'spark', x: EVENT_X + rnd(-12, 12), y: FLOOR - 120 + rnd(-10, 10), vx: rnd(-20, 20), vy: -rnd(60, 160), life: rnd(0.2, 0.5), size: rnd(1.2, 2.2), color: BLOOD, len: 0.05 });
   }
 
@@ -583,6 +605,30 @@
       } else diamond(ctx, x, cy, 4, 7, G.rgba(c, 0.7));
       ctx.globalCompositeOperation = 'source-over';
       pool(ctx, c, x, 110, ev.done ? 0.1 : 0.3);
+    } else if (ev.kind === 'champion') {
+      // a rock standing in the road, split by a crack of dawn light; inside it, a man sitting, waiting
+      const top = FLOOR - 236, open = ev.done ? 0 : 1, flick = 0.85 + 0.15 * Math.sin(t * 2.3);
+      if (open) {
+        glow(ctx, '255,214,160', x, FLOOR - 110, 260, 0.2 * flick);
+        ctx.globalCompositeOperation = 'source-over';
+        const g = ctx.createLinearGradient(x, 0, x - 260, 0);
+        g.addColorStop(0, 'rgba(255,214,160,0.22)'); g.addColorStop(1, 'rgba(255,214,160,0)');
+        poly(ctx, [x - 14, FLOOR, x - 260, FLOOR + 22, x - 260, FLOOR + 2, x - 14, FLOOR - 2], null, false); ctx.fillStyle = g; ctx.fill();
+      }
+      poly(ctx, [x - 112, FLOOR + 2, x - 104, FLOOR - 120, x - 76, FLOOR - 196, x - 30, top, x + 10, top - 14, x + 58, FLOOR - 206, x + 96, FLOOR - 140, x + 116, FLOOR + 2], STONE);
+      poly(ctx, [x - 112, FLOOR + 2, x - 104, FLOOR - 120, x - 76, FLOOR - 196, x - 50, FLOOR - 160, x - 70, FLOOR + 2], STONE2);
+      // the crack: a tall sliver of the dawn on the other side
+      const cw = 30 * open + 3;
+      ctx.save();
+      ctx.beginPath(); ctx.moveTo(x - cw * 0.4, FLOOR); ctx.lineTo(x - cw * 0.7, FLOOR - 120); ctx.lineTo(x - cw * 0.2, top + 26); ctx.lineTo(x + cw * 0.5, FLOOR - 140); ctx.lineTo(x + cw * 0.6, FLOOR); ctx.closePath();
+      const sky = ctx.createLinearGradient(0, top, 0, FLOOR);
+      sky.addColorStop(0, open ? '#2c2c42' : '#08060c'); sky.addColorStop(0.7, open ? '#c9a07c' : '#0a080e'); sky.addColorStop(1, open ? '#f2d2a6' : '#0c0a10');
+      ctx.fillStyle = sky; ctx.fill();
+      ctx.clip();
+      if (open && G.champ) G.champ.drawSeated(ctx, x + 4, FLOOR, -1, 0.95);
+      ctx.restore();
+      if (open) glow(ctx, '255,236,200', x, FLOOR - 120, 70, 0.35 * flick);
+      ctx.globalCompositeOperation = 'source-over';
     } else if (ev.kind === 'duel') {
       const sh = ev.sh;
       if (ev.state === 'wait') {
@@ -1011,6 +1057,7 @@
       const done = REST.ev.done;
       return ['The Omen Altar', done ? 'Pledged. An omen more walks with you into the next trial.' : 'Pledge yourself: an omen more in the next trial, and a second boon from this offering.', done ? '' : 'pledge'];
     }
+    if (s.id === 'door') return ['The Doorway', 'Someone sits in the light inside, waiting. A duel: lose it, and you lose nothing.', 'step through'];
     if (s.id === 'duel') return ['The Duelling Shade', 'It dashes at you, six times at most. Strike it three times before its blade touches you and it leaves a relic.', 'duel'];
     if (s.id === 'seventh') return ['The Seventh Portal', run.runWon() ? 'It stirs, but does not open. Not yet.' : 'Dormant. It waits for six trials won (' + run.beaten.length + ' of ' + G.RUN_FIGHTS + ').', run.runWon() ? 'touch it' : ''];
     if (s.id === 'portal') {
@@ -1025,7 +1072,7 @@
     if (s.id === 'boon') return shownDef(s.i).name;
     if (s.id === 'card') return s.i === 1 ? 'The Fortune-Teller' : '';
     if (s.id === 'portal') { const B = G.bosses[s.boss]; return B ? (portalState(s.boss) === 'corrupt' ? 'Corrupted' : B.short) : ''; }
-    return { fire: 'The Fire', stone: 'Second Thoughts', seventh: 'The Seventh', home: 'The Way Home', fountain: 'The Fountain', smith: 'The Smith', pledge: 'The Omen Altar', duel: 'The Shade' }[s.id];
+    return { fire: 'The Fire', stone: 'Second Thoughts', seventh: 'The Seventh', home: 'The Way Home', fountain: 'The Fountain', smith: 'The Smith', pledge: 'The Omen Altar', duel: 'The Shade', door: 'The Doorway' }[s.id];
   }
 
   // names over each place, what the nearest one does; in front of everything

@@ -97,14 +97,19 @@
   // Straight into a fight with no relic (used by tests and the console).
   G.startRun = function () { G.run.reset(); G.startFight(); };
   // After a victory: out onto the road between trials, where the boon is chosen (rest.js).
+  // (back from the Champion's doorway, champion.js: the road is as it was left, and a lost duel costs
+  // nothing, not even the Dawnbreak meter spent in it)
   G.toRest = function () {
     G.practice = null;
+    const back = G.run.champFight, lost = G.champLost;
+    G.run.champFight = false; G.champLost = false;
+    if (back && lost) G.player.ult = G.run.champUlt;
     G.run.ult = G.player.ult || 0; // the Dawnbreak meter carries over
     G.setBoss('rest');
     G.arena.reset(); G.hazards.clear(); F.reset();
     G.player.reset(); G.flow.reset(); G.boss.reset(); G.moments.reset(); G.sets.reset();
-    G.rest.enter();
-    G.player.x = G.rest.spawn(); G.player.facing = 1;
+    if (back) G.rest.back(lost); else G.rest.enter();
+    G.player.x = back ? G.rest.doorX : G.rest.spawn(); G.player.facing = back ? -1 : 1;
     G.cam.x = G.rest.camTarget(); G.cam.y = 0;
     G.state = 'rest'; G.paused = false; G.hitstop = 0; G.slowT = 0;
     G.ui.resetHud(); G.ui.close(); G.ui.buildHp(G.player.maxHp); G.ui.buildRun(); G.ui.hud(true, true, true);
@@ -121,6 +126,13 @@
     if (!corrupt) R.trial++;
     G.startFight();
   };
+  // Through the Champion's doorway (rest.js): his duel. Not a trial; win or lose, back to this road.
+  G.enterChampion = function () {
+    const R = G.run;
+    R.ult = G.player.ult || 0; R.champUlt = R.ult;
+    R.champFight = true; R.champMet = true;
+    G.startFight();
+  };
   G.nextTrial = function () { const left = G.run.left(); G.enterPortal(G.pick(left.length ? left : G.BOSS_IDS), false); };
   G.rerollBoons = function () { if (G.run.reroll()) { G.audio.play('uiSelect'); G.ui.fillBoons(); } else G.audio.play('empty'); };
   G.takeBoon = function (i) { G.run.take(i); G.nextTrial(); };
@@ -128,7 +140,7 @@
   G.startFight = function () {
     G.rest.leave();
     G.seed((Date.now() ^ (Math.random() * 1e9)) >>> 0);
-    G.setBoss(G.debug.boss || (G.practice ? G.practice.boss : G.run.foe()));
+    G.setBoss(G.debug.boss || (G.practice ? G.practice.boss : G.run.champFight ? 'champion' : G.run.foe()));
     if (G.corrupt.on()) G.arena.setTheme(G.corrupt.theme(G.boss.theme || G.boss.id)); // corrupt.js
     G.cam.x = 0; G.cam.y = 0; // the camp scrolls; an arena does not
     G.run.rollOmens(); // before the boss works out its health
@@ -174,6 +186,8 @@
 
   G.onPlayerDeath = function () {
     G.state = 'dead'; G.deadT = 0;
+    // beaten by the Champion: nothing lost but pride (the road waits, see step)
+    if (G.run.champFight && !G.practice) { G.champLost = true; G.lastShards = 0; G.ui.letterbox(false); G.ui.mood('dead'); G.audio.duck(0.35); return; }
     G.lastShards = G.meta.onDefeat();
     G.ui.letterbox(false); G.ui.mood('dead');
     G.audio.duck(0.35);
@@ -227,6 +241,19 @@
     return { grade, title, newBest, best: best[d], trial, newDepth, done, wonNow, corrupt, newCorrupt, offer, meta };
   }
 
+  // The Champion beaten (champion.js): his trophy and gift (meta.js), and his hilt for the rest of the run.
+  // Nothing about the run's trials changes.
+  function champResult() {
+    const P = G.player, t = G.time, R = G.run;
+    const score = 100 - P.stats.hits * 9 - Math.max(0, t - 150) * 0.12 + Math.min(10, P.stats.perfect * 1.5);
+    const grade = score >= 92 ? 'S' : score >= 76 ? 'A' : score >= 58 ? 'B' : 'C';
+    const title = { S: 'Flawless light', A: 'Radiant', B: 'Steadfast', C: 'Survivor' }[grade];
+    const meta = G.meta.onVictory(grade, 'champion');
+    const hilt = !R.extraRelics.includes('hilt');
+    if (hilt) R.extraRelics.push('hilt');
+    return { grade, title, trial: R.trial, champ: true, hilt, meta, done: false, corrupt: false };
+  }
+
   // The Moves page: what each button does for the hero in play. Held open with Tab (the fight
   // waits while it is up), or opened from the pause menu.
   G.showMoves = function () {
@@ -242,7 +269,7 @@
     if (a === 'pause') G.pause();
     if (a === 'moves') G.showMoves();
     // no need to wait for the defeat screen: R restarts at once
-    if (a === 'retry' && G.state === 'dead') G.newRun();
+    if (a === 'retry' && G.state === 'dead' && !G.champLost) G.newRun();
   }
 
   // ------------------------------------------------------------------ simulation
@@ -298,7 +325,8 @@
     if (G.state === 'fight' && G.boss.active && !G.boss.dying && !G.boss.dead) G.time += sdt;
     if (G.state === 'dead') {
       G.deadT += dt;
-      if (G.deadT > 1.7 && !G.endShown) { G.endShown = true; G.audio.setIntensity(0); G.ui.showDead(); }
+      if (G.champLost) { if (G.deadT > 2.4 && !G.endShown) { G.endShown = true; G.audio.setIntensity(0); G.toRest(); } }
+      else if (G.deadT > 1.7 && !G.endShown) { G.endShown = true; G.audio.setIntensity(0); G.ui.showDead(); }
     }
     if (G.state === 'won') {
       G.wonT += dt;
@@ -308,7 +336,7 @@
           // a practice win goes straight back to the ring it started from
           const t = G.time, name = G.boss.short;
           G.toHub('ring'); G.hub.say(name + ' beaten in ' + G.ui.fmtTime(t));
-        } else G.ui.showWin(result());
+        } else G.ui.showWin(G.run.champFight ? champResult() : result());
       }
     }
   }

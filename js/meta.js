@@ -47,6 +47,7 @@
     { id: 'pelt', boss: 'wolf', name: 'Cinder Pelt', desc: 'A dash fills Starlight as a hit does, and dashes recover 20% faster.' },
     { id: 'pearl', boss: 'leviathan', name: 'Drowned Pearl', desc: 'One more health, and Starlight fills 25% faster.' },
     { id: 'wraps', boss: 'kairo', name: 'Sparring Wraps', desc: 'After a perfect dodge, your next attack blinks you behind the foe and deals 50% more.' },
+    { id: 'hilt', boss: 'champion', name: 'The Offered Hilt', desc: 'Once a fight, when you break the boss’s stagger, for 6 seconds every attack also throws an echo of another hero’s weapon.' },
   ];
   for (const t of TROPHIES) { G.RELICS.push(t); }
   G.TROPHIES = TROPHIES;
@@ -81,6 +82,8 @@
       out.relic = TROPHIES.find((t) => t.boss === bossId) || null;
       out.lines.push('First victory over ' + G.bosses[bossId].short + ' +25');
     }
+    // the Champion's own gift, on top (not scaled): more the first time
+    if (bossId === 'champion') { const g = out.first ? 60 : 30; n += g; out.lines.push('His gift +' + g); }
     if (G.run.omens.length) out.lines.push('Omen +' + 25 * G.run.omens.length + '%');
     if (G.run.corrupt) out.lines.push('Corrupted \u00d73');
     // feats done for the first time in this fight (see feats.js); their pay is not scaled
