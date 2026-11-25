@@ -557,3 +557,24 @@ ul.tips b { color: var(--ink); font-weight: 600; }
 .recap .rbuild { display: flex; flex-wrap: wrap; gap: 4px; margin: 6px 0 0; }
 .recap .rbuild span { padding: 1px 6px; font-size: 10.5px; letter-spacing: 0.06em; color: var(--ink); border: 1px solid var(--tagc, rgba(255, 255, 255, 0.3)); border-left-width: 3px; background: rgba(8, 6, 14, 0.6); }
 
+/* ---------------------------------------------------------------- v2.8a: the Boss Journal */
+.panel.journal #journalBody { min-height: 470px; max-height: 540px; overflow-y: auto; border-left: 1px solid rgba(255, 255, 255, 0.1); padding-left: 30px; padding-right: 8px; }
+.panel.journal #journalBody h3 { margin: 2px 0 4px; font: 400 20px var(--display); letter-spacing: 0.16em; color: var(--ink); text-transform: uppercase; }
+.panel.journal #journalBody .lead { margin: 0 0 12px; color: var(--dim); font-size: 13px; }
+.panel.journal nav .item { text-align: left; padding: 7px 8px 7px 30px; font-size: 14px; letter-spacing: 0.12em; }
+.panel.journal nav .item::after { display: none; }
+.panel.journal nav .item.open { color: var(--gold); }
+.jlist { display: grid; gap: 8px; }
+.jent { padding: 7px 10px; background: rgba(255, 255, 255, 0.03); border-left: 2px solid rgba(255, 210, 122, 0.55); }
+.jent b { font-size: 14px; letter-spacing: 0.08em; color: var(--ink); }
+.jent i { margin-left: 10px; font-size: 11px; font-style: normal; letter-spacing: 0.12em; text-transform: uppercase; color: var(--dim); }
+.jent p { margin: 4px 0 3px; font-size: 13px; line-height: 1.45; color: #d9d1c2; }
+.jent .jst { font-size: 11.5px; color: var(--dim); }
+.jent .jst em { font-style: normal; color: #ffb0a0; }
+.jent .jst em.fell { color: #ff7a6a; }
+.jent.unseen { border-left-color: rgba(255, 255, 255, 0.12); opacity: 0.6; }
+.jent.unseen p { font-style: italic; }
+
+.panel.journal #journalBody::-webkit-scrollbar { width: 8px; }
+.panel.journal #journalBody::-webkit-scrollbar-track { background: rgba(255, 255, 255, 0.04); }
+.panel.journal #journalBody::-webkit-scrollbar-thumb { background: rgba(255, 210, 122, 0.35); border-radius: 4px; }

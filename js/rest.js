@@ -168,7 +168,7 @@
   REST.enter = function () {
     REST.t = 0; REST.taken = -1; REST.near = null; REST.msgT = 0;
     REST.taken2 = -1; REST.extra = false; REST.awakeT = -1;
-    REST.ev = rollEvent();
+    REST.ev = G.run.seeded('event', rollEvent); // (v2.8a: from the day, in a daily trial)
     initTurn();
     if (!REST.flies.length) {
       for (let i = 0; i < 40; i++) REST.flies.push({ x: WALL_L + Math.random() * (WALL_R - WALL_L), y: FLOOR - 16 - Math.random() * 160, s: 0.5 + Math.random() * 0.9, ph: Math.random() * 6.28, dx: (Math.random() - 0.5) * 14 });

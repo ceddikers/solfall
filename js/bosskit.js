@@ -529,6 +529,7 @@
       if (!name) name = nextAttack();
       if (!B.ATTACKS[name]) name = B.bags[B.phase][0];
       B.attackName = name;
+      G.meta.jot(B.id, name, 'seen'); // (v2.8a: the Boss Journal)
       B.body.ctrl = true;
       yield* B.ATTACKS[name]();
       // every attack ends in its own way back to rest (B.recover): the Knight shoulders its sword, the

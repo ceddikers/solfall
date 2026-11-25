@@ -7,15 +7,25 @@
   // the trophies won (boss id: true). Before v2.6b a trophy came with the first victory over its boss;
   // a save from then keeps every trophy it had (they are copied from its victories once).
   if (!M.trophy) { M.trophy = {}; for (const id in M.kills) if (M.kills[id]) M.trophy[id] = true; }
-  const save = () => G.store.save('meta', { shards: M.shards, earned: M.earned, up: M.up, kills: M.kills, trophy: M.trophy, runs: M.runs, best: M.best, feats: M.feats, toys: M.toys });
+  // (v2.8a) mastery: xp per hero (costumes.js); journal: per boss and attack, how often met, hit by, felled by (ui.js)
+  M.mastery = M.mastery || {}; M.journal = M.journal || {};
+  const save = () => G.store.save('meta', { shards: M.shards, earned: M.earned, up: M.up, kills: M.kills, trophy: M.trophy, runs: M.runs, best: M.best, feats: M.feats, toys: M.toys, mastery: M.mastery, journal: M.journal });
   // Erase everything that lasts between runs (Settings, Reset progress).
   M.reset = function () {
-    M.shards = 0; M.earned = 0; M.up = {}; M.kills = {}; M.trophy = {}; M.runs = 0; M.best = {}; M.feats = {}; M.toys = {};
+    M.shards = 0; M.earned = 0; M.up = {}; M.kills = {}; M.trophy = {}; M.runs = 0; M.best = {}; M.feats = {}; M.toys = {}; M.mastery = {}; M.journal = {};
     save(); G.store.save('best', {}); G.store.save('depth', {});
   };
   // Fastest first-trial win against a boss on the current difficulty, in seconds (or undefined).
   M.bestTime = (bossId) => (M.best[bossId] || {})[G.settings.difficulty];
   M.save = save;
+  // (v2.8a) The Boss Journal's record: an attack seen (it began, in a real fight or practice), a blow taken
+  // from it, a fall to it. Tests record nothing. Seen is saved at once (it is rare); hits and falls too.
+  M.jot = function (boss, atk, what) {
+    if (!boss || !atk || G.debug.freeze || G.debug.god || boss === 'dummy' || boss === 'rest') return;
+    const b = M.journal[boss] || (M.journal[boss] = {}), e = b[atk] || (b[atk] = { seen: 0, hit: 0, fell: 0 });
+    e[what] = (e[what] || 0) + 1;
+    save();
+  };
 
   // ------------------------------------------------------------------ the Shrine
   // costs: one entry per rank. text(rank) describes what that many ranks give.

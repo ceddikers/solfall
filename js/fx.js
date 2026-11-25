@@ -116,6 +116,7 @@
     p.max = p.life;
     if (p.grav == null) p.grav = 0;
     if (p.drag == null) p.drag = 0;
+    if (p.rot == null) p.rot = 0; // (v2.8a: a wobble reads it; without one it made the position NaN)
     if (!p.kind) p.kind = 'glow';
     F.parts.push(p);
   };
@@ -435,6 +436,34 @@
     if (G.arena.bump) G.arena.bump(p);
   };
 
+  function drawCostumePart(ctx, p, k) {
+    const s = p.size;
+    ctx.save();
+    ctx.translate(p.x, p.y); ctx.rotate(p.rot || 0);
+    if (p.kind === 'petal') {
+      ctx.fillStyle = G.rgba(p.color, Math.min(1, k * 1.8) * 0.85);
+      ctx.beginPath(); ctx.ellipse(0, 0, p.long ? s * 1.6 : s, p.long ? s * 0.42 : s * 0.62, 0, 0, G.TAU); ctx.fill();
+    } else if (p.kind === 'star4') {
+      const a = Math.min(1, k * 2) * (0.7 + 0.3 * Math.sin(p.life * 40));
+      ctx.fillStyle = G.rgba(p.color, a);
+      ctx.beginPath(); ctx.moveTo(0, -s); ctx.lineTo(s * 0.25, -s * 0.25); ctx.lineTo(s, 0); ctx.lineTo(s * 0.25, s * 0.25); ctx.lineTo(0, s); ctx.lineTo(-s * 0.25, s * 0.25); ctx.lineTo(-s, 0); ctx.lineTo(-s * 0.25, -s * 0.25); ctx.closePath(); ctx.fill();
+    } else if (p.kind === 'hex') {
+      ctx.strokeStyle = G.rgba(p.color, Math.min(1, k * 2)); ctx.lineWidth = 1.4;
+      ctx.beginPath(); for (let i = 0; i < 6; i++) { const a = i * Math.PI / 3; if (i) ctx.lineTo(Math.cos(a) * s, Math.sin(a) * s); else ctx.moveTo(s, 0); } ctx.closePath(); ctx.stroke();
+    } else if (p.kind === 'wisp') {
+      ctx.rotate(-(p.rot || 0));
+      ctx.fillStyle = G.rgba(p.color, Math.min(1, k * 1.6) * 0.8);
+      ctx.beginPath(); ctx.moveTo(0, -s * 2.4); ctx.quadraticCurveTo(s, -s * 0.4, 0, s); ctx.quadraticCurveTo(-s, -s * 0.4, 0, -s * 2.4); ctx.fill();
+      ctx.fillStyle = G.rgba('255,255,255', Math.min(1, k * 1.6) * 0.7); ctx.beginPath(); ctx.arc(0, 0, s * 0.35, 0, G.TAU); ctx.fill();
+    } else if (p.kind === 'bolt') {
+      ctx.strokeStyle = G.rgba(p.color, k); ctx.lineWidth = 1.6; ctx.lineJoin = 'round';
+      ctx.beginPath(); ctx.moveTo(0, 0);
+      for (let i = 1; i <= 4; i++) ctx.lineTo(s * i / 4, Math.sin(p.seed + i * 2.7) * s * 0.22);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
   // ------------------------------------------------------------------ update
   F.update = function (dt) {
     const parts = F.parts;
@@ -447,6 +476,7 @@
       p.vy += p.grav * dt;
       if (p.wob) p.vx += Math.sin(p.life * 9 + p.rot) * p.wob * dt;
       p.x += p.vx * dt; p.y += p.vy * dt;
+      if (p.vr && p.kind !== 'chunk' && p.kind !== 'shard') p.rot += p.vr * dt; // (v2.8a: petals, stars, hexes turn)
       if (p.kind === 'chunk' || p.kind === 'shard') {
         p.rot += p.vr * dt;
         if (p.y > FLOOR - 2 && p.vy > 0) {
@@ -622,6 +652,9 @@
         ctx.moveTo(p.x, p.y);
         ctx.lineTo(p.x - p.vx * len, p.y - p.vy * len);
         ctx.stroke();
+      } else if (p.kind === 'petal' || p.kind === 'star4' || p.kind === 'hex' || p.kind === 'wisp' || p.kind === 'bolt') {
+        // (v2.8a) the costumes' own: petals and feathers, four-pointed stars, hex sparks, spirit fire, lightning
+        drawCostumePart(ctx, p, k);
       } else if (p.kind === 'shard') {
         const c = Math.cos(p.rot) * p.size, s = Math.sin(p.rot) * p.size;
         ctx.fillStyle = G.rgba(p.color, Math.min(1, k * 2.2));

@@ -100,7 +100,7 @@
   ];
   const heroById = {};
   for (const h of G.HEROES) heroById[h.id] = h;
-  G.hero = () => heroById[R.hero] || G.HEROES[0];
+  G.hero = () => { const h = heroById[R.hero] || G.HEROES[0]; return G.costumed ? G.costumed(h) : h; }; // (v2.8a: as worn, costumes.js)
 
   // ------------------------------------------------------------------ relics (one, chosen before the first trial)
   // Each one awakens on the road after trials II, IV and VI (relics.js, which also holds what they do).
@@ -289,6 +289,7 @@
     // (v2.7a) what the run has dealt and taken, by source, for the recap on the result screens: the whole run,
     // and the fight in hand (game.js starts it afresh)
     R.stats = { dealt: {}, taken: {} }; R.fight = { dealt: {}, taken: {} };
+    R.daily = null; R.dn = {}; // (v2.8a) the day of a daily trial, and how often each of its picks has been drawn
     if (typeof document !== 'undefined') document.documentElement.style.setProperty('--herocol', G.hero().css); // (a hero's own boons wear the hero's colour)
   };
 
@@ -319,6 +320,23 @@
     if (!R.stats) R.stats = { dealt: {}, taken: {} };
     if (!R.fight) R.fight = { dealt: {}, taken: {} };
   };
+  // (v2.8a) The daily trial. Every pick a run makes (the first boss, each offering and redraw, the omens,
+  // a corrupted portal, a road's meeting, a banish's replacement, the relic) is drawn from the day itself and
+  // how many times that kind of pick has been drawn this run, so the same day and the same choices give the
+  // same run on anyone's screen. Outside a daily trial nothing changes. (The fights are seeded too: game.js.)
+  R.dayKey = function () { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
+  R.hashSeed = function (s) { let h = 2166136261; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; };
+  R.seeded = function (tag, fn) {
+    if (!R.daily) return fn();
+    R.dn = R.dn || {};
+    const n = R.dn[tag] = (R.dn[tag] || 0) + 1;
+    const rng0 = G.rng, pick0 = G.pick, rand0 = Math.random;
+    G.seed(R.hashSeed(R.daily + '|' + tag + '|' + n));
+    const rr = G.rng;
+    Math.random = rr; G.pick = (arr) => arr[(rr() * arr.length) | 0];
+    try { return fn(); } finally { G.rng = rng0; G.pick = pick0; Math.random = rand0; }
+  };
+
   // (v2.7a) Damage dealt, by where it came from, and blows taken, by the boss's attack: for the recap.
   R.source = (info) => (G.player.ulting ? 'Dawnbreak' : info.crown ? 'Crown' : info.tick ? 'Embers' : info.set ? 'Set'
     : info.relic ? 'Relic' : info.flow ? 'Flow' : info.lance ? 'Special' : info.finisher ? 'Finishers' : 'Blows');
@@ -529,6 +547,11 @@
       stagger: b.stagger - (bulwark ? 0.8 : 0),
     });
   };
+  // (v2.8a: in a daily trial these picks come from the day: R.seeded)
+  for (const k of ['foe', 'rollCorruption', 'rollRelicReward', 'rollOffer', 'freeBoon', 'freeCurse', 'banish']) {
+    const f = R[k];
+    if (f) R[k] = function () { const a = arguments; return R.seeded(k, () => f.apply(R, a)); };
+  }
   // From the fifth trial (of seven, the last three met) they also use their Merciless patterns.
   G.fierce = () => G.settings.difficulty === 2 || R.trial >= 5 || (G.corrupt && G.corrupt.on());
 })();

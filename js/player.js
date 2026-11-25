@@ -278,6 +278,7 @@
     if (P.dashBuf > 0 && !P.plunge && P.drawT <= 0 && P.dashT <= 0 && P.dashCd <= 0 && P.stun <= 0 && (P.onGround || P.airDashes > 0)) {
       P.dashBuf = 0;
       P.dashT = C.DASH_T; P.dashDir = mx || P.facing; P.facing = P.dashDir;
+      G.costumeFx('dash', P.x, P.y - 24, P.dashDir > 0 ? Math.PI : 0); // (v2.8a: a costume's own burst)
       P.iframes = C.IFRAME; P.pdDone = false;
       if (!P.onGround) P.airDashes--;
       G.relics.dashed(); // (Cinder Pelt, Quicksilver: relics.js)
@@ -513,6 +514,7 @@
       P.flareBuf = 0;
       if (P.ember >= C.SEG) {
         P.ember -= C.SEG; P.stats.lances++; P.castN++; // (castN tells one special from the next: sets.js)
+        G.costumeFx('special', P.x, P.y - 34);
         const d = aim(mx, up, down, I.aim.flare);
         if (H.special === 'lance') castLance(d.x, d.y);
         else if (H.special === 'starfall') castStarfall();
@@ -590,6 +592,7 @@
   }
 
   function slashArc(a, t0) {
+    G.costumeFx('swing', P.x + a.dir * 28, P.y - 34, a.dir > 0 ? 0 : Math.PI);
     P.slashes.push({
       kind: a.kind, dir: a.dir, heavy: a.heavy, thrust: a.thrust, idx: a.idx, t: t0, dur: a.heavy ? 0.3 + 0.1 * a.charge : 0.19,
       reach: (1 + 0.25 * G.boon('reach')) * H.reach * (1 + 0.25 * a.charge), thick: H.thick * (1 + 0.5 * a.charge),
@@ -730,6 +733,7 @@
   // Stormcaller: every fifth weapon hit calls lightning onto what it struck.
   function struck(t, x, y) {
     P.hitCount++;
+    G.costumeFx('hit', x, y);
     if (!G.relic('storm') || P.hitCount % G.relics.stormEvery() !== 0) return;
     if (G.boss.damage(Math.round(G.relics.stormDmg() * G.dmgMult()), t, { x, y, heavy: true, poise: G.relics.stormPoise() })) {
       const pts = [];
@@ -869,6 +873,7 @@
   function loose(a) {
     arrow(a.dx, a.dy, a.dmg, a.heavy);
     hiltEcho(G.sign(a.dx) || P.facing, a.dmg);
+    G.costumeFx('shot', P.x + a.dx * 24, P.y - 38 + a.dy * 24, Math.atan2(a.dy, a.dx));
     G.audio.play(a.heavy ? 'arrowHeavy' : 'arrow');
     // firing downward in the air lifts her
     // (each shot before she next lands lifts less than the last, so she cannot hang in the sky)
@@ -888,6 +893,7 @@
   // ---------------------------------------------------------------- specials
   // Fire one Star Lance (or three with Split Lance) along a unit direction.
   function fireLance(dx, dy) {
+    G.costumeFx('shot', P.x + dx * 24, P.y - 36 + dy * 24, Math.atan2(dy, dx));
     const split = G.boon('split');
     const angles = split ? [-0.2, 0, 0.2] : [0];
     const dmg = Math.round(C.LANCE_DMG * (split ? 0.6 : 1) * G.dmgMult() * spec());
@@ -1590,6 +1596,7 @@
     dmg = G.relics.blowDmg(dmg); // (Anvil Heart, Ascendant)
     if (G.bane('bloodedge')) dmg += 1; // Bloodied Edge's bane
     P.hp -= dmg; P.stats.hits++; G.run.hurtBy(dmg); // (v2.7a: for the recap)
+    G.meta.jot(G.boss.id, G.boss.attackName, 'hit'); // (v2.8a: the Boss Journal)
     G.relics.hurt(); // (relics.js: Thorn Crown, Rising Sun, Anvil Heart, the Pearl)
     if (G.bane('feral')) P.ember = 0; // Feral Rhythm's bane
     if (G.bane('ravenous')) G.hexes.feed(); // Ravenous Light's bane
@@ -1664,6 +1671,7 @@
     for (let i = G.shots.length - 1; i >= 0; i--) {
       const s = G.shots[i];
       s.t += dt;
+      if (Math.random() < dt * 14) G.costumeFx('trail', s.x, s.y, Math.atan2(-s.vy, -s.vx)); // (v2.8a: a costume's trail)
       // step in two halves so a fast shot cannot skip through a thin target
       for (let k = 0; k < 2 && !s.dead; k++) {
         s.x += s.vx * dt * 0.5; s.y += s.vy * dt * 0.5;
@@ -2752,7 +2760,8 @@
   // { x, y, facing, vx, vy, onGround, squash, runT, atk, primed, hurtFlash, dash }.
   // Used for the live hero, dash afterimages and the portraits on the hero-select screen.
   function drawBody(ctx, h, s) {
-    const st = STYLE[h.id], col = h.col, id = h.id;
+    // (v2.8a) a costume's own tones over the hero's (costumes.js)
+    const st = h.costume ? (h.costume.st || (h.costume.st = Object.assign({}, STYLE[h.id], h.costume.style))) : STYLE[h.id], col = h.col, id = h.id;
     const a = s.atk, air = !s.onGround, sp = Math.abs(s.vx);
     const run = !air && sp > 40, idle = !air && !run && !a;
     const ph = PHASE[id] || 0;
@@ -3057,6 +3066,7 @@
     else if (id === 'aster') headAster(ctx, h, st);
     else if (id === 'eos') headEos(ctx, h, st, hat);
     else headLune(ctx, h, st, moon);
+    G.costumeHead(ctx, h); // (v2.8a)
     if (id === 'lune' || id === 'eos') anchorHere(); // her hair, their hat ribbons: tied at the head
     ctx.restore();
     if (id === 'vesper') plateVesper(ctx, h, st);

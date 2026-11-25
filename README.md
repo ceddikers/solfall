@@ -2,7 +2,7 @@
 
 A side-on boss rush for the browser: four heroes, seven three-phase bosses, played as a run of
 ever-harder trials. You pick a hero and a relic before the run and win a boon after each victory.
-Version 2.7b.
+Version 2.8a.
 
 This is an early slice of a planned boss-rush roguelite (short runs, a boon after each boss,
 bosses drawn from a pool). A run is seven trials, one for each boss, each harder than the last: the first boss
@@ -114,6 +114,63 @@ hero (`tools/feel-check.js`).
 - Settings, Reset progress erases Sunshards, upgrades, trophies and records (it has to be chosen twice).
 
 Not done: touch controls, a colour-blind alternative to red-orange warnings, gamepad rebinding.
+
+## A Boss Journal, a daily trial, and costumes (v2.8a)
+
+Asked, from a list of ten ideas: "2 / 3 / 7 (since its mainly for friends can you make some anime inspired costumes
+that change skill effects too?)": the Boss Journal, a daily trial, and hero mastery with costumes.
+
+- **The Boss Journal** (a lectern with an open book in the camp, by the Tally; also **Journal** in the pause
+  menu). A page for each boss, an entry for each of its moves. A move not yet met is "? ? ?" with only the phases
+  it comes in. Once met: its name, what it does and how to read it, how many times you have met it, how often it
+  hit you and how often it felled you. Each tab shows how many of that boss's moves are written down. The text
+  is made from the comments over each attack in the boss files, by `tools/build-journal.py`, with
+  `tools/journal-extra.json` for the moves that had none (160 moves, all with text). Run it again when a
+  boss's attacks change. Practice, god mode and the training dummy write nothing.
+- **The daily trial** (title screen: "Daily trial · Lune with the Sunstone · best today: 3 trials"). One run a
+  day, the same for everyone that day: the hero and relic are picked from the date, and every pick of the run
+  (the first boss, each offering and redraw, the omens, corrupted portals, the road's meetings, banishes, relic
+  rewards) is drawn from the day and how many times that kind of pick has come up, so the same choices give the
+  same run on any screen. The fights are seeded by the day too. Your difficulty is your own. The day's best
+  (trials won, or the run won) is kept. Starting one ends a saved run, and the title says so.
+- **Mastery and costumes** (`js/costumes.js`). Winning a trial with a hero gives it 1 mastery, and winning the run
+  gives 3 more (the Champion's duel gives 1). The first costume unlocks at 3 and the second at 10. They're put on at
+  **the Wardrobe**: your own hero's bay in the Hall of Echoes (it used to be empty). Use it to cycle through
+  the costumes and the hero's own colours. A costume changes the hero's colours, adds a head piece, and gives
+  their skills their own particles: on swings, hits taken, shots, a shot's trail, dashes and the special. They
+  are cosmetic only. The other heroes' echoes in the Hall wear theirs.
+
+  | Hero | Costume | Its effects | Head piece |
+  |---|---|---|---|
+  | Vesper | Crimson Ronin | falling petals | a headband with trailing tails |
+  | Vesper | Starlit Paladin | white feathers | a halo |
+  | Aster | Oni Breaker | embers | horns of flame |
+  | Aster | Steel Frame | hex plates | a visor |
+  | Lune | Shrine Archer | spirit wisps | a fox mask |
+  | Lune | Starlight Idol | four-point stars | a ribbon bow |
+  | Eos | Thunder Iaido | lightning forks | a crest |
+  | Eos | Ink Wanderer | ink drops | a hat's tassel |
+
+  They're anime archetypes, original designs and not copies of any one show's characters. A costume just
+  unlocked is named first on the victory screen.
+
+**Checked** in the preview:
+- Two daily starts gave the same hero, relic, first boss and offerings; ordinary runs stay random.
+- The Journal fills as moves are met and renders each page; it opens from the pause menu.
+- All eight costumes and their particles were drawn side by side. The wisps were invisible at first (a
+  particle drift read an unset angle) and are fixed.
+- The Wardrobe says how far a locked hero has to go, and cycles once a costume unlocks.
+- A win at 2 mastery unlocked the Crimson Ronin and said so on the victory screen.
+- 28 scripted fights (every boss and hero, 60 seconds each) with costumes worn, and no errors.
+
+**Not played by hand.**
+
+Playtest checklist:
+- Fight a boss, then open the Journal: are the moves you saw written down, and does the text help you read them?
+- Play today's daily trial with a friend. Do you both get the same first boss and the same offerings?
+- Win three trials with a hero and visit the Wardrobe (your own bay in the Hall). Do the costumes look good, and
+  do their effects get in the way of reading the fight?
+- Is 3 and 10 the right pace for unlocks?
 
 ## Lune aims down from the ground (v2.7b)
 

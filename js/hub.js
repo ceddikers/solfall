@@ -116,6 +116,7 @@
   // a scale while you keep it ringing, and a paper lantern in the yard, which counts the blows you
   // land before it touches the ground. Both are targets of the sparring post's "boss".
   const BELL_X = 224, TALLY_X = 420, LAMP_X = 1150, LAMP_R = 20;
+  const JOURNAL_X = 318; // (v2.8a) the Boss Journal's lectern, by the Tally
   const PENT = [0, 2, 4, 7, 9, 12, 14, 16, 19, 21, 24];
   const bell = { a: 0, av: 0, n: 0, quiet: 9, flash: 0 };
   const lamp = { x: LAMP_X, y: FLOOR - LAMP_R, vx: 0, vy: 0, n: 0, rot: 0, idle: 0, flash: 0 };
@@ -244,6 +245,23 @@
     ctx.globalCompositeOperation = 'source-over';
     pool(ctx, GOLD, x, 100, on ? 0.34 : 0.2);
   }
+  // (v2.8a) the Boss Journal: a lectern with a book lying open on it, a page lifting now and then
+  function drawJournal(ctx, t) {
+    if (!seen(JOURNAL_X, 200)) return;
+    const x = JOURNAL_X, on = HUB.near && HUB.near.id === 'journal';
+    glow(ctx, GOLD, x, FLOOR - 70, 80, on ? 0.34 : 0.18);
+    poly(ctx, [x - 4, FLOOR, x - 3, FLOOR - 56, x + 3, FLOOR - 56, x + 4, FLOOR], STONE);
+    poly(ctx, [x - 16, FLOOR, x - 12, FLOOR - 6, x + 12, FLOOR - 6, x + 16, FLOOR], STONE2);
+    poly(ctx, [x - 22, FLOOR - 58, x + 22, FLOOR - 66, x + 24, FLOOR - 60, x - 20, FLOOR - 52], STONE2);
+    // the open book: two pages, and a third turning
+    poly(ctx, [x - 20, FLOOR - 60, x - 1, FLOOR - 64, x - 1, FLOOR - 70, x - 19, FLOOR - 66], '#d8ccb0');
+    poly(ctx, [x + 1, FLOOR - 64, x + 21, FLOOR - 68, x + 20, FLOOR - 74, x + 1, FLOOR - 70], '#e6dcc2');
+    const turn = Math.max(0, Math.sin(t * 0.6)) ** 6;
+    if (turn > 0.02) poly(ctx, [x, FLOOR - 69, x + 18 - 30 * turn, FLOOR - 73 - 10 * Math.sin(turn * Math.PI), x + 17 - 30 * turn, FLOOR - 79 - 10 * Math.sin(turn * Math.PI), x, FLOOR - 75], '#f0e8d4');
+    ctx.strokeStyle = 'rgba(60,40,30,0.55)'; ctx.lineWidth = 0.8;
+    for (let i = 0; i < 3; i++) { ctx.beginPath(); ctx.moveTo(x - 16, FLOOR - 63 - i * 1.6); ctx.lineTo(x - 4, FLOOR - 66 - i * 1.6); ctx.moveTo(x + 4, FLOOR - 67 - i * 1.6); ctx.lineTo(x + 17, FLOOR - 70 - i * 1.6); ctx.stroke(); }
+    pool(ctx, GOLD, x, 60, on ? 0.3 : 0.16);
+  }
   function drawLamp(ctx, t) {
     // where it lives: a ring painted on the paving
     if (seen(LAMP_X, 200)) { ctx.strokeStyle = G.rgba(WARM, 0.3); ctx.lineWidth = 1.5; ctx.beginPath(); ctx.ellipse(LAMP_X, FLOOR + 4, 30, 4, 0, 0, TAU); ctx.stroke(); }
@@ -271,13 +289,16 @@
     ...G.HEROES.map((h, i) => ({ id: 'echo', hero: i, x: ECHO_X[i], reach: Math.min(56, BAY / 2 - 8), top: 262 })),
     { id: 'shrine', x: SHRINE_X, reach: 78, top: 300 },
     { id: 'tally', x: TALLY_X, reach: 62, top: 204 },
+    { id: 'journal', x: JOURNAL_X, reach: 40, top: 176 },
     { id: 'post', x: POST_X, reach: 0, top: 140 },
     { id: 'brazier', x: BRAZIER_X, reach: 70, top: 222 },
     { id: 'ring', x: RING_X, reach: 44, top: 150 },
     { id: 'gate', x: GATE_X, reach: 160, top: 474 },
   ];
   const foeName = (v) => (G.bosses[v] ? G.bosses[v].short : 'Whoever comes');
-  const usable = (s) => s.reach > 0 && !(s.id === 'echo' && G.HEROES[s.hero].id === G.run.hero);
+  // (v2.8a: your own empty bay in the Hall is the Wardrobe, where costumes are put on)
+  const usable = (s) => s.reach > 0;
+  const ownBay = (s) => s.id === 'echo' && G.HEROES[s.hero].id === G.run.hero;
 
   // The reliquary: one plinth for each relic on offer this visit (three, or four with the Shrine's
   // Fourth Relic). The plinths are places too, rebuilt only when the offer changes.
@@ -297,9 +318,21 @@
   const foeCol = (v) => (G.THEMES[v] ? G.THEMES[v][1].boss : '200,200,215');
 
   function label(s) {
+    if (ownBay(s)) {
+      // the Wardrobe: mastery, and the costume worn
+      const h = G.HEROES[s.hero], MA = G.mastery, lv = MA.level(h.id), nx = MA.next(h.id), c = MA.worn(h.id), n = MA.unlocked(h.id).length;
+      const mast = 'Mastery ' + (lv ? G.roman(lv) : '0') + (nx ? ' (' + MA.xp(h.id) + ' of ' + nx + ' toward the next costume: a trial won is 1, a run won 4)' : ' (every costume unlocked)');
+      return ['The Wardrobe: ' + (c ? c.name : h.name + '’s own colours'), (c ? c.note + ' ' : '') + mast, n ? 'change costume (' + (n + 1) + ' to choose from)' : ''];
+    }
     if (s.id === 'echo') {
       const h = G.HEROES[s.hero];
       return [h.name + ', ' + h.title, h.blurb, 'take up ' + h.name + '’s ' + h.weapon];
+    }
+    if (s.id === 'journal') {
+      const J = G.JOURNAL || {}, rec = G.meta.journal || {};
+      let all = 0, seen = 0;
+      for (const b in J) for (const a in J[b]) { all++; if (((rec[b] || {})[a] || {}).seen) seen++; }
+      return ['The Journal', seen + ' of ' + all + ' attacks written down: each boss move, once you have met it', 'read it'];
     }
     if (s.id === 'tally') return ['The Tally', G.feats.count() + ' of ' + G.feats.total + ' feats done', 'read it'];
     if (s.id === 'shrine') return ['The Shrine', '◆ ' + G.meta.shards + ' Sunshards', 'spend them'];
@@ -324,7 +357,8 @@
     return ['', '', ''];
   }
   function shortName(s) {
-    if (s.id === 'echo') return G.HEROES[s.hero].id === G.run.hero ? '' : G.HEROES[s.hero].name;
+    if (s.id === 'echo') return G.HEROES[s.hero].id === G.run.hero ? 'Wardrobe' : G.HEROES[s.hero].name;
+    if (s.id === 'journal') return 'Journal';
     if (s.id === 'relic') return G.run.relicOffer[s.i].name;
     return { shrine: 'The Shrine', tally: 'The Tally', post: 'Sparring post', brazier: G.diff().name, ring: 'Practice', gate: 'The Gate' }[s.id];
   }
@@ -334,6 +368,24 @@
 
   function use(s) {
     const P = G.player;
+    if (ownBay(s)) {
+      // the Wardrobe: the next costume unlocked, or back to the hero's own colours
+      const h = G.HEROES[s.hero], MA = G.mastery;
+      if (!MA.unlocked(h.id).length) { G.audio.play('uiMove'); say('Win trials as ' + h.name + ' to unlock a costume (' + MA.xp(h.id) + ' of ' + MA.next(h.id) + ')'); return; }
+      const c = MA.cycle(h.id), x = P.x, f = P.facing;
+      G.run.reset(); HUB.offer();
+      P.reset(); G.flow.reset(); G.moments.reset(); G.sets.reset();
+      P.x = x; P.facing = f; P.ember = G.PLAYER.SEG * P.segs;
+      G.ui.buildRun();
+      const hh = G.hero();
+      G.audio.play('heal'); G.audio.play('whoosh');
+      F.ring(P.x, P.y - 30, { r0: 10, r1: 150, life: 0.45, color: hh.hot, width: 6 });
+      F.burst(P.x, P.y - 30, { n: 22, color: hh.col, speed: [30, 200], life: [0.5, 1.1], size: [2, 4], grav: -160, wob: 120, jitter: 18 });
+      G.costumeFx('special', P.x, P.y - 34);
+      say(c ? c.name : h.name + '’s own colours');
+      return;
+    }
+    if (s.id === 'journal') { G.audio.play('uiSelect'); G.ui.showJournal(); return; }
     if (s.id === 'echo') {
       // trade places with the echo: the hero you were goes back to their own alcove
       const h = G.HEROES[s.hero], x = P.x, f = P.facing;
@@ -722,6 +774,7 @@
     drawHall(ctx, t);
     drawShrine(ctx, t);
     drawTally(ctx, t);
+    drawJournal(ctx, t);
     drawFire(ctx, t);
     drawYard(ctx, t);
     drawLamp(ctx, t);
@@ -742,7 +795,7 @@
     ctx.fillStyle = DARK; ctx.fillRect(322, FLOOR - 226, 536, 226);
     block(ctx, 590, 600, 9, 0, STONE2);
     for (let i = 0; i < NH; i++) {
-      const cx = ECHO_X[i] - HALL_DX, h = G.HEROES[i], mine = h.id === G.run.hero, on = near === i;
+      const cx = ECHO_X[i] - HALL_DX, h = G.costumed(G.HEROES[i]), mine = h.id === G.run.hero, on = near === i;
       // light in the alcove, in that hero's colour
       glow(ctx, h.col, cx, FLOOR - 92, on ? 128 : 100, mine ? 0.22 : on ? 0.62 : 0.36 + 0.06 * Math.sin(t * 1.7 + i * 2));
       block(ctx, cx, Math.min(64, ARCH * 2 - 14), 12, 9, STONE);
@@ -756,7 +809,7 @@
       } else {
         ctx.globalAlpha = on ? 0.97 : 0.66;
         still.x = cx; still.y = FLOOR - 21; still.facing = 1;
-        G.drawHero(ctx, h, still);
+        G.drawHero(ctx, G.costumed(h), still); // (v2.8a: in the costume they wear)
         ctx.globalAlpha = 1;
       }
     }

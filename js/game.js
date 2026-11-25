@@ -88,6 +88,28 @@
     G.ui.buildHp(G.player.maxHp); G.ui.buildRun();
     return true;
   };
+  // (v2.8a) The daily trial: one run a day, the same for everyone on the same day (run.js R.seeded): the
+  // day's hero and relic (from the relics every save starts with), and every pick of the run drawn from the day.
+  // Your difficulty is your own. The best of the day is kept: trials won, and whether the run was won.
+  G.dailyPlan = function () {
+    const R = G.run, key = R.dayKey(), hero = G.HEROES[R.hashSeed(key + '|hero') % G.HEROES.length];
+    const pool = G.RELICS.filter((r) => !r.boss && r.id !== 'crown').sort((a, b) => (a.id < b.id ? -1 : 1));
+    return { key, hero, relic: pool[R.hashSeed(key + '|relic') % pool.length] };
+  };
+  G.startDaily = function () {
+    const plan = G.dailyPlan();
+    G.settings.hero = plan.hero.id; G.saveSettings();
+    G.practice = null;
+    G.run.reset(); G.run.daily = plan.key; G.run.relic = plan.relic.id;
+    G.startFight();
+  };
+  G.dailyRecord = function () {
+    const R = G.run, all = G.store.load('daily', {}), was = all[R.daily] || { trials: 0, won: false };
+    const now = { trials: Math.max(was.trials, R.beaten.length), won: was.won || R.runWon(), hero: R.hero, diff: G.settings.difficulty };
+    all[R.daily] = now;
+    G.store.save('daily', all);
+  };
+
   // (v2.7a) Quick start on the title: the last hero and relic, straight into a first trial.
   G.quickStart = function () {
     const r = G.relicDef(G.settings.lastRelic);
@@ -180,11 +202,12 @@
 
   G.startFight = function () {
     G.rest.leave();
-    G.seed((Date.now() ^ (Math.random() * 1e9)) >>> 0);
+    // (v2.8a) a daily trial's fights are seeded by the day, the trial and the boss
+    G.seed(G.run.daily && !G.practice ? G.run.hashSeed(G.run.daily + '|fight|' + G.run.trial + '|' + (G.run.current || '') + '|' + (G.run.corrupt ? 'c' : '')) : (Date.now() ^ (Math.random() * 1e9)) >>> 0);
     G.setBoss(G.debug.boss || (G.practice ? G.practice.boss : G.run.champFight ? 'champion' : G.run.foe()));
     if (G.corrupt.on()) G.arena.setTheme(G.corrupt.theme(G.boss.theme || G.boss.id)); // corrupt.js
     G.cam.x = 0; G.cam.y = 0; // the camp scrolls; an arena does not
-    G.run.rollOmens(); // before the boss works out its health
+    G.run.seeded('omens', () => G.run.rollOmens()); // before the boss works out its health (from the day, in a daily trial)
     G.arena.reset(); G.hazards.clear(); F.reset();
     G.player.reset(); G.flow.reset(); G.boss.reset(); G.moments.reset(); G.sets.reset(); G.relics.reset(); G.feats.reset(); G.hexes.reset(); G.boss.intro();
     G.state = 'fight'; G.paused = false;
@@ -229,10 +252,11 @@
 
   G.onPlayerDeath = function () {
     G.state = 'dead'; G.deadT = 0;
+    if (G.player.lastHit && G.player.lastHit.attack) G.meta.jot(G.boss.id, G.player.lastHit.attack, 'fell'); // (v2.8a: the Boss Journal)
     // beaten by the Champion: nothing lost but pride (the road waits, see step)
     if (G.run.champFight && !G.practice) { G.champLost = true; G.lastShards = 0; G.ui.letterbox(false); G.ui.mood('dead'); G.audio.duck(0.35); return; }
     G.lastShards = G.meta.onDefeat();
-    if (!G.practice) G.clearRun(); // (the run is over)
+    if (!G.practice) { if (G.run.daily) G.dailyRecord(); G.clearRun(); } // (the run is over)
     G.ui.againHint(); // (R starts again at once: v2.7a says so)
     G.ui.letterbox(false); G.ui.mood('dead');
     G.audio.duck(0.35);
@@ -281,9 +305,11 @@
     if (wonNow) { const wins = G.store.load('wins', {}); wins[d] = (wins[d] || 0) + 1; G.store.save('wins', wins); }
     const newCorrupt = !G.practice && !corrupt ? R.rollCorruption(id) : null;
     const meta = G.meta.onVictory(grade, id);
+    const costume = G.practice ? null : G.mastery.gain(R.hero, 1 + (wonNow ? 3 : 0)); // (v2.8a: mastery, costumes.js)
+    if (R.daily && !G.practice) G.dailyRecord(); // (v2.8a)
     const offer = corrupt ? R.rollRelicReward() : R.rollOffer();
     R.current = null;
-    return { grade, title, newBest, best: best[d], trial, newDepth, done, wonNow, corrupt, newCorrupt, offer, meta };
+    return { grade, title, newBest, best: best[d], trial, newDepth, done, wonNow, corrupt, newCorrupt, offer, meta, costume };
   }
 
   // The Champion beaten (champion.js): his trophy and gift (meta.js), and his hilt for the rest of the run.
@@ -294,9 +320,10 @@
     const grade = score >= 92 ? 'S' : score >= 76 ? 'A' : score >= 58 ? 'B' : 'C';
     const title = { S: 'Flawless light', A: 'Radiant', B: 'Steadfast', C: 'Survivor' }[grade];
     const meta = G.meta.onVictory(grade, 'champion');
+    const costume = G.mastery.gain(R.hero, 1); // (v2.8a)
     const hilt = !R.extraRelics.includes('hilt');
     if (hilt) R.extraRelics.push('hilt');
-    return { grade, title, trial: R.trial, champ: true, hilt, meta, done: false, corrupt: false };
+    return { grade, title, trial: R.trial, champ: true, hilt, meta, done: false, corrupt: false, costume };
   }
 
   // The Moves page: what each button does for the hero in play. Held open with Tab (the fight

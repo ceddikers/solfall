@@ -726,6 +726,7 @@
     if (!name) name = nextAttack();
     if (!ATTACKS[name] || !canUse(name)) name = B.phase === 3 ? 'rain' : 'lance';
     B.attackName = name;
+    G.meta.jot(B.id, name, 'seen'); // (v2.8a: the Boss Journal)
     yield* ATTACKS[name]();
     // back to rest: a hand that was used shakes itself out and flexes on its way home; if it was the
     // core's doing alone, the eye closes for a moment

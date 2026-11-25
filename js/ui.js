@@ -42,7 +42,7 @@
       'hint', 'lowhp', 'lbTop', 'lbBot', 'diffNote', 'bestLine', 'ver', 'deadLead', 'deadFill', 'deadStats',
       'pauseBoons', 'boons', 'trial', 'winOver', 'winPick', 'winCards', 'heroName', 'heroCards', 'relicCards', 'relicOver',
       'deadTip', 'winStats', 'winBest', 'gradeLetter', 'gradeTitle', 'gradeSub', 'stage',
-      'practiceOver', 'keyList', 'resetItem', 'movesOver', 'movesTitle', 'movesBody', 'movesFoot', 'ult', 'ultFill', 'ultKey', 'crown', 'crownFill', 'crownName', 'crownKey', 'flow', 'flowRank', 'flowFill', 'omen', 'shardCount', 'shrineLead', 'shrineList', 'shrineTrophies', 'rerollItem', 'featsLead', 'featsBody', 'helpBody', 'helpTabs', 'fountainLead', 'fountainList', 'smithLead', 'smithList', 'continueItem', 'quickItem', 'deadRecap', 'winRecap']) el[id] = $(id);
+      'practiceOver', 'keyList', 'resetItem', 'movesOver', 'movesTitle', 'movesBody', 'movesFoot', 'ult', 'ultFill', 'ultKey', 'crown', 'crownFill', 'crownName', 'crownKey', 'flow', 'flowRank', 'flowFill', 'omen', 'shardCount', 'shrineLead', 'shrineList', 'shrineTrophies', 'rerollItem', 'featsLead', 'featsBody', 'helpBody', 'helpTabs', 'fountainLead', 'fountainList', 'smithLead', 'smithList', 'continueItem', 'quickItem', 'deadRecap', 'winRecap', 'dailyItem', 'journalTabs', 'journalBody']) el[id] = $(id);
     el.segs = Array.from(document.querySelectorAll('#ember .seg'));
     el.bbar = document.querySelector('.bbar');
     el.bname = document.getElementById('bname');
@@ -81,7 +81,7 @@
   };
   // (v2.7a) Menus you come back to open where you left the cursor (the result and choice screens always
   // open on their first item)
-  const REMEMBER = ['title', 'pause', 'settings', 'help', 'keys', 'practice', 'shrine', 'how', 'feats', 'moves'];
+  const REMEMBER = ['title', 'pause', 'settings', 'help', 'keys', 'practice', 'shrine', 'how', 'feats', 'moves', 'journal'];
   U.mem = {};
   U.setFocus = function (i) {
     document.body.classList.toggle('pad', G.input.device === 'gamepad');
@@ -91,6 +91,8 @@
     items.forEach((it, k) => it.classList.toggle('focus', k === U.focus));
     const act = U.current === 'help' && items[U.focus] ? items[U.focus].dataset.act || '' : '';
     if (/^help\d$/.test(act)) U.fillHelp(Number(act.slice(4)));
+    const ja = U.current === 'journal' && items[U.focus] ? items[U.focus].dataset.act || '' : '';
+    if (/^jour\d$/.test(ja)) U.fillJournal(Number(ja.slice(4)));
   };
   U.show = function (name, push) {
     if (push && U.current) U.stack.push(U.current);
@@ -135,6 +137,9 @@
     if (name === 'begin') G.toHub('fire');
     else if (name === 'continue') { if (!G.continueRun()) { G.audio.play('empty'); U.refresh(); } }
     else if (name === 'quick') G.quickStart();
+    else if (name === 'daily') G.startDaily();
+    else if (name === 'journal') U.showJournal();
+    else if (/^jour\d$/.test(name)) U.fillJournal(Number(name.slice(4)));
     else if (name === 'retry' || name === 'restart') G.newRun();
     else if (name === 'heroes' || name === 'camp') G.toHub('gate');
     else if (/^hero\d$/.test(name)) G.pickHero(Number(name.slice(4)));
@@ -374,6 +379,48 @@
     Array.from(el.helpTabs.children).forEach((it) => it.classList.toggle('open', it.dataset.act === 'help' + i));
   };
   U.showHelp = function () { U.helpPage = -1; U.fillHelp(0); U.show('help', true); };
+  // ---- (v2.8a) The Boss Journal: a page for each boss, an entry for each of its moves. A move you have not
+  // met is only a blank line; once met, its name, the phases it comes in, what it does and how to read it
+  // (js/journal-data.js, made from the bosses' own notes), and how often it has hit you and felled you.
+  const J_ORDER = ['warden', 'mage', 'assassin', 'knight', 'wolf', 'leviathan', 'kairo', 'champion'];
+  const jRec = (b) => (G.meta.journal || {})[b] || {};
+  U.showJournal = function () {
+    Array.from(el.journalTabs.children).forEach((it, i) => {
+      const b = J_ORDER[i];
+      if (!b) return;
+      const B = G.bosses[b], all = Object.keys((G.JOURNAL || {})[b] || {}), seen = all.filter((a) => (jRec(b)[a] || {}).seen).length;
+      it.textContent = (B ? B.short : b) + '  ' + seen + '/' + all.length;
+    });
+    U.jPage = -1;
+    U.show('journal', true);
+    const f = el.journalTabs.children[U.focus];
+    U.fillJournal(f && /^jour\d$/.test(f.dataset.act) ? Number(f.dataset.act.slice(4)) : 0);
+  };
+  U.fillJournal = function (i) {
+    const b = J_ORDER[i], B = G.bosses[b], J = (G.JOURNAL || {})[b];
+    if (!B || !J || U.jPage === i) return;
+    U.jPage = i;
+    const rec = jRec(b), bags = B.bags || {}, cor = B.corruptBags || {};
+    const phasesOf = (a) => [1, 2, 3].filter((p) => (bags[p] || []).includes(a));
+    const corrupt = (a) => [1, 2, 3].some((p) => (cor[p] || []).includes(a));
+    // in the order they are met: phase I's first, then II's, then III's, then the rest
+    const ids = Object.keys(J).sort((x, y) => ((phasesOf(x)[0] || 4) - (phasesOf(y)[0] || 4)));
+    let seen = 0, hits = 0, falls = 0;
+    const rows = ids.map((a) => {
+      const r = rec[a] || {}, e = J[a], ph = phasesOf(a);
+      hits += r.hit || 0; falls += r.fell || 0;
+      const when = (ph.length ? 'Phase ' + ph.map((p) => ROMAN[p]).join(', ') : corrupt(a) ? 'Corrupted only' : 'Its own moment')
+        + (ph.length && corrupt(a) ? ' \u00b7 also corrupted' : '');
+      if (!r.seen) return '<div class="jent unseen"><b>? ? ?</b><i>' + when + '</i><p>Not met yet.</p></div>';
+      seen++;
+      return '<div class="jent"><b>' + esc(e.name) + '</b><i>' + when + '</i><p>' + esc(e.text) + '</p>'
+        + '<span class="jst">met ' + r.seen + (r.hit ? ' \u00b7 <em>hit you ' + r.hit + '</em>' : ' \u00b7 never hit you') + (r.fell ? ' \u00b7 <em class="fell">felled you ' + r.fell + '</em>' : '') + '</span></div>';
+    });
+    const kills = (G.meta.kills || {})[b] || 0;
+    el.journalBody.innerHTML = '<h3>' + esc(B.name) + '</h3><p class="lead">' + seen + ' of ' + ids.length + ' moves written down \u00b7 beaten ' + kills + (kills === 1 ? ' time' : ' times')
+      + ' \u00b7 its moves have hit you ' + hits + (hits === 1 ? ' time' : ' times') + (falls ? ', felled you ' + falls : '') + '</p><div class="jlist">' + rows.join('') + '</div>';
+    Array.from(el.journalTabs.children).forEach((it) => it.classList.toggle('open', it.dataset.act === 'jour' + i));
+  };
   // ---- the Tally: every feat, done or not, and what it pays
   U.showFeats = function () {
     const FE = G.feats;
@@ -475,6 +522,10 @@
       el.continueItem.textContent = 'Continue \u00b7 ' + h.name + ', ' + (sv.at === 'fight' ? 'trial ' + G.roman(tr) + ' (it starts again)' : (sv.run.beaten || []).length >= G.RUN_FIGHTS ? 'the run won' : 'after trial ' + G.roman(Math.max(1, (sv.run.beaten || []).length)));
     }
     el.quickItem.style.display = !sv && last && lastHero && G.meta.unlocked(last) ? '' : 'none';
+    // (v2.8a) the daily trial: the day's hero and relic, and your best of the day
+    const dp = G.dailyPlan(), dr = G.store.load('daily', {})[dp.key];
+    el.dailyItem.textContent = 'Daily trial \u00b7 ' + dp.hero.name + ' with ' + dp.relic.name
+      + (dr ? ' \u00b7 best today: ' + (dr.won ? 'the run won' : dr.trials + (dr.trials === 1 ? ' trial' : ' trials')) : '') + (sv ? ' (ends the saved run)' : '');
     if (last && lastHero) el.quickItem.textContent = 'Quick start \u00b7 ' + lastHero.name + ', ' + last.name;
     const best = G.store.load('best', {})[G.settings.difficulty];
     const depth = G.store.load('depth', {})[G.settings.difficulty];
@@ -850,6 +901,11 @@
     return notes.join('');
   };
 
+  // (v2.8a) a costume this win unlocked (costumes.js) is named first
+  function costumeNote(res) {
+    if (!res.costume) return;
+    el.winBest.textContent = 'Mastery: the ' + res.costume.name + ' costume is yours (the Wardrobe, in the Hall of Echoes). ' + el.winBest.textContent;
+  }
   U.showWin = function (res) {
     const P = G.player;
     el.gradeLetter.textContent = res.grade;
@@ -877,6 +933,7 @@
       el.rerollItem.style.display = 'none';
       const ri = document.getElementById('restItem');
       ri.style.display = ''; ri.textContent = 'Return to the road';
+      costumeNote(res);
       U.hud(false);
       U.lockUntil = performance.now() + 700;
       U.show('win');
@@ -905,6 +962,7 @@
     const restItem = document.getElementById('restItem');
     restItem.style.display = goOn ? '' : 'none';
     restItem.textContent = res.corrupt ? 'Rest, and take a relic' : res.done ? 'Rest at the crossroads' : 'Rest, and choose a boon';
+    costumeNote(res);
     U.hud(false);
     U.lockUntil = performance.now() + 700;
     U.show('win');

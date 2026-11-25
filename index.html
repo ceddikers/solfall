@@ -59,6 +59,7 @@
         <nav>
           <div class="item" data-act="continue" id="continueItem" style="display:none">Continue</div>
           <div class="item" data-act="quick" id="quickItem" style="display:none">Quick start</div>
+          <div class="item" data-act="daily" id="dailyItem">Daily trial</div>
           <div class="item" data-act="begin">Enter the Vigil</div>
           <div class="item" data-act="help">Help</div>
           <div class="item" data-act="settings">Settings</div>
@@ -257,6 +258,26 @@
       </div>
     </section>
 
+    <section id="s-journal" class="screen panelscreen">
+      <div class="panel help journal">
+        <h2>The Journal</h2>
+        <div class="helpcols">
+          <nav id="journalTabs">
+            <div class="item" data-act="jour0">warden</div>
+            <div class="item" data-act="jour1">mage</div>
+            <div class="item" data-act="jour2">assassin</div>
+            <div class="item" data-act="jour3">knight</div>
+            <div class="item" data-act="jour4">wolf</div>
+            <div class="item" data-act="jour5">leviathan</div>
+            <div class="item" data-act="jour6">kairo</div>
+            <div class="item" data-act="jour7">champion</div>
+            <div class="item" data-act="back">Back</div>
+          </nav>
+          <div id="journalBody"></div>
+        </div>
+      </div>
+    </section>
+
     <section id="s-feats" class="screen panelscreen">
       <div class="panel feats">
         <p class="over">Feats</p>
@@ -298,6 +319,7 @@
         <nav>
           <div class="item" data-act="resume">Resume</div>
           <div class="item" data-act="moves">Moves</div>
+          <div class="item" data-act="journal">Journal</div>
           <div class="item" data-act="restart">Restart run</div>
           <div class="item" data-act="camp">Return to camp</div>
           <div class="item" data-act="help">Help</div>
@@ -355,6 +377,8 @@
 <script src="js/util.js"></script>
 <script src="js/run.js"></script>
 <script src="js/meta.js"></script>
+<script src="js/costumes.js"></script>
+<script src="js/journal-data.js"></script>
 <script src="js/feats.js"></script>
 <script src="js/input.js"></script>
 <script src="js/audio.js"></script>
