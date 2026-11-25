@@ -10,15 +10,18 @@
   const FLOOR = G.FLOOR, F = G.fx, rnd = G.rand, W = G.W, TAU = G.TAU;
   const GOLD = '255,214,140', RIM = '255,206,150', WARM = '255,170,90';
   const STONE = '#120f26', STONE2 = '#1c1736', DARK = '#0b0919';
-  const HW = 4040, WALL_L = 150, WALL_R = HW - 110, PAD = 48;
+  const HW = 3820, WALL_L = 150, WALL_R = HW - 110, PAD = 48;
   const NOTES = ['7 health. Warnings last longer, attacks come slower', '5 health. The fight as intended', '4 health. Shorter warnings, less rest, extra attacks'];
   const FLAME = ['150,215,255', '255,170,90', '255,70,60'];
   // where things stand
   // The Hall of Echoes has one bay for each hero, between piers that stand BAY apart
   const NH = G.HEROES.length, BAY = 510 / NH, ARCH = BAY / 2 - 23;
-  const ECHO_X = G.HEROES.map((h, i) => Math.round(335 + BAY * (i + 0.5)));
-  const SHRINE_X = 1130, FIRE_X = 1560, POST_X = 1950, BRAZIER_X = 2390, RELIQ_X = 3266, GATE_X = 3720;
-  const RING_X = 2900; // (the banners that stood before it went in v1.8c: the ring's own menu chooses the foe)
+  // (v2.5c: the hall stands by the reliquary and the gate, where a run ends and the next begins; it was at the
+  // far left, three screens from the gate. It is drawn in its own frame, 300-880, moved over by HALL_DX.)
+  const HALL_L = 2200, HALL_DX = HALL_L - 300;
+  const ECHO_X = G.HEROES.map((h, i) => Math.round(HALL_DX + 335 + BAY * (i + 0.5)));
+  const SHRINE_X = 1680, FIRE_X = 640, POST_X = 960, BRAZIER_X = 1330, RELIQ_X = 3050, GATE_X = 3500;
+  const RING_X = 2020; // (the banners that stood before it went in v1.8c: the ring's own menu chooses the foe)
 
   const HUB = G.hub = { near: null, t: 0, lastX: FIRE_X - 70, msg: '', msgT: 0, W: HW, layers: null, flies: [], blades: [] };
   HUB.maxCam = HW - W;
@@ -112,7 +115,7 @@
   // Two things in the camp that are only there to be hit: an old bell at the far end, which climbs
   // a scale while you keep it ringing, and a paper lantern in the yard, which counts the blows you
   // land before it touches the ground. Both are targets of the sparring post's "boss".
-  const BELL_X = 224, TALLY_X = 935, LAMP_X = 2190, LAMP_R = 20;
+  const BELL_X = 224, TALLY_X = 420, LAMP_X = 1150, LAMP_R = 20;
   const PENT = [0, 2, 4, 7, 9, 12, 14, 16, 19, 21, 24];
   const bell = { a: 0, av: 0, n: 0, quiet: 9, flash: 0 };
   const lamp = { x: LAMP_X, y: FLOOR - LAMP_R, vx: 0, vy: 0, n: 0, rot: 0, idle: 0, flash: 0 };
@@ -737,13 +740,14 @@
 
   // The Hall of Echoes: an alcove for each hero. Yours stands empty while you are out of it.
   function drawHall(ctx, t) {
-    if (!seen(590, 520)) return;
+    if (!seen(HALL_DX + 590, 520)) return;
     const near = HUB.near && HUB.near.id === 'echo' ? HUB.near.hero : -1;
+    ctx.save(); ctx.translate(HALL_DX, 0);
     // back wall, and a step up to the hall
     ctx.fillStyle = DARK; ctx.fillRect(322, FLOOR - 226, 536, 226);
     block(ctx, 590, 600, 9, 0, STONE2);
     for (let i = 0; i < NH; i++) {
-      const cx = ECHO_X[i], h = G.HEROES[i], mine = h.id === G.run.hero, on = near === i;
+      const cx = ECHO_X[i] - HALL_DX, h = G.HEROES[i], mine = h.id === G.run.hero, on = near === i;
       // light in the alcove, in that hero's colour
       glow(ctx, h.col, cx, FLOOR - 92, on ? 128 : 100, mine ? 0.22 : on ? 0.62 : 0.36 + 0.06 * Math.sin(t * 1.7 + i * 2));
       block(ctx, cx, Math.min(64, ARCH * 2 - 14), 12, 9, STONE);
@@ -763,7 +767,7 @@
     }
     // the arcade in front of them: piers, an arch over each bay, a beam, and what is left of the roof
     for (let i = 0; i < NH; i++) {
-      const cx = ECHO_X[i], ay = FLOOR - 212 + ARCH; // every arch reaches the same height, however wide the bays
+      const cx = ECHO_X[i] - HALL_DX, ay = FLOOR - 212 + ARCH; // every arch reaches the same height, however wide the bays
       ctx.fillStyle = STONE;
       ctx.beginPath(); ctx.moveTo(cx - ARCH, FLOOR - 226); ctx.lineTo(cx + ARCH, FLOOR - 226); ctx.lineTo(cx + ARCH, ay); ctx.arc(cx, ay, ARCH, 0, Math.PI, true); ctx.closePath(); ctx.fill();
       ctx.strokeStyle = G.rgba(RIM, 0.5); ctx.lineWidth = 1.5;
@@ -786,6 +790,7 @@
     poly(ctx, [300, FLOOR - 226, 300, FLOOR - 254, 880, FLOOR - 254, 880, FLOOR - 226], STONE2);
     poly(ctx, [312, FLOOR - 254, 420, FLOOR - 318, 560, FLOOR - 300, 600, FLOOR - 334, 668, FLOOR - 286, 720, FLOOR - 296, 742, FLOOR - 254], STONE);
     ctx.fillStyle = G.rgba(RIM, 0.55); ctx.fillRect(300, FLOOR - 254, 580, 2);
+    ctx.restore();
   }
 
   // The Shrine: a stepped dais under the ribs of a fallen dome, and the shard that turns above it.

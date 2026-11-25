@@ -160,7 +160,7 @@
     } else st.over = 0;
     let charging = b.hurt && !b.hidden && Math.abs(b.x - P.x) < 330 && Math.abs(b.y - FLOOR) < 4;
     // the Champion's thrust and draw: the glint as he sets is the moment to jump (his body comes through)
-    if (B.id === 'champion' && b.set && Math.abs(b.x - P.x) < (b.pose === 'thrustC' ? 470 : [0, 260, 380, 560][b.set] || 300) && (P.x - b.x) * b.face > -20) charging = true;
+    if (B.id === 'champion' && b.set && Math.abs(b.x - P.x) < (b.pose === 'thrustC' || b.pose === 'thrustP' ? 470 : [0, 260, 380, 560][b.set] || 300) && (P.x - b.x) * b.face > -20) charging = true;
     // the Warden's hands, borrowed: over them as they close
     for (const h of list) if (h.kind === 'clap' && !h.dead) { const c = h.t - h.follow - h.hold; if (c > -0.2 && c < 0.1 && Math.abs(P.x - h.cx) < h.gap + 20) { jump = true; high = true; } }
     if (charging) { jump = true; if (B.h > 100) high = true; }

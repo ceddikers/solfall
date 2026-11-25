@@ -104,15 +104,145 @@
     // the Tolling: lifted in both hands point down, and driven into the floor
     tollRaise: [-0.08, -61, 16, 0, -18, 0, 16, -172, 1.5708, 999, 0],
     tollRaiseDeep: [-0.12, -63, 15, 0, -18, 0, 16, -180, 1.5708, 999, 0],
+
+    // (v2.5c, the animation pass) In-between poses: the settle before a wind-up, the depth it builds
+    // to, and where the blade's weight carries it after the blow. Each attack's wind-up has a shape
+    // no other attack shares.
+    // The cleave: it sinks and both hands come onto the hilt, then it rises onto its toes with the
+    // blade cocked behind the helm. Burning, it drops into a low, wide stance instead.
+    raiseSet: [0.08, -52, 22, 0, -21, 0, 12, -90, -2.72, 999, 0],
+    raiseDeep: [-0.2, -58, 21, 0, -19, 0, -14, -114, -2.6, 999, 0],
+    raiseBlaze: [0.04, -48, 31, 0, -30, 0, -14, -110, -2.4, 999, 0],
+    raiseBlazeDeep: [-0.08, -45, 33, 0, -32, 0, -20, -112, -2.56, 999, 0],
+    cleaveThrough: [0.44, -47, 30, 0, -22, 0, 46, -46, 0.3, 999, 0],
+    // the cut back up: it coils down over the blade on the floor, and the blade carries on over the
+    // helm after it, back towards the shoulder
+    lowDeep: [0.42, -46, 28, 0, -24, 0, 24, -34, 0.22, 999, 0],
+    riseThrough: [-0.22, -58, 18, 0, -18, 0, -6, -116, -2.5, 999, 0],
+    // spent after a cut: bent over the blade, its point on the floor
+    dragSlump: [0.46, -46, 26, 0, -22, 0, 30, -40, 0.28, 999, 0],
+    // the overhead: both hands onto the hilt at the shoulder with the knees giving, then the blade
+    // straight up over the helm; as it locks it rises onto it, the blade a hair past upright
+    overSet: [0.1, -52, 20, 0, -20, 0, 16, -96, -1.92, 999, 0],
+    overLock: [-0.16, -58, 16, 0, -20, 0, 4, -132, -1.5, 999, 0],
+    // the charge: the blade comes down off the shoulder and levels in both hands, and it hunches
+    // lower and lower behind it, the back foot tearing at the floor
+    chargeSet: [0.3, -50, 22, 0, -26, 0, 14, -80, -0.6, 999, 0],
+    chargeUpDeep: [0.68, -38, 26, 0, -36, 0, 22, -54, 0.16, 999, 0],
+    crashHit: [-0.45, -54, 18, 0, -26, 0, 4, -100, -1.2, -20, -96],
+    // the grip: leaning back against the pull, the off hand reaching; then the haul, the off hand
+    // dragged in to its chest while the sword goes up behind
+    gripDeep: [-0.12, -56, 26, 0, -24, 0, -12, -52, 2.85, 56, -92],
+    gripHaul: [-0.2, -56, 24, 0, -24, 0, -14, -104, -2.6, -4, -82],
+    // the graves: it stands tall over the planted sword and lifts its off hand to the sky; the hand
+    // comes down at the hero and the columns follow it
+    graveCall: [0.0, -59, 17, 0, -18, 0, 24, -100, 1.5708, 14, -150],
+    graveDown: [0.18, -56, 20, 0, -20, 0, 24, -102, 1.5708, 52, -96],
+    // the wraiths: down on one knee by the planted sword, the off hand palm down over the floor;
+    // then it rises and flings the hand up, and the skulls go
+    wraithKneel: [0.3, -38, 26, 0, -30, 0, 26, -100, 1.5708, 40, -42],
+    wraithDeep: [0.38, -36, 27, 0, -30, 0, 26, -100, 1.5708, 48, -30],
+    wraithRise: [-0.05, -56, 20, 0, -22, 0, 24, -104, 1.5708, 30, -150],
+    // the desecration: the sword turned point down and held out at arm's length, dangling over the
+    // floor in front of it, the off hand spread low behind; then let drop and driven in
+    rotRaise: [0.16, -56, 22, 0, -22, 0, 48, -104, 1.52, -30, -56],
+    rotRaiseDeep: [0.22, -54, 24, 0, -22, 0, 54, -108, 1.56, -36, -50],
+    rotStab: [0.4, -46, 28, 0, -24, 0, 48, -100, 1.5, 999, 0],
+    // the whirl: coiled, the blade level behind it at the waist and the off arm flung out in front;
+    // after the spin it reels, feet crossed, before the blade drops
+    whirlSet: [0.14, -52, 26, 0, -26, 0, 18, -80, -2.9, 999, 0],
+    whirlCoil: [-0.1, -50, 32, 0, -30, 0, -26, -68, 3.1, 40, -92],
+    whirlCoilDeep: [-0.18, -46, 34, 0, -32, 0, -34, -66, 3.12, 46, -96],
+    whirlStagger: [-0.3, -54, 6, 0, -28, -4, 30, -50, 0.5, -30, -70],
+    // the rend: a long lunging stance, front foot far out; the blade held level over the helm, point
+    // forward (the high wave), or trailing on the floor behind it (the low one)
+    rendHigh: [0.22, -48, 40, 0, -34, 0, -24, -126, -0.08, 999, 0],
+    rendLow: [0.34, -44, 40, 0, -34, 0, -20, -40, 2.85, 999, 0],
+    // the leap: a deep squat with the sword gathered at the shoulder; at the top of the jump the
+    // blade goes up over the helm and the knees tuck; it lands into a crouch over the buried blade
+    leapCrouch: [0.3, -36, 26, 0, -28, 0, 10, -100, -2.0, 999, 0],
+    airHold: [-0.2, -62, 16, -20, -12, -14, -2, -134, -1.9, 999, 0],
+    airHoldDeep: [-0.28, -62, 14, -24, -10, -18, -8, -136, -2.1, 999, 0],
+    leapLand: [0.62, -38, 30, 0, -28, 0, 36, -74, 1.3, 999, 0],
+    // the hurl: the sword cocked behind its head, point hanging down its back like a hatchet, the off
+    // hand aimed at the far wall; then the whole body thrown after it
+    hurlSet: [0.06, -54, 22, 0, -22, 0, 4, -110, -2.9, 30, -90],
+    hurlCock: [-0.3, -55, 30, 0, -26, 0, -10, -124, 1.95, 46, -100],
+    hurlCockDeep: [-0.38, -54, 32, 0, -28, 0, -16, -126, 2.05, 52, -102],
+    hurlThrow: [0.5, -46, 36, 0, -30, 0, 50, -70, 0.3, -20, -76],
+    // the sever: one-handed, its off hand pointed at the hero like an accusation; the blade up behind
+    // (a cut coming down) or low in front (a cut coming up)
+    severHigh: [0.06, -56, 22, 0, -20, 0, -12, -98, -2.2, 56, -102],
+    severLow: [0.26, -52, 26, 0, -22, 0, 26, -44, 0.3, 46, -96],
+    // after the Heel's whip the blade carries on round, and the off hand is flung back
+    heelLowThrough: [0.38, -46, 32, 0, -24, 0, 50, -36, 0.1, -32, -60],
+    heelHighThrough: [0.24, -54, 30, 0, -22, 0, 44, -80, 0.55, -34, -84],
+    // the thrust: first the blade comes off the shoulder and levels, the knees giving; after the lunge
+    // it hangs stretched out past its front foot
+    drawSetLow: [0.1, -50, 24, 0, -24, 0, 6, -56, 0.42, 999, 0],
+    drawSetHigh: [0.04, -56, 22, 0, -24, 0, 6, -100, -0.42, 999, 0],
+    thrustLowSpent: [0.5, -38, 50, 0, -42, 0, 58, -36, 0.12, -36, -70],
+    thrustHighSpent: [0.38, -40, 48, 0, -40, 0, 60, -80, 0.12, -36, -78],
+    // the March's finisher: a stomp, the feet go wide and both hands take the hilt at the chest
+    hoistSet: [0.1, -48, 30, 0, -30, 0, 18, -96, -1.6, 999, 0],
+    // Skyward: it sinks over the blade before the cut, and the cut carries on past upright
+    skySet: [0.2, -50, 22, 0, -22, 0, 30, -70, 0.9, 999, 0],
+    skyOver: [-0.3, -59, 16, 0, -16, 0, -6, -136, -2.0, 999, 0],
+    // the grave-blades under the hero: the sword lifted one-handed behind the helm, slanting point
+    // down to the floor in front, the off hand pointing up at whoever is over it (the Tolling lifts
+    // it upright in both hands)
+    stabRaise: [-0.12, -58, 20, 0, -20, 0, -4, -140, 1.05, 16, -150],
+    // the Souls: the hand drawn in first (to the belly for one great soul, up by the helm for many)
+    soulDrawLow: [0.04, -57, 18, 0, -18, 0, 22, -84, -2.24, 14, -62],
+    soulDrawHigh: [0.0, -58, 18, 0, -18, 0, 22, -84, -2.24, 12, -108],
+    soulWatch: [0.08, -57, 20, 0, -18, 0, 22, -84, -2.24, 50, -90],
+    // the Tolling: the sword swung off the shoulder and turned point down at the chest; and after,
+    // both hands on the pommel, leaning on it while the rows rise
+    tollGrip: [0.14, -52, 20, 0, -20, 0, 20, -112, 1.5708, 999, 0],
+    tollLean: [0.24, -50, 20, 0, -22, 0, 24, -102, 1.5708, 999, 0],
   };
+  // The March's swings are made off a long stride (the tell that another is coming): its wind-ups
+  // are the cuts' own, with the feet a stride apart.
+  for (const [m, w] of [['marchRaise', 'raise'], ['marchLow', 'low'], ['marchAcross', 'heelHigh']]) {
+    const p = POSES[w].slice();
+    p[1] = -50; p[2] = 38; p[3] = 0; p[4] = -30; p[5] = 0;
+    POSES[m] = p;
+  }
+  // (the charge: hunched behind the blade levelled like a ram, its weight all forward, where the
+  // thrust's draw has its weight back)
+  POSES.chargeUp = [0.55, -44, 24, 0, -32, 0, 24, -62, 0.12, 999, 0];
+  POSES.charge = [0.66, -46, 28, -4, -32, -2, 34, -60, 0.1, 999, 0];
+  // (the overhead: both hands, blade straight up and higher than the cleave's)
+  POSES.overRaise = [-0.1, -60, 18, 0, -18, 0, 8, -126, -1.62, 999, 0];
+  // where a sword is left stuck in the floor (B.recover wrenches it free) or dropped in a crash
+  const PLANTED = new Set(['slam', 'plant', 'kneel', 'bury', 'wrench', 'graveCall', 'graveDown', 'wraithKneel', 'wraithDeep', 'wraithRise', 'rotStab', 'tollLean', 'leapLand']);
+  const DROPPED = new Set(['crash', 'whirlStagger', 'crashHit']);
   // A tell is not a pose held still: it keeps building (POSES.dyn, written by the attack each frame,
   // from where it starts towards how deep it goes)
   POSES.dyn = POSES.idle.slice();
   function building(from, to, k) {
     const A = POSES[from], Z = POSES[to], d = POSES.dyn, q = E.inOutQuad(G.clamp(k, 0, 1));
     for (let i = 0; i < NP; i++) d[i] = A[i] === 999 ? 999 : A[i] + (Z[i] - A[i]) * q;
+    B.body.dynName = from + '>' + to; B.body.dynBase = to;
     return 'dyn';
   }
+  // A pose with a few of its parts changed (also written into POSES.dyn)
+  function varied(name, mods) {
+    const A = POSES[name], d = POSES.dyn;
+    for (let i = 0; i < NP; i++) d[i] = A[i];
+    for (const i in mods) d[i] = mods[i];
+    B.body.dynName = name + '*'; B.body.dynBase = name;
+    return 'dyn';
+  }
+  // A wind-up in stages, inside the time it always had (k from 0 to 1 over it): first the settle
+  // (the dip, the blade coming off the shoulder), then the cock-back building to its deepest by
+  // hold, and held there to the end.
+  function staged(k, set, from, to, setK, hold) {
+    if (k < setK) return set;
+    return building(from, to, (k - setK) / ((hold || 1) - setK));
+  }
+  // What a pose is, for B.recover (a pose written into dyn is what it was made from)
+  const poseOf = (b) => (b.pose === 'dyn' ? b.dynBase || 'idle' : b.pose);
   const NP = 11;
   function walkPose(t) {
     const s = Math.sin(t), c = Math.cos(t), p = POSES.idle.slice();
@@ -128,6 +258,7 @@
     b.bare = false; b.still = false; b.voidK = 0; b.voidOn = false; b.hush = false; b.smooth = 0; b.fd = -1;
     b.look = 0; b.lookV = 0; b.lookT = 0; b.behindT = 0; B.sinceHeel = 0;
     B.cape = D.chain(9, b.x, b.y - 100);
+    b.rig = null; b.rigS = null; b.dr = null; // (the drawn bones: see living)
     WL = G.WALL_L; WR = G.WALL_R; B.ring = false; B.swords = []; B.lost = null;
   };
   B.bounds = () => (B.ring ? { l: WL + 13, r: WR - 13 } : null);
@@ -138,8 +269,8 @@
     if (b.hush && G.state === 'fight' && !G.player.dead && !G.paused) G.audio.duck(1);
     b.hush = false;
   }
-  B.onRelease = function () { const b = B.body; b.hurt = false; b.pose = 'idle'; b.spinning = false; b.fast = false; b.unarmed = false; b.blaze = 0; b.voidOn = false; b.lookT = 0; b.gazeT = 0; b.burn = 0; b.jit = 0; unhush(); };
-  B.onStagger = function () { B.body.pose = 'kneel'; };
+  B.onRelease = function () { const b = B.body; b.hurt = false; b.pose = 'idle'; b.stiff = 0; b.spinning = false; b.fast = false; b.unarmed = false; b.blaze = 0; b.voidOn = false; b.lookT = 0; b.gazeT = 0; b.burn = 0; b.jit = 0; unhush(); };
+  B.onStagger = function () { B.body.pose = 'kneel'; B.body.stiff = 0; };
   B.onInterrupt = function () { B.lost = null; unhush(); };
   B.staggerWord = 'DISARMED';
   B.staggerIn = function* () {
@@ -230,16 +361,27 @@
   // blaze: the blade burns red through the wind-up. That swing takes two health and throws a wave along the floor.
   function* cut(down, tele, r, blaze) {
     const b = B.body;
-    b.fast = false; b.pose = down ? 'raise' : 'low'; b.blaze = blaze ? 1 : 0;
+    // (v2.5c) down: it sinks and takes the hilt in both hands, then rises onto its toes with the
+    // blade cocked behind the helm (burning: down into a low, wide stance instead). Up: it coils
+    // down over the blade on the floor. After the blow the blade's weight carries on through.
+    const wind = down ? (blaze ? 'raiseBlaze' : 'raise') : 'low', deep = down ? (blaze ? 'raiseBlazeDeep' : 'raiseDeep') : 'lowDeep';
+    const set = down ? 'raiseSet' : 'low';
+    b.fast = false; b.pose = set; b.blaze = blaze ? 1 : 0;
     if (blaze) { G.audio.play('charge', { dur: tele }); G.audio.play('whoosh'); }
     const o = down ? { a0: -2.5, a1: 0.78, tele, pose: 'cleave', r } : { a0: 0.78, a1: -2.5, tele, pose: 'rise', r };
     if (blaze) o.dmg = 2;
-    if (B.phase >= 2) o.wind = down ? 'raise' : 'low';
+    if (B.phase >= 2) o.wind = wind;
     swing(o);
-    yield* wait(tele);
+    let e = 0;
+    while (e < tele) {
+      e += yield;
+      if (e < tele) b.pose = staged(e / tele, set, wind, deep, down ? 0.24 : 0.12, 0.86);
+    }
+    b.fast = true; b.pose = o.pose; // (as the swing fires)
     if (blaze) { H.shockwave(b.x + b.face * 84, b.face, 560, 46, { boss: DANGER, hot: '255,236,220' }); G.fx.shake(11); G.audio.play('boom'); }
     b.blaze = 0;
     yield* tween(b, { x: G.clamp(b.x + b.face * 34, WL + 50, WR - 50) }, 0.14, E.outCubic);
+    b.pose = down ? 'cleaveThrough' : 'riseThrough';
     yield* wait(0.12);
   }
 
@@ -288,12 +430,24 @@
   //   Its blade burns red while it winds up: that swing takes two health and throws a wave. Do not trade with it.
   const BLAZE = [0, 0.25, 0.35, 0.45];
   function* stamp() {
-    const b = B.body;
-    G.audio.play('stomp'); G.fx.shake(5); G.fx.kick(0, 3);
-    G.fx.thud(b.x - b.face * 20, FLOOR, 0.7, { noCrack: true });
-    G.fx.ring(b.x - b.face * 20, FLOOR - 4, { r0: 10, r1: 96, life: 0.3, color: G.pal().hot, width: 4 });
-    b.stamp = 1;
-    yield* wait(0.34);
+    const b = B.body, at = POSES[poseOf(b)] ? poseOf(b) : 'idle', A = POSES[at];
+    // (v2.5c) the back knee comes up high, and the foot is driven down; the body sinks into it
+    b.fast = false; b.stiff = 30;
+    b.pose = varied(at, { 1: A[1] - 3, 4: A[4] + 8, 5: -26 });
+    let e = 0, down = false;
+    while (e < 0.34) {
+      e += yield;
+      if (!down && e >= 0.07) {
+        down = true;
+        G.audio.play('stomp'); G.fx.shake(5); G.fx.kick(0, 3);
+        G.fx.thud(b.x - b.face * 20, FLOOR, 0.7, { noCrack: true });
+        G.fx.ring(b.x - b.face * 20, FLOOR - 4, { r0: 10, r1: 96, life: 0.3, color: G.pal().hot, width: 4 });
+        b.stamp = 1;
+        b.stiff = 46; b.pose = varied(at, { 1: A[1] + 6, 4: -24, 5: 0, 0: A[0] + 0.05 });
+        if (b.pv) b.pv[1] += 30;
+      }
+    }
+    b.stiff = 0;
     facePlayer();
   }
   function* drag() {
@@ -305,6 +459,8 @@
     while (e < 0.8) {
       const dt = yield;
       e += dt;
+      // (v2.5c) it sags over the blade, breathing hard
+      if (e > 0.14) b.pose = varied('dragSlump', { 1: POSES.dragSlump[1] + Math.sin(e * 9) * 1.6, 0: POSES.dragSlump[0] + Math.sin(e * 9) * 0.025 });
       if (e < 0.5 && Math.random() < dt * 14) {
         const L = bladeLine(b);
         if (L.py > FLOOR - 24) G.fx.spawn({ kind: 'spark', x: L.px, y: FLOOR - 2, vx: b.face * G.rand(30, 160), vy: -G.rand(40, 160), life: G.rand(0.1, 0.25), size: G.rand(1.2, 2.2), color: G.pal().hot, drag: 2, grav: 900 });
@@ -352,22 +508,29 @@
   function* overhead(track, lock, stuck, delay) {
     const b = B.body, P = G.player;
     facePlayer();
-    b.fast = false; b.pose = delay ? 'overHold' : 'overRaise';
+    b.fast = false; b.pose = 'overSet';
     if (delay) b.burn = 1;
     const reach = 138;
     const m = K.columnMark(b.x + b.face * reach, 132, true); // where the blade will land (not drawn: watch the sword)
     G.audio.play('charge', { dur: track + lock });
-    let e = 0;
+    let e = 0, amp = 0, st = 0;
+    const up = delay ? 'overHold' : 'overRaise', U = POSES[up];
     while (e < track) {
       const dt = yield;
       e += dt;
       // it strides after the hero while the blade is up
-      const want = P.x - b.face * reach;
+      const want = P.x - b.face * reach, x0 = b.x;
       if ((want - b.x) * b.face > 4) b.x = G.clamp(b.x + b.face * Math.min(230, Math.abs(want - b.x) * 6) * dt, WL + 50, WR - 50);
       m.x = b.x + b.face * reach; m.k = e / track * 0.7;
+      // (v2.5c) first the dip, both hands onto the hilt; then the blade up, and its feet stride with it
+      amp = G.damp(amp, Math.abs(b.x - x0) > 0.05 ? 1 : 0, 10, dt); st += Math.abs(b.x - x0) * 0.06;
+      const s = Math.sin(st) * amp, c = Math.cos(st);
+      b.pose = e < track * 0.2 ? 'overSet' : varied(up, { 2: U[2] + s * 13, 3: -Math.max(0, c) * 7 * amp, 4: U[4] - s * 13, 5: -Math.max(0, -c) * 7 * amp, 1: U[1] + Math.abs(s) * 2 });
     }
     // the blade stops following and catches the light: it is coming down
     G.fx.glint(b.x - b.face * 8, b.y - 212, 34, DANGER, 0.3); G.audio.play('glint');
+    // (v2.5c) it plants its feet and rises onto the blow, the blade a hair past upright
+    b.pose = delay ? 'overHold' : 'overLock';
     e = 0;
     while (e < lock) { e += yield; m.k = 0.7 + 0.3 * Math.min(1, e / lock); }
     if (delay) {
@@ -393,7 +556,7 @@
   // Stuck: the blade is in the floor and it is open; towards the end it strains to pull it free (the
   // body shakes, grit spits from round the blade, the steel creaks), so the end of the window shows.
   function* stuckFast(dur, x) {
-    const b = B.body;
+    const b = B.body, at = POSES[poseOf(b)] ? poseOf(b) : 'slam', A = POSES[at];
     b.exposed = true;
     let e = 0, creaked = false;
     while (e < dur) {
@@ -401,6 +564,11 @@
       e += dt;
       const k = e / dur;
       b.jit = k > 0.55 ? (k - 0.55) * 2.4 : 0;
+      // (v2.5c) its hands stay where the blade is stuck: the body sinks on into the blow, then leans
+      // back against it and hauls, the back foot digging in
+      if (e > 0.1) b.fast = false;
+      const sink = E.outCubic(Math.min(1, e / 0.25)), haul = k > 0.55 ? E.inOutQuad((k - 0.55) / 0.45) : 0;
+      b.pose = varied(at, { 0: A[0] + 0.07 * sink - 0.3 * haul, 1: A[1] + 5 * sink - 8 * haul, 4: A[4] - 10 * haul });
       if (k > 0.55 && Math.random() < dt * 16) G.fx.burst(x + G.rand(-10, 10), FLOOR - 3, { n: 1, color: '22,18,32', speed: [60, 220], angle: -Math.PI / 2, spread: 1.2, life: [0.3, 0.6], size: [2, 4], kind: 'chunk', grav: 1400 });
       if (!creaked && k > 0.6) { creaked = true; G.audio.play('knightCreak'); }
     }
@@ -419,7 +587,7 @@
     const b = B.body, T = K.T();
     facePlayer();
     const dir = b.face, tele = 0.85 * T;
-    b.pose = 'chargeUp';
+    b.fast = false; b.pose = 'chargeSet';
     H.lane({ x: WL, y: FLOOR - 108, w: WR - WL, h: 108, dir, dur: tele, quiet: true });
     G.audio.play('charge', { dur: tele });
     // it lowers its shoulder and its back foot tears at the ground
@@ -427,6 +595,14 @@
     while (ce < tele) {
       const dt = yield;
       ce += dt;
+      // (v2.5c) it sets itself, then hunches lower and lower, pawing at the floor with its back foot
+      const k = ce / tele;
+      if (k >= 0.2) {
+        building('chargeUp', 'chargeUpDeep', (k - 0.2) / 0.7);
+        const d = POSES.dyn, s = Math.sin(ce * 17);
+        d[4] -= 8 + s * 8; d[5] = -Math.max(0, s) * 9;
+        b.pose = 'dyn';
+      }
       if (Math.random() < dt * 30) G.fx.dust(b.x - dir * 26, FLOOR, 1, { dir: -dir, speed: [60, 260], size: [6, 11], life: [0.3, 0.6], up: 40, a: 0.4 });
       if (!glinted && ce >= tele - 0.22) { glinted = true; G.fx.glint(b.x + dir * 22, b.y - 84, 30, G.pal().hot); G.audio.play('glint'); }
     }
@@ -446,8 +622,12 @@
       // rubble shaken loose from the wall
       for (let i = 0; i < 4; i++) H.orb(tx + dir * 20, FLOOR - 300 - i * 40, -dir * G.rrand(120, 520), -G.rrand(60, 320), { grav: 1000, r: 11 });
     }
-    b.pose = 'crash'; b.exposed = true;
-    yield* wait(B.phase === 3 ? 1.1 : 1.4);
+    // (v2.5c) thrown back off the wall, the sword flung up, before it slumps
+    b.fast = true; b.pose = 'crashHit'; b.exposed = true;
+    if (b.pv) b.pv[0] -= 2;
+    let he = 0;
+    const down = B.phase === 3 ? 1.1 : 1.4;
+    while (he < down) { he += yield; if (he > 0.16 && b.pose === 'crashHit') { b.fast = false; b.pose = 'crash'; } }
     b.exposed = false;
   }
 
@@ -471,10 +651,13 @@
       },
     });
     G.audio.play('charge', { dur: tele });
-    yield* wait(tele);
+    // (v2.5c) the hand reaches, and it leans back against what it has hold of
+    b.fast = false;
+    let ge = 0;
+    while (ge < tele) { ge += yield; b.pose = building('grip', 'gripDeep', ge / tele); }
     G.audio.play('pull');
     const pullT = 0.8;
-    b.fast = false; b.pose = 'raise';
+    b.fast = false; b.pose = 'gripHaul';
     swing({ a0: -2.5, a1: 0.78, tele: pullT + 0.15 * T, pose: 'cleave' });
     let e = 0;
     while (e < pullT) {
@@ -482,9 +665,15 @@
       e += dt;
       const dx = b.x - P.x;
       G.wind = Math.abs(dx) > 70 ? G.sign(dx) * (K.gentle() ? 380 : 450) : 0;
+      // the off hand hauls in to its chest with the sword going up behind, then takes the hilt
+      if (e > pullT * 0.5) b.pose = building('raise', 'raiseDeep', (e - pullT * 0.5) / (pullT * 0.4));
     }
     G.wind = 0; tether.dead = true;
-    yield* wait(0.15 * T + 0.2);
+    e = 0;
+    while (e < 0.15 * T + 0.2) {
+      e += yield;
+      if (e > 0.15 * T + 0.1 && b.pose === 'cleave') b.pose = 'cleaveThrough';
+    }
     if (B.phase >= 2) { facePlayer(); yield* cut(false, 0.5 * T); }
     yield* wait(0.75);
   }
@@ -495,9 +684,17 @@
   function* atkGraves() {
     const b = B.body, P = G.player, T = K.T();
     facePlayer();
-    b.pose = 'plant';
+    // (v2.5c) it stands the sword in the floor, straightens over it and lifts its off hand to the
+    // sky; on the bell the hand comes down at the hero
+    b.fast = false; b.stiff = 24; b.pose = 'plant';
     G.audio.play('charge', { dur: 0.5 * T });
-    yield* wait(0.5 * T);
+    let e = 0;
+    while (e < 0.5 * T) {
+      e += yield;
+      const k = e / (0.5 * T);
+      if (k > 0.3) { b.stiff = 0; b.pose = building('plant', 'graveCall', (k - 0.3) / 0.6); }
+    }
+    b.stiff = 0; b.fast = true; b.pose = 'graveDown';
     G.audio.play('bell'); G.fx.shake(6);
     const n = 4 + (B.phase - 1) + (K.hard() ? 1 : 0);
     for (let i = 0; i < n; i++) {
@@ -513,9 +710,14 @@
     const b = B.body, P = G.player, T = K.T();
     G.ui.hint('wraiths', 'The skulls follow you. Cut them down');
     facePlayer();
-    b.pose = 'plant';
+    // (v2.5c) down on one knee by the planted sword, the off hand palm down over the floor, drawing;
+    // then it rises and flings the hand up, and the skulls go
+    b.fast = false; b.pose = 'wraithKneel';
     G.audio.play('charge', { dur: 0.7 * T });
-    yield* wait(0.7 * T);
+    let we = 0;
+    while (we < 0.7 * T) { we += yield; const k = we / (0.7 * T); if (k > 0.25) b.pose = building('wraithKneel', 'wraithDeep', (k - 0.25) / 0.65); }
+    b.fast = true; b.pose = 'wraithRise';
+    if (b.pv) b.pv[1] -= 40;
     G.audio.play('bell');
     const n = 3 + (B.phase === 3 ? 1 : 0) + (K.hard() ? 1 : 0), speed = K.gentle() ? 185 : 225;
     for (let i = 0; i < n; i++) {
@@ -539,11 +741,15 @@
     const b = B.body, P = G.player, T = K.T();
     G.ui.hint('rot', 'Keep off the rotting ground');
     facePlayer();
-    b.fast = false; b.pose = 'overRaise';
+    // (v2.5c) the sword turned point down and held out at arm's length over the floor in front, the
+    // off hand spread low behind; then driven in where it hangs
+    b.fast = false; b.pose = 'rotRaise';
     G.audio.play('charge', { dur: 0.6 * T });
-    yield* wait(0.6 * T);
-    b.fast = true; b.pose = 'slam';
+    let re = 0;
+    while (re < 0.6 * T) { re += yield; b.pose = building('rotRaise', 'rotRaiseDeep', re / (0.6 * T) / 0.9); }
+    b.fast = true; b.pose = 'rotStab';
     yield* wait(0.07);
+    if (b.pv) b.pv[1] += 30;
     K.impact(b.x + b.face * 60, false);
     K.crush(b.x + b.face * 60, FLOOR - 24, 48, 28, 1);
     const have = H.list.filter((h) => h.kind === 'pool').length;
@@ -562,7 +768,7 @@
     const b = B.body, P = G.player, T = K.T();
     G.ui.hint('whirl', 'Keep away from the spinning blade: run, dash through it, or take a platform');
     facePlayer();
-    b.pose = 'whirl';
+    b.fast = false; b.pose = 'whirlSet';
     const tele = 0.85 * T, dur = B.ring ? 1.7 : 2.4, R = 80, TOP = 108;
     G.audio.play('charge', { dur: tele });
     H.add({
@@ -597,10 +803,13 @@
     while (we < tele) {
       const dt = yield;
       we += dt;
+      // (v2.5c) the blade swung down off the shoulder, then the coil: level behind it at the waist,
+      // the off arm flung out in front, sinking into it
+      if (we < tele) b.pose = staged(we / tele, 'whirlSet', 'whirlCoil', 'whirlCoilDeep', 0.22, 0.9);
       if (Math.random() < dt * 26) { const s = Math.random() < 0.5 ? -1 : 1; G.fx.dust(b.x + s * G.rand(70, 130), FLOOR, 1, { dir: -s, speed: [80, 240], size: [5, 9], life: [0.3, 0.6], up: 30, a: 0.34 }); }
       if (!wg && we >= tele - 0.22) { wg = true; G.fx.glint(b.x + b.face * 74, b.y - 70, 32, G.pal().hot); G.audio.play('glint'); }
     }
-    b.spinning = true;
+    b.spinning = true; b.fast = true; b.pose = 'whirl';
     let e = 0, sfx = 0;
     const speed = ((K.gentle() ? 205 : 240) + (K.hard() ? 35 : 0)) * (B.ring ? 0.8 : 1);
     while (e < dur) {
@@ -611,8 +820,10 @@
       if (sfx <= 0) { sfx = 0.28; G.audio.play('blade'); G.fx.shake(2.5); }
     }
     b.spinning = false; facePlayer();
-    b.pose = 'crash'; b.exposed = true;
-    yield* wait(1.15);
+    // (v2.5c) it reels out of the spin, feet crossed, and the blade drops
+    b.fast = false; b.pose = 'whirlStagger'; b.exposed = true;
+    let se = 0;
+    while (se < 1.15) { se += yield; if (se > 0.3 && b.pose === 'whirlStagger') b.pose = 'crash'; }
     b.exposed = false;
   }
 
@@ -625,14 +836,19 @@
     let low = false; // off the shoulder the blade can only come down first; the low wave is the cut back up
     for (let i = 0; i < n; i++) {
       const tele = (i ? 0.6 : 0.7) * T, dir = b.face;
-      b.fast = false; b.pose = low ? 'low' : 'raise';
+      // (v2.5c) a long lunging stance, the front foot far out: the blade level over the helm for the
+      // high wave, trailing on the floor behind it for the low one
+      b.fast = false; b.pose = low ? 'rendLow' : 'rendHigh';
       H.lane({ x: WL, y: low ? FLOOR - 58 : FLOOR - 124, w: WR - WL, h: low ? 58 : 48, dir, dur: tele });
       yield* wait(tele);
       b.fast = true; b.pose = low ? 'rise' : 'cleave';
       G.audio.play('cleave'); G.fx.shake(5);
+      if (b.pv) b.pv[1] += 24;
       if (low) H.shockwave(b.x + dir * 50, dir, 560, 56);
       else crescent(b.x + dir * 50, dir, 560);
-      yield* wait(Math.max(0.2, 0.92 - tele));
+      const after = Math.max(0.2, 0.92 - tele);
+      let e = 0;
+      while (e < after) { e += yield; if (e > 0.1) b.pose = low ? 'riseThrough' : 'cleaveThrough'; }
       low = !low;
     }
     yield* wait(0.85);
@@ -642,9 +858,11 @@
   function* atkLeap() {
     const b = B.body, P = G.player, T = K.T();
     facePlayer();
-    b.pose = 'chargeUp';
+    // (v2.5c) a deep squat, the sword gathered at the shoulder
+    b.fast = false; b.stiff = 24; b.pose = 'leapCrouch';
     yield* wait(0.3);
-    b.fast = true; b.pose = 'air';
+    b.stiff = 0; b.fast = true; b.pose = 'air';
+    if (b.pv) b.pv[1] -= 50;
     G.audio.play('whoosh');
     K.impact(b.x, false);
     yield* tween(b, { y: -260 }, 0.32, E.outQuad);
@@ -653,15 +871,24 @@
       x: P.x, y: FLOOR - 8, r: 150, tele, dmg: 2,
       follow(h) { if (h.t < tele - lockT) h.x = G.damp(h.x, G.clamp(P.x, WL + 80, WR - 80), 0.2, 1); },
     });
-    yield* wait(tele - 0.11);
+    // (v2.5c) rising it tucks, and at the top the blade goes up over the helm and hangs there
+    let ae = 0;
+    while (ae < tele - 0.11) {
+      ae += yield;
+      const k = ae / (tele - 0.11);
+      if (k > 0.3) { b.fast = false; b.pose = building('airHold', 'airHoldDeep', (k - 0.3) / 0.6); }
+    }
     b.x = bl.x; b.face = P.x >= b.x ? 1 : -1;
-    b.pose = 'slam';
+    b.fast = true; b.pose = 'slam';
     yield* tween(b, { y: FLOOR }, 0.11, E.inQuad);
     H.shockwave(b.x - 60, -1, 470, 46);
     H.shockwave(b.x + 60, 1, 470, 46);
     if (K.hard()) for (const s of [-1, 1]) H.pool({ x: G.clamp(b.x + s * 230, WL + 100, WR - 100), w: 150, tele: 0.8 * T, active: 4 });
     b.exposed = true;
-    yield* wait(1.2);
+    // it lands down through its knees, crouched over the buried blade
+    if (b.pv) b.pv[1] += 50;
+    let le = 0;
+    while (le < 1.2) { le += yield; if (le > 0.1 && b.pose === 'slam') { b.fast = false; b.pose = 'leapLand'; } }
     b.exposed = false;
   }
 
@@ -685,7 +912,7 @@
     const b = B.body, T = K.T(), P = G.player;
     facePlayer();
     const dir = b.face, tele = 0.8 * T, speed = K.gentle() ? 860 : 980;
-    b.fast = false; b.pose = 'raise';
+    b.fast = false; b.pose = 'hurlSet';
     // (v2.5b: the lane runs only where the sword will fly, from its edge as it leaves the Knight's hand
     // to the wall it sticks in; it used to cover the whole floor, behind the Knight too)
     const span = (a, c) => ({ x: Math.min(a, c), w: Math.abs(c - a) });
@@ -693,8 +920,12 @@
     const out = span(b.x + dir * (60 - 36), wallAt);
     H.lane({ x: out.x, y: FLOOR - 66, w: out.w, h: 66, dir, dur: tele });
     G.audio.play('charge', { dur: tele });
-    yield* wait(tele);
-    b.fast = true; b.pose = 'cleave'; b.unarmed = true;
+    // (v2.5c) the sword cocked behind its head, point hanging down its back like a hatchet, the off
+    // hand aimed down the lane; then the whole body thrown after it
+    let he = 0;
+    while (he < tele) { he += yield; if (he < tele) b.pose = staged(he / tele, 'hurlSet', 'hurlCock', 'hurlCockDeep', 0.22, 0.9); }
+    b.fast = true; b.pose = 'hurlThrow'; b.unarmed = true;
+    if (b.pv) b.pv[0] += 1.5;
     G.audio.play('cleave'); G.audio.play('streak'); G.fx.shake(6);
     const tint = tintNow(), wall = dir > 0 ? WR - 34 : WL + 34;
     const blade = H.add({
@@ -730,7 +961,7 @@
     });
     // unarmed: nothing to swing, and every blow counts for more
     while (blade.state === 'out') yield;
-    b.pose = 'idle'; b.exposed = true;
+    b.fast = false; b.pose = 'idle'; b.exposed = true;
     yield* wait(B.phase === 3 ? 1.0 : 1.4);
     // the call: a lane the other way, then the sword tears free
     b.pose = 'grip'; facePlayer();
@@ -785,7 +1016,9 @@
     const n = (B.phase === 3 ? 3 : 2) + (K.hard() ? 1 : 0);
     for (let i = 0; i < n; i++) {
       facePlayer();
-      b.fast = false; b.pose = i % 2 ? 'low' : 'raise';
+      // (v2.5c) one-handed, the off hand pointed at the hero: the blade up behind for a cut coming
+      // down, low in front for one coming up
+      b.fast = false; b.pose = i % 2 ? 'severLow' : 'severHigh';
       const tele = (i ? 0.44 : 0.62) * T, ox = b.x + b.face * 44, oy = b.y - 92;
       const aim = K.aim(ox, oy, tele, 0.17);
       if (!i) G.audio.play('charge', { dur: tele });
@@ -793,7 +1026,8 @@
       b.fast = true; b.pose = i % 2 ? 'rise' : 'cleave';
       G.audio.play('cleave'); G.audio.play('streak'); G.fx.shake(5);
       flyingCut(ox, oy, aim.ang, K.gentle() ? 780 : 900);
-      yield* wait(0.26);
+      let se = 0;
+      while (se < 0.26) { se += yield; if (se > 0.1) b.pose = i % 2 ? 'riseThrough' : 'cleaveThrough'; }
     }
     yield* approach(165, 560, 0.9);
     yield* cut(true, 0.52 * T);
@@ -886,8 +1120,11 @@
     b.pose = o.pose;
     const s = yield* pivot(back, SPIN, 12);
     if (low) G.fx.dust(b.x + back * 120, FLOOR, 4, { dir: back, speed: [80, 300], size: [6, 11], up: 30, a: 0.36 });
+    // (v2.5c) the blade carries on round, and the off hand is flung back
+    b.pose = low ? 'heelLowThrough' : 'heelHighThrough';
     while (e + s < tele + 0.02) { e += yield; }
     yield* wait(0.12);
+    b.fast = false;
     if (B.phase === 3) {
       // the Blood Oath: no pause between them, the cut carries straight up into the overhead
       yield* overhead(0.4 * T, 0.26 * T, 1.05);
@@ -953,8 +1190,10 @@
     b.pose = 'heelLowCut';
     const s = yield* pivot(back, SPIN, 12);
     G.fx.dust(b.x + back * 120, FLOOR, 4, { dir: back, speed: [80, 300], size: [6, 11], up: 30, a: 0.36 });
+    b.pose = 'heelLowThrough';
     while (e + s < tele + 0.02) { e += yield; }
     yield* wait(0.1);
+    b.fast = false;
   }
 
   // The thrust's spectral lance (from the second phase): the point's line goes on to the wall.
@@ -993,7 +1232,10 @@
   // One thrust: the draw (the tell), then the point goes and the body follows it.
   function* thrustOnce(low, tele, first) {
     const b = B.body, P = G.player;
-    b.fast = false; b.pose = low ? 'drawLow' : 'drawHigh';
+    // (v2.5c) first the blade comes off the shoulder and levels with the knees giving (a re-draw is
+    // quicker), then the draw back
+    const setK = first ? 0.25 : 0.12;
+    b.fast = false; b.pose = low ? 'drawSetLow' : 'drawSetHigh';
     if (first) G.audio.play('charge', { dur: tele });
     else G.audio.play('pull');
     let e = 0, hit = null, glinted = false;
@@ -1003,7 +1245,7 @@
       // it can still turn while it settles its weight back; after that the line is set
       if (e < tele * 0.5 && (P.x - b.x) * b.face < -20) facePlayer();
       const k = e / tele;
-      b.pose = building(low ? 'drawLow' : 'drawHigh', low ? 'drawLowDeep' : 'drawHighDeep', k);
+      b.pose = staged(k, low ? 'drawSetLow' : 'drawSetHigh', low ? 'drawLow' : 'drawHigh', low ? 'drawLowDeep' : 'drawHighDeep', setK, 1);
       b.jit = k > 0.75 ? 0.8 : 0;
       if (Math.random() < dt * 10) G.fx.dust(b.x - b.face * 26, FLOOR, 1, { dir: -b.face, speed: [20, 90], size: [5, 8], life: [0.3, 0.5], up: 16, a: 0.28 });
       if (!glinted && e >= tele - 0.2) {
@@ -1057,6 +1299,8 @@
     if (b.pv) b.pv[1] += 34;
     hit.done = true;
     if (B.phase >= 2) { const L = bladeLine(b); lance(L.px, L.py, dir, low); G.audio.play('streak'); }
+    // (v2.5c) it hangs stretched out past its front foot, the point sagging
+    b.fast = false; b.pose = low ? 'thrustLowSpent' : 'thrustHighSpent';
   }
 
   // The Thrust: the one blow it makes point first, and the longest reach it has on foot.
@@ -1239,7 +1483,7 @@
   }
   function* risingCut(tele) {
     const b = B.body;
-    b.fast = false; b.pose = 'skyLow';
+    b.fast = false; b.pose = 'skySet';
     G.audio.play('charge', { dur: tele }); G.audio.play('bladeGrind');
     const m = (ang) => (b.face > 0 ? ang : Math.PI - ang);
     const o = { a0: -0.1, a1: -2.25, r: 236, cy: 70, pose: 'skyCut' };
@@ -1257,7 +1501,8 @@
       const dt = yield;
       e += dt;
       const k = e / tele;
-      b.pose = building('skyLow', 'skyLowDeep', k);
+      // (v2.5c) it sinks over the blade as the point comes down to the floor, then hunches
+      b.pose = staged(k, 'skySet', 'skyLow', 'skyLowDeep', 0.18, 1);
       b.jit = k > 0.75 ? 0.8 : 0;
       if (Math.random() < dt * 10) {
         const L = bladeLine(b);
@@ -1268,7 +1513,9 @@
     b.jit = 0; b.fast = true; b.pose = 'skyCut';
     if (b.pv) b.pv[1] -= 60;
     G.fx.dust(b.x, FLOOR, 3, { speed: [40, 180], size: [6, 10], up: 30, a: 0.34 });
-    yield* wait(0.3);
+    // and carries on past upright, the back arched under it
+    let oe = 0;
+    while (oe < 0.3) { oe += yield; if (oe > 0.12) b.pose = 'skyOver'; }
     // the blade's weight at the top: it lets it come back over onto the shoulder, open for a moment
     b.fast = false; b.pose = 'heft';
     b.exposed = true;
@@ -1278,8 +1525,10 @@
   function* gravesUnder(n, pace) {
     const b = B.body, T = K.T();
     // it lifts the sword point down and drives it into the floor
-    b.fast = false; b.pose = 'tollRaise';
+    // (v2.5c: one-handed, the off hand pointing up at whoever is over it; the Tolling lifts it in both)
+    b.fast = false; b.stiff = 22; b.pose = 'stabRaise';
     yield* wait(0.32 * T * pace);
+    b.stiff = 0;
     b.fast = true; b.pose = 'plant';
     yield* wait(0.07);
     G.audio.play('tink'); G.audio.play('stomp'); G.fx.shake(6);
@@ -1290,6 +1539,7 @@
     for (let i = 0; i < n; i++) {
       last = graveColumn(tele, lockT, 50);
       yield* wait(0.62 * pace);
+      b.fast = false; b.pose = 'tollLean'; // (leaning on the hilt while they come)
     }
     while (last && !last.fired) yield;
     yield* wait(0.5);
@@ -1304,10 +1554,11 @@
   //   stride. When it stops striding, sets its feet wide and hoists the sword in both hands, the
   //   finisher comes: two health, and a wave both ways under the Blood Oath.
   //   Then the blade is stuck in the floor and it strains to pull it free: the longest opening it gives.
+  // (v2.5c: each wound up off a long stride, and carried on through after the blow)
   const MARCH = [
-    { wind: 'raise', pose: 'cleave', a0: -2.5, a1: 0.78 },   // down off the shoulder
-    { wind: 'low', pose: 'rise', a0: 0.78, a1: -2.5 },       // up off the floor
-    { wind: 'heelHigh', pose: 'heelHighCut', a0: -0.95, a1: 0.38, r: 205 }, // across, at chest height
+    { wind: 'marchRaise', pose: 'cleave', through: 'cleaveThrough', a0: -2.5, a1: 0.78 },   // down off the shoulder
+    { wind: 'marchLow', pose: 'rise', through: 'riseThrough', a0: 0.78, a1: -2.5 },       // up off the floor
+    { wind: 'marchAcross', pose: 'heelHighCut', through: 'heelHighThrough', a0: -0.95, a1: 0.38, r: 205 }, // across, at chest height
   ];
   function* atkMarch() {
     const b = B.body, P = G.player, T = K.T();
@@ -1322,7 +1573,8 @@
       if (B.phase >= 2) o.wind = s.wind;
       swing(o);
       yield* wait(tele);
-      yield* wait(0.1);
+      let fe = 0;
+      while (fe < 0.1) { fe += yield; if (fe > 0.05) b.pose = s.through; }
       n++;
       const near = Math.abs(P.x - b.x) < 340 && P.y > FLOOR - 260;
       if (!(n < 2 || (n < max && near && K.chance(0.85, 'on')))) break;
@@ -1337,7 +1589,7 @@
     const d = POSES.dyn, from = b.pose === 'dyn' ? POSES.dyn.slice() : (POSES[b.pose] || POSES.idle).slice();
     for (let i = 0; i < NP; i++) d[i] = from[i];
     d[2] = 42; d[3] = -6; d[4] = -24; d[1] = from[1] + 4; d[0] = from[0] + 0.1; // (the front foot reaching out)
-    b.fast = false; b.pose = 'dyn';
+    b.fast = false; b.pose = 'dyn'; b.dynName = 'stride'; b.dynBase = 'idle';
     const x0 = b.x, x1 = G.clamp(b.x + b.face * Math.min(90, Math.max(30, Math.abs(P.x - b.x) - 150)), WL + 50, WR - 50);
     G.fx.dust(b.x - b.face * 18, FLOOR, 2, { dir: -b.face, speed: [40, 160], size: [5, 9], up: 20, a: 0.32 });
     let e = 0;
@@ -1355,7 +1607,7 @@
     const b = B.body, T = K.T();
     facePlayer();
     // it stops: the feet go wide and set, and the sword comes up over the helm in both hands
-    b.fast = false; b.pose = 'hoist';
+    b.fast = false; b.pose = 'hoistSet';
     G.audio.play('stomp'); G.fx.shake(3);
     G.fx.dust(b.x, FLOOR, 3, { speed: [30, 140], size: [6, 10], up: 22, a: 0.34 });
     const tele = [0, 0.74, 0.68, 0.6][B.phase] * T, reach = 132;
@@ -1366,7 +1618,8 @@
       const dt = yield;
       e += dt;
       const k = e / tele;
-      b.pose = building('hoist', 'hoistDeep', k);
+      // (v2.5c) both hands take the hilt at the chest first, then it goes up over the helm
+      b.pose = staged(k, 'hoistSet', 'hoist', 'hoistDeep', 0.2, 1);
       b.jit = k > 0.7 ? 0.7 : 0;
       m.x = b.x + b.face * reach; m.k = k;
       if (!glinted && e >= tele - 0.22) { glinted = true; G.fx.glint(b.x - b.face * 4, b.y - 270, 34, DANGER, 0.3); G.audio.play('glint'); }
@@ -1531,7 +1784,9 @@
     const many = K.chance(0.5, 'many'), tint = tintNow();
     const tele = [0, 0.78, 0.7, 0.62][B.phase] * T;
     const from = many ? 'spread' : 'cupLow', to = many ? 'spreadDeep' : 'cupLowDeep';
-    b.fast = false; b.pose = from;
+    // (v2.5c) the hand is drawn in first: to the belly for one great soul, up by the helm for many
+    const draw = many ? 'soulDrawHigh' : 'soulDrawLow';
+    b.fast = false; b.pose = draw;
     G.audio.play('charge', { dur: tele });
     // the hand: what gathers in it says how many
     const hand = () => ({ x: b.x + b.face * b.p[9], y: b.y + b.p[10] });
@@ -1540,7 +1795,7 @@
       const dt = yield;
       e += dt;
       const k = e / tele;
-      b.pose = building(from, to, k);
+      b.pose = staged(k, draw, from, to, 0.22, 1);
       const h = hand();
       if (many) {
         if (Math.random() < dt * 26) G.fx.spawn({ x: h.x + G.rand(-12, 12), y: h.y + G.rand(-6, 6), vx: G.rand(-20, 20), vy: G.rand(10, 60), life: G.rand(0.3, 0.6), size: G.rand(2, 3.5), color: tint.boss, wob: 20 });
@@ -1563,7 +1818,7 @@
     }
     yield* wait(0.3);
     // it watches them go, the hand still out, following them; then lets it fall
-    b.fast = false;
+    b.fast = false; b.pose = 'soulWatch';
     e = 0;
     const until = Math.max(...out.map((s) => s.fuse)) - 0.6;
     while (e < until && out.some((s) => !s.dead)) {
@@ -1644,13 +1899,15 @@
   function* atkTolling() {
     const b = B.body, P = G.player, T = K.T(), tint = tintNow();
     facePlayer();
-    b.fast = false; b.pose = 'tollRaise';
+    // (v2.5c) the sword swung off the shoulder and turned point down at the chest, then lifted in
+    // both hands over the helm
+    b.fast = false; b.pose = 'tollGrip';
     G.audio.play('charge', { dur: 0.5 * T });
     let e = 0;
     while (e < 0.5 * T) {
       const dt = yield;
       e += dt;
-      b.pose = building('tollRaise', 'tollRaiseDeep', e / (0.5 * T));
+      b.pose = staged(e / (0.5 * T), 'tollGrip', 'tollRaise', 'tollRaiseDeep', 0.26, 1);
     }
     b.fast = true; b.pose = 'plant';
     yield* wait(0.08);
@@ -1679,6 +1936,7 @@
       if (hi - gr > 20) last = graveRow(gr, hi, false, tele, tint);
       if (i) G.audio.play('bell');
       yield* wait(step);
+      b.fast = false; b.pose = 'tollLean'; // (it leans on the hilt while the rows rise)
     }
     while (last && !last.dead && last.t < last.tele + 0.6) yield;
     // it hauls the sword out of the floor: open while it does
@@ -1841,7 +2099,7 @@
       b.face = face; b.pose = wind;
       return;
     }
-    b.fast = false; b.pose = 'chargeUp'; // it sinks before it springs
+    b.fast = false; b.pose = 'leapCrouch'; // it sinks before it springs
     yield* wait(0.1);
     b.fast = true; b.pose = 'air';
     G.fx.dust(b.x, FLOOR, 4, { dir: -G.sign(x - x0), speed: [40, 200], size: [6, 11], up: 30, a: 0.36 });
@@ -2112,10 +2370,10 @@
   // depends on where the sword was left: stuck in the ground it is wrenched free; dropped after a
   // crash it is pushed up off; low or out in front it is stood up and let fall back.
   B.recover = function* () {
-    const b = B.body, at = b.pose;
+    const b = B.body, at = poseOf(b);
     if (b.unarmed || b.y < FLOOR - 1) return;
-    b.fast = false; b.spinning = false;
-    if (at === 'slam' || at === 'plant' || at === 'kneel' || at === 'bury' || at === 'wrench') {
+    b.fast = false; b.spinning = false; b.stiff = 0;
+    if (PLANTED.has(at)) {
       b.pose = 'wrench';
       yield* wait(0.14);
       G.audio.play('tink'); G.fx.shake(3);
@@ -2124,7 +2382,7 @@
       b.fast = true; b.pose = 'heft';
       yield* wait(0.16);
       b.fast = false;
-    } else if (at === 'crash') {
+    } else if (DROPPED.has(at)) {
       b.pose = 'push';
       yield* wait(0.3);
       b.pose = 'heft';
@@ -2257,6 +2515,149 @@
     else b.pose = 'idle';
   };
 
+  // ------------------------------------------------------------------ the bones (v2.5c)
+  // Drawn only: nothing here moves a hit area, a hazard or the pose the game reads (b.p). On top of the
+  // pose every piece is its own part on its own spring: the torso is thrown back as the body drives and
+  // bows as it lands or sinks; the helm lags the shoulders, swings past and nods; each pauldron rides
+  // loose and clanks when a blow lands, a foot strikes or the body lands; the elbows give; the greatsword's
+  // weight lags the hands and swings on past them after a heavy blow; the knee plates jolt, the sabatons
+  // roll off the toe and hang when lifted; the tabard and the cape hang on chains the body throws about.
+  // At rest it breathes (harder after exertion) and shifts its weight from foot to foot. A ghost of the
+  // Host is drawn without any of it.
+  const NO_RIG = { ok: false, lean: 0, bow: 0, breath: 0, sway: 0, hdx: 0, hdy: 0, hrot: 0, pdF: 0, prF: 0, pdB: 0, prB: 0, blade: null, elF: 0, elB: 0, wrist: 0, foot: [0, 0], pl: [1, 1], knee: [0, 0], tab: null };
+  const TABN = 4;
+  // the tabard hangs straight down from the belt; the front thigh pushes it out as it comes forward or lifts
+  function tabWant(p, out) {
+    const lift = Math.max(0, -p[3]);
+    const a0 = Math.PI / 2 - G.clamp((p[2] - 20) * 0.012, -0.15, 0.45) - G.clamp(lift * 0.025, 0, 0.35);
+    for (let i = 0; i < TABN; i++) out[i] = Math.PI / 2 + (a0 - Math.PI / 2) * (1 - 0.22 * i);
+    return out;
+  }
+  const TAB_T = new Array(TABN);
+  const angDiff = (a, c) => ((((a - c + Math.PI) % G.TAU) + G.TAU) % G.TAU) - Math.PI;
+  // A two-bone limb like D.ik, with the joint folded a little further (extra, in radians) than the reach asks.
+  function ikB(x0, y0, x1, y1, l1, l2, bend, extra) {
+    const dx = x1 - x0, dy = y1 - y0;
+    const dd = Math.min(Math.hypot(dx, dy) || 0.001, l1 + l2 - 0.01);
+    const a = Math.atan2(dy, dx);
+    const th = Math.acos(G.clamp((l1 * l1 + dd * dd - l2 * l2) / (2 * l1 * dd), -1, 1)) * bend + (extra || 0);
+    return { jx: x0 + Math.cos(a + th) * l1, jy: y0 + Math.sin(a + th) * l1, ex: x0 + Math.cos(a) * dd, ey: y0 + Math.sin(a) * dd };
+  }
+  // A jolt through the armour (s about 0.3 a footfall to 1.4 a landing): the plates drop and ring back, the
+  // helm nods, the knee plates jump, the blade shivers, the tabard and the cape take it down their length.
+  function clank(b, s) {
+    const R = b.rig, d = b.dr;
+    if (!R || !d) return;
+    // (one blow sets off several of the jolts at once, the blade stopping, the hips, a foot: within a
+    // moment of each other they count as the biggest of them, not their sum)
+    if (d.clkT > 0) { const add = s - d.clkS; if (add <= 0) return; d.clkS = s; s = add; } else { d.clkS = s; }
+    d.clkT = 0.14;
+    R.kick('pdF', 46 * s); R.kick('pdB', 56 * s); R.kick('prF', 1.5 * s); R.kick('prB', -1.8 * s);
+    R.kick('hdy', 40 * s); R.kick('hrot', 0.75 * s); R.kick('bow', 18 * s);
+    R.kick('knee0', 34 * s); R.kick('knee1', 30 * s);
+    R.kick('blade', (b.pv[8] < 0 ? -1 : 1) * 1.8 * s);
+    if (d.tab.v) for (let i = 0; i < TABN; i++) d.tab.v[i] += (i % 2 ? -1 : 1) * 2.5 * s * (i + 1) / TABN;
+    for (let i = 1; i < B.cape.length; i++) if (B.cape[i].py != null) B.cape[i].py -= 1.6 * s * i / B.cape.length;
+    d.exert = Math.min(1.5, d.exert + 0.3 * Math.max(0, s - 0.4));
+  }
+  // The cape: a heavy cloth hung from behind the shoulders, each point carrying its own speed (so it lags
+  // a start, swings past a stop and whips round a turn), pulled down and a little back, dragging on the floor.
+  function capeStep(pts, ax, ay, dt, face) {
+    const a0 = pts[0];
+    if (a0.px == null || Math.abs(ax - a0.x) > 160 || Math.abs(ay - a0.y) > 160) {
+      for (let i = 0; i < pts.length; i++) { const q = pts[i]; q.x = q.px = ax - face * i * 3; q.y = q.py = ay + i * 12; }
+    }
+    a0.x = a0.px = ax; a0.y = a0.py = ay;
+    const keep = Math.max(0, 1 - 2.2 * dt), seg = 13, n = pts.length;
+    for (let i = 1; i < n; i++) {
+      const q = pts[i], vx = (q.x - q.px) * keep, vy = (q.y - q.py) * keep;
+      q.px = q.x; q.py = q.y;
+      q.x += vx - face * 140 * dt * dt; q.y += vy + 900 * dt * dt;
+    }
+    for (let it = 0; it < 2; it++) {
+      for (let i = 1; i < n; i++) {
+        const a = pts[i - 1], q = pts[i], dx = q.x - a.x, dy = q.y - a.y, dd = Math.hypot(dx, dy) || 1;
+        if (dd > seg) { q.x = a.x + dx / dd * seg; q.y = a.y + dy / dd * seg; }
+        // (near the shoulders it stays behind the back rather than swinging through the body)
+        if (i <= 2 && (q.x - ax) * face > -1 - i) q.x = ax - face * (1 + i);
+        if (q.y > FLOOR - 2) { q.y = FLOOR - 2; q.px = G.lerp(q.px, q.x, 0.5); }
+      }
+    }
+    for (const q of pts) if (!isFinite(q.x) || !isFinite(q.y)) { a0.px = null; break; } // (reset next frame)
+  }
+  function living(b, dt) {
+    if (dt <= 0) return;
+    const p = b.p, f = b.face, lean = p[0], hip = p[1];
+    const shx = Math.sin(lean) * 46, shy = hip - Math.cos(lean) * 46, bx = b.x + (b.kx || 0);
+    const R = b.rig || (b.rig = D.rig()), RS = b.rigS || (b.rigS = D.rig());
+    const d = b.dr || (b.dr = { ok: true, exert: 0, brP: 0, swP: 0, avPk: 0, hvPk: 0, lvy: 0, ly: b.y, lfl: 0, lpv: b.pv.slice(), lift: [false, false], foot: [0, 0], pl: [1, 1], knee: [0, 0], tab: {} });
+    capeStep(B.cape, bx + f * (shx - 12), b.y + shy + 6, dt, f);
+    // the body's push, in its own frame (forward is the way it faces): at the hips and at the shoulders
+    const A = R.accel(bx, b.y + hip, dt), S = RS.accel(bx + f * shx, b.y + shy, dt);
+    const ax = A.ax * f, sax = S.ax * f, say = S.ay;
+    // how still it is: still, it breathes and shifts its weight; after hard blows it breathes harder
+    const sp = Math.abs(b.pv[0]) * 30 + Math.abs(b.pv[1]) * 0.02 + (Math.abs(b.pv[6]) + Math.abs(b.pv[7])) * 0.004 + Math.abs(A.vx || 0) * 0.006;
+    const calm = R.spring('calm', G.clamp(1 - sp, 0, 1), dt, 3, 1);
+    d.exert = Math.max(0, d.exert - dt * 0.16);
+    d.clkT = Math.max(0, (d.clkT || 0) - dt);
+    d.brP = (d.brP + dt * (1.6 + 2.4 * d.exert)) % G.TAU;
+    d.swP = (d.swP + dt * 0.6) % G.TAU;
+    d.breath = Math.sin(d.brP) * (0.5 + 0.5 * calm) * (1 + 0.8 * d.exert);
+    d.sway = Math.sin(d.swP) * 2.2 * calm;
+    // the torso: thrown back as the body drives, on as it stops; it bows as it sinks or lands
+    d.lean = R.spring('lean', G.clamp(-ax * 0.000022, -0.1, 0.1) + d.breath * 0.012, dt, 12, 0.5);
+    d.bow = G.clamp(R.spring('bow', G.clamp(lean * 3 - say * 0.0004 - sax * 0.0002 + Math.max(0, b.pv[1]) * 0.012, -3, 5), dt, 13, 0.5), -5, 7);
+    // the helm lags the shoulders (and swings past), and tips with the body a beat late
+    d.hdx = G.clamp(R.spring('hdx', G.clamp(-sax * 0.0006, -4, 4), dt, 15, 0.42), -6, 6);
+    d.hdy = G.clamp(R.spring('hdy', G.clamp(-say * 0.0008, -4, 5) - d.breath * 0.3, dt, 15, 0.42), -8, 8);
+    const ht = (lean + d.lean) * 0.5;
+    d.hrot = G.clamp(R.spring('hrot', ht + G.clamp(-sax * 0.00002, -0.12, 0.12), dt, 15, 0.45) - ht, -0.26, 0.26);
+    // each pauldron on its own spring, rising with the breath (the back one a little looser)
+    const pdy = G.clamp(-say * 0.0005, -3, 3) - d.breath * 0.6, prt = G.clamp(-sax * 0.00003, -0.15, 0.15);
+    d.pdF = G.clamp(R.spring('pdF', pdy, dt, 21, 0.38), -8, 8); d.prF = G.clamp(R.spring('prF', prt, dt, 21, 0.38), -0.45, 0.45);
+    d.pdB = G.clamp(R.spring('pdB', pdy, dt, 17, 0.35), -8, 8); d.prB = G.clamp(R.spring('prB', -prt, dt, 17, 0.35), -0.45, 0.45);
+    // the elbows give as the hands are flung or stopped; the free hand's wrist trails
+    const lp = d.lpv;
+    const hax = G.clamp((b.pv[6] - lp[6]) / dt, -16000, 16000), hay = G.clamp((b.pv[7] - lp[7]) / dt, -16000, 16000);
+    const oax = G.clamp((b.pv[9] - lp[9]) / dt, -16000, 16000), oay = G.clamp((b.pv[10] - lp[10]) / dt, -16000, 16000);
+    for (let i = 0; i < NP; i++) lp[i] = b.pv[i];
+    d.elF = G.clamp(R.spring('elF', G.clamp((hay - hax * 0.5) * 0.00003, -0.3, 0.3), dt, 16, 0.45), -0.4, 0.4);
+    d.elB = G.clamp(R.spring('elB', G.clamp((oay - oax * 0.5) * 0.00003, -0.3, 0.3), dt, 14, 0.42), -0.4, 0.4);
+    d.wrist = G.clamp(R.spring('wrist', G.clamp(oay * 0.00004, -0.4, 0.4), dt, 18, 0.4), -0.5, 0.5);
+    // the greatsword's weight: the blade lags the hands and swings past them when they stop (held
+    // steady while its point is buried in the floor)
+    const planted = PLANTED.has(poseOf(b)), lim = planted ? 0.05 : 0.24;
+    let a = R.spring('blade', p[8], dt, planted ? 60 : b.fast ? 30 : 22, planted ? 0.95 : 0.34);
+    if (Math.abs(a - p[8]) > lim) { a = p[8] + Math.sign(a - p[8]) * lim; R.s.blade.x = a; R.s.blade.v = b.pv[8]; }
+    d.blade = a;
+    // jolts: a swing stopped hard (a blow landing), the hips dropping and stopped (a stamp, a kneel),
+    // the body landing, a foot striking the floor, a blow taken
+    const av = Math.abs(b.pv[8]);
+    if (av < d.avPk * 0.3) { if (d.avPk > 9) clank(b, G.clamp(d.avPk / 20, 0.35, 1.3)); d.avPk = av; } else d.avPk = Math.max(d.avPk, av);
+    const hv = b.pv[1];
+    if (hv < d.hvPk * 0.3) { if (d.hvPk > 90) clank(b, G.clamp(d.hvPk / 300, 0.3, 1)); d.hvPk = Math.max(0, hv); } else d.hvPk = Math.max(d.hvPk, hv);
+    const vy = Math.abs(b.y - d.ly) > 160 ? 0 : (b.y - d.ly) / dt;
+    d.ly = b.y;
+    if (d.lvy > 260 && vy < d.lvy * 0.3) clank(b, G.clamp(d.lvy / 800, 0.5, 1.4));
+    d.lvy = vy;
+    if ((b.flash || 0) > d.lfl + 0.15) clank(b, 0.3);
+    d.lfl = b.flash || 0;
+    // the sabatons: lifted, the toe hangs; planted behind it with the leg stretched, it rolls up off the toe
+    for (let i = 0; i < 2; i++) {
+      const fx = p[2 + i * 2], fy = p[3 + i * 2], lx = i ? -6 : 6, lift = Math.max(0, -fy), up = lift > 1.5;
+      if (d.lift[i] && lift < 0.6) clank(b, 0.4);
+      if (lift > 3) d.lift[i] = true; else if (lift < 0.6) d.lift[i] = false;
+      const tgt = up ? G.clamp(lift / 10, 0, 1) * 0.42 : G.clamp((lx - fx - 16) / 14, 0, 1) * G.clamp((Math.hypot(fx - lx, fy - hip) - 50) / 8, 0, 1) * 0.55;
+      d.foot[i] = G.clamp(R.spring('foot' + i, tgt, dt, 18, 0.5), -0.3, 0.7);
+      d.pl[i] = G.clamp(R.spring('pl' + i, up ? 0 : 1, dt, 26, 1), 0, 1);
+      d.knee[i] = G.clamp(R.spring('knee' + i, 0, dt, 22, 0.35), -5, 5);
+    }
+    // the tabard: a short chain from the belt, stiff at the top, pushed by the hips' starts and stops
+    D.angleChain(d.tab, tabWant(p, TAB_T), dt, { w0: 20, w1: 13, z0: 0.45, z1: 0.3, follow: 0.55, push: G.clamp(ax * 0.006, -110, 110) });
+    for (let i = 0; i < TABN; i++) if (!isFinite(d.tab.a[i])) { d.tab.a = null; break; }
+    d.ok = true;
+  }
+
   B.tick = function (dt) {
     const b = B.body, P = G.player;
     if (b.pose === 'walk') {
@@ -2295,17 +2696,28 @@
     // the sword hand, the point of the blade) is hurried by it, whatever is on its way up is held back.
     // So a cut that falls lands hard and bites, and hauling the sword back up takes visible effort.
     if (!b.pv) b.pv = new Array(NP).fill(0);
-    const w0 = b.fast ? 42 : 13, z = b.fast ? 0.6 : 0.82;
+    // (b.stiff: a stage that has to land in a few frames, such as the stamp's foot, sets its own)
+    const w0 = b.stiff || (b.fast ? 42 : 13), z = b.fast ? 0.6 : 0.82;
+    // (v2.5c) the off hand no longer jumps: off the hilt it starts from where the hilt is, and onto
+    // it, it travels there and then holds on
+    const hiltX = b.p[6] - Math.cos(b.p[8]) * 14, hiltY = b.p[7] - Math.sin(b.p[8]) * 14;
+    if (target[9] !== 999 && b.p[9] === 999) { b.p[9] = hiltX; b.p[10] = hiltY; b.pv[9] = b.pv[10] = 0; }
     for (let i = 0; i < NP; i++) {
-      if (i === 9 && (target[9] === 999 || b.p[9] === 999)) { b.p[9] = target[9]; b.p[10] = target[10]; b.pv[9] = b.pv[10] = 0; continue; }
-      if (i === 10 && target[9] === 999) continue;
+      if (i === 9 && b.p[9] === 999) { b.pv[9] = b.pv[10] = 0; i++; continue; }
+      if ((i === 9 || i === 10) && target[9] === 999) {
+        const want = i === 9 ? hiltX : hiltY, w = w0 * 1.5;
+        b.pv[i] += ((want - b.p[i]) * w * w - 2 * 0.9 * w * b.pv[i]) * dt;
+        b.p[i] += b.pv[i] * dt;
+        if (i === 10 && Math.hypot(b.p[9] - hiltX, b.p[10] - hiltY) < 4) { b.p[9] = 999; b.p[10] = 0; b.pv[9] = b.pv[10] = 0; }
+        continue;
+      }
       let w = w0;
       const falling = i === 8 ? Math.sin(target[8]) > Math.sin(b.p[8]) + 0.02 : (i === 1 || i === 7) ? target[i] > b.p[i] + 0.5 : null;
       if (falling !== null) w *= falling ? 1.3 : 0.86;
       b.pv[i] += ((target[i] - b.p[i]) * w * w - 2 * z * w * b.pv[i]) * dt;
       b.p[i] += b.pv[i] * dt;
     }
-    D.chainStep(B.cape, b.x - b.face * 12, b.y + b.p[1] - 42, dt, { seg: 13, grav: 90, drift: 12, face: b.face, wave: 5, rate: 4, floor: FLOOR - 2 });
+    living(b, dt);
     if (b.blaze && Math.random() < dt * 70) {
       G.fx.spawn({ x: b.x + b.face * G.rand(-10, 70), y: b.y - G.rand(90, 200), vx: G.rand(-40, 40), vy: -G.rand(40, 160), life: G.rand(0.3, 0.7), size: G.rand(2, 4.5), color: DANGER, wob: 60, rot: G.rand(0, 6) });
     }
@@ -2435,7 +2847,9 @@
     const p = b.p, pal = G.pal(), col = pal.boss, hot = pal.hot, real = b === B.body;
     const lean = p[0], hip = p[1];
     const dark = '#090c11', mid = '#18212b', plate = '#2b3846', trim = '#40536a';
-    const jx = b.jit ? G.rand(-b.jit, b.jit) : 0;
+    // (v2.5c: the strain of holding a blow back is a tremor, not noise: two fast sines, so it shivers
+    // without flickering from frame to frame)
+    const jx = b.jit ? b.jit * (0.75 * Math.sin(G.t * 57) + 0.35 * Math.sin(G.t * 89 + 1.3)) : 0;
     // while it whirls the whole figure turns: squeeze it sideways and flip; any other turn narrows it
     // through the turn too (K.turn), rather than flipping it in one frame
     const turn = b.spinning ? Math.cos(b.spin) : 1;
@@ -2458,48 +2872,82 @@
     ctx.scale(sx, 1);
     D.glow(ctx, col, 0, -70, 120, real ? 0.2 : 0.55);
 
-    const shx = Math.sin(lean) * 46, shy = hip - Math.cos(lean) * 46; // shoulders
-    const hx = p[6], hy = p[7], ang = p[8];
+    // (the drawn bones, see living: the real Knight only, a ghost stands as its pose has it)
+    const r = real && b.dr && b.dr.ok ? b.dr : NO_RIG;
+    // its weight shifting from foot to foot: the body moves over the feet, the feet and hands stay put
+    ctx.translate(r.sway, 0);
+    const leanD = lean + r.lean;
+    const shx = Math.sin(leanD) * 46, shy = hip - Math.cos(leanD) * 46 - r.breath * 0.9; // shoulders (rising with each breath)
+    const hx = p[6] - r.sway, hy = p[7], ang = r.blade == null ? p[8] : r.blade; // (the drawn blade: its weight lags the hands)
     const grip = p[9] === 999;
-    const ox = grip ? hx - Math.cos(ang) * 14 : p[9], oy = grip ? hy - Math.sin(ang) * 14 : p[10];
+    const ox = grip ? hx - Math.cos(ang) * 14 : p[9] - r.sway, oy = grip ? hy - Math.sin(ang) * 14 : p[10];
 
     const leg = (i) => {
-      const lx = i ? -6 : 6, k = D.ik(lx, hip, p[2 + i * 2], p[3 + i * 2], 30, 30, -1);
+      const lx = i ? -6 : 6, fx = p[2 + i * 2] - r.sway, fy = p[3 + i * 2], phi = r.foot[i], q = phi * r.pl[i];
+      // the sabaton rolls: planted, about the ball of the foot (the heel and the ankle rise with it);
+      // lifted, about the ankle (the toe hangs)
+      const c = Math.cos(q), s = Math.sin(q);
+      const k = D.ik(lx, hip, fx + 13 - 13 * c + 4 * s, fy - 13 * s - 4 * c + 4, 30, 30, -1);
       ctx.fillStyle = i ? dark : mid;
       D.limb(ctx, lx, hip, k.jx, k.jy, 17, 12); ctx.fill();
       D.limb(ctx, k.jx, k.jy, k.ex, k.ey - 4, 12, 9); ctx.fill();
-      // greave, knee spike and a heavy sabaton
+      // greave, knee spike (it jumps on its strap when the foot strikes) and a heavy sabaton
       ctx.fillStyle = i ? mid : plate;
       D.poly(ctx, [k.jx - 5, k.jy + 2, k.jx + 7, k.jy + 1, k.ex + 6, k.ey - 8, k.ex - 4, k.ey - 8]); ctx.fill();
-      D.poly(ctx, [k.jx - 2, k.jy - 6, k.jx + 13, k.jy - 3, k.jx + 4, k.jy + 5]); ctx.fill();
-      D.poly(ctx, [k.ex - 7, k.ey - 9, k.ex + 6, k.ey - 9, k.ex + 17, k.ey - 2, k.ex + 17, k.ey, k.ex - 7, k.ey]); ctx.fill();
+      const kn = r.knee[i];
+      D.poly(ctx, [k.jx - 2, k.jy - 6 + kn, k.jx + 13, k.jy - 3 + kn * 1.3, k.jx + 4, k.jy + 5 + kn]); ctx.fill();
+      ctx.save(); ctx.translate(k.ex, k.ey - 4); ctx.rotate(phi);
+      D.poly(ctx, [-7, -5, 6, -5, 17, 2, 17, 4, -7, 4]); ctx.fill();
+      ctx.restore();
       if (!i) { ctx.strokeStyle = G.rgba(col, 0.6); ctx.lineWidth = 1.2; D.line(ctx, k.jx + 7, k.jy + 1, k.ex + 6, k.ey - 8); }
     };
     const arm = (front) => {
       const ax = shx + (front ? 9 : -9), ay = shy + 4, tx = front ? hx : ox, ty = front ? hy : oy;
-      const k = D.ik(ax, ay, tx, ty, 23, 23, 1);
+      // (the elbow gives a little as the hand is flung or stopped)
+      const k = ikB(ax, ay, tx, ty, 23, 23, 1, front ? r.elF : r.elB);
       ctx.fillStyle = front ? mid : dark;
       D.limb(ctx, ax, ay, k.jx, k.jy, 13, 10); ctx.fill();
       D.limb(ctx, k.jx, k.jy, k.ex, k.ey, 10, 9); ctx.fill();
       // vambrace and gauntlet
       ctx.fillStyle = front ? plate : mid;
       D.limb(ctx, G.lerp(k.jx, k.ex, 0.3), G.lerp(k.jy, k.ey, 0.3), G.lerp(k.jx, k.ex, 0.9), G.lerp(k.jy, k.ey, 0.9), 13, 11); ctx.fill();
+      // the wrist bends: the cuff turns halfway between the forearm and the hand, the hand follows the
+      // hilt it holds (or, free, trails the forearm on its own spring)
+      const fa = Math.atan2(k.ey - k.jy, k.ex - k.jx), holds = front || grip, ha = holds ? ang : fa + r.wrist;
+      ctx.save(); ctx.translate(k.ex, k.ey); ctx.rotate(fa + angDiff(ha, fa) * 0.5);
+      D.poly(ctx, [-9, -6, -3, -7.5, 1, -6, 1, 6, -3, 7.5, -9, 6]); ctx.fill();
+      ctx.restore();
       ctx.beginPath(); ctx.arc(k.ex, k.ey, 6.5, 0, G.TAU); ctx.fill();
       if (front) { ctx.strokeStyle = G.rgba(col, 0.6); ctx.lineWidth = 1.2; ctx.stroke(); }
+      ctx.save(); ctx.translate(k.ex, k.ey); ctx.rotate(ha);
+      if (holds) D.poly(ctx, [-6, -8, 2, -8, 3.5, -5, -7, -5]); // knuckles closed over the grip
+      else D.poly(ctx, [1, -6, 6, -5, 9, -1.5, 9, 1.5, 6, 5, 1, 6]); // the fingers
+      ctx.fill();
+      ctx.restore();
     };
 
     leg(1);
     arm(false);
-    // faulds and a tattered tabard under the belt
+    // faulds and a tattered tabard under the belt (the tabard on its own chain: see living)
     ctx.fillStyle = dark;
-    D.poly(ctx, [-13, hip - 4, 14, hip - 4, 17, hip + 20, 9, hip + 14, 6, hip + 34, 0, hip + 24, -5, hip + 36, -9, hip + 16, -16, hip + 22]); ctx.fill();
+    D.poly(ctx, [-13, hip - 4, 14, hip - 4, 17, hip + 20, 9, hip + 14, 4, hip + 18, -3, hip + 18, -9, hip + 16, -16, hip + 22]); ctx.fill();
     ctx.strokeStyle = G.rgba(col, 0.4); ctx.lineWidth = 1.2; ctx.stroke();
-    // breastplate: broad at the shoulders, with a burning sigil
+    {
+      const ta = r.tab && r.tab.a ? r.tab.a : tabWant(p, TAB_T), pts = [{ x: 0.5, y: hip + 2 }];
+      for (let i = 0; i < TABN; i++) { const l = pts[i]; pts.push({ x: l.x + Math.cos(ta[i]) * 8.2, y: l.y + Math.sin(ta[i]) * 8.2 }); }
+      D.ribbon(ctx, pts, 12, 9, 4);
+      ctx.fillStyle = dark; ctx.fill(); ctx.stroke();
+    }
+    // breastplate: broad at the shoulders, with a burning sigil. Its middle bows as the body gathers
+    // or lands and the chest swells with each breath.
+    const sl = Math.hypot(shx, shy - hip) || 1, nx = -(shy - hip) / sl, ny = shx / sl; // (forward of the spine)
+    const fmx = (14 + shx + 21) / 2 + nx * (r.breath * 0.7 - r.bow), fmy = (hip + 2 + shy + 6) / 2 + ny * (r.breath * 0.7 - r.bow);
+    const bmx = (shx - 21 - 13) / 2 - nx * r.bow, bmy = (shy + 6 + hip + 2) / 2 - ny * r.bow;
     ctx.fillStyle = mid;
-    D.poly(ctx, [-13, hip + 2, 14, hip + 2, shx + 21, shy + 6, shx + 15, shy - 6, shx - 15, shy - 6, shx - 21, shy + 6]); ctx.fill();
+    D.poly(ctx, [-13, hip + 2, 14, hip + 2, fmx, fmy, shx + 21, shy + 6, shx + 15, shy - 6, shx - 15, shy - 6, shx - 21, shy + 6, bmx, bmy]); ctx.fill();
     ctx.fillStyle = plate;
-    D.poly(ctx, [shx + 21, shy + 6, shx + 15, shy - 6, shx + 2, shy - 6, G.lerp(4, shx + 4, 0.45), G.lerp(hip, shy, 0.45), 14, hip + 2]); ctx.fill();
-    const cx = G.lerp(0, shx, 0.62) + 3, cy = G.lerp(hip, shy, 0.62);
+    D.poly(ctx, [shx + 21, shy + 6, shx + 15, shy - 6, shx + 2, shy - 6, G.lerp(4, shx + 4, 0.45) - nx * r.bow * 0.6, G.lerp(hip, shy, 0.45) - ny * r.bow * 0.6, 14, hip + 2, fmx, fmy]); ctx.fill();
+    const cx = G.lerp(0, shx, 0.62) + 3 - nx * r.bow * 0.5, cy = G.lerp(hip, shy, 0.62) - ny * r.bow * 0.5;
     D.glow(ctx, col, cx, cy, 22, 0.9);
     ctx.fillStyle = G.rgba(hot, 1);
     D.poly(ctx, [cx, cy - 9, cx + 3, cy - 2, cx + 8, cy, cx + 3, cy + 2, cx, cy + 11, cx - 3, cy + 2, cx - 8, cy, cx - 3, cy - 2]); ctx.fill();
@@ -2510,20 +2958,24 @@
     leg(0);
 
     // back pauldron, then the helm, then the front pauldron over the arm
-    const pauldron = (px, py, s, c1) => {
+    // (each rides loose on its own spring over the shoulder, and clanks: see living)
+    const pauldron = (px, py, s, c1, dy, rot) => {
+      ctx.save(); ctx.translate(px, py + dy); ctx.rotate(rot);
       ctx.fillStyle = c1;
-      D.poly(ctx, [px - 15 * s, py + 9, px - 16 * s, py - 4, px - 6 * s, py - 13, px + 8 * s, py - 12, px + 17 * s, py - 2, px + 15 * s, py + 10, px, py + 5]); ctx.fill();
+      D.poly(ctx, [-15 * s, 9, -16 * s, -4, -6 * s, -13, 8 * s, -12, 17 * s, -2, 15 * s, 10, 0, 5]); ctx.fill();
       ctx.strokeStyle = G.rgba(col, 0.75); ctx.lineWidth = 1.3; ctx.stroke();
       ctx.fillStyle = trim;
-      D.poly(ctx, [px - 6 * s, py - 12, px - 3 * s, py - 27, px + 3 * s, py - 12]); ctx.fill();
-      D.poly(ctx, [px + 5 * s, py - 12, px + 12 * s, py - 23, px + 13 * s, py - 8]); ctx.fill();
+      D.poly(ctx, [-6 * s, -12, -3 * s, -27, 3 * s, -12]); ctx.fill();
+      D.poly(ctx, [5 * s, -12, 12 * s, -23, 13 * s, -8]); ctx.fill();
+      ctx.restore();
     };
-    pauldron(shx - 15, shy, 0.85, mid);
+    pauldron(shx - 15, shy, 0.85, mid, r.pdB, r.prB);
 
-    // helm: a crowned great helm with a slit of light and horns swept back
-    const ex = shx + Math.sin(lean) * 15 + 2, ey = shy - Math.cos(lean) * 15 - 3;
+    // helm: a crowned great helm with a slit of light and horns swept back. It rides on its own spring,
+    // lagging the shoulders and tipping with the body a beat late (and nodding when the armour clanks).
+    const ex = shx + Math.sin(leanD) * 15 + 2 + r.hdx, ey = shy - Math.cos(leanD) * 15 - 3 + r.hdy;
     ctx.save();
-    ctx.translate(ex, ey); ctx.rotate(lean * 0.5);
+    ctx.translate(ex, ey); ctx.rotate(leanD * 0.5 + r.hrot);
     if (b.look) {
       // looking back over its shoulder: the helm turns (narrows, then faces the other way) and dips
       const c = Math.cos(G.clamp(b.look, -0.2, 1.2) * Math.PI);
@@ -2557,7 +3009,7 @@
       if (b.voidK > 0.01) voidBlade(ctx, hx, hy, ang, b.voidK);
     }
     arm(true);
-    pauldron(shx + 14, shy, 1, plate);
+    pauldron(shx + 14, shy, 1, plate, r.pdF, r.prF);
 
     if (b.flash > 0) D.glow(ctx, '255,255,255', 0, -70, 84, b.flash * 0.3); // (v1.6d: a tint, not a white dome)
     ctx.restore();

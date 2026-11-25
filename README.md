@@ -2,7 +2,7 @@
 
 A side-on boss rush for the browser: four heroes, seven three-phase bosses, played as a run of
 ever-harder trials. You pick a hero and a relic before the run and win a boon after each victory.
-Version 2.5b.
+Version 2.5c.
 
 This is an early slice of a planned boss-rush roguelite (short runs, a boon after each boss,
 bosses drawn from a pool). A run meets the four bosses in a shuffled order, then meets them again, harder.
@@ -113,6 +113,132 @@ hero (`tools/feel-check.js`).
 - Settings, Reset progress erases Sunshards, upgrades, trophies and records (it has to be chosen twice).
 
 Not done: touch controls, a colour-blind alternative to red-orange warnings, gamepad rebinding.
+
+## Every character, more frames and a bone for every part; the Hall by the gate (v2.5c)
+
+Asked for: the hero choice nearer the gate, and "the boss animations to be filled with a few more frames and
+natural movements to make each move feel distinct from the last ... i still have difficulties figuring out what
+kairo is gonna do for his punch combos ... do a full pass for each boss and their animations".
+
+**The Vigil.** The Hall of Echoes now stands between the practice ring and the reliquary, a short walk from the
+gate where a run ends (about 1000 px, was about 3100). The camp is a little shorter (3820 px, was 4040) and
+re-spaced: the bell, the tally, the fire, the sparring post, the brazier, the Shrine (about 1800 px from the gate,
+was 2600), the ring, the Hall, the reliquary, the gate.
+
+**Every boss.** The rule throughout: no timing, hit area, damage or choice of form changed; the new poses fit
+inside the time each move already took. A wind-up now plays in stages (a settle or dip, then a build to a peak
+that is that move's own), most blows carry on into a follow-through, and the return to rest has its own pose.
+
+- **Kairo's punch combos**, made readable. Each punch winds up in two stages, and the peak is the blow's own: the
+  **jab** tucks behind his lead shoulder, chin down; the **cross** rocks his whole body back, the rear fist by his
+  ear and the back heel up; the **last punch of a string** sinks low and winds right round, the fist high behind
+  his head (a haymaker: the string ends here). The ending tells are bigger: before the **kicks** he turns away
+  with the back heel high and an arm up; before the **beam** a glowing hand drops to his hip. Wind-ups are reached
+  quicker than relaxed poses, so each stage shows; his step into a punch lands late, as the weight comes forward;
+  the rising kick drops onto the front leg first.
+- **Aurel:** his sword cuts, thrust, sweep, overhead maul and rising cut coil on to a deeper peak halfway through
+  the wind-up; under the charged maul he trembles, more as it fills.
+- **The Warden:** the hands and core have a drawn pose on top of where they really are (turn, curl, squash and
+  stretch, swell) on springy settles, so they lag, overshoot and settle; a hand swings like a hanging weight and
+  stretches along fast motion, fingers curl one after another, and the old per-frame jitter is a smooth tremble.
+  Every hand attack has its own hand shape: the slam's upright fist (heavy: swollen and trembling; late: opening
+  as it rises), the sweep's cupped scoop, the clap's splayed palms, the flick's pointing finger, the crossfire's
+  palms pressed to the walls, the rocket's fist wound against the wall, the comb's raking claws, the cage's
+  knuckles turned in, the swat's backhand. The free hands move with the core's attacks, and the core gathers and
+  recoils with each of its own.
+- **The Magus:** ten spells used to share one raised-staff cast; each now has its own stance (the shards'
+  conductor sweep, the rime's floor sweep, the fireball's overhand throw / underhand bowl / two-handed heave, the
+  bolts' jabs at the sky, the spheres bounced like a ball, the firewall raked along the floor, the storm stirred
+  overhead, the blizzard braced against, the comet cradled then batted), a sprung jolt on release, a sleeve, charm,
+  hem and cape that follow late, and a settle that brings the staff down to the hip.
+- **The Veil:** blows chain into follow-throughs, it breathes at rest, landings squash. The flurry's tempo tell is
+  in the body now: the measured string stands tall with the blade raised behind its head; the quick one hunches,
+  fists by its face, bouncing in time. The feint rocks back where the lunge drops into a sprinter's set; the
+  stance's low and high forms are told further apart; the snare is two-handed (no longer the crescent's wind-up).
+- **The Knight:** a settle, then a build to the deepest pose, held; a follow-through after most blows; the off
+  hand springs on and off the hilt; the strain is a smooth tremor. The stamp is visible now (the back knee lifts,
+  the foot slams); the charge levels the blade like a ram, pawing; the whirl coils with the blade level behind;
+  the overhead strides with the blade straight up, rises onto the lock and sinks into the blow.
+- **The Cinder Wolf, overhauled** (the user: "the wolf in general really felt kinda roboticy"). It was drawn as one
+  rigid piece: a straight bar of a neck with the head locked to it, stick legs that never bent at the wrist, a
+  plank of a back, and a tail on a fixed sway. Now, drawing only (no hit area moves): a **neck** with a crest that
+  arches up from the withers and a throat that falls to the chest; a **head carried on a spring**, so it is thrown
+  back as the body drives off, carries on as it stops, dips as it lands and nods against the stride; a **tail of
+  springs**, stiff at the root and loose at the tip, that whips through every start, stop, turn and landing;
+  **legs with muscle** (the shoulder slung from the withers, a heavy thigh) whose **wrists fold and hocks flex**
+  as a paw comes up, the paw curling under; a **back that flexes**, bowing up as it gathers or lands and
+  stretching as it drives, and a chest that heaves with its breath.
+- **The Cinder Wolf** (the first pass): a real trot (the back dips with each footfall, the head nods late, the tail swings against
+  the stride), leaps through push-off, stretch, tuck, fall and reach, and landings forepaws first. The short pounce
+  goes low and flat; the long one sits back on its haunches, chest up, tail lashing. The breath and the cinders no
+  longer share a wind-up; the prowl's rump wiggle is its own; the harry is a bull's stance.
+- **The Leviathan:** a pose table of its own (it had none): the head pulls back, rears, tips and rolls on springs,
+  the neck winds into an S and the coils follow a beat late. The low lunge gathers into a flat tight S, the high
+  one rears like a swan; the snap holds a raised S that sways; the high jet stands a rigid column; the breaker
+  draws back like a bow.
+
+**A bone for every part** (the user, after the wolf's overhaul: "can we do this sort of build for every character
+and boss, give each piece its own bone/part"). Every hero and boss now has a rig drawn over its pose, built the
+way the wolf's was, on shared spring helpers in `js/draw.js` (`D.rig`, `D.angleChain`): each piece on its own
+spring, so it lags, swings past and settles instead of moving with the body as one piece; joints that bend
+(feet that roll off the toe and fold as they lift, spines that bow and stretch, heads that ride their necks);
+everything that hangs on a chain pushed by the body's starts, stops and landings; and breath and a shifting
+weight at rest. **Drawing only:** for every character the old and new files were run side by side on fixed
+seeds and compared frame by frame (hit boxes, hazards, timings, health): identical.
+- **The heroes:** hips that sink through the knees on a landing or a blow and come back up past rest; the chest
+  riding the hips a beat late; the head on its own spring and tilt; feet that roll, fold and strike heel first;
+  the weapon at rest swinging on the hand (never during a blow, so it still lines up with the cut); coat tails,
+  cloaks, tabards, sashes, Vesper's hood point, Lune's quiver and moon, Eos's hat, sleeves and sheath, Aster's
+  pauldrons each on their own spring; scarves, capes, hair and ribbons as weighted chains. (Fixed on the way:
+  the front leg was drawn shifted down by the run's bob and Eos's crouch, sinking her front foot into the floor.)
+- **The Warden:** each finger a chain of joints (curling knuckle first, splaying, trailing, thrown by a stop);
+  a wrist of void under each palm bending on its own, with two wisps; the core's glow, corona, rim and eye each
+  lagging the disc; the lid opening wider and settling but never shutting past what it tells (the lance count
+  stays crisp); the corona's flames leaning from its motion.
+- **The Magus:** torso, head, the hat bending at two joints with its charm hanging plumb on a cord, each arm and a
+  fist turned with the staff, the staff head lagging the hands, a three-link sleeve, a two-joint hem, an
+  eight-joint cape, motes trailing their orbits.
+- **The Veil:** hips, chest, spine, head and a loose hood point; each upper arm and hand; each blade lagging the
+  hand through a fast cut and swinging past; feet that point and roll; the cape, sash and scarf as chains (the
+  shadows each have their own springs).
+- **The Knight:** a torso that leans and bows, a helm that lags and nods, each pauldron on its own spring, and
+  **clanks**: when a swing stops hard, it lands, a foot strikes or it is struck, the plates drop and ring back,
+  the blade shivers and the tabard and cape ripple; the greatsword lagging the hands and swinging past after a
+  heavy blow; the tabard's tatters and the cape as weighted chains.
+- **The Leviathan:** a jaw on its own hinge spring; a lure, a frill on three rays and two barbels as chains; each
+  of the thirty segments of neck and coils its own spring, so what the head does runs down the body a beat late
+  and swings past; the crest spines; a tail that whips between its root and its fluke; weed and water trailing.
+- **Kairo:** a head that jolts and snaps back; shoulders that twist with the fists (adding to the wind-up tells,
+  not blurring them); hips that dip; fists that overshoot and recoil; bare feet that roll onto the ball, point in
+  the air and grip on landing; trousers that billow; hair and sash with real momentum. His corrupted **Shadow
+  Partner** used to stay frozen in one pose and never visibly punch: it now throws each blow half a second after
+  him, when its hit comes.
+- **Aurel:** chest, hips, shoulders and head on springs; a short hood point; the weapon in hand on its own spring
+  (the maul heavy and slow, the sword quick); each racked weapon jostling and rattling on its own spring (its glow,
+  the tell, unchanged, and a small start as it lights); boots that point and pivot on the toe; the cloak's tails
+  thrown about by his motion.
+
+**Two small hit-what-you-see changes** came with it: the Magus's body box follows its drawn lift and sink (up to
+about 12 px), and the spot on the Leviathan's head where your blows land follows its drawn pose (up to about
+50 px in a wind-up). Say if either should be kept where it was.
+
+**Checked:** each boss's agent ran every attack and form in all three phases with no errors, and compared hazards
+frame by frame against the old file (the Knight, the Wolf and the Leviathan: identical); I looked at a strip of
+one move of each boss, and at Kairo's five wind-up peaks and Aurel's side by side. The scripted player over every
+boss at roads III and V (224 fights): no errors; the Warden 75-84%, the Magus 100%, the Veil 91%, the Knight
+92-100%, the Wolf 91% (89% of 80 after its overhaul), the Leviathan 100%, Kairo 55-60% (as before). After every character's rig, again
+(224 fights, every boss with every hero at roads III and V, then 64 of Aurel): no errors; the Warden 84%, the
+Magus 100%, the Veil 97%, the Knight 97%, the Wolf 94%, the Leviathan 100%, Kairo 53%, Aurel 73%; by hero Aster
+89%, Vesper 88%, Lune 84%, Eos 96%. I looked at one move of each on film and at the heroes' contact sheet.
+**Not played by hand.**
+
+**Playtest checklist**
+- Does the wolf still feel robotic anywhere? (Its walk, its turn, its landings, its tail.)
+- Does anyone now move too loosely (floppy, rubbery) or too much? The Leviathan's coils, the Magus's cape, the
+  heroes' ribbons (they can hook at the tip as a run starts) and the Warden's fingers moved most.
+- Can you now tell Kairo's jab, cross and last punch apart, and which ending is coming?
+- Does any boss look stiff, floaty or too wobbly now? (The Warden's hands and the Leviathan's neck changed most.)
+- Is the Hall of Echoes where you want it?
 
 ## Cleaner blows, a quicker Echo, a truer throw (v2.5b)
 

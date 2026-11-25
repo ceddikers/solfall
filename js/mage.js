@@ -58,6 +58,9 @@
     b.spT = null; b.spK = 0; b.lean = 0; b.leanV = 0; b.leanT = 0; b.hl = 0; b.hv = 0; b.pvy = 0; b.py = b.y;
     B.novaArcs = []; B.glaze = null; B.picks = 0; B.novaPick = null;
     B.flick = null; B.dizzy = false; B.moteEl = ICE;
+    b.oy = 0; b.oyV = 0; b.oyT = 0; b.two = 0; b.twoT = 0; b.orR = 1; b.orY = 0; b.orT = null; b.trem = 0; b.tremT = 0; b.pose = '';
+    b.kq = { hx: 0, hy: 0, tilt: 0, vhx: 0, vhy: 0, vt: 0 };
+    b.rig = D.rig(); b.bn = null; // (the bones: see bones)
   };
   const setElem = (el) => { B.body.elem = el; };
   const face = () => { const b = B.body; b.face = G.player.x >= b.x ? 1 : -1; };
@@ -73,18 +76,68 @@
     const g = gn === 'read' ? { hx: 30, hy: -70, tilt: b.readTilt } : GEST[gn];
     const s = { hx: 23 + 9 * c, hy: -62 - 18 * c, tilt: 0.07 + 0.42 * c };
     const r = g && k > 0.001 ? { hx: G.lerp(s.hx, g.hx, k), hy: G.lerp(s.hy, g.hy, k), tilt: G.lerp(s.tilt, g.tilt, k) } : s;
-    // held by hand (holdStaff): on springs
+    // held by hand (holdStaff): on springs (the tilt blended the short way round, so a staff let go
+    // after a full swing never spins back through a turn)
     const q = b.spK || 0;
-    return q > 0.001 && b.sp ? { hx: G.lerp(r.hx, b.sp.hx, q), hy: G.lerp(r.hy, b.sp.hy, q), tilt: G.lerp(r.tilt, b.sp.tilt, q) } : r;
+    const o = q > 0.001 && b.sp ? { hx: G.lerp(r.hx, b.sp.hx, q), hy: G.lerp(r.hy, b.sp.hy, q), tilt: r.tilt + G.angDiff(r.tilt, b.sp.tilt) * q } : r;
+    // on top: the jolt of a release (kick) and the tremor of a held peak (v2.5c)
+    const kq = b.kq, tr = b.trem || 0;
+    if ((!kq || (!kq.hx && !kq.hy && !kq.tilt)) && tr < 0.001) return o;
+    return { hx: o.hx + (kq ? kq.hx : 0), hy: o.hy + (kq ? kq.hy : 0) + Math.sin(B.t * 39) * tr * 55, tilt: o.tilt + (kq ? kq.tilt : 0) + Math.sin(B.t * 47) * tr };
   };
   const tip = () => {
     const b = B.body, s = staff(b.cast);
     return { x: b.x + b.face * (s.hx + Math.sin(s.tilt) * 96), y: b.y + s.hy - Math.cos(s.tilt) * 96 };
   };
+  // Where cast() holds the staff, and the head of it then: thrown spells (fireballs, spheres, the
+  // comet) leave from here, wherever the stance has carried the staff on its way (v2.5c: the stances
+  // are drawn only, and every throw still leaves from where it always did; each throw's last stage
+  // brings the staff back to this hold as it lets go).
+  const CAST = { hx: 32, hy: -80, tilt: 0.49 };
+  const tipCast = () => {
+    const b = B.body, c = b.cast, hx = 23 + 9 * c, hy = -62 - 18 * c, tl = 0.07 + 0.42 * c;
+    return { x: b.x + b.face * (hx + Math.sin(tl) * 96), y: b.y + hy - Math.cos(tl) * 96 };
+  };
 
-  B.onRelease = function () { const b = B.body; b.want = 0; b.spent = false; b.charge = 0; b.hidden = false; b.alpha = 1; B.blizz = 0; b.gest = null; b.merge = 0; b.dark = 0; b.track = 0; b.slit = 0; B.readAim = null; b.spT = null; b.leanT = 0; B.flick = null; B.dizzy = false; B.spin = 1; };
+  // ---- the body language (v2.5c). Every spell has its own stance and runs through stages (gather,
+  // peak, release, recoil, settle) inside the time it always took. A stance names where the staff is
+  // held (on springs, see holdStaff), how the body leans, how far the figure lifts (-) or sinks (+) in
+  // the air (b.oy: drawn only, so b.y and every hazard placed from it stay where they were), whether
+  // the back hand takes the staff too (two), where the three motes circle (orb: [radius, height]),
+  // and how much the held staff trembles (trem).
+  function stance(name, st, o) {
+    const b = B.body;
+    o = o || {};
+    b.pose = name;
+    if (st) holdStaff(st, o.stiff || 1.4);
+    if (o.lean != null) b.leanT = o.lean;
+    b.oyT = o.oy || 0; b.twoT = o.two || 0; b.orT = o.orb || null; b.tremT = o.trem || 0;
+  }
+  // a jolt through the staff: it springs back, past, and settles (a release, an impact)
+  function kick(hx, hy, tilt) {
+    const b = B.body, k = b.kq || (b.kq = { hx: 0, hy: 0, tilt: 0, vhx: 0, vhy: 0, vt: 0 });
+    k.vhx += hx * 18; k.vhy += hy * 18; k.vt += tilt * 18;
+  }
+  // exactly as long as wait(dur), calling fn(k, e, dt) every frame
+  function* act(dur, fn) {
+    let e = 0;
+    while (e < dur) { const dt = yield; e += dt; fn(Math.min(1, e / dur), e, dt); }
+  }
+  // cast() with stages: the same time and charge, and fn(k, e, dt) sets the stance as it goes
+  function* castT(el, dur, fn) {
+    const b = B.body;
+    setElem(el); b.want = 1;
+    G.audio.play('charge', { dur });
+    let e = 0;
+    while (e < dur) { const dt = yield; e += dt; b.charge = Math.min(1, e / dur); fn(b.charge, e, dt); }
+    b.charge = 0;
+  }
+  // the end of the stance (the kit's B.recover settles it; this lets it go)
+  function unstance() { const b = B.body; b.spT = null; b.leanT = 0; b.oyT = 0; b.twoT = 0; b.orT = null; b.tremT = 0; b.pose = ''; }
+
+  B.onRelease = function () { const b = B.body; b.want = 0; b.spent = false; b.charge = 0; b.hidden = false; b.alpha = 1; B.blizz = 0; b.gest = null; b.merge = 0; b.dark = 0; b.track = 0; b.slit = 0; B.readAim = null; b.spT = null; b.leanT = 0; B.flick = null; B.dizzy = false; B.spin = 1; b.oyT = 0; b.twoT = 0; b.orT = null; b.tremT = 0; b.pose = ''; };
   B.onInterrupt = function () { B.shards.length = 0; };
-  B.onStagger = function () { const b = B.body; b.alpha = 1; b.elem = null; b.spT = null; b.leanT = 0; if (B.glaze) B.glaze.fade = true; B.flick = null; B.dizzy = false; b.track = 0; };
+  B.onStagger = function () { const b = B.body; b.alpha = 1; b.elem = null; b.spT = null; b.leanT = 0; if (B.glaze) B.glaze.fade = true; B.flick = null; B.dizzy = false; b.track = 0; b.oyT = 0; b.twoT = 0; b.orT = null; b.tremT = 0; b.pose = ''; };
   // a hero who reaches it is met with a Nova (not twice running, and not too often)
   B.choose = function () {
     const b = B.body, P = G.player;
@@ -391,7 +444,20 @@
         follow(bm, dt) { if (!bm.locked) bm.ang += G.angDiff(bm.ang, Math.atan2(P.y - 22 - oy, P.x - ox)) * Math.min(1, dt * 10); },
       });
     }
-    yield* wait((0.75 + (n - 1) * 0.21) * T + 0.55);
+    // the stance: a conductor's. The staff is drawn in, then swept up and back over the hat while the
+    // motes rise to hang with the shards; each shard looses on a flick of it, each flick further on
+    const t0 = 0.75 * T, gap = 0.21 * T, end = t0 + (n - 1) * gap;
+    yield* act(end + 0.55, (k, e) => {
+      const hi = [0.6, -80];
+      if (e < 0.2 * T) stance('shards-gather', { hx: 18, hy: -74, tilt: 0.25 }, { stiff: 1.7, lean: 0.05, oy: 4, orb: [0.8, -24] });
+      else if (e < t0 - 0.06) stance('shards-peak', { hx: 8, hy: -116, tilt: -0.55 }, { stiff: 1.5, lean: -0.08, oy: -6, orb: hi, trem: 0.012 + 0.02 * (e / t0) });
+      else if (e < end + 0.06) {
+        const i = Math.floor((e - t0 + 0.06) / gap), q = e - t0 + 0.06 - i * gap, f = Math.min(1, i / Math.max(1, n - 1));
+        if (q < 0.09) stance('shards-flick', { hx: 14 + 6 * f, hy: -108, tilt: 0.35 + 0.35 * f }, { stiff: 4.2, lean: 0.04, oy: -4, orb: hi });
+        else stance('shards-hold', { hx: 10 + 4 * f, hy: -114, tilt: -0.32 + 0.32 * f }, { stiff: 2.2, lean: -0.04, oy: -5, orb: hi });
+      } else if (e < end + 0.3) stance('shards-follow', { hx: 34, hy: -86, tilt: 1.1 }, { stiff: 2.4, lean: 0.1, oy: 2 });
+      else stance('shards-settle', { hx: 26, hy: -74, tilt: 0.6 }, { stiff: 1.1, lean: 0.02 });
+    });
   }
 
   // Ice: the floor freezes outward from the Magus.
@@ -399,10 +465,41 @@
     yield* reposition();
     const b = B.body, T = K.T();
     G.ui.hint('rime', 'Jump as the ice reaches you');
-    yield* cast(ICE, 0.35 * T);
+    // the stance: it goes up before it comes down, then sweeps the head of the staff along the floor
+    // in front of it, crouched low, and drags it on round behind; the motes sink to its feet
+    const low = [1.25, 52];
+    const F = { hx: 30, hy: -56, tilt: 2.25 }, M = { hx: 22, hy: -92, tilt: 3.1 }, Bk = { hx: 12, hy: -72, tilt: 3.95 };
+    yield* castT(ICE, 0.35 * T, (k) => {
+      if (k < 0.4) stance('rime-gather', { hx: 18, hy: -102, tilt: -0.45 }, { stiff: 2.2, lean: -0.07, oy: -6, orb: [1, -10] });
+      else stance('rime-sweep', F, { stiff: 3.4, lean: 0.14, oy: 10, orb: low });
+    });
     rime(b.x, [-1, 1], T);
-    if (K.hard() || B.phase === 3) { yield* wait(1.05); rime(b.x, [-1, 1], T); }
-    yield* wait(0.6 * T + 1.3);
+    b.sq = Math.max(b.sq || 0, 0.07); kick(0, 4, 0.12);
+    // the sweep on round behind it, held low while the ice runs
+    const drag = (e) => {
+      if (e < 0.16) stance('rime-drag', M, { stiff: 2.6, lean: 0.1, oy: 9, orb: low });
+      else stance('rime-back', Bk, { stiff: 2.2, lean: 0.08, oy: 10, orb: low, trem: e > 0.42 ? 0.02 : 0 });
+    };
+    // then the ice comes up and the staff comes up with it, over and upright, and it straightens
+    const after = (from, e, dur) => {
+      if (e < 0.6 * T) { if (from) drag(e); else stance('rime-hold', F, { stiff: 2, lean: 0.12, oy: 10, orb: low, trem: 0.02 }); }
+      else if (e < 0.6 * T + 0.25) stance('rime-rise', { hx: 16, hy: -100, tilt: -0.25 }, { stiff: 2.6, lean: -0.06, oy: -5, orb: [0.9, -6] });
+      else if (e < dur - 0.45) stance('rime-watch', { hx: 24, hy: -84, tilt: 0.2 }, { stiff: 1.3, lean: -0.02 });
+      else stance('rime-settle', { hx: 22, hy: -68, tilt: 0.15 }, { stiff: 1.1, lean: 0 });
+    };
+    if (K.hard() || B.phase === 3) {
+      // a second, swept back the other way: it lifts the staff behind it a little, and brings it round
+      // under and out in front again
+      yield* act(1.05, (k, e) => {
+        if (e < 0.72) drag(e);
+        else if (e < 0.86) stance('rime-coil', { hx: 14, hy: -98, tilt: 3.7 }, { stiff: 2.4, lean: -0.02, oy: 2, orb: low });
+        else if (e < 0.95) stance('rime-drag', M, { stiff: 3.8, lean: 0.1, oy: 8, orb: low });
+        else stance('rime-sweep', F, { stiff: 4, lean: 0.14, oy: 10, orb: low });
+      });
+      rime(b.x, [-1, 1], T);
+      b.sq = Math.max(b.sq || 0, 0.07); kick(0, 4, 0.12);
+      yield* act(0.6 * T + 1.3, (k, e) => after(false, e, 0.6 * T + 1.3));
+    } else yield* act(0.6 * T + 1.3, (k, e) => after(true, e, 0.6 * T + 1.3));
   }
 
   // Fire: a slow ball of flame that leans after the hero and bursts where it lands.
@@ -410,7 +507,7 @@
   // smoulder (v2.1a): its core is dark red, not pale, as it leaves the staff. It does not burst where it
   // lands: it sinks in as a coal, smoulders, and bursts a moment later, wider.
   function fireball(speed, great, smoulder) {
-    const P = G.player, o = tip();
+    const P = G.player, o = tipCast();
     const a = Math.atan2(P.y - 30 - o.y, P.x - o.x);
     G.audio.play('whoosh'); if (great) G.audio.play('roar');
     const ob = H.orb(o.x, o.y, Math.cos(a) * speed, Math.sin(a) * speed, {
@@ -450,13 +547,23 @@
     yield* reposition();
     const T = K.T();
     // the tell: one mote burning in the staff is an ordinary fireball; all three flying into it is the great one
+    // the body tells them apart too (v2.5c): the great one is a heave in both hands, from a crouch up
+    // to the staff held high behind it, the figure rising and leaning back while the motes fly in; an
+    // ordinary one is a one-handed overhand throw, the staff cocked back over the shoulder; a
+    // smouldering one is bowled underhand, the staff kept low behind it, hunched over, and swung through
     if (K.chance([0, 0.25, 0.35, 0.45][B.phase], 'great')) {
       const b = B.body;
       face(); b.merge = 1;
-      yield* cast(FIRE, 1.15 * T);
+      yield* castT(FIRE, 1.15 * T, (k) => {
+        if (k < 0.2) stance('great-crouch', { hx: 20, hy: -64, tilt: 1.3 }, { stiff: 1.6, two: 1, oy: 8, lean: 0.06 });
+        else if (k < 0.55) stance('great-rise', { hx: 6, hy: -122, tilt: -0.35 }, { stiff: 1.3, two: 1, oy: -10, lean: -0.1 });
+        else if (k < 0.86) stance('great-peak', { hx: 4, hy: -124, tilt: -0.8 }, { stiff: 1.2, two: 1, oy: -12, lean: -0.16, trem: 0.015 + 0.04 * (k - 0.55) / 0.31 });
+        else stance('great-heave', CAST, { stiff: 4.4, two: 0.7, oy: -2, lean: 0.02 });
+      });
       fireball(K.gentle() ? 330 : 370, true);
+      kick(5, 7, 0.3); b.recV = (b.recV || 0) + b.face * 0.8;
       b.merge = 0;
-      yield* opening(0.8);
+      yield* opening(0.8, { t: 0.22, name: 'great-follow', st: { hx: 38, hy: -62, tilt: 1.7 }, o: { stiff: 3, lean: 0.16, oy: 5, two: 0.6 } });
       yield* wait(0.5);
       return;
     }
@@ -465,9 +572,31 @@
       face();
       // each throw its own: a pale core bursts where it lands, a dark red one smoulders first
       const sm = K.chance([0, 0.3, 0.35, 0.4][B.phase], 'smoulder');
-      yield* cast(sm ? COAL : FIRE, (i ? 0.5 : 0.8) * T);
+      // (the throw itself takes the same moment however long the wind-up: it is timed back from the
+      // release, so the staff's head is where the fireball leaves from as it goes)
+      const dur = (i ? 0.5 : 0.8) * T;
+      yield* castT(sm ? COAL : FIRE, dur, (k, e) => {
+        const left = dur - e;
+        if (sm) {
+          if (k < 0.3 && left > 0.26) stance('smoulder-bank', { hx: 16, hy: -80, tilt: -2.2 }, { stiff: 1.7, lean: 0.08, oy: 6 });
+          else if (left > 0.26) stance('smoulder-hold', { hx: 14, hy: -82, tilt: -2.45 }, { stiff: 1.4, lean: 0.12, oy: 9, trem: 0.02 });
+          // swung down through hanging and under, so the head comes up in front (never over the top)
+          else if (left > 0.14) stance('smoulder-swing', { hx: 22, hy: -92, tilt: -Math.PI }, { stiff: 4.6, lean: 0.03, oy: 4 });
+          else stance('smoulder-lob', { hx: CAST.hx, hy: CAST.hy, tilt: CAST.tilt - G.TAU }, { stiff: 5.5, lean: 0, oy: 0 });
+        } else {
+          if (k < 0.3 && left > 0.16) stance('fireball-cock', { hx: 14, hy: -82, tilt: -1.0 }, { stiff: 1.8, lean: -0.08, oy: 3 });
+          else if (left > 0.16) stance('fireball-peak', { hx: 8, hy: -100, tilt: -1.45 }, { stiff: 1.5, lean: -0.13, oy: -2, trem: 0.022 });
+          else stance('fireball-throw', CAST, { stiff: 5, lean: 0.02, oy: 0 });
+        }
+      });
       fireball(K.gentle() ? 400 : 470, false, sm);
-      yield* wait(0.45);
+      kick(5, sm ? -4 : 5, sm ? -0.15 : 0.24);
+      yield* act(0.45, (k, e) => {
+        if (e < 0.2) {
+          if (sm) stance('smoulder-follow', { hx: 30, hy: -104, tilt: -0.15 - G.TAU }, { stiff: 2.6, lean: -0.08, oy: -6 });
+          else stance('fireball-follow', { hx: 36, hy: -66, tilt: 1.55 }, { stiff: 2.6, lean: 0.14, oy: 3 });
+        } else stance('fireball-recover', { hx: 28, hy: -76, tilt: 0.85 }, { stiff: 1.4, lean: 0.02 });
+      });
     }
     // the throw spends it for a moment: an opening
     yield* opening([0, 0.6, 0.5, 0.45][B.phase]);
@@ -479,7 +608,18 @@
     yield* reposition();
     const P = G.player, T = K.T();
     const n = 4 + (B.phase - 1) + (K.hard() ? 1 : 0), b = B.body;
-    yield* cast(BOLT, 0.4 * T);
+    // the stance (v2.5c): a dip, then the staff raised out in front, tipped forward over the hero's side;
+    // it calls each strike down with a jab at the sky, like a drummer keeping time
+    yield* castT(BOLT, 0.4 * T, (k) => {
+      if (k < 0.45) stance('bolts-dip', { hx: 20, hy: -66, tilt: 0.2 }, { stiff: 2, lean: 0.04, oy: 5 });
+      else stance('bolts-raise', { hx: 30, hy: -100, tilt: 0.32 }, { stiff: 2.4, lean: -0.05, oy: -4, orb: [0.85, -14] });
+    });
+    const beat = (e) => {
+      // (the fork's tell, set below, holds through its beat: the staff levelled at the hero)
+      if (b.track) stance('bolts-fork', { hx: 34, hy: -64, tilt: 1.5 }, { stiff: 3, lean: 0.08, oy: 3 });
+      else if (e < 0.07) stance('bolts-jab', { hx: 32, hy: -118, tilt: 0.28 }, { stiff: 4.6, lean: -0.06, oy: -6, orb: [0.85, -14] });
+      else stance('bolts-beat', { hx: 30, hy: -98, tilt: 0.36 }, { stiff: 1.8, lean: -0.03, oy: -2, orb: [0.85, -14] });
+    };
     // (v2.1a) a hero who stands still is noticed: its head snaps round to them, the staff levels at them,
     // and the next bolt forks off the last one onto where they stand. The fork takes that bolt's place
     // (the volley is no denser), one a volley (two in the last phase).
@@ -493,8 +633,8 @@
         prev = strike(x, 0.5 * T);
         if (i === n - 1) { strike(G.clamp(x - 150, WL + 40, WR - 40), 0.5 * T); strike(G.clamp(x + 150, WL + 40, WR - 40), 0.5 * T); }
       }
-      yield* wait(0.3);
-      b.track = 0; b.spT = null; b.leanT = 0;
+      yield* act(0.3, (k, e) => beat(e));
+      b.track = 0;
       still = Math.abs(P.x - lastX) < 34 && P.onGround ? still + 1 : 0; // (still for two beats running)
       if (i < n - 2 && forks < (B.phase === 3 ? 2 : 1) && still >= 2) {
         still = 0;
@@ -506,8 +646,15 @@
       }
       lastX = P.x;
     }
-    b.track = 0; b.spT = null; b.leanT = 0;
-    yield* wait(0.5 * T + 0.1);
+    b.track = 0;
+    // the last three called down together: a long reach up, and as they land the staff jolts and the
+    // spell goes out of the arm
+    let landed = false;
+    yield* act(0.5 * T + 0.1, (k, e) => {
+      if (!landed && e >= 0.5 * T - 0.3) { landed = true; kick(-3, 7, -0.14); }
+      if (e < 0.5 * T - 0.3) stance('bolts-last', { hx: 30, hy: -124, tilt: 0.2 }, { stiff: 3, lean: -0.08, oy: -8, orb: [0.85, -14], trem: 0.025 });
+      else stance('bolts-spent', { hx: 32, hy: -78, tilt: 0.9 }, { stiff: 1.3, lean: 0.06, oy: 3 });
+    });
     yield* opening([0, 0.55, 0.45, 0.4][B.phase]);
   }
 
@@ -517,9 +664,16 @@
     const b = B.body, T = K.T();
     const n = (B.phase === 1 ? 2 : 3) + (K.hard() ? 1 : 0);
     G.ui.hint('spheres', 'The spheres can be cut down');
-    yield* cast(BOLT, 0.7 * T);
+    // the stance (v2.5c): the staff held low in front and its head bounced, as a ball is, the body
+    // bobbing with it; then a crouch, and each sphere is pumped up off the head of the staff
+    yield* castT(BOLT, 0.7 * T, (k, e) => {
+      const bn = Math.sin(e * 14);
+      if (k < 0.6) stance('spheres-dribble', { hx: 30, hy: -62 + bn * 5, tilt: 1.85 + bn * 0.18 }, { stiff: 2.6, lean: 0.06, oy: 3 + Math.abs(bn) * 3, orb: [1.1, 18] });
+      else if (k < 0.82) stance('spheres-coil', { hx: 26, hy: -58, tilt: 2.15 }, { stiff: 2.2, lean: 0.1, oy: 8, orb: [1.1, 18] });
+      else stance('spheres-pump', CAST, { stiff: 4.6, lean: -0.02, oy: -4 });
+    });
     for (let i = 0; i < n; i++) {
-      const o = tip(), dir = i % 2 ? -b.face : b.face;
+      const o = tipCast(), dir = i % 2 ? -b.face : b.face;
       G.audio.play('orb');
       H.orb(o.x, o.y, dir * (150 + i * 45), -260, {
         r: 15, grav: 1150, life: 6.5, tint: BOLT,
@@ -529,9 +683,12 @@
           if (ob.life < 0.05) ob.pop();
         },
       });
-      yield* wait(0.22);
+      // a jolt as each leaves; between them the head dips and pumps back up to let the next go
+      kick(2, -4, i % 2 ? -0.2 : 0.2);
+      if (i === n - 1) yield* act(0.22, () => stance('spheres-follow', { hx: 26, hy: -104, tilt: 0.05 }, { stiff: 2.6, lean: -0.07, oy: -6 }));
+      else yield* act(0.22, (k, e) => (e < 0.1 ? stance('spheres-dip', { hx: 30, hy: -66, tilt: 1.2 }, { stiff: 3.2, lean: 0.05, oy: 3 }) : stance('spheres-pump', CAST, { stiff: 4.8, lean: -0.02, oy: -3 })));
     }
-    yield* wait(0.8);
+    yield* act(0.8, (k, e) => (e < 0.3 ? stance('spheres-follow', { hx: 26, hy: -104, tilt: 0.05 }, { stiff: 2.2, lean: -0.05, oy: -5 }) : stance('spheres-settle', { hx: 28, hy: -72, tilt: 0.55 }, { stiff: 1.2, lean: 0 })));
   }
 
   // Fire: a wall of flame crosses the floor.
@@ -540,10 +697,45 @@
     const b = B.body, T = K.T();
     G.ui.hint('firewall', 'Stand on a platform, or dash through the flames');
     const dir = b.x < 640 ? 1 : -1;
-    yield* cast(FIRE, 0.4 * T);
+    // the stance (v2.5c): both hands on the staff, leaning far in, its head scraping the floor in front
+    // as if raking up the fire; held, gathering; then flung up as the wall surges
+    yield* castT(FIRE, 0.4 * T, (k) => {
+      if (k < 0.45) stance('firewall-reach', { hx: 32, hy: -64, tilt: 2.35 }, { stiff: 2.4, two: 1, oy: 6, lean: 0.14 });
+      else stance('firewall-scrape', { hx: 40, hy: -60, tilt: 2.2 }, { stiff: 2, two: 1, oy: 8, lean: 0.16, trem: 0.025 });
+    });
     firewall(dir, T);
-    if (K.hard() || B.phase === 3) { yield* wait(1.1); firewall(-dir, T); }
-    yield* wait(0.95 * T + 2.4);
+    b.sq = Math.max(b.sq || 0, 0.06);
+    // (the wall waits 0.95T before it moves; the fling comes as it goes)
+    const fling = (e, tf, cue) => {
+      if (e < tf) stance('firewall-heave', { hx: 22, hy: -70, tilt: 2.55 }, { stiff: 1.8, two: 1, oy: 9, lean: 0.06, trem: 0.02 + 0.03 * Math.min(1, e / Math.max(0.01, tf)) });
+      else if (e < tf + 0.3) { if (!cue.done) { cue.done = true; kick(4, -6, -0.2); } stance('firewall-fling', { hx: 30, hy: -108, tilt: 0.4 }, { stiff: 4.6, two: 0.6, oy: -6, lean: -0.08 }); }
+      else return false;
+      return true;
+    };
+    if (K.hard() || B.phase === 3) {
+      const tf = Math.min(0.95 * T, 1.1) - 0.12, cue = {};
+      yield* act(1.1, (k, e) => {
+        if (fling(e, tf, cue)) return;
+        // the second comes from the other way: the staff swept back over its shoulder, beckoning it
+        stance('firewall-beckon', { hx: 16, hy: -96, tilt: -0.9 }, { stiff: 2, lean: -0.1, oy: -2, trem: 0.02 });
+      });
+      firewall(-dir, T);
+      const cue2 = {};
+      yield* act(0.95 * T + 2.4, (k, e) => {
+        if (e < 0.95 * T - 0.12) stance('firewall-beckon', { hx: 16, hy: -96, tilt: -0.9 }, { stiff: 1.6, lean: -0.1, oy: -2, trem: 0.03 });
+        else if (e < 0.95 * T + 0.2) { if (!cue2.done) { cue2.done = true; kick(5, 4, 0.2); } stance('firewall-throw', { hx: 38, hy: -82, tilt: 1.3 }, { stiff: 4.4, lean: 0.12, oy: 2 }); }
+        else if (e < 0.95 * T + 2.0) stance('firewall-watch', { hx: 26, hy: -78, tilt: 0.4 }, { stiff: 1.2, lean: 0 });
+        else stance('firewall-settle', { hx: 22, hy: -68, tilt: 0.2 }, { stiff: 1, lean: 0 });
+      });
+    } else {
+      const cue = {};
+      yield* act(0.95 * T + 2.4, (k, e) => {
+        if (fling(e, 0.95 * T - 0.12, cue)) return;
+        if (e < 0.95 * T + 0.9) stance('firewall-hold', { hx: 26, hy: -96, tilt: 0.2 }, { stiff: 1.6, oy: -2, lean: -0.03 });
+        else if (e < 0.95 * T + 2.0) stance('firewall-watch', { hx: 26, hy: -78, tilt: 0.4 }, { stiff: 1.2, lean: 0 });
+        else stance('firewall-settle', { hx: 22, hy: -68, tilt: 0.2 }, { stiff: 1, lean: 0 });
+      });
+    }
   }
 
   // Ice: crystals that burst into rings unless they are broken first.
@@ -574,7 +766,14 @@
     yield* reposition();
     const P = G.player, T = K.T();
     G.ui.hint('crystals', 'Break the crystals before they burst');
-    yield* cast(ICE, 0.7 * T);
+    // the stance (v2.5c): the staff kept upright the whole time, in both hands, and lifted as if out of
+    // the floor: down into a crouch, a slow straining rise, then thrust up high as the crystals come
+    yield* castT(ICE, 0.7 * T, (k) => {
+      if (k < 0.3) stance('crystals-dip', { hx: 26, hy: -52, tilt: 0.02 }, { stiff: 1.9, two: 1, oy: 8, lean: 0.06 });
+      else if (k < 0.86) { const q = E.inQuad((k - 0.3) / 0.56); stance('crystals-strain', { hx: 26, hy: -52 - 36 * q, tilt: 0.02 }, { stiff: 2, two: 1, oy: 8 - 8 * q, lean: 0.06 - 0.08 * q, trem: 0.015 + 0.02 * q }); }
+      else stance('crystals-lift', { hx: 24, hy: -122, tilt: -0.05 }, { stiff: 4.4, two: 1, oy: -8, lean: -0.09, orb: [0.8, -30] });
+    });
+    kick(0, -6, 0);
     G.audio.play('frost');
     const n = (B.phase === 3 || K.hard()) ? 3 : 2;
     const xs = G.shuffle([230, 470, 810, 1050]).filter((x) => Math.abs(x - B.body.x) > 90).slice(0, n);
@@ -582,7 +781,11 @@
     // they burst one at a time, far enough apart that each ring can be dashed through
     xs.forEach((x, i) => crystal(x + G.rrand(-30, 30), life + i * 0.9));
     void P;
-    yield* wait(0.9);
+    yield* act(0.9, (k, e) => {
+      if (e < 0.25) stance('crystals-lift', { hx: 24, hy: -122, tilt: -0.05 }, { stiff: 3, two: 1, oy: -8, lean: -0.09, orb: [0.8, -30] });
+      else if (e < 0.6) stance('crystals-hold', { hx: 24, hy: -110, tilt: 0 }, { stiff: 1.6, two: 0.5, oy: -4, lean: -0.04 });
+      else stance('crystals-settle', { hx: 24, hy: -76, tilt: 0.2 }, { stiff: 1.2, lean: 0 });
+    });
   }
 
   // Lightning: a cloud that follows the hero while the Magus goes on casting.
@@ -590,9 +793,18 @@
     yield* reposition();
     const T = K.T();
     G.ui.hint('storm', 'The cloud strikes below itself. Keep out from under it');
-    yield* cast(BOLT, 0.7 * T);
+    // the stance (v2.5c): a dip, then the staff stirs the sky overhead, its head circling faster and
+    // faster with the motes whirling up round the hat, and it is thrust up to let the cloud go
+    let a = 0;
+    yield* castT(BOLT, 0.7 * T, (k, e, dt) => {
+      a += dt * (5 + 12 * k);
+      if (k < 0.25) stance('storm-dip', { hx: 20, hy: -68, tilt: 0.1 }, { stiff: 2, lean: 0.04, oy: 5 });
+      else if (k < 0.88) stance('storm-stir', { hx: 14 + Math.cos(a) * 9, hy: -116 + Math.sin(a) * 5, tilt: -0.12 + Math.sin(a) * 0.28 }, { stiff: 2.2, lean: -0.06, oy: -6, orb: [0.7, -64] });
+      else stance('storm-thrust', { hx: 12, hy: -130, tilt: -0.05 }, { stiff: 4.6, lean: -0.1, oy: -10, orb: [0.7, -64] });
+    });
     if (!H.list.some((h) => h.kind === 'cloud')) cloud(B.phase === 3 || K.hard() ? 5 : 4, T);
-    yield* wait(0.5);
+    kick(0, 6, 0.06);
+    yield* act(0.5, (k, e) => (e < 0.22 ? stance('storm-thrust', { hx: 12, hy: -130, tilt: -0.05 }, { stiff: 3, lean: -0.08, oy: -8, orb: [0.7, -64] }) : stance('storm-lower', { hx: 22, hy: -90, tilt: 0.15 }, { stiff: 1.3, oy: -2, lean: -0.02 })));
   }
 
   // Ice: wind drives the hero back while icicles fall.
@@ -602,14 +814,21 @@
     yield* blink(640 + side * 450, GY);
     const b = B.body;
     G.ui.hint('blizzard', 'The wind pushes you back. Icicles fall where the floor is marked');
-    yield* cast(ICE, 0.8 * T);
+    // the stance (v2.5c): drawn back and up, as a breath is taken; then braced, leaning far in, the
+    // staff thrust out ahead in both hands, and held into the wind it makes, buffeted
+    yield* castT(ICE, 0.8 * T, (k) => {
+      if (k < 0.3) stance('blizzard-draw', { hx: 14, hy: -88, tilt: -0.25 }, { stiff: 1.8, two: 1, oy: -4, lean: -0.08, orb: [1.2, -6] });
+      else stance('blizzard-brace', { hx: 40, hy: -92, tilt: 0.75 }, { stiff: 2.6, two: 1, oy: 4, lean: 0.14, trem: 0.02, orb: [1.3, -6] });
+    });
     G.audio.play('tide'); G.audio.play('frost');
     B.blizz = -side;
+    kick(-5, 0, -0.1);
     const dur = 4.2, n = K.hard() ? 11 : 9;
     let e = 0, next = 0.3, i = 0;
     while (e < dur) {
       const dt = yield;
       e += dt; next -= dt;
+      stance('blizzard-channel', { hx: 40 + Math.sin(e * 3.1) * 2, hy: -92 + Math.sin(e * 4.3) * 2, tilt: 0.75 + Math.sin(e * 5.7) * 0.05 }, { stiff: 2, two: 1, oy: 4 + Math.sin(e * 1.9) * 1.5, lean: 0.15 + Math.sin(e * 2.3) * 0.02, orb: [1.3, -6] });
       G.wind = -side * 185 * Math.min(1, e / 0.4) * Math.min(1, (dur - e) / 0.4);
       if (next <= 0 && i < n) {
         next = dur / (n + 1); i++;
@@ -617,7 +836,8 @@
       }
     }
     G.wind = 0; B.blizz = 0; b.want = 0;
-    yield* wait(0.8);
+    // the wind drops out of it: it slumps forward a beat, then straightens
+    yield* act(0.8, (k, e) => (e < 0.22 ? stance('blizzard-release', { hx: 30, hy: -76, tilt: 1.2 }, { stiff: 2, lean: 0.07, oy: 3 }) : stance('blizzard-settle', { hx: 24, hy: -70, tilt: 0.4 }, { stiff: 1.2, lean: -0.02 })));
   }
 
   // The last verse, once: ice, then fire, then lightning, and the Magus is spent.
@@ -628,27 +848,44 @@
     b.want = 1; B.spin = 5;
     setElem(ICE);
     rime(640, [-1, 1], T, 0.085);
-    yield* wait(0.6 * T + 0.75);
+    // each verse its own stance (v2.5c): ice, the staff swept down at the floor in both hands;
+    // fire, heaved up overhead and held back, trembling, then hurled down as the blast comes;
+    // lightning, held straight up and jabbed at the sky for each volley
+    kick(0, 6, 0.15);
+    yield* act(0.6 * T + 0.75, (k, e) => stance(e < 0.2 ? 'cata-ice' : 'cata-ice-hold', { hx: 30, hy: -60, tilt: 2.5 }, { stiff: e < 0.2 ? 3.6 : 1.6, two: 1, oy: 6, lean: 0.12, trem: e < 0.2 ? 0 : 0.02, orb: [1.3, 40] }));
     setElem(FIRE);
     G.audio.play('charge', { dur: 1.25 * T });
     H.blast({ x: 640, y: FLOOR - 30, r: 330, tele: 1.25 * T, tint: FIRE, sfx: 'boom' });
-    yield* wait(1.25 * T + 0.3);
+    let hurled = false;
+    yield* act(1.25 * T + 0.3, (k, e) => {
+      if (e < 0.3) stance('cata-fire-rise', { hx: 6, hy: -124, tilt: -0.4 }, { stiff: 1.6, two: 1, oy: -8, lean: -0.1 });
+      else if (e < 1.25 * T - 0.12) stance('cata-fire-peak', { hx: 4, hy: -124, tilt: -0.8 }, { stiff: 1.2, two: 1, oy: -10, lean: -0.15, trem: 0.015 + 0.04 * Math.min(1, e / (1.25 * T)) });
+      else { if (!hurled) { hurled = true; b.recV = (b.recV || 0) + b.face * 1.2; } stance('cata-fire-hurl', { hx: 38, hy: -66, tilt: 1.7 }, { stiff: 5, two: 0.6, oy: 4, lean: 0.16 }); }
+    });
     setElem(BOLT);
     const lanes = 9, lw = (WR - WL) / lanes;
     let parity = G.rng() < 0.5 ? 0 : 1;
     for (let v = 0; v < 3; v++) {
       for (let i = 0; i < lanes; i++) if (i % 2 === parity) strike(WL + (i + 0.5) * lw, 0.85 * T, lw - 16);
-      yield* wait(0.85 * T + 0.15);
+      let hit = false;
+      yield* act(0.85 * T + 0.15, (k, e) => {
+        if (!hit && e >= 0.85 * T) { hit = true; kick(0, 7, 0.08); }
+        if (e < 0.12) stance('cata-bolt-jab', { hx: 12, hy: -134, tilt: -0.04 }, { stiff: 4.4, oy: -9, lean: -0.1, orb: [0.7, -64] });
+        else stance('cata-bolt-hold', { hx: 12, hy: -122, tilt: -0.1 }, { stiff: 1.8, oy: -6, lean: -0.07, trem: 0.02, orb: [0.7, -64] });
+      });
       parity = 1 - parity;
     }
     // spent: the Magus drops and lies open
     B.spin = 0.3; b.elem = null; b.want = 0; b.spent = true; b.exposed = true;
+    stance('cata-spent', { hx: 26, hy: -44, tilt: 1.1 }, { stiff: 1, lean: 0 });
     yield* tween(b, { y: FLOOR }, 0.45, E.inCubic);
     G.fx.shake(8); G.audio.play('boom');
     G.fx.thud(b.x, FLOOR, 1.2);
     G.ui.callout('SPENT', 'Strike now');
+    kick(0, 8, 0.3); b.sq = Math.max(b.sq || 0, 0.12);
     yield* wait(3.4);
     b.spent = false; b.exposed = false; b.homeY = GY; B.spin = 1;
+    unstance();
   }
 
   const coda = (spell, el) => function* () {
@@ -656,8 +893,23 @@
     if (B.phase < 3) return;
     setElem(el === BOLT ? ICE : BOLT); B.body.want = 1;
     echo(el);
-    yield* wait(0.85 * K.T() + 0.3);
+    yield* echoStance(el);
   };
+  // The echo's own stance (v2.5c), in the staff's language: a bolt from the sky is called with the
+  // staff jabbed straight up; an ice shard is aimed with the staff levelled at the hero. A quick coil
+  // first, the held point, and a jolt as it goes.
+  function* echoStance(el) {
+    const T = K.T(), sky = el !== BOLT;
+    let fired = false;
+    yield* act(0.85 * T + 0.3, (k, e) => {
+      if (e < 0.1) stance('echo-coil', { hx: 20, hy: -70, tilt: sky ? 0.3 : 0.6 }, { stiff: 2.6, oy: 4, lean: sky ? 0.04 : -0.04 });
+      else if (e < 0.85 * T) stance(sky ? 'echo-sky' : 'echo-aim', sky ? { hx: 14, hy: -118, tilt: -0.12 } : { hx: 34, hy: -84, tilt: 1.25 }, { stiff: 2.6, oy: sky ? -7 : 3, lean: sky ? -0.08 : 0.1, trem: 0.02 });
+      else {
+        if (!fired) { fired = true; if (sky) kick(0, 7, 0.08); else kick(-7, 0, -0.18); }
+        stance('echo-release', { hx: 26, hy: -78, tilt: 0.5 }, { stiff: 1.4, lean: 0 });
+      }
+    });
+  }
   // Comet: a slow star that follows the hero. It cannot be outrun for ever; the answer is to strike
   // it, which sends it back at the Magus. In the last phase (and on Merciless patterns) the Magus
   // bats it back again, faster, and it must be struck a second time.
@@ -667,8 +919,15 @@
     const T = K.T(), b = B.body, P = G.player;
     G.ui.hint('comet', 'Strike the star to send it back at the Magus');
     face();
-    yield* cast(STAR, 0.9 * T);
-    const o = tip(), sp = K.gentle() ? 210 : K.hard() ? 280 : 245;
+    // the stance (v2.5c): the staff taken across the body in both hands, then raised and cradled at
+    // the height of its face, the figure rising, while the star swells on its head; and pushed off
+    yield* castT(STAR, 0.9 * T, (k, e) => {
+      if (k < 0.25) stance('comet-gather', { hx: 22, hy: -70, tilt: 1.4 }, { stiff: 1.8, two: 1, oy: 4, lean: 0.04 });
+      else if (k < 0.85) stance('comet-cradle', { hx: 20, hy: -98, tilt: 1.0 + Math.sin(e * 6) * 0.04 }, { stiff: 1.3, two: 1, oy: -10, lean: -0.08, orb: [1.2, -30] });
+      else stance('comet-push', CAST, { stiff: 4.2, two: 0.7, oy: -4, lean: 0.04 });
+    });
+    kick(5, 0, 0.18);
+    const o = tipCast(), sp = K.gentle() ? 210 : K.hard() ? 280 : 245;
     const a0 = Math.atan2(P.y - 30 - o.y, P.x - o.x);
     G.audio.play('whoosh');
     const ob = H.orb(o.x, o.y, Math.cos(a0) * sp, Math.sin(a0) * sp, {
@@ -719,14 +978,31 @@
     const hits0 = ob.hits;
     ob.hits = (Pl) => !ob.back && hits0.call(ob, Pl);
     b.want = 0.5;
-    while (!ob.dead) { const dt = yield; b.charge = Math.max(0, b.charge - dt * 3); face(); }
+    // while it hunts: a guard, the staff held ready in both hands like a bat. Coming back at it with a
+    // rally left, it cocks the staff back over its shoulder and swings through it; with none left it
+    // can only brace
+    let swing = 0, ralWas = ob.rallies;
+    while (!ob.dead) {
+      const dt = yield;
+      b.charge = Math.max(0, b.charge - dt * 3); face();
+      if (ob.rallies < ralWas) { ralWas = ob.rallies; swing = 0.22; kick(6, 2, 0.3); }
+      const near = ob.back && G.dist(ob.x, ob.y, b.x, b.y - B.h / 2) < 260;
+      if (swing > 0) { swing -= dt; stance('comet-bat', { hx: 40, hy: -76, tilt: 1.9 }, { stiff: 6, two: 1, lean: 0.12, oy: 2 }); }
+      else if (near && ob.rallies > 0) stance('comet-windup', { hx: 12, hy: -92, tilt: -0.9 }, { stiff: 3, two: 1, lean: -0.08, oy: 2 });
+      else if (near) stance('comet-brace', { hx: 18, hy: -104, tilt: 0.15 }, { stiff: 3, two: 1, lean: -0.1, oy: -4 });
+      else stance('comet-guard', { hx: 24, hy: -84, tilt: 0.25 + Math.sin(B.t * 2.2) * 0.05 }, { stiff: 1.3, two: 1, lean: 0 });
+    }
     b.charge = 0; b.want = 0;
     if (ob.struck) {
-      // its own star in its face: it reels, open
+      // its own star in its face: it reels, open (thrown back, then dazed and swaying)
       b.exposed = true;
-      yield* wait(1.7);
+      kick(-6, -6, -0.4); b.sq = Math.max(b.sq || 0, 0.1);
+      yield* act(1.7, (k, e) => {
+        if (e < 0.28) stance('comet-reel', { hx: 10, hy: -96, tilt: -0.8 }, { stiff: 3, lean: -0.2, oy: -4 });
+        else stance('comet-dazed', { hx: 24, hy: -48, tilt: 0.7 + Math.sin(e * 2.5) * 0.12 }, { stiff: 1, lean: -0.1 + Math.sin(e * 2.5) * 0.04, oy: 6 });
+      });
       b.exposed = false;
-    } else yield* wait(0.5);
+    } else yield* act(0.5, () => stance('comet-settle', { hx: 24, hy: -76, tilt: 0.35 }, { stiff: 1.2, lean: 0 }));
   }
 
   // Invocation: lightning, two to four times, each from a different quarter. The red warning comes
@@ -744,7 +1020,20 @@
       const g = forced || G.rpick(['high', 'level', 'plant'].filter((q) => q !== last));
       last = g;
       b.gest = g;
-      yield* cast(BOLT, 0.72 * T);
+      // the body says it too (v2.5c), after a quick coil the other way: from the sky, it rises and
+      // leans back looking up, the motes lifting; along the ground, it drops into a crouch and leans in
+      // behind the levelled staff like a lance; through the floor, it rises and comes down on the
+      // driven staff, the motes sinking. The hold steadies, then trembles as the bolt comes.
+      const BODY = { high: { lean: -0.12, oy: -11, orb: [0.7, -60] }, level: { lean: 0.13, oy: 8, orb: [1.25, 6] }, plant: { lean: 0.05, oy: 5, orb: [1.2, 48] } }[g];
+      const COIL = { high: { lean: 0.06, oy: 5 }, level: { lean: -0.06, oy: -4 }, plant: { lean: -0.04, oy: -9 } }[g];
+      let planted = false;
+      yield* castT(BOLT, 0.72 * T, (k) => {
+        if (k < 0.14) stance('invoke-coil-' + g, null, COIL);
+        else {
+          if (g === 'plant' && !planted) { planted = true; b.sq = Math.max(b.sq || 0, 0.09); kick(0, 5, 0); G.fx.dust(b.x + b.face * 40, FLOOR, 2, { speed: [20, 90], size: [5, 9], up: 30, a: 0.3 }); }
+          stance('invoke-' + g, null, Object.assign({ trem: k > 0.6 ? 0.03 * (k - 0.6) / 0.4 : 0 }, BODY));
+        }
+      });
       if (g === 'high') {
         strike(G.clamp(P.x + P.vx * 0.15, WL + 40, WR - 40), late, 88);
       } else if (g === 'level') {
@@ -753,19 +1042,23 @@
         // through the floor: a mark under the staff, then waves both ways
         const m = K.columnMark(b.x + b.face * 26, 70);
         let e = 0;
-        while (e < late) { e += yield; m.k = e / late; m.locked = e > late * 0.6; }
+        while (e < late) { e += yield; m.k = e / late; m.locked = e > late * 0.6; stance('invoke-plant-hold', null, Object.assign({}, BODY, { trem: 0.03 + 0.03 * e / late })); }
         m.dead = true;
+        b.sq = Math.max(b.sq || 0, 0.08);
         G.audio.play('zap'); G.fx.shake(7);
         G.fx.thud(b.x + b.face * 26, FLOOR, 0.9, { col: BOLT.boss });
         H.shockwave(b.x + b.face * 40, b.face, 640, 46, BOLT);
         H.shockwave(b.x - b.face * 10, -b.face, 640, 46, BOLT);
       }
-      if (g !== 'plant') yield* wait(late);
-      yield* wait(0.3);
+      if (g !== 'plant') yield* act(late, (k) => stance('invoke-' + g + '-hold', null, Object.assign({}, BODY, { trem: 0.03 + 0.03 * k })));
+      // the bolt goes: from the sky the staff jolts down in the hand; along the ground it kicks back like
+      // a fired lance; through the floor the Magus is thrown up off it
+      if (g === 'high') kick(0, 9, 0.1); else if (g === 'level') kick(-9, 0, -0.2); else kick(0, -10, 0);
+      yield* act(0.3, (k, e) => stance('invoke-recoil', null, e < 0.14 ? { high: { lean: -0.04, oy: -4 }, level: { lean: -0.05, oy: 2 }, plant: { lean: -0.02, oy: -8 } }[g] : { lean: 0, oy: 0 }));
       b.gest = null;
-      yield* wait(0.3);
+      yield* act(0.3, () => stance('invoke-settle', null, { lean: 0.02, oy: 2 }));
     }
-    yield* wait(0.5);
+    yield* act(0.5, () => stance('invoke-settle', null, { lean: 0, oy: 0 }));
   }
 
   // ------------------------------------------------------------------ corrupted: the void's own two
@@ -1275,16 +1568,22 @@
         e += dt;
         const k = Math.min(1, e / windup), a = e * 9;
         b.y = G.lerp(y0, FLOOR - 10, E.outCubic(Math.min(1, k * 1.5)));
-        b.leanT = 0.08 * Math.min(1, k * 2);
-        holdStaff({ hx: 30 + Math.cos(a) * 6, hy: -48 + Math.sin(a) * 4, tilt: 1.78 + Math.sin(a) * 0.16 });
+        // (v2.5c: the motes sink to circle its feet, wide, with the frost)
+        stance('nova-ice-sink', { hx: 30 + Math.cos(a) * 6, hy: -48 + Math.sin(a) * 4, tilt: 1.78 + Math.sin(a) * 0.16 }, { lean: 0.08 * Math.min(1, k * 2), orb: [1.35, 56] });
         B.glaze.x = b.x; B.glaze.r = 130 * E.outQuad(k);
         if (Math.random() < dt * 30) G.fx.burst(b.x + G.rand(-1, 1) * B.glaze.r, FLOOR - 3, { n: 1, color: ICE.hot, speed: [20, 90], angle: -Math.PI / 2, spread: 1, life: [0.2, 0.5], kind: 'shard', size: [2, 4] });
       }
-      // a breath up
-      holdStaff({ hx: 30, hy: -86, tilt: 0.3 }, 2.2); b.leanT = -0.07;
-      yield* tween(b, { y: FLOOR - 32 }, 0.2, E.outQuad);
+      // a breath up: it rises slowing into the top, and hangs there a moment with the staff taken up
+      // high in both hands, drawn back to drive down (v2.5c: the same 0.2 s, in two stages)
+      const y1 = b.y;
+      yield* act(0.2, (k, e) => {
+        b.y = G.lerp(y1, FLOOR - 32, E.outQuad(Math.min(1, e / 0.15)));
+        if (e < 0.12) stance('nova-ice-breath', { hx: 22, hy: -108, tilt: -0.3 }, { stiff: 2.6, two: 1, lean: -0.09, orb: [1.1, 20] });
+        else stance('nova-ice-peak', { hx: 18, hy: -116, tilt: -0.42 }, { stiff: 2, two: 1, lean: -0.11, trem: 0.03, orb: [1.1, 20] });
+      });
+      b.y = FLOOR - 32;
       // and down
-      holdStaff({ hx: 38, hy: -58, tilt: 0.04 }, 6); b.leanT = 0.12;
+      stance('nova-ice-drive', { hx: 38, hy: -58, tilt: 0.04 }, { stiff: 6, two: 1, lean: 0.12, orb: [1.35, 56] });
       yield* tween(b, { y: FLOOR - 6 }, 0.08, E.inCubic);
       const sx = b.x + b.face * 30;
       frostNova(sx, ([0, 760, 820, 900][B.phase]) * (K.gentle() ? 0.88 : 1));
@@ -1300,9 +1599,9 @@
         e += dt; crk -= dt;
         const k = Math.min(1, e / windup);
         b.y = G.lerp(y0, GY - 28, E.outCubic(k));
-        b.leanT = -0.09 * k;
         spin += dt * (4 + 22 * k * k);
-        holdStaff({ hx: 8, hy: -126, tilt: -0.2 + spin }, 1.5);
+        // (v2.5c: one hand, the motes whirled tight and high round the hat)
+        stance('nova-bolt-spin', { hx: 8, hy: -126, tilt: -0.2 + spin }, { stiff: 1.5, lean: -0.09 * k, orb: [0.55, -82] });
         if (crk <= 0) { crk = 0.11 - 0.06 * k; G.audio.play('crackle'); }
         // lightning crawls down out of the staff and earths itself at the edge of the dome
         if (Math.random() < dt * (3 + 16 * k)) {
@@ -1313,17 +1612,17 @@
       }
       // and down: the spin brought round to the floor
       b.sp.tilt = Math.atan2(Math.sin(b.sp.tilt), Math.cos(b.sp.tilt));
-      holdStaff({ hx: 38, hy: -58, tilt: 0.04 }, 6); b.leanT = 0.12;
+      stance('nova-bolt-drive', { hx: 38, hy: -58, tilt: 0.04 }, { stiff: 6, two: 1, lean: 0.12, orb: [0.9, 30] });
       yield* tween(b, { y: FLOOR - 6 }, 0.1, E.inCubic);
       G.audio.play('novaBolt'); G.audio.play('zap'); G.fx.shake(12); G.fx.stop(0.06);
       G.fx.thud(b.x + b.face * 30, FLOOR, 1.1, { col: BOLT.boss });
       b.sq = 0.16;
     }
     B.glaze && (B.glaze.fade = true);
-    // it rocks back off the planted staff
+    // it rocks back off the planted staff, which rings in its hands
     b.recV = (b.recV || 0) - b.face * 1.4;
-    b.leanT = -0.04;
-    yield* wait(0.12);
+    kick(0, -5, 0.1);
+    yield* act(0.12, () => stance('nova-recoil', { hx: 38, hy: -58, tilt: 0.04 }, { stiff: 4, two: 0.8, lean: -0.04 }));
   }
 
   function* atkNova() {
@@ -1345,15 +1644,15 @@
       yield* wait(tight ? 0.08 : 0.28);
       yield* novaOne(second, (second === 'ice' ? (tight ? 0.5 : 0.65) : (tight ? 0.62 : 0.75)) * T);
     }
-    yield* wait(0.25);
-    // it lifts off the staff and floats back up
-    b.spT = null; b.leanT = 0;
+    // it leans on the staff a beat, then levers it out of the floor and floats back up
+    yield* act(0.25, () => stance('nova-lean', { hx: 34, hy: -58, tilt: 0.1 }, { stiff: 1.6, two: 0.5, lean: 0.06 }));
+    stance('nova-lift', { hx: 22, hy: -96, tilt: -0.1 }, { stiff: 2.2, lean: -0.06 });
     yield* tween(b, { y: GY }, 0.4, E.outCubic);
     if (B.phase === 3) {
       const el = B.novaEl;
       setElem(el === BOLT ? ICE : BOLT); b.want = 1;
       echo(el);
-      yield* wait(0.85 * T + 0.3);
+      yield* echoStance(el);
     }
   }
 
@@ -1528,25 +1827,29 @@
       const k = Math.min(1, e / windup);
       a += dt * (brood ? 16 : G.TAU * 0.95 / windup);
       const amp = brood ? 0.17 : 0.45;
-      holdStaff({ hx: 30 + Math.cos(a) * (brood ? 4 : 12), hy: -56 + Math.sin(a) * (brood ? 3 : 8), tilt: (brood ? 1.6 : 1.5) + Math.sin(a) * amp }, 1.4);
-      b.leanT = 0.04 + 0.03 * k + Math.sin(a) * (brood ? 0.01 : 0.03);
       b.y = y0 + 8 * E.outQuad(k);
+      // (v2.5c) the whole body goes with the swirl: one long slow turn rolls through it, rising and
+      // dipping; the brood's quick circles are made hunched low and tight, the staff shivering. Before
+      // the staff goes down it is lifted (the last moment of the swirl), to drive it the harder.
+      if (k > 0.88) { stance('serpent-lift', { hx: 30, hy: -90, tilt: 1.0 }, { stiff: 3.2, oy: -6, lean: -0.04, orb: [1.15, 30] }); }
+      else if (brood) stance('serpent-brood', { hx: 30 + Math.cos(a) * 4, hy: -56 + Math.sin(a) * 3, tilt: 1.6 + Math.sin(a) * amp }, { stiff: 1.4, oy: 10, lean: 0.1 + 0.03 * k + Math.sin(a) * 0.01, trem: 0.02, orb: [1.15, 40] });
+      else stance('serpent-coil', { hx: 30 + Math.cos(a) * 12, hy: -56 + Math.sin(a) * 8, tilt: 1.5 + Math.sin(a) * amp }, { stiff: 1.4, oy: 3 + Math.sin(a) * 5, lean: 0.04 + 0.03 * k + Math.sin(a) * 0.05, orb: [1.15, 30] });
       if (Math.random() < 0.7) { const o = tip(); G.fx.spawn({ x: o.x + G.rand(-3, 3), y: o.y + G.rand(-3, 3), vx: G.rand(-30, 30), vy: -G.rand(20, 80), life: G.rand(0.25, 0.5), size: G.rand(3, 6), color: FIRE.boss }); }
     }
     // the staff drives down at the floor in front, and the fire goes into the ground
-    holdStaff({ hx: 42, hy: -52, tilt: 1.95 }, 2); b.leanT = 0.12;
+    stance('serpent-drive', { hx: 42, hy: -52, tilt: 1.95 }, { stiff: 4.4, two: 1, oy: 7, lean: 0.12, orb: [1.2, 46] });
     yield* wait(0.09);
     const sx = G.clamp(b.x + b.face * 84, WL + 40, WR - 40);
     G.audio.play('serpent'); G.audio.play('whoosh'); G.fx.shake(6);
     G.fx.thud(sx, FLOOR, 0.8, { col: FIRE.boss });
     G.fx.burst(sx, FLOOR - 4, { n: 14, color: FIRE.boss, speed: [80, 360], angle: -Math.PI / 2, spread: 1.6, life: [0.3, 0.7], size: [3, 7], grav: -100 });
     b.recV = (b.recV || 0) - b.face * 1.0;
+    b.sq = Math.max(b.sq || 0, 0.08); kick(0, 5, 0.15);
     const ph = B.phase, pools = ph >= 2, mine = [];
     if (!brood) mine.push(serpent(sx, b.face, { big: true, len: 22, speed: 330, life: 4.2, hp: 2, pools, split: ph === 3 }));
     else mine.push(serpent(sx, b.face, { len: 11, speed: 410, life: 3.2, hp: 1, pools }));
     yield* wait(0.12);
-    b.leanT = -0.03;
-    holdStaff({ hx: 34, hy: -62, tilt: 1.2 }, 1.2);
+    stance('serpent-recoil', { hx: 34, hy: -62, tilt: 1.2 }, { stiff: 1.2, lean: -0.03, oy: 2 });
     if (brood) {
       const n = ph === 3 ? 3 : 2;
       for (let i = 1; i < n; i++) {
@@ -1566,10 +1869,9 @@
       if (!s) break;
       if (Math.abs(s.x - b.x) > 20) b.face = s.x > b.x ? 1 : -1;
       const dx = (s.x - b.x) * b.face, dy = s.y - (b.y - 70);
-      holdStaff({ hx: 32, hy: -62, tilt: G.clamp(Math.atan2(Math.max(10, dx), -dy), 0.7, 2.3) }, 0.8);
-      b.leanT = 0.06;
+      stance('serpent-conduct', { hx: 32, hy: -62, tilt: G.clamp(Math.atan2(Math.max(10, dx), -dy), 0.7, 2.3) }, { stiff: 0.8, lean: 0.06 });
     }
-    b.spT = null; b.leanT = 0;
+    stance('serpent-rise', { hx: 24, hy: -80, tilt: 0.4 }, { stiff: 1.2, lean: -0.02 });
     yield* tween(b, { y: y0 }, 0.3, E.outQuad);
     yield* wait(0.3);
   }
@@ -1611,7 +1913,8 @@
 
   // A clear opening after a cast: the spell takes something out of it. The staff dips, it sags in the
   // air, and for a moment it is open (more damage) before it gathers itself.
-  function* opening(dur) {
+  // ft (v2.5c): the throw's own follow-through, held for its first moments before the sag
+  function* opening(dur, ft) {
     const b = B.body;
     if (b.hidden || !dur) return;
     b.exposed = true; b.want = 0;
@@ -1621,12 +1924,13 @@
       const dt = yield;
       e += dt;
       const k = Math.min(1, e / dur);
-      holdStaff({ hx: 24, hy: -40, tilt: 0.85 + 0.1 * Math.sin(e * 3) }, 0.8);
-      b.leanT = -0.06;
+      if (ft && e < ft.t) stance(ft.name, ft.st, ft.o);
+      // the sag: the staff droops first and the body follows it down a beat later, the hem last
+      else stance('opening', { hx: 24, hy: -40, tilt: 0.85 + 0.1 * Math.sin(e * 3) }, { stiff: 0.8, lean: -0.06, oy: 2 + 2 * Math.sin(e * 2.4) });
       b.y = y0 + 12 * Math.sin(Math.min(1, k * 1.8) * Math.PI / 2); // sags, and hangs there
       if (Math.random() < dt * 10) { const o = tip(); G.fx.dust(o.x, o.y, 1, { speed: [10, 40], size: [5, 9], life: [0.4, 0.7], up: 50, a: 0.28, color: '70,64,84' }); }
     }
-    b.exposed = false; b.spT = null; b.leanT = 0;
+    b.exposed = false; unstance();
   }
 
   // A smouldering fireball, sunk into the floor where it came down: it smokes, glows faster and faster,
@@ -1782,24 +2086,26 @@
       const dt = yield;
       e += dt;
       const k = Math.min(1, e / gather);
-      holdStaff({ hx: 10, hy: -116 - 8 * k, tilt: -0.1 }, 1.6);
-      b.leanT = -0.1 * k; b.y = y0 + 7 * E.outQuad(k);
+      b.y = y0 + 7 * E.outQuad(k);
+      stance('spire-gather', { hx: 10, hy: -116 - 8 * k, tilt: -0.1 }, { stiff: 1.6, lean: -0.1 * k, oy: 4 * k, orb: [0.7, -70] });
     }
     const runes = [];
     for (let i = 0; i < n; i++) {
       const tele = (i ? 0.62 : 0.8) * T, lockAt = tele * 0.55;
       runes.push(spire(P.x, tele, lockAt));
       // a jab at the sky for each
-      holdStaff({ hx: 8, hy: -138, tilt: -0.04 }, 3.2); b.leanT = -0.15;
       b.recV = (b.recV || 0) + b.face * 0.4;
+      kick(0, -6, -0.05);
       e = 0;
       while (e < (i < n - 1 ? lockAt + 0.04 : tele + 0.1)) {
         const dt = yield;
         e += dt;
-        holdStaff({ hx: 10, hy: -126, tilt: -0.08 + Math.sin(e * 30) * 0.03 }, 1.4); b.leanT = -0.1;
+        if (e < 0.09) stance('spire-jab', { hx: 8, hy: -138, tilt: -0.04 }, { stiff: 3.2, lean: -0.15, oy: -6, orb: [0.7, -70] });
+        else stance('spire-hold', { hx: 10, hy: -126, tilt: -0.08 + Math.sin(e * 30) * 0.03 }, { stiff: 1.4, lean: -0.1, oy: -3, orb: [0.7, -70] });
       }
     }
     while (runes.some((r) => !r.fired && !r.dead)) yield;
+    kick(0, 8, 0.08);
     b.track = 0;
     yield* opening([0, 0.5, 0.42, 0.36][B.phase]);
   }
@@ -1953,15 +2259,18 @@
       e += dt;
       if (e < windup) {
         // the tell: level and turning slowly (ice), upright and rattling (lightning), slanted between (both)
-        if (bolt) holdStaff({ hx: 12 + G.rand(-1.5, 1.5), hy: -112 + G.rand(-2, 2), tilt: -0.08 + Math.sin(e * 40) * 0.06 }, 2.4);
-        else if (mixed) holdStaff({ hx: 22, hy: -84, tilt: 0.72 + Math.sin(e * 3) * 0.18 }, 1.2);
-        else holdStaff({ hx: 32, hy: -66, tilt: 1.45 + Math.sin(e * 2.2) * 0.35 }, 1.0);
-        b.leanT = -0.05;
+        // (v2.5c) and the body with it: for ice it sways slow and low with the turning staff; for
+        // lightning it draws itself up tall and the staff rattles (a steady rattle now, not a random one);
+        // for both, a half crouch that rocks between the two
+        const gk = Math.min(1, e / 0.18); // (a quick gather into the hold)
+        if (bolt) stance('motes-bolt', { hx: 12 + Math.sin(e * 53) * 1.5, hy: -112 + Math.sin(e * 61) * 2, tilt: -0.08 + Math.sin(e * 40) * 0.06 }, { stiff: 2.4, lean: -0.08 * gk, oy: -10 * gk, trem: 0.01 });
+        else if (mixed) stance('motes-mixed', { hx: 22, hy: -84, tilt: 0.72 + Math.sin(e * 3) * 0.18 }, { stiff: 1.2, lean: -0.02 + Math.sin(e * 3) * 0.04, oy: 4 * gk });
+        else stance('motes-ice', { hx: 32, hy: -66, tilt: 1.45 + Math.sin(e * 2.2) * 0.35 }, { stiff: 1.0, lean: -0.03 + Math.sin(e * 2.2) * 0.04, oy: 3 * gk + Math.sin(e * 2.2) * 2 });
       } else {
-        // then it sends them, a sweep of the staff for each
-        const q = (e - windup) / gapT;
-        holdStaff({ hx: 34, hy: -72, tilt: 1.25 + 0.4 * Math.sin(q * Math.PI) }, 1.8);
-        b.leanT = 0.05 + 0.04 * Math.sin(q * Math.PI);
+        // then it sends them, a flick of the staff after each as it leaves
+        const q = (e - windup) / gapT, f = q - Math.floor(q);
+        if (f < 0.3) stance('motes-send', { hx: 38, hy: -76, tilt: 1.65 }, { stiff: 4, lean: 0.08, oy: 1 });
+        else stance('motes-return', { hx: 30, hy: -78, tilt: 1.05 }, { stiff: 1.6, lean: 0.03 });
       }
     }
     // it watches them hunt
@@ -1970,9 +2279,9 @@
       const dt = yield;
       t += dt;
       face();
-      holdStaff({ hx: 30, hy: -70, tilt: 1.2 }, 0.9); b.leanT = 0.03;
+      stance('motes-watch', { hx: 30, hy: -70, tilt: 1.2 }, { stiff: 0.9, lean: 0.03 });
     }
-    b.spT = null; b.leanT = 0;
+    unstance();
     yield* opening([0, 0.6, 0.5, 0.45][ph]);
   }
 
@@ -2020,9 +2329,8 @@
     const b = B.body, P = G.player, T = K.T(), ph = B.phase;
     const n = ph + 1;
     setElem(BOLT); b.want = 1;
-    // it draws itself up tall, staff upright, and is gone
-    holdStaff({ hx: 10, hy: -122, tilt: 0 }, 1.4); b.leanT = -0.06;
-    yield* wait(0.24 * T);
+    // it sinks a touch, then draws itself up tall, staff upright, and is gone
+    yield* act(0.24 * T, (k) => (k < 0.35 ? stance('blink-dip', { hx: 18, hy: -80, tilt: 0.1 }, { stiff: 2, lean: 0.04, oy: 5 }) : stance('blink-tall', { hx: 10, hy: -122, tilt: 0 }, { stiff: 1.8, lean: -0.06, oy: -9, orb: [0.6, -40] })));
     let surf = FLOOR;
     for (let i = 0; i < n; i++) {
       const last = i === n - 1;
@@ -2054,15 +2362,17 @@
       b.x = g.x; b.y = g.y; b.face = g.face; b.homeY = b.y; b.hidden = false;
       b.tqf = b.face; b.tqP = 1; // (it arrives facing its way: no turn)
       puff(b.x, b.y - 50, BOLT.boss);
-      holdStaff({ hx: 12, hy: -134, tilt: 0 }, 2.6); b.leanT = slant ? 0.12 : -0.04;
+      // (v2.5c) both hands on it: straight up overhead to drive straight down, or slanted like a lance
+      // for the dive in at an angle
+      if (slant) stance('blink-lance', { hx: 22, hy: -122, tilt: 0.55 }, { stiff: 2.6, two: 1, lean: 0.12, oy: -4 });
+      else stance('blink-raise', { hx: 12, hy: -134, tilt: 0 }, { stiff: 2.6, two: 1, lean: -0.04, oy: -4 });
       yield* tween(b, { alpha: 1 }, 0.07);
       // a breath at the top: it draws up, and drops
       const hang = 0.13, y0 = b.y;
       e = 0;
       while (e < hang) { const dt = yield; e += dt; b.y = y0 - 12 * E.outQuad(Math.min(1, e / hang)); }
       G.audio.play('mgDrop');
-      holdStaff({ hx: 22, hy: -66, tilt: slant ? 0.4 : 0.05 }, 4);
-      b.leanT = slant ? 0.32 : 0.06;
+      stance(slant ? 'blink-dive' : 'blink-drop', { hx: 22, hy: -66, tilt: slant ? 0.4 : 0.05 }, { stiff: 4, two: 1, lean: slant ? 0.32 : 0.06 });
       const fall = H.add({ kind: 'fall', x: b.x, update() { this.x = b.x; this.srcX = b.x - b.face * 20; }, hits(Pl) { return G.rectsOverlap(Pl.box(), { cx: b.x, cy: b.y - 54, hw: 24, hh: 56 }); } });
       const sx = b.x, sy = b.y, ty = surf - 6;
       let vy = 260;
@@ -2082,17 +2392,17 @@
       G.fx.lines(b.x, ty - 6, 6, BOLT.hot, { r0: 12, speed: [300, 650] });
       b.sq = 0.22;
       b.recV = (b.recV || 0) - b.face * (slant ? 1.6 : 0.8);
+      kick(0, -6, slant ? -0.2 : 0.06);
       if (last && ty >= FLOOR - 7) for (const d of [-1, 1]) H.shockwave(b.x + d * 26, d, 560, 38, BOLT);
       if (!last) {
-        // it pulls the staff free, hard, and is gone again
-        holdStaff({ hx: 14, hy: -104, tilt: -0.06 }, 3); b.leanT = -0.08;
-        yield* wait(ph === 3 ? 0.12 : 0.2);
+        // it pulls the staff free, hard, and is gone again (a beat bowed over it first)
+        yield* act(ph === 3 ? 0.12 : 0.2, (k, e) => (e < 0.05 ? stance('blink-impact', { hx: 22, hy: -60, tilt: 0.1 }, { stiff: 3, two: 1, lean: 0.1, oy: 4 }) : stance('blink-pull', { hx: 14, hy: -104, tilt: -0.06 }, { stiff: 3, lean: -0.08, oy: -5 })));
       }
     }
     // dizzy, leaning on the staff driven into the floor
     B.dizzy = true; B.spin = 0.35; b.want = 0;
     b.exposed = true;
-    holdStaff({ hx: 30, hy: -40, tilt: 0.28 }, 1.1);
+    stance('blink-dizzy', { hx: 30, hy: -40, tilt: 0.28 }, { stiff: 1.1, oy: 3, orb: [0.8, -66] });
     const dz = [0, 1.7, 1.5, 1.3][ph] * (K.gentle() ? 1.15 : 1);
     let e = 0;
     while (e < dz) {
@@ -2108,10 +2418,11 @@
     b.exposed = false; B.dizzy = false;
     // it wrenches the staff out of the floor and rises
     G.audio.play('whoosh');
-    holdStaff({ hx: 14, hy: -106, tilt: -0.1 }, 3); b.leanT = -0.1;
+    stance('blink-wrench', { hx: 14, hy: -106, tilt: -0.1 }, { stiff: 3, lean: -0.1, oy: -3 });
+    kick(0, -5, -0.1);
     const hy = surf - HOVER;
     yield* tween(b, { y: hy }, 0.36, E.outCubic);
-    b.homeY = hy; b.spT = null; b.leanT = 0; B.spin = 1;
+    b.homeY = hy; unstance(); B.spin = 1;
   }
 
   // ---- the Glacier: a set-piece with one ask. A wall of ice spears grows out of one wall of the arena
@@ -2214,24 +2525,32 @@
         e += dt;
         const k = e / tele, q = drift ? E.inOutQuad(G.clamp((k - 0.3) / 0.55, 0, 1)) : 0, pa = pose(gA), pb = pose(gB);
         // the staff points at the gap while the wall grows (and, drifting, follows where it will go)
-        holdStaff({ hx: G.lerp(pa.hx, pb.hx, q), hy: G.lerp(pa.hy, pb.hy, q), tilt: G.lerp(pa.tilt, pb.tilt, q) + Math.sin(e * 5) * 0.03 }, 1.3);
-        b.leanT = 0.04 + 0.04 * k;
+        // (v2.5c) and the body bows down with a low gap, crouched and leaning in, or rises and leans
+        // back with a high one, after a quick coil the other way
+        const ba = body(gA), bb = body(gB), lo = G.lerp(ba.lean, bb.lean, q), oy = G.lerp(ba.oy, bb.oy, q);
+        const st = { hx: G.lerp(pa.hx, pb.hx, q), hy: G.lerp(pa.hy, pb.hy, q), tilt: G.lerp(pa.tilt, pb.tilt, q) + Math.sin(e * 5) * 0.03 };
+        if (k < 0.14) stance('glacier-coil', st, { stiff: 1.3, lean: -lo * 0.4, oy: -oy * 0.5 });
+        else stance(gA === gB ? (high ? 'glacier-high' : 'glacier-low') : 'glacier-drift', st, { stiff: 1.3, lean: lo + 0.03 * k, oy, trem: k > 0.7 ? 0.02 : 0, orb: [1.2, oy > 0 ? 40 : -40] });
       }
-      // and drives it on
-      b.leanT = 0.14; b.recV = (b.recV || 0) - b.face * 0.6;
+      // and drives it on, a push in both hands
+      b.recV = (b.recV || 0) - b.face * 0.6;
+      const pe = pose(gB);
+      stance('glacier-drive', { hx: pe.hx + 6, hy: pe.hy, tilt: pe.tilt }, { stiff: 4, two: 1, lean: 0.14, oy: body(gB).oy * 0.5 });
+      kick(7, 0, 0.12);
       return w;
     };
+    const body = (gp) => (gp === GAP.high ? { lean: -0.06, oy: -8 } : { lean: 0.12, oy: 10 });
     const walls = [];
     walls.push(yield* one(-side, K.chance(0.5, 'high'), ph === 3, 0.95 * T));
     if (ph >= 2) {
       // a second from the far wall: it turns to point at it
-      yield* wait(0.55);
+      yield* act(0.55, (k, e) => (e < 0.25 ? stance('glacier-drive', null, { two: 1, lean: 0.14 }) : stance('glacier-turn', { hx: 24, hy: -86, tilt: 0.4 }, { stiff: 1.8, lean: -0.02 })));
       b.face = -side;
       walls.push(yield* one(side, K.chance(0.5, 'high2'), false, 0.85 * T));
     }
     let t = 0;
-    while (t < 5 && walls.some((w) => !w.dead)) { const dt = yield; t += dt; b.leanT = 0.04; holdStaff({ hx: 30, hy: -66, tilt: 1.3 }, 0.8); }
-    b.spT = null; b.leanT = 0;
+    while (t < 5 && walls.some((w) => !w.dead)) { const dt = yield; t += dt; stance(t < 0.25 ? 'glacier-drive' : 'glacier-watch', t < 0.25 ? null : { hx: 30, hy: -66, tilt: 1.3 }, { stiff: 0.8, lean: t < 0.25 ? 0.14 : 0.04, two: t < 0.25 ? 1 : 0 }); }
+    unstance();
     yield* opening([0, 0.5, 0.45, 0.4][ph]);
   }
 
@@ -2258,10 +2577,14 @@
     } else G.audio.play('zap');
     const y0 = b.y, dur = el === VOID ? 0.55 : 0.34;
     let e = 0;
+    // (v2.5c) whatever stance the spell left it in, the staff comes down to the hip and the body
+    // straightens, a little behind it; then it is let go to rest
+    stance('settle', { hx: 20, hy: -56, tilt: 0.22 }, { stiff: 1.2, lean: -0.03, oy: 2 });
     while (e < dur) {
       const dt = yield;
       e += dt;
       const k = Math.min(1, e / dur);
+      if (k > 0.6 && b.pose === 'settle') unstance();
       b.y = y0 + Math.sin(k * Math.PI) * 9; // sinks, and floats back
       if (el === VOID && b.dark > 0 && k > 0.25 + (3 - b.dark) * 0.22) {
         const i = b.dark - 1, a = B.t * 1.5 * B.spin + i * G.TAU / 3;
@@ -2364,6 +2687,119 @@
     b.want = 0; b.elem = null; B.spin = 1; b.homeY = GY;
   };
 
+  // ---- the bones (v2.5c): every piece of the figure on its own spring, drawing only. Nothing here is
+  // read by a hit area, a hazard or a spell's origin (tip(), staff() and the body box stay as they
+  // were): each part keeps a drawn offset from where the pose puts it, and B.draw adds it. The core
+  // goes first and the loose parts after: the torso lags the hips a little, the head rides the torso
+  // and tips with it, the hat's crown and the charm on its tip hang on their own chains, the staff's
+  // head lags its hand and the shaft flexes, the robe's hem, the sleeves and the cape are chains pushed
+  // by the body's motion, and the motes trail their orbits. A blow landing or a release's jolt kicks
+  // them all. (Stepped from B.tick; B.draw reads it and draws a plain pose without it.)
+  const CAPE_N = 9, CAPE_SEG = 13;
+  // a world-frame vector in the figure's drawn frame (mirrored to its facing, then turned by its lean)
+  const toLocal = (x, y, face, rot) => { const lx = x * face, c = Math.cos(rot), s = Math.sin(rot); return [lx * c + y * s, -lx * s + y * c]; };
+  // the push on a hanging joint at angle a (0 straight down, + forward) from an acceleration of its root
+  const hangPush = (ax, ay, a, k) => G.clamp(-(ax * Math.cos(a) - ay * Math.sin(a)) * k, -500, 500);
+  function bones(b, dt) {
+    if (!(dt > 0)) return;
+    const R = b.rig || (b.rig = D.rig());
+    const N = b.bn || (b.bn = { cape: {}, hat: {}, charm: {}, slv: {}, slvB: {}, armB: {}, robe: {}, rot0: null, rv0: 0, fl0: 0, kv0: 0, hp: null, hv: null });
+    const down = B.staggered || b.spent || B.dying;
+    // how the drawn frame is turned (lean, a fall, a recoil), and how fast that turn is changing
+    const rot = (b.lean ? G.clamp(b.lean, -0.35, 0.4) : 0) + (down ? 0.28 : 0) + b.face * (b.rec || 0);
+    const rv = N.rot0 == null ? 0 : (rot - N.rot0) / dt, al = G.clamp((rv - N.rv0) / dt, -60, 60);
+    N.rot0 = rot; N.rv0 = rv;
+    // the body's acceleration (a blink is not a push: R.accel gives 0 across one), in the drawn frame
+    const A = R.accel(b.x + (b.kx || 0), b.y + (b.oy || 0), dt), L = toLocal(A.ax, A.ay, b.face, rot), ax = L[0], ay = L[1];
+    const wvx = A.vx || 0, wvy = A.vy || 0;
+    // the hand on the staff: its own acceleration (the stances swing it about) on top of the body's
+    const S = staff(b.cast);
+    let hax = 0, hay = 0;
+    if (N.hp) {
+      const vx = (S.hx - N.hp[0]) / dt, vy = (S.hy - N.hp[1]) / dt;
+      if (N.hv) { hax = G.clamp((vx - N.hv[0]) / dt, -14000, 14000); hay = G.clamp((vy - N.hv[1]) / dt, -14000, 14000); }
+      N.hv = [vx, vy];
+    }
+    N.hp = [S.hx, S.hy];
+    if (b.hidden) { hax = 0; hay = 0; }
+    const Hx = ax + hax, Hy = ay + hay;
+    // impacts: a blow landing (its flash) knocks everything away from the hero; a release's jolt
+    // through the staff (kick) jerks the shoulders and head after it
+    const hit = (b.flash || 0) > N.fl0 + 0.4, away = (b.x >= G.player.x ? 1 : -1) * b.face;
+    N.fl0 = b.flash || 0;
+    const kq = b.kq, kv = kq ? Math.abs(kq.vhx) + Math.abs(kq.vhy) : 0, jolt = kq && kv > N.kv0 + 40;
+    N.kv0 = kv;
+    // the torso (shoulders and chest) lags the hips: back as the body drives, down as it rises
+    R.spring('tx', 0, 0); R.spring('ty', 0, 0);
+    // (and the shoulder goes with the arm: a swing of the staff pulls it after the hand)
+    R.kick('tx', (-ax * 0.15 + hax * 0.06) * dt); R.kick('ty', (-ay * 0.12 + hay * 0.04) * dt);
+    if (hit) { R.kick('tx', away * 70); R.kick('ty', 30); }
+    if (jolt) { R.kick('tx', G.clamp(kq.vhx * 0.35, -60, 60)); R.kick('ty', G.clamp(kq.vhy * 0.25, -40, 40)); }
+    // (its breath: the chest and shoulders rise and fall, heavier when it is down; the head, the hat
+    // and the charm come after it on their own springs)
+    const breath = -Math.sin(B.t * 1.25) * 0.9 * (down ? 1.7 : 1);
+    const tx = R.spring('tx', 0, dt, 13, 0.45), ty = R.spring('ty', breath, dt, 15, 0.5);
+    // the head rides the torso a beat late, and tips back as the body drives off (forward as it stops)
+    R.spring('hx', 0, 0); R.spring('hy', 0, 0); R.spring('ht', 0, 0);
+    R.kick('hx', -ax * 0.1 * dt); R.kick('hy', -ay * 0.08 * dt);
+    R.kick('ht', (-ax * 0.003 + hax * 0.0006 - al * 0.9) * dt);
+    if (hit) { R.kick('hx', away * 100); R.kick('ht', away * 2.4); }
+    if (jolt) R.kick('ht', G.clamp(-kq.vhx * 0.012, -1.6, 1.6));
+    R.spring('hx', tx, dt, 11, 0.4); R.spring('hy', ty, dt, 12, 0.42);
+    const ht = R.spring('ht', 0, dt, 12, 0.4), htv = R.s.ht.v;
+    // (the head's own sway, as an acceleration, for the hat and charm on it)
+    const hxv = R.s.hx.v, hyv = R.s.hy.v, hha = N.hxv == null ? 0 : G.clamp((hxv - N.hxv) / dt, -6000, 6000), hhy = N.hyv == null ? 0 : G.clamp((hyv - N.hyv) / dt, -6000, 6000);
+    N.hxv = hxv; N.hyv = hyv;
+    // the hat's crown: two joints, stiff at the brim and loose at the tip (the tip flops back as the
+    // body drives, droops as it rises, flicks up as it stops)
+    if (hit && N.hat.v) { N.hat.v[0] += away * 2.5; N.hat.v[1] += away * 3.5; }
+    const hat = D.angleChain(N.hat, [0, 0], dt, { w0: 16, w1: 10, z0: 0.35, z1: 0.25, follow: 0.5, push: G.clamp(-(ax + hha) * 0.012 + (ay + hhy) * 0.009 - al * 1.6 - htv * 8 + Math.sin(B.t * 1.3 + 2) * 1.2, -320, 320) });
+    // the charm on the hat's tip hangs plumb whatever the head and hat are doing, and swings after them
+    // (its angles are in the head's frame: see B.draw)
+    const pl = rot + ht + (b.hd || 0);
+    if (hit && N.charm.v) N.charm.v[1] += away * 6;
+    D.angleChain(N.charm, [pl, pl], dt, { w0: 10, w1: 8, z0: 0.22, z1: 0.18, follow: 0.4, push: hangPush(ax + hha, ay + hhy, pl, 0.012) + Math.sin(B.t * 1.6 + 0.7) * 1.5 - (al + htv * 4) * 0.8 - (N.hat.v ? N.hat.v[1] : 0) * 2 });
+    void hat;
+    // the staff's head lags its hand (a heavy staff pivoting in the grip), swings past and settles
+    R.spring('sl', 0, 0);
+    R.kick('sl', G.clamp(-(Hx * Math.cos(S.tilt) + Hy * Math.sin(S.tilt)) / 60 * 0.36, -200, 200) * dt);
+    if (hit) R.kick('sl', away * 1.2);
+    R.spring('sl', 0, dt, 12, 0.3);
+    // the robe hangs half plumb from the waist: two joints (waist to knee, knee to hem), pushed by the
+    // body's motion and stirred by the air it floats on
+    const draft = Math.sin(B.t * 0.9) * 7 + Math.sin(B.t * 2.3 + 1) * 4;
+    if (hit && N.robe.v) N.robe.v[1] += away * 1.5;
+    D.angleChain(N.robe, [rot * 0.35, rot * 0.5], dt, { w0: 11, w1: 8, z0: 0.4, z1: 0.28, follow: 0.6, push: hangPush(ax, ay, rot * 0.4, 0.006) + draft });
+    // the long front sleeve: three links hanging from the wrist, flung about by the hand
+    if (hit && N.slv.v) N.slv.v[2] += away * 4;
+    D.angleChain(N.slv, [rot - 0.15, rot - 0.35, rot - 0.5], dt, { w0: 14, w1: 8, z0: 0.38, z1: 0.22, follow: 0.55, push: hangPush(Hx, Hy, rot, 0.009) + draft * 0.5 });
+    // the back arm hangs at rest (upper arm and forearm on their own springs) until it takes the
+    // staff, and its shorter sleeve
+    D.angleChain(N.armB, [rot * 0.7 - 0.06, rot * 0.7 + 0.62], dt, { w0: 12, w1: 10, z0: 0.45, z1: 0.35, follow: 0.5, push: hangPush(ax, ay, rot, 0.006) });
+    D.angleChain(N.slvB, [rot - 0.2, rot - 0.4], dt, { w0: 13, w1: 9, z0: 0.38, z1: 0.24, follow: 0.55, push: hangPush(ax, ay, rot, 0.009) + draft * 0.4 });
+    // the motes trail their orbits, each on its own spring (so they never move as one)
+    for (let i = 0; i < 3; i++) {
+      const w = 7.5 + 1.6 * i, kx = 'm' + i + 'x', ky = 'm' + i + 'y';
+      R.spring(kx, 0, 0); R.spring(ky, 0, 0);
+      R.kick(kx, -A.ax * 0.22 * dt); R.kick(ky, -A.ay * 0.22 * dt);
+      R.spring(kx, 0, dt, w, 0.35); R.spring(ky, 0, dt, w, 0.35);
+    }
+    // the cape, in the world: a chain from the shoulders, trailing behind, streaming back as the body
+    // moves, lifting as it falls, swinging past as it stops and stirring in the air
+    const tr = -b.face, lift = G.clamp(wvy * 0.001, 0, 0.45), drag = G.clamp(-wvx * 0.001, -0.55, 0.55), want = [];
+    for (let i = 0; i < CAPE_N - 1; i++) want.push(G.clamp(tr * (0.16 + 0.045 * i + lift) + drag, -1.3, 1.3));
+    if (hit && N.cape.v) for (let i = 0; i < N.cape.v.length; i++) N.cape.v[i] -= away * b.face * 0.6;
+    const ca = D.angleChain(N.cape, want, dt, { w0: 9, w1: 5, z0: 0.5, z1: 0.3, follow: 0.6, push: G.clamp(-A.ax * 0.005, -300, 300) + Math.sin(B.t * 1.1) * 1.6 + Math.sin(B.t * 2.7 + 2) * 1 });
+    let px = b.x + (b.kx || 0) - b.face * 12 + b.face * G.clamp(tx, -6, 6), py = b.y + (b.oy || 0) - 92 + G.clamp(ty, -5, 6);
+    if (!B.cape || B.cape.length !== CAPE_N) B.cape = D.chain(CAPE_N, px, py);
+    B.cape[0].x = px; B.cape[0].y = py;
+    for (let i = 1; i < CAPE_N; i++) {
+      const a = ca[i - 1];
+      px += Math.sin(a) * CAPE_SEG; py = Math.min(FLOOR - 2, py + Math.cos(a) * CAPE_SEG);
+      B.cape[i].x = px; B.cape[i].y = py;
+    }
+  }
+
   B.idle = function (dt) {
     const b = B.body, P = G.player;
     if (Math.abs(P.x - b.x) > 14) b.face = P.x > b.x ? 1 : -1;
@@ -2400,17 +2836,33 @@
     // the body leans on a spring too
     b.leanV = (b.leanV || 0) + (140 * ((b.leanT || 0) - (b.lean || 0)) - 15 * (b.leanV || 0)) * dt;
     b.lean = (b.lean || 0) + b.leanV * dt;
+    // (v2.5c) the figure's lift or sink in the air (drawn only), on a spring that overshoots a little;
+    // the back hand on the staff; where the motes circle; the tremor of a held staff; the kick's spring
+    b.oyV = (b.oyV || 0) + (170 * ((b.oyT || 0) - (b.oy || 0)) - 17 * (b.oyV || 0)) * dt;
+    b.oy = (b.oy || 0) + b.oyV * dt;
+    b.two = G.damp(b.two || 0, b.twoT || 0, 12, dt);
+    b.orR = G.damp(b.orR == null ? 1 : b.orR, b.orT ? b.orT[0] : 1, 5, dt);
+    b.orY = G.damp(b.orY || 0, b.orT ? b.orT[1] : 0, 5, dt);
+    b.trem = G.damp(b.trem || 0, b.tremT || 0, 10, dt);
+    const kq = b.kq;
+    if (kq) {
+      kq.vhx += (-320 * kq.hx - 14 * kq.vhx) * dt; kq.hx += kq.vhx * dt;
+      kq.vhy += (-320 * kq.hy - 14 * kq.vhy) * dt; kq.hy += kq.vhy * dt;
+      kq.vt += (-320 * kq.tilt - 14 * kq.vt) * dt; kq.tilt += kq.vt * dt;
+      if (Math.abs(kq.hx) + Math.abs(kq.hy) + Math.abs(kq.tilt) * 30 < 0.02 && Math.abs(kq.vhx) + Math.abs(kq.vhy) + Math.abs(kq.vt) * 30 < 0.2) { kq.hx = kq.hy = kq.tilt = kq.vhx = kq.vhy = kq.vt = 0; }
+    }
     // the hem lags the body: when it drops the robe floats up, and when it stops the robe swings on down
     if (dt > 0) {
-      const vy = (b.y - (b.py == null ? b.y : b.py)) / dt, ay = G.clamp((vy - (b.pvy || 0)) / dt, -9000, 9000);
+      const yy = b.y + (b.oy || 0);
+      const vy = (yy - (b.py == null ? yy : b.py)) / dt, ay = G.clamp((vy - (b.pvy || 0)) / dt, -9000, 9000);
       b.hv = (b.hv || 0) + (-190 * (b.hl || 0) - 13 * (b.hv || 0) - ay * 0.6) * dt;
       b.hl = G.clamp((b.hl || 0) + b.hv * dt, -12, 12);
-      b.py = b.y; b.pvy = vy;
+      b.py = yy; b.pvy = vy;
     }
+    bones(b, dt);
     for (const s of B.novaArcs) s.life -= dt;
     B.novaArcs = B.novaArcs.filter((s) => s.life > 0);
     if (B.glaze && B.glaze.fade) { B.glaze.a -= dt * 1.6; if (B.glaze.a <= 0) B.glaze = null; }
-    D.chainStep(B.cape, b.x - b.face * 12, b.y - 92, dt, { seg: 13, grav: 50, drift: 24, face: b.face, wave: 10, rate: 5 });
     for (const s of B.shards) s.life -= dt;
     B.shards = B.shards.filter((s) => s.life > 0);
     for (const s of B.skyBolts) s.life -= dt;
@@ -2473,6 +2925,15 @@
     else if (el.isVoid) { ctx.beginPath(); ctx.arc(x, y, 5 * s, 0, G.TAU); } // a black sun in little
     else D.poly(ctx, [x, y - 6.5 * s, x + 1.6 * s, y - 1.6 * s, x + 6.5 * s, y, x + 1.6 * s, y + 1.6 * s, x, y + 6.5 * s, x - 1.6 * s, y + 1.6 * s, x - 6.5 * s, y, x - 1.6 * s, y - 1.6 * s]);
   }
+  // a hand closed round the staff, turned with it (in the staff's frame: knuckles forward, lit along them)
+  function fist(ctx, x, y, tilt, col) {
+    ctx.save(); ctx.translate(x, y); ctx.rotate(tilt);
+    ctx.fillStyle = '#03040a';
+    D.poly(ctx, [-3.8, -3.3, 1.2, -4.2, 4.3, -2.4, 4.7, 1.8, 2.2, 3.9, -3.2, 3.4, -4.5, 0]); ctx.fill();
+    ctx.strokeStyle = G.rgba(col, 0.5); ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(1.2, -4.2); ctx.lineTo(4.3, -2.4); ctx.lineTo(4.7, 1.8); ctx.stroke();
+    ctx.restore();
+  }
   // dk: how far this mote has gone out (corrupted, the Black Sun): a black cinder rimmed in blood
   function mote(ctx, el, x, y, s, a, dk) {
     const lit = a * (1 - (dk || 0)), out = a * (dk || 0), ga = ctx.globalAlpha;
@@ -2515,7 +2976,7 @@
   B.drawGround = function (ctx) {
     const b = B.body;
     if (B.dead || b.hidden) return;
-    const k = G.clamp(1 - (FLOOR - b.y) / 300, 0.3, 1) * b.alpha;
+    const k = G.clamp(1 - (FLOOR - b.y - (b.oy || 0)) / 300, 0.3, 1) * b.alpha;
     ctx.fillStyle = 'rgba(0,0,0,' + (0.4 * k) + ')';
     ctx.beginPath(); ctx.ellipse(b.x, FLOOR + 3, 34 * k, 6 * k, 0, 0, G.TAU); ctx.fill();
   };
@@ -2592,19 +3053,29 @@
     const el = b.elem, pal = G.pal();
     const col = el ? el.boss : pal.boss, hot = el ? el.hot : pal.hot;
     const bob = down ? 0 : Math.sin(B.t * 2.2) * 4;
-    const c = b.cast, sw = Math.sin(B.t * 1.7) * 2.2;
+    const c = b.cast;
     const jx = b.jit ? G.rand(-b.jit, b.jit) : 0;
+    // the bones (see bones): each part's drawn offset, or none (the plain pose) before the first step
+    const R = b.rig, N = b.bn || {};
+    // (eased into their limits, never stopped dead at them)
+    const rs = (k, lo, hi) => { const v = R && R.s[k] ? R.s[k].x : 0; if (!isFinite(v)) return 0; const m = v < 0 ? -lo : hi; return m * Math.tanh(v / m); };
+    const ang = (st, i, lo, hi, d) => (st && st.a && isFinite(st.a[i]) ? G.clamp(st.a[i], lo, hi) : d);
+    const rot = (b.lean ? G.clamp(b.lean, -0.35, 0.4) : 0) + (down ? 0.28 : 0) + b.face * (b.rec || 0);
+    // the torso (shoulders, chest, collar, the upper robe) lags the hips and rises with each breath;
+    // the head rides the torso
+    const tx = rs('tx', -6, 6), ty = rs('ty', -5, 6);
+    const hdx = rs('hx', -8, 8), hdy = rs('hy', -7, 8), htl = rs('ht', -0.3, 0.3);
 
     ctx.save();
     ctx.globalAlpha = b.alpha;
     ctx.lineJoin = 'round'; ctx.lineCap = 'round';
 
-    // cape, in world space
+    // cape, in world space (a chain of springs: see bones)
     D.ribbon(ctx, B.cape.map((p) => ({ x: p.x + jx, y: p.y + bob })), 30, 60, 13);
     ctx.fillStyle = '#070919'; ctx.fill();
     ctx.strokeStyle = G.rgba(col, 0.4); ctx.lineWidth = 1.5; ctx.stroke();
 
-    ctx.translate(b.x + b.kx + jx, b.y + bob);
+    ctx.translate(b.x + b.kx + jx, b.y + bob + (b.oy || 0));
     K.recoil(ctx, b);
     ctx.scale(K.faceX(b), 1); // (a turn narrows the figure through it: see K.turn)
     if (b.lean) ctx.rotate(G.clamp(b.lean, -0.35, 0.4)); // (leaning into a cast, about its feet)
@@ -2612,11 +3083,19 @@
 
     D.glow(ctx, col, 0, -70, 130, 0.2 + 0.2 * c);
 
+    // the staff as drawn: where the game holds it (staff(): spells leave from there), with its head
+    // lagging the hand on its own spring (sl) and the shaft flexing with it
+    const S0 = staff(c), sl = rs('sl', -0.16, 0.16), S = { hx: S0.hx, hy: S0.hy, tilt: S0.tilt + sl };
+    const headX = S.hx + Math.sin(S.tilt) * 96, headY = S.hy - Math.cos(S.tilt) * 96;
+
     // the three motes circle the Magus; the one in use burns in the staff
+    // (v2.5c: each stance says where they circle: rising round the hat, or sunk to the feet, wide or tight;
+    // and each trails its orbit on its own spring as the body moves)
+    const orR = b.orR == null ? 1 : b.orR, orY = b.orY || 0;
     const motes = ELEMS.map((e, i) => {
-      const a = B.t * 1.5 * B.spin + i * G.TAU / 3, mk = b.mk || 0, S0 = staff(c);
-      const tx = S0.hx + Math.sin(S0.tilt) * 96, ty = S0.hy - Math.cos(S0.tilt) * 96; // the staff's head
-      return { e, x: G.lerp(Math.cos(a) * 56, tx, mk), y: G.lerp(-62 + Math.sin(a) * 15, ty, mk), back: Math.sin(a) < 0 && mk < 0.5, dk: (b.dk && b.dk[i]) || 0 };
+      const a = B.t * 1.5 * B.spin + i * G.TAU / 3, mk = b.mk || 0;
+      const o = R ? toLocal(rs('m' + i + 'x', -24, 24), rs('m' + i + 'y', -24, 24), b.face, rot) : [0, 0];
+      return { e, x: G.lerp(Math.cos(a) * 56 * orR + o[0], headX, mk), y: G.lerp(-62 + orY + Math.sin(a) * 15 * orR + o[1], headY, mk), back: Math.sin(a) < 0 && mk < 0.5, dk: (b.dk && b.dk[i]) || 0 };
     });
     const dim = down ? 0.35 : 1;
     for (const m of motes) if (m.back && (m.e !== el || b.mk > 0.05)) mote(ctx, m.e, m.x, m.y, 0.8, 0.7 * dim, m.dk);
@@ -2625,32 +3104,51 @@
     const g = ctx.createLinearGradient(0, -96, 0, 6);
     g.addColorStop(0, '#2c3690'); g.addColorStop(0.5, '#181d58'); g.addColorStop(1, '#070920');
     ctx.fillStyle = g;
-    // the hem lags the body (b.hl): the lower robe lifts and flares, or swings on down
-    const hl = b.hl || 0, hem = (a) => { if (!hl) return a; const o = a.slice(); for (let i = 0; i < o.length; i += 2) { const q = G.clamp((o[i + 1] + 50) / 56, 0, 1); o[i] *= 1 + Math.abs(hl) * 0.018 * q; o[i + 1] -= hl * q; } return o; };
-    D.poly(ctx, hem([-15, -95, 15, -95, 11, -64, 15, -44, 22 + sw, -22, 29 + sw, -6, 21 + sw, 5, 15 + sw * 0.6, -7, 8, 7, 1, -6, -6 + sw * 0.5, 6, -12, -7, -19 + sw, 4, -28 + sw, -9, -21, -30, -14, -46, -10, -64]));
+    // the robe below the belt hangs on two joints (waist to knee, knee to hem: N.robe) and lifts and
+    // flares as the hem lags (b.hl); above the belt it goes with the torso; the torn wisps flick as the
+    // hem swings (rbv)
+    const hl = b.hl || 0, rb0 = ang(N.robe, 0, -0.5, 0.5, 0), rb1 = ang(N.robe, 1, -0.6, 0.6, 0);
+    const rbv = N.robe && N.robe.v && isFinite(N.robe.v[1]) ? G.clamp(N.robe.v[1] * 2.5, -4, 4) : 0;
+    const m1x = 34 * Math.sin(rb0), m1y = 34 * (1 - Math.cos(rb0)), m2x = 30 * Math.sin(rb1), m2y = 30 * (1 - Math.cos(rb1));
+    const hem = (a) => {
+      const o = a.slice();
+      for (let i = 0; i < o.length; i += 2) {
+        const y = o[i + 1], q = G.clamp((y + 50) / 56, 0, 1), qa = G.clamp((y + 64) / 34, 0, 1), qb = G.clamp((y + 30) / 30, 0, 1), qt = G.clamp((-60 - y) / 35, 0, 1);
+        o[i] = o[i] * (1 + Math.abs(hl) * 0.018 * q) + qa * m1x + qb * m2x + qt * tx;
+        o[i + 1] = y - hl * q - qa * m1y - qb * m2y + qt * ty;
+      }
+      return o;
+    };
+    const w = rbv;
+    D.poly(ctx, hem([-15, -95, 15, -95, 11, -64, 15, -44, 22 + w * 0.5, -22, 29 + w, -6, 21 + w, 5, 15 + w * 0.6, -7, 8, 7, 1, -6, -6 + w * 0.5, 6, -12, -7, -19 + w, 4, -28 + w, -9, -21 + w * 0.4, -30, -14, -46, -10, -64]));
     ctx.fill();
     // light along the leading edge
     ctx.fillStyle = G.rgba(col, 0.28);
-    D.poly(ctx, hem([15, -95, 11, -64, 15, -44, 22 + sw, -22, 29 + sw, -6, 25 + sw, -7, 18 + sw, -24, 11, -44, 7.5, -64, 11, -95])); ctx.fill();
+    D.poly(ctx, hem([15, -95, 11, -64, 15, -44, 22 + w * 0.5, -22, 29 + w, -6, 25 + w, -7, 18 + w * 0.5, -24, 11, -44, 7.5, -64, 11, -95])); ctx.fill();
     // hem trim
     ctx.strokeStyle = G.rgba(col, 0.75); ctx.lineWidth = 1.6;
     ctx.beginPath();
-    [[29 + sw, -6], [21 + sw, 5], [15 + sw * 0.6, -7], [8, 7], [1, -6], [-6 + sw * 0.5, 6], [-12, -7], [-19 + sw, 4], [-28 + sw, -9]].map((p) => hem(p)).forEach((p, i) => (i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1])));
+    [[29 + w, -6], [21 + w, 5], [15 + w * 0.6, -7], [8, 7], [1, -6], [-6 + w * 0.5, 6], [-12, -7], [-19 + w, 4], [-28 + w, -9]].map((p) => hem(p)).forEach((p, i) => (i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1])));
     ctx.stroke();
-    // stole: two hanging bands marked with runes
+    // stole: two hanging bands marked with runes (hung from the neck, swinging with the robe)
     for (const sx of [-5.5, 3]) {
       ctx.fillStyle = '#0a0c26';
-      D.poly(ctx, [sx - 2.6, -92, sx + 2.6, -92, sx + 3 + sw * 0.3, -30, sx + sw * 0.4, -23, sx - 3 + sw * 0.3, -30]); ctx.fill();
+      D.poly(ctx, hem([sx - 2.6, -92, sx + 2.6, -92, sx + 3 + w * 0.3, -30, sx + w * 0.4, -23, sx - 3 + w * 0.3, -30])); ctx.fill();
       ctx.fillStyle = G.rgba(col, 0.9);
-      for (let i = 0; i < 4; i++) ctx.fillRect(sx - 1.4, -58 + i * 7, 2.8, 1.8);
-      D.poly(ctx, [sx - 3 + sw * 0.3, -30, sx + 3 + sw * 0.3, -30, sx + sw * 0.4, -23]); ctx.fill();
+      for (let i = 0; i < 4; i++) { const r = hem([sx, -58 + i * 7]); ctx.fillRect(r[0] - 1.4, r[1], 2.8, 1.8); }
+      D.poly(ctx, hem([sx - 3 + w * 0.3, -30, sx + 3 + w * 0.3, -30, sx + w * 0.4, -23])); ctx.fill();
     }
     // belt and its stone
+    const bo = hem([0, -64]);
+    ctx.save(); ctx.translate(bo[0], bo[1] + 64);
     ctx.strokeStyle = '#05060f'; ctx.lineWidth = 5; D.line(ctx, -10, -64, 11, -64);
     ctx.strokeStyle = G.rgba(col, 0.9); ctx.lineWidth = 1.5; D.line(ctx, -10, -66, 11, -66);
     D.glow(ctx, col, 0, -64, 10, 0.9);
     ctx.fillStyle = G.rgba(hot, 1); D.poly(ctx, [0, -68.5, 3.4, -64, 0, -59.5, -3.4, -64]); ctx.fill();
+    ctx.restore();
 
+    // the shoulders: collar and mantle ride the torso (lagging the hips, rising with each breath)
+    ctx.save(); ctx.translate(tx, ty);
     // high collar behind the head
     ctx.fillStyle = '#12164a';
     D.poly(ctx, [-13, -98, -19, -121, -5, -105]); ctx.fill();
@@ -2664,59 +3162,106 @@
     ctx.beginPath();
     [[33, -78], [19, -83], [12, -76], [0, -85], [-12, -76], [-19, -83], [-33, -78]].forEach((p, i) => (i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1])));
     ctx.stroke();
+    ctx.restore();
 
-    // (Foresight: the head turns on the neck to follow the hero)
+    // the head rides the torso on its own spring and tips on the neck (and, for Foresight, turns on
+    // the neck to follow the hero)
     ctx.save();
-    if (b.hd) { ctx.translate(2, -100); ctx.rotate(b.hd); ctx.translate(-2, 100); }
+    ctx.translate(hdx, hdy);
+    const hr = (b.hd || 0) + htl;
+    if (hr) { ctx.translate(2, -100); ctx.rotate(hr); ctx.translate(-2, 100); }
     // a face of nothing but two burning eyes; reading the hero, they narrow to one slit of light
-    const sl = b.sl || 0;
+    const sl2 = b.sl || 0;
     ctx.fillStyle = '#020308';
     ctx.beginPath(); ctx.ellipse(2, -108, 8.5, 9.5, 0, 0, G.TAU); ctx.fill();
-    D.glow(ctx, col, 6.5, -108, 13 * (1 - 0.35 * sl), 1);
+    D.glow(ctx, col, 6.5, -108, 13 * (1 - 0.35 * sl2), 1);
     ctx.save();
-    ctx.translate(6.5, -108.8); ctx.scale(1 + 0.15 * sl, 1 - 0.75 * sl); ctx.translate(-6.5, 108.8);
+    ctx.translate(6.5, -108.8); ctx.scale(1 + 0.15 * sl2, 1 - 0.75 * sl2); ctx.translate(-6.5, 108.8);
     ctx.fillStyle = G.rgba(hot, 1);
     D.poly(ctx, [1.6, -110.4, 5.6, -108.6, 2.2, -107]); ctx.fill();
     D.poly(ctx, [7.6, -108.8, 11.4, -110.8, 10.6, -107.2]); ctx.fill();
     ctx.restore();
-    if (sl > 0.02) {
-      ctx.save(); ctx.translate(7, -109); ctx.scale(1.9, 0.38); D.glow(ctx, col, 0, 0, 16, 0.9 * sl); ctx.restore();
-      ctx.strokeStyle = G.rgba(hot, sl); ctx.lineWidth = 1.6; D.line(ctx, 0, -108.7, 13, -109.3);
+    if (sl2 > 0.02) {
+      ctx.save(); ctx.translate(7, -109); ctx.scale(1.9, 0.38); D.glow(ctx, col, 0, 0, 16, 0.9 * sl2); ctx.restore();
+      ctx.strokeStyle = G.rgba(hot, sl2); ctx.lineWidth = 1.6; D.line(ctx, 0, -108.7, 13, -109.3);
     }
-    // hat: a tall crooked crown over a wide brim
+    // hat: a tall crooked crown over a wide brim; the crown bends on two joints of its own (N.hat),
+    // at the brim and halfway up, and its tip flops after the head
+    const hat0 = ang(N.hat, 0, -0.45, 0.45, 0), hat1 = ang(N.hat, 1, -0.6, 0.6, 0);
+    const c0 = Math.cos(hat0), s0 = Math.sin(hat0), P1x = (-13) * c0 - (-22) * s0, P1y = -128 + (-13) * s0 + (-22) * c0;
+    const bendHat = (a) => {
+      const o = a.slice();
+      for (let i = 0; i < o.length; i += 2) {
+        let x = o[i], y = o[i + 1];
+        const w0 = G.clamp((-126 - y) / 14, 0, 1), w1 = G.clamp((-148 - y) / 8, 0, 1);
+        if (w0) { const t = hat0 * w0, cc = Math.cos(t), ss = Math.sin(t), dx = x, dy = y + 128; x = dx * cc - dy * ss; y = -128 + dx * ss + dy * cc; }
+        if (w1) { const t = hat1 * w1, cc = Math.cos(t), ss = Math.sin(t), dx = x - P1x, dy = y - P1y; x = P1x + dx * cc - dy * ss; y = P1y + dx * ss + dy * cc; }
+        o[i] = x; o[i + 1] = y;
+      }
+      return o;
+    };
     ctx.fillStyle = '#202a78';
-    D.poly(ctx, [-14, -119, -12, -137, -17, -151, -28, -164, -38, -160, -24, -155, -11, -157, 2, -143, 13, -119]); ctx.fill();
+    D.poly(ctx, bendHat([-14, -119, -12, -137, -17, -151, -28, -164, -38, -160, -24, -155, -11, -157, 2, -143, 13, -119])); ctx.fill();
     ctx.fillStyle = G.rgba(col, 0.22);
-    D.poly(ctx, [13, -119, 2, -143, -11, -157, -7, -152, 4, -139, 9, -119]); ctx.fill();
+    D.poly(ctx, bendHat([13, -119, 2, -143, -11, -157, -7, -152, 4, -139, 9, -119])); ctx.fill();
     ctx.strokeStyle = G.rgba(col, 0.95); ctx.lineWidth = 3.4; D.line(ctx, -13, -123.5, 12, -123.5);
     ctx.fillStyle = '#141a52';
     ctx.beginPath(); ctx.ellipse(1, -118, 31, 6.5, -0.08, 0, G.TAU); ctx.fill();
     ctx.strokeStyle = G.rgba(col, 0.8); ctx.lineWidth = 1.4;
     ctx.beginPath(); ctx.ellipse(1, -118, 31, 6.5, -0.08, 0.1, Math.PI - 0.1); ctx.stroke();
-    // a charm hanging from the tip
-    ctx.strokeStyle = G.rgba(col, 0.6); ctx.lineWidth = 1; D.line(ctx, -38, -160, -39 - sw, -148);
-    D.glow(ctx, col, -39 - sw, -146, 9, 0.9);
-    ctx.fillStyle = G.rgba(hot, 1); ctx.beginPath(); ctx.arc(-39 - sw, -146, 2.2, 0, G.TAU); ctx.fill();
+    // a charm hanging from the tip on a cord of two links (N.charm), plumb whatever the hat is doing
+    const plH = rot + htl + (b.hd || 0), T0 = bendHat([-38, -160]);
+    const ch0 = ang(N.charm, 0, plH - 1.5, plH + 1.5, plH), ch1 = ang(N.charm, 1, plH - 1.8, plH + 1.8, plH);
+    const cjx = T0[0] + Math.sin(ch0) * 6, cjy = T0[1] + Math.cos(ch0) * 6, cex = cjx + Math.sin(ch1) * 6, cey = cjy + Math.cos(ch1) * 6;
+    const chx = cex + Math.sin(ch1) * 2, chy = cey + Math.cos(ch1) * 2;
+    ctx.strokeStyle = G.rgba(col, 0.6); ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(T0[0], T0[1]); ctx.lineTo(cjx, cjy); ctx.lineTo(cex, cey); ctx.stroke();
+    D.glow(ctx, col, chx, chy, 9, 0.9);
+    ctx.fillStyle = G.rgba(hot, 1); ctx.beginPath(); ctx.arc(chx, chy, 2.2, 0, G.TAU); ctx.fill();
     ctx.restore();
 
-    // the staff, taller than its bearer, and the arm that holds it
-    const S = staff(c);
+    // the staff, taller than its bearer, and the arms that hold it (from shoulders that ride the torso)
+    const F0x = 13 + tx, F0y = -92 + ty, B0x = -11 + tx, B0y = -92 + ty;
     // raised flat overhead (the Black Sun) it is held in both hands, arms at full stretch
-    const sunK = (b.gest || b.gestWas) === 'sun' ? (b.gk || 0) : 0, reach = 18 + 11 * sunK;
-    if (sunK > 0.02) {
-      const gx = S.hx - Math.sin(S.tilt) * 38, gy = S.hy + Math.cos(S.tilt) * 38;
-      const k2 = D.ik(-11, -92, gx, gy, reach, reach, -1);
-      ctx.globalAlpha = b.alpha * Math.min(1, sunK * 1.5);
+    const sunK = (b.gest || b.gestWas) === 'sun' ? (b.gk || 0) : 0, twoK = b.two || 0, reach = 18 + 11 * sunK + 3 * twoK;
+    // (v2.5c) a hand that cannot reach where the staff is held slides along the staff to the nearest
+    // point of it that it can, so it never floats free of the wood
+    const ax = Math.sin(S.tilt), ay = -Math.cos(S.tilt);
+    const along = (u) => ({ x: S.hx + ax * u, y: S.hy + ay * u, u });
+    const grip = (sx, sy, u0) => {
+      const p = along(u0);
+      return Math.hypot(p.x - sx, p.y - sy) <= reach * 2 - 1 ? p : along(G.clamp((sx - S.hx) * ax + (sy - S.hy) * ay, -60, 70));
+    };
+    const fg = grip(F0x, F0y, 0);
+    // the back arm: hanging at rest on its own springs (N.armB), it reaches from there to take the
+    // staff in both hands (b.two), or to raise it flat overhead (the Black Sun)
+    let bk = null;
+    const holdK = Math.max(sunK, twoK);
+    if (holdK > 0.02) {
+      const u0 = ang(N.armB, 0, -1.2, 1.2, rot * 0.7 - 0.06), u1 = ang(N.armB, 1, -1.2, 2.2, rot * 0.7 + 0.62);
+      const rex = B0x + Math.sin(u0) * 17, rey = B0y + Math.cos(u0) * 17, rhx = rex + Math.sin(u1) * 16, rhy = rey + Math.cos(u1) * 16;
+      const g2 = sunK >= twoK ? along(-38) : grip(B0x, B0y, fg.u - 30);
+      const q = Math.min(1, holdK * 1.6), e = q * q * (3 - 2 * q);
+      bk = D.ik(B0x, B0y, G.lerp(rhx, g2.x, e), G.lerp(rhy, g2.y, e), reach, reach, -1);
+      bk.a = Math.min(1, holdK * 3);
+      ctx.globalAlpha = b.alpha * bk.a;
       ctx.fillStyle = '#1a2160';
-      D.limb(ctx, -11, -92, k2.jx, k2.jy, 9, 8); ctx.fill();
-      D.limb(ctx, k2.jx, k2.jy, k2.ex, k2.ey, 8, 6); ctx.fill();
-      ctx.fillStyle = '#03040a'; ctx.beginPath(); ctx.arc(k2.ex, k2.ey, 3.4, 0, G.TAU); ctx.fill();
+      D.limb(ctx, B0x, B0y, bk.jx, bk.jy, 9, 8); ctx.fill();
+      D.limb(ctx, bk.jx, bk.jy, bk.ex, bk.ey, 8, 6); ctx.fill();
+      // its shorter sleeve, two links from the wrist
+      const v0 = ang(N.slvB, 0, rot - 2, rot + 2, rot - 0.2), v1 = ang(N.slvB, 1, rot - 2.2, rot + 2.2, rot - 0.4);
+      const wx = bk.ex + 1, wy = bk.ey + 2.5, d1x = wx + Math.sin(v0) * 9, d1y = wy + Math.cos(v0) * 9, d2x = d1x + Math.sin(v1) * 9, d2y = d1y + Math.cos(v1) * 9;
+      ctx.fillStyle = '#141a50';
+      D.poly(ctx, [bk.jx - 2.5, bk.jy + 2, wx, wy, d1x, d1y, d2x, d2y]); ctx.fill();
       ctx.globalAlpha = b.alpha;
     }
     ctx.save();
     ctx.translate(S.hx, S.hy); ctx.rotate(S.tilt);
-    ctx.strokeStyle = '#04050c'; ctx.lineWidth = 5.5; D.line(ctx, 0, 66, 0, -82);
-    ctx.strokeStyle = '#39449c'; ctx.lineWidth = 2.8; D.line(ctx, 0, 66, 0, -82);
+    // the shaft flexes as its head lags (bowed towards where the hand is taking it)
+    const flex = G.clamp(-sl * 24, -4, 4);
+    ctx.beginPath(); ctx.moveTo(0, 66); ctx.quadraticCurveTo(flex, -8, 0, -82);
+    ctx.strokeStyle = '#04050c'; ctx.lineWidth = 5.5; ctx.stroke();
+    ctx.strokeStyle = '#39449c'; ctx.lineWidth = 2.8; ctx.stroke();
     ctx.fillStyle = G.rgba(col, 0.9); D.poly(ctx, [-2.6, 62, 2.6, 62, 0, 74]); ctx.fill();
     ctx.strokeStyle = G.rgba(col, 0.95); ctx.lineWidth = 3;
     ctx.beginPath(); ctx.arc(0, -96, 13, Math.PI * 0.62, Math.PI * 2.38); ctx.stroke();
@@ -2739,20 +3284,25 @@
       ctx.beginPath(); ctx.ellipse(0, 74, 38 * gk, 7 * gk, 0, 0, G.TAU); ctx.stroke();
     }
     ctx.restore();
-    const k = D.ik(13, -92, S.hx, S.hy, reach, reach, 1);
+    // the back hand closes over the staff
+    if (bk) { ctx.globalAlpha = b.alpha * bk.a; fist(ctx, bk.ex, bk.ey, S.tilt, col); ctx.globalAlpha = b.alpha; }
+    const k = D.ik(F0x, F0y, fg.x, fg.y, reach, reach, 1);
     ctx.fillStyle = '#28338c';
-    D.limb(ctx, 13, -92, k.jx, k.jy, 10, 9); ctx.fill();
+    D.limb(ctx, F0x, F0y, k.jx, k.jy, 10, 9); ctx.fill();
     D.limb(ctx, k.jx, k.jy, k.ex, k.ey, 9, 7); ctx.fill();
-    // a long sleeve hangs from the forearm
+    // a long sleeve hangs from the wrist on three links (N.slv), flung about by the hand
+    const v0 = ang(N.slv, 0, rot - 2, rot + 2, rot - 0.15), v1 = ang(N.slv, 1, rot - 2.2, rot + 2.2, rot - 0.35), v2 = ang(N.slv, 2, rot - 2.4, rot + 2.4, rot - 0.5);
+    const wx = k.ex + 1, wy = k.ey + 3, s1x = wx + Math.sin(v0) * 11, s1y = wy + Math.cos(v0) * 11, s2x = s1x + Math.sin(v1) * 11, s2y = s1y + Math.cos(v1) * 11, s3x = s2x + Math.sin(v2) * 10, s3y = s2y + Math.cos(v2) * 10;
     ctx.fillStyle = '#1c2468';
-    D.poly(ctx, [k.jx - 3, k.jy + 2, k.ex + 1, k.ey + 3, G.lerp(k.jx, k.ex, 0.45) - 2 - sw, Math.max(k.jy, k.ey) + 30]); ctx.fill();
+    D.poly(ctx, [k.jx - 3, k.jy + 2, wx, wy, s1x, s1y, s2x, s2y, s3x, s3y]); ctx.fill();
     ctx.strokeStyle = G.rgba(col, 0.7); ctx.lineWidth = 1.2;
-    ctx.beginPath(); ctx.moveTo(k.ex + 1, k.ey + 3); ctx.lineTo(G.lerp(k.jx, k.ex, 0.45) - 2 - sw, Math.max(k.jy, k.ey) + 30); ctx.lineTo(k.jx - 3, k.jy + 2); ctx.stroke();
-    ctx.fillStyle = '#03040a'; ctx.beginPath(); ctx.arc(k.ex, k.ey, 3.6, 0, G.TAU); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(wx, wy); ctx.lineTo(s1x, s1y); ctx.lineTo(s2x, s2y); ctx.lineTo(s3x, s3y); ctx.lineTo(k.jx - 3, k.jy + 2); ctx.stroke();
+    // the hand: a fist closed round the wood, turned with the staff (the wrist bends to it)
+    fist(ctx, k.ex, k.ey, S.tilt, col);
     if (c > 0.3) D.glow(ctx, col, k.ex, k.ey, 14 + 10 * b.charge, c * 0.8);
 
     for (const m of motes) if (!m.back && (m.e !== el || b.mk > 0.05)) mote(ctx, m.e, m.x, m.y, 1 + 0.5 * (b.mk || 0), dim, m.dk);
-    if (b.mk > 0.3) { const S1 = staff(c); D.glow(ctx, '255,255,255', S1.hx + Math.sin(S1.tilt) * 96, S1.hy - Math.cos(S1.tilt) * 96, 70 * b.mk, 0.8 * b.mk); }
+    if (b.mk > 0.3) D.glow(ctx, '255,255,255', headX, headY, 70 * b.mk, 0.8 * b.mk);
 
     if (b.flash > 0) D.glow(ctx, '255,255,255', 0, -70, 80, b.flash * 0.3); // (v1.6d: a tint, not a white dome)
     ctx.restore();
@@ -2766,6 +3316,6 @@
     const b = B.body, down = B.staggered || b.spent || B.dying;
     const th = (b.lean ? G.clamp(b.lean, -0.35, 0.4) : 0) + (down ? 0.28 : 0), fx = K.faceX(b);
     const top = 126, s = Math.sin(th), c = Math.cos(th);
-    return { cx: b.x + (b.kx || 0) + fx * s * top / 2, cy: b.y - c * top / 2, hw: B.w / 2 + Math.abs(s) * 18, hh: top / 2 };
+    return { cx: b.x + (b.kx || 0) + fx * s * top / 2, cy: b.y + (b.oy || 0) - c * top / 2, hw: B.w / 2 + Math.abs(s) * 18, hh: top / 2 };
   };
 })();

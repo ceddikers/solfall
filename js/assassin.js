@@ -114,8 +114,10 @@
     streak: null, // (corrupted) the dash, laid along the line of a cut (set for each cut)
     // the stance: bowed, both blades home along the forearms, the lead hand on the hilt either low at
     // the hip (the cut will come low) or high at the shoulder (it will come at a leaping height)
-    stanceLo: [0.6, -30, 0, 19, 0, -18, 0, 7, -35, 2.75, -3, -38, 2.85],
-    stanceHi: [0.6, -30, 0, 19, 0, -18, 0, 11, -62, -2.7, -1, -50, -2.85],
+    // (v2.5c: told further apart: low is wide and sunk with the hand at the hip; high stands taller on
+    // a lifted back heel, the hand up by the cheek)
+    stanceLo: [0.7, -27, 0, 24, 0, -22, 0, 6, -31, 2.85, -6, -34, 2.95],
+    stanceHi: [0.35, -33, 0, 17, 0, -17, -5, 14, -74, -2.75, 2, -62, -2.85],
     // a blow caught on a hand's width of drawn steel
     parry: [0.25, -34, 0, 21, 0, -16, 0, 24, -52, -1.25, -4, -42, 2.8],
     // the draw at a leaping height: laid out flat in the air, the blade out ahead
@@ -133,7 +135,8 @@
     coilUp: [0.34, -21, 0, 19, 0, -17, 0, 9, -24, -1.57, -15, -28, -1.4],
     heel: [0.08, -46, 0, 5, 0, -9, -28, 16, -62, -1.25, -15, -58, -2.0],
     // a lunge with its weight on the back foot and the blades held back: it will stop short
-    feint: [0.12, -29, 0, 21, 0, -21, 0, -21, -34, 2.95, -17, -43, 2.6],
+    // (v2.5c: sat right back on its heels, the front foot light on its toe, both blades behind the hip)
+    feint: [-0.1, -27, 0, 26, -2, -20, 0, -14, -40, 2.9, -20, -46, 2.7],
     // the flurry's last cut, held: the blade high behind the head
     slashHold: [-0.2, -37, 0, 19, 0, -15, 0, -8, -88, -2.25, -14, -46, 2.7],
     // the snare: an underhand flick (the arm back low, then through and up) and the yank
@@ -145,9 +148,95 @@
     tapDown: [0.24, -35, 0, 15, 0, -14, 0, 9, -54, 0.55, 7, -52, -0.15],
     // the echo's working: down on one knee, both blades crossed upright before its face
     channel: [0.32, -22, 0, 15, 0, -20, 0, 9, -60, -2.05, 5, -58, -1.05],
+
+    // ---- v2.5c: the in-between poses (key poses inside the same timings; see keys() below)
+    // the lunge: a settle back onto the heels, then down into a sprinter's set, the lead blade low and
+    // pointing at the hero, the other laid back along the forearm; and the skid it overshoots into
+    lungeDip: [0.25, -29, 0, 18, 0, -17, 0, 14, -44, 2.6, -14, -40, 2.9],
+    lungeSet: [0.95, -22, 0, 24, 0, -26, 0, 52, -30, 0.15, 2, -36, 3.0],
+    skidOver: [0.85, -21, 0, 26, 0, -20, 0, 44, -22, 0.3, -14, -38, 2.9],
+    // measured cuts: a dip with the blade drawn low, then tall with the blade raised high behind the
+    // head and the other hand aimed (a cut down), or sunk with the blade by the knee (a cut back up);
+    // and where each blow carries the blade on past
+    cutDip: [0.65, -27, 0, 21, 0, -17, 0, 10, -30, 2.4, 8, -44, 2.9],
+    cutHighA: [0.0, -37, 0, 20, 0, -16, 0, -6, -92, -2.4, 20, -52, 0.3],
+    cutLowB: [0.6, -29, 0, 24, 0, -18, 0, 30, -27, 1.2, -12, -52, 3.7],
+    slashAFol: [0.7, -31, 0, 22, 0, -16, 0, 30, -26, 1.5, -14, -46, 2.7],
+    slashBFol: [0.05, -37, 0, 19, 0, -15, 0, 14, -86, -1.9, -12, -42, 2.6],
+    // quick cuts: hunched, both fists up by the face with the blades hanging point down, bouncing on
+    // the balls of its feet; small cocks and small chops
+    quickSet: [0.55, -30, 0, 17, 0, -17, 0, 18, -64, 1.9, 9, -59, 1.6],
+    quickA: [0.55, -31, 0, 18, 0, -16, 0, 12, -66, -1.9, 16, -46, 2.8],
+    quickB: [0.6, -30, 0, 18, 0, -16, 0, 28, -40, 0.9, 6, -50, 2.6],
+    chopA: [0.6, -32, 0, 19, 0, -15, 0, 30, -38, 0.7, 10, -50, 2.6],
+    chopB: [0.5, -33, 0, 19, 0, -15, 0, 26, -66, -0.9, 8, -48, 2.6],
+    // out of the smoke behind the hero: low, the blade raised point-down over the shoulder, the other
+    // hand reaching to grab; and the hunt's cross of both blades overhead (on the floor or in the air)
+    stabSet: [0.45, -26, 0, 22, 0, -20, 0, 6, -76, 1.75, 34, -46, 0.2],
+    huntSet: [0.3, -30, 0, 21, 0, -18, 0, 12, -82, -2.1, 2, -80, -0.9],
+    airCock: [0.1, -42, 0, 10, -14, -10, -8, 10, -84, -2.0, 2, -80, -1.0],
+    // knives: tucked in the spring back, drawing them; a fan cocked behind the head (either hand) and
+    // the arm come through; the flurry's fan backhanded from across the body; the bursting knife
+    // lobbed from straight back over the head
+    springTuck: [0.3, -40, 0, 10, -18, -8, -14, 14, -52, 2.6, 8, -50, 2.4],
+    fanHigh: [-0.2, -37, 0, 22, 0, -17, 0, -22, -78, -2.6, 18, -60, 0.0],
+    fanHighB: [-0.2, -37, 0, 22, 0, -17, 0, 24, -54, 0.1, -20, -80, -2.6],
+    throwB: [0.35, -37, 0, 21, 0, -15, 0, -4, -46, 2.7, 34, -60, -0.2],
+    throwFol: [0.45, -35, 0, 21, 0, -15, 0, 30, -34, 0.6, -14, -46, 2.7],
+    throwFolB: [0.45, -35, 0, 21, 0, -15, 0, -2, -44, 2.7, 22, -40, 0.6],
+    fanLow: [0.5, -31, 0, 24, 0, -18, 0, -4, -44, 2.9, -16, -50, 2.6],
+    fanSweep: [0.2, -36, 0, 22, 0, -16, 0, 38, -55, -0.1, -14, -44, 2.7],
+    lobWind: [-0.35, -36, 0, 24, 0, -14, 0, -30, -84, -2.2, 12, -74, -0.6],
+    lobThrow: [0.35, -37, 0, 22, 0, -15, 0, 34, -78, -0.7, -12, -46, 2.7],
+    // landing on the blade from a height: the weight goes on down through the knee before it holds
+    stuckDeep: [0.9, -18, 0, 20, 0, -20, 0, 22, -4, 1.57, -12, -26, 2.8],
+    // an echo's shadow standing up out of the floor, head down, blades trailing on the boards; set in
+    // the air, tucked with the blade out at the hero
+    shadeRise: [0.9, -20, 0, 15, 0, -20, 0, 14, -10, 1.6, -6, -16, 1.8],
+    airSet: [0.7, -40, 0, 8, -16, -14, -10, 40, -46, 0.1, 2, -52, 3.0],
+    // after a draw, held a breath with the blade out flat before it goes home
+    drawFol: [0.75, -24, 0, 26, 0, -22, 0, 46, -40, -0.05, -10, -40, 2.9],
+    // the crescent: a reach over the shoulder for it (overhand), or a dip with the arm already low
+    // (sidearm); and where the arm ends up once the weight has gone with it
+    reachBack: [0.1, -37, 0, 16, 0, -14, 0, -10, -80, -2.6, -12, -46, 2.7],
+    sideDip: [0.45, -26, 0, 20, 0, -18, 0, 0, -36, 2.9, 14, -48, 0.4],
+    throwOverFol: [0.85, -28, 0, 24, 0, -14, -2, 34, -20, 1.0, -2, -40, 2.8],
+    throwSideFol: [0.45, -32, 0, 27, 0, -12, 0, 28, -50, -0.6, -10, -44, 2.8],
+    catchJolt: [-0.15, -38, 0, 12, 0, -16, 0, 6, -62, -1.2, -13, -47, 2.7],
+    // the snare is two-handed (a knife in each, the thread between): both low and spread by the knees,
+    // or both stretched wide over the head; flung out; then fists at the chest drawing it tight
+    snareUnder: [0.8, -25, 0, 24, 0, -20, 0, 30, -18, 1.4, 4, -24, 1.9],
+    snareFlick: [0.3, -34, 0, 22, 0, -15, 0, 38, -50, -0.5, 26, -42, 0.2],
+    snareOver: [-0.25, -37, 0, 20, 0, -16, 0, 10, -94, -1.3, -26, -92, -2.0],
+    snareCast: [0.6, -32, 0, 23, 0, -14, -2, 40, -48, 0.3, 26, -66, -0.3],
+    snareHold: [-0.05, -36, 0, 18, 0, -16, 0, 22, -58, -0.3, 4, -54, 2.8],
+    // the dance: the blades crossed in an X before the chest, low (or tucked in the air)
+    danceCoil: [0.75, -25, 0, 22, 0, -20, 0, 26, -52, -0.9, 22, -48, -2.2],
+    airCoil: [0.4, -42, 0, 10, -16, -10, -12, 22, -66, -0.9, 18, -62, -2.2],
+    // moonfall: arms opened wide with the head up as the light goes, then sunk with both arms swept
+    // back behind it to leap
+    moonSpread: [-0.2, -34, 0, 22, 0, -20, 0, 26, -66, -0.4, -30, -64, -2.7],
+    moonSink: [0.55, -20, 0, 22, 0, -20, 0, -6, -46, -2.4, -14, -40, -2.6],
+    // rain: hanging with the arms crossed over the chest, then flung wide and down
+    rainWind: [0.0, -42, 0, 8, -16, -10, -10, -6, -66, -2.6, 14, -66, -0.5],
+    rainThrow: [0.1, -40, 0, 10, -8, -12, -4, 28, -50, 0.9, -20, -50, 2.2],
   };
   // poses it snaps into rather than eases (the rest follow at the usual rate)
-  const SNAP = { dash: 60, dive: 60, streak: 60, drawHi: 60, throwOver: 44, throwSide: 44, parry: 50, heel: 60, flickUnder: 46, pull: 46 };
+  const SNAP = {
+    dash: 60, dive: 60, streak: 60, drawHi: 60, throwOver: 44, throwSide: 44, parry: 50, heel: 60, flickUnder: 46, pull: 46,
+    // (v2.5c) blows snap; where the blade is carried on past them settles slower, with the weight
+    slashA: 50, slashB: 50, chopA: 62, chopB: 62, throw: 44, throwB: 44, fanSweep: 46, lobThrow: 46, snareFlick: 46, snareCast: 46,
+    rainThrow: 46, skidOver: 40, stuckDeep: 40, catchJolt: 40,
+    slashAFol: 18, slashBFol: 18, throwOverFol: 18, throwSideFol: 18,
+  };
+  // poses that carry on into another by themselves after a moment: a blow's follow-through, a skid's
+  // overshoot, a landing's give. (Never stuck or kneel: B.recover reads those.)
+  const NEXT = {
+    slashA: ['slashAFol', 0.07], slashB: ['slashBFol', 0.07], skidOver: ['skid', 0.12], stuckDeep: ['stuck', 0.14],
+    throwOver: ['throwOverFol', 0.09], throwSide: ['throwSideFol', 0.09], catchJolt: ['watch', 0.1],
+  };
+  // poses it breathes in, [depth, rate]: easy at rest, heaving when spent
+  const BREATH = { idle: [0.7, 3.1], skid: [1.0, 7], kneel: [1.6, 8.5], stuck: [1.3, 8], watch: [0.5, 3.4], sheathe: [0.5, 3] };
   // a pose between two others, written into a figure's own scratch pose (a.live)
   function mixPose(a, P0, P1, k) {
     const p = a.live || (a.live = P0.slice());
@@ -156,6 +245,48 @@
     return p;
   }
   const NP = 13;
+  // (v2.5c) Key poses inside a timing. ks: [[at (0..1), pose (a name, an array, or null for wherever
+  // the figure was when this began), ease into it], ...]; the pose at k is eased from one key to the
+  // next and written into a.live, which the figure then follows quickly (a.liveRate).
+  const poseOf = (x, from) => (x == null ? from : typeof x === 'string' ? (POSES[x] || POSES.idle) : x);
+  function poseAt(a, ks, k, from) {
+    const p = a.live || (a.live = a.p.slice());
+    let i = 0;
+    while (i < ks.length - 1 && k >= ks[i + 1][0]) i++;
+    const k0 = ks[i], k1 = ks[i + 1], P0 = poseOf(k0[1], from);
+    if (!k1) for (let j = 0; j < NP; j++) p[j] = P0[j];
+    else {
+      const P1 = poseOf(k1[1], from), u = G.clamp((k - k0[0]) / Math.max(1e-6, k1[0] - k0[0]), 0, 1), q = (k1[2] || E.inOutQuad)(u);
+      for (let j = 0; j < NP; j++) p[j] = P0[j] + (P1[j] - P0[j]) * q;
+    }
+    a.pose = 'live';
+    return p;
+  }
+  // The same, as a wait: it takes exactly the frames wait(dur) would. If something else sets the
+  // figure's pose meanwhile (a blow landing sets its own), it lets go of it, unless o.force.
+  // o.fx(p, k, e) may add to the pose (a tremor, a breath); o.box is the shape a shadow is struck in.
+  function* keys(a, dur, ks, o) {
+    o = o || {};
+    let e = 0, mine = false, from = null;
+    while (e < dur) {
+      e += yield;
+      if (a.gone || (mine && a.pose !== 'live' && !o.force)) continue;
+      if (!from) from = a.p.slice();
+      const k = Math.min(1, e / dur), p = poseAt(a, ks, k, from);
+      if (o.fx) o.fx(p, k, e);
+      a.liveRate = o.rate || 30; a.liveBox = o.box || null;
+      mine = true;
+    }
+  }
+  // Several at once, started together (unlike seq.par, no first frame is lost).
+  function* together(...gens) {
+    let alive = gens.filter((g) => !g.next().done);
+    while (alive.length) { const dt = yield; alive = alive.filter((g) => !g.next(dt).done); }
+  }
+  // a fine, even tremble (never random: a held breath, not jitter)
+  const tremble = (p, amt, t) => { p[1] += Math.sin(t * 70) * 0.8 * amt; p[0] += Math.sin(t * 53) * 0.012 * amt; p[8] += Math.sin(t * 81) * 1.1 * amt; };
+  // a spring back off the hero: knees tucked up as it rises, legs let down to land
+  const SPRING = [[0, null], [0.4, 'springTuck', E.outQuad], [1, 'air', E.inQuad]];
   function runPose(t) {
     const s = Math.sin(t), c = Math.cos(t);
     return [0.55, -36, 0, s * 20, -Math.max(0, c) * 12, -s * 20, -Math.max(0, -c) * 12, -18, -46, 2.95, -26, -50, 3.05];
@@ -166,7 +297,7 @@
     const b = B.body;
     b.x = 900; b.y = -120; b.pose = 'dive'; b.hurt = false; b.p = POSES.dive.slice(); b.runT = 0;
     B.clones = []; B.serial = 0;
-    B.scarf = D.chain(11, b.x, b.y - 70);
+    B.scarf = D.chain(11, b.x, b.y - 70); B.scarfV = null; b.liv = null;
     B.lights = true; B.dark = 0; B.wires = []; B.wireHit = 0;
     B.pinned = null; B.strings = 0;
   };
@@ -231,11 +362,16 @@
     b.face = G.player.x >= x ? 1 : -1; b.tqf = b.face; b.tqP = 1; // she comes out of the smoke already facing the hero
     b.vis = 0; // and gathers out of it, quickly (B.tick)
     for (const p of B.scarf) { p.x = x; p.y = y - 70; }
+    if (B.scarfV) for (const v of B.scarfV) { v.x = 0; v.y = 0; }
     smoke(x, y - 40);
   }
   // quiet: it fades in (c.vis, from 0) instead of bursting out of smoke
   // (the duelling shade on the road between trials is drawn as one of these: rest.js)
-  G.veilShade = { pose: (name) => (POSES[name] || POSES.idle).slice(), draw: (ctx, a, alpha) => figure(ctx, a, alpha) };
+  G.veilShade = { pose: (name) => (POSES[name] || POSES.idle).slice(), draw: (ctx, a, alpha) => {
+    // (it has no tick of ours: its springs step on the clock as it is drawn)
+    const dt = a.livT == null ? 0 : G.clamp(G.t - a.livT, 0, 0.05);
+    a.livT = G.t; living(a, dt); figure(ctx, a, alpha);
+  } };
   function clone(x, y, face, pose, quiet) {
     const c = {
       id: 'shade' + (B.serial++), x, y, face, pose: pose || 'crouch', hurt: false, clone: true, runT: 0, p: null,
@@ -271,10 +407,13 @@
     a.face = dir; a.pose = 'crouch';
     H.lane({ x: WL, y: a.y - 66, w: WR - WL, h: 66, dir, dur: tele, quiet: true });
     // no lane on the floor: it sinks into its crouch, and the blade catches the light before it goes
-    yield* wait(Math.max(0, tele - 0.2));
+    // (v2.5c: a settle back onto its heels, then down and forward into a sprinter's set with the lead
+    // blade low and pointed at the hero; held there, trembling, through the glint)
+    yield* keys(a, Math.max(0, tele - 0.2), [[0, null], [0.22, 'lungeDip', E.outQuad], [0.72, 'lungeSet', E.inOutQuad], [1, 'lungeSet']],
+      { fx: (p, k) => { p[1] += 2 * Math.max(0, k - 0.72) / 0.28; } });
     if (a.gone) return;
     G.fx.glint(a.x + dir * 20, a.y - 44, 26, a.clone ? '170,160,210' : G.pal().hot); G.audio.play('glint');
-    yield* wait(Math.min(tele, 0.2));
+    yield* keys(a, Math.min(tele, 0.2), [[0, null], [1, 'lungeSet']], { rate: 40, fx: (p, k, e) => { p[1] += 2; p[0] += 0.04 * k; tremble(p, k, e); } });
     if (a.gone) return;
     a.pose = 'dash'; a.hurt = true;
     G.audio.play('streak');
@@ -285,7 +424,9 @@
       a.x = G.lerp(x0, toX, Math.min(1, e / dur));
       G.fx.spawn({ x: a.x - dir * 20, y: a.y - G.rand(10, 60), vx: -dir * G.rand(40, 200), vy: G.rand(-30, 30), life: 0.25, size: G.rand(4, 9), color: a.clone ? '20,16,34' : G.pal().boss });
     }
-    a.hurt = false; a.pose = 'skid';
+    // it overshoots into the skid, blade still out, then rises into it (NEXT)
+    a.hurt = false; a.pose = 'skidOver';
+    if (!a.clone) a.recV = (a.recV || 0) + dir * 1.2;
   }
   const farSide = (x) => (x < G.player.x ? Math.min(WR - 60, G.player.x + 300) : Math.max(WL + 60, G.player.x - 300));
 
@@ -337,12 +478,18 @@
     a.face = dir;
     // (the same quiet lane as a real lunge: the crouch is the only difference)
     H.lane({ x: WL, y: a.y - 66, w: WR - WL, h: 66, dir, dur: tele, quiet: true });
-    let e = 0;
+    // (v2.5c: a dip as for the real one, then it rocks back onto its heels, the blades going back
+    // behind the hip and the front foot coming up onto its toe: the set of a lunge is never reached)
+    const FK = [[0, null], [0.2, 'lungeDip', E.outQuad], [0.6, 'feint', E.inOutQuad], [1, 'feint']];
+    let e = 0, from = null;
     while (e < tele) {
       e += yield;
       const k = Math.min(1, e / tele);
-      const p = mixPose(a, POSES.crouch, POSES.feint, E.outQuad(Math.min(1, k * 1.6)));
+      if (!from) from = a.p.slice();
+      const p = poseAt(a, FK, k, from);
+      a.liveRate = 30; a.liveBox = null;
       p[1] += 2.5 * k;
+      if (k > 0.6) { p[0] -= 0.05 * (k - 0.6) / 0.4; tremble(p, 0.6 * (k - 0.6) / 0.4, e); }
       if (!a.glinted && tele - e < 0.2) { a.glinted = true; G.fx.glint(a.x - dir * 18, a.y - 38, 22, G.pal().hot, 0.18); G.audio.play('glint'); }
     }
     a.glinted = false;
@@ -358,7 +505,7 @@
         G.fx.spawn({ x: a.x - dir * 20, y: a.y - G.rand(10, 60), vx: -dir * G.rand(40, 200), vy: G.rand(-30, 30), life: 0.25, size: G.rand(4, 9), color: G.pal().boss });
       }
     }
-    a.pose = 'skid';
+    a.pose = 'skidOver';
     G.fx.dust(a.x, FLOOR, 5, { dir, speed: [60, 260], size: [6, 12], up: 24 });
     yield* wait(0.07);
     yield* hopBack(a, 130, 0.26, 58);
@@ -369,8 +516,9 @@
     for (let i = 0; i < n; i++) angs.push(base + (i - (n - 1) / 2) * 0.13);
     const tt = 0.36 * T;
     volley(ox, oy, angs, tt, 760);
-    yield* wait(tt);
-    a.pose = 'throw';
+    // (backhanded from across the body, off its heels)
+    yield* keys(a, tt, [[0, null], [0.45, 'fanLow', E.outQuad], [1, 'fanLow']], { fx: (p, k) => { p[0] -= 0.08 * k; } });
+    a.pose = 'fanSweep';
     yield* wait(0.22);
     a.pose = 'skid'; a.exposed = true;
     yield* wait(0.7);
@@ -414,11 +562,29 @@
       // so getting behind it (a dash straight through) is safe for the rest of the flurry
       if ((!fast || i === 0) && Math.abs(P.x - b.x) > 20) b.face = P.x > b.x ? 1 : -1;
       if (held && i === n - 1) { yield* heldCut(); return; }
-      b.pose = 'crouch';
       const tele = (fast ? (i === 0 ? 0.4 : 0.19) : (i === 0 ? 0.5 : 0.4)) * T, r = fast ? 86 : 112;
-      if (i % 2 === 0) swing(b, { r, a0: -2.1, a1: 0.95, tele, pose: 'slashA' });
-      else swing(b, { r, a0: 1.0, a1: -2.0, tele, pose: 'slashB' });
-      yield* wait(tele);
+      // (v2.5c) the body says the tempo before the first cut lands. Measured: a dip with the blade
+      // drawn low, then up tall with it raised high behind the head and the free hand aimed; each cut
+      // after rides the last one's weight (down from high, back up from by the knee). Quick: hunched,
+      // fists up by the face with the blades hanging, bouncing in time with the cuts to come; small
+      // cocks and small chops.
+      const A = i % 2 === 0, hit = fast ? (A ? 'chopA' : 'chopB') : (A ? 'slashA' : 'slashB');
+      if (A) swing(b, { r, a0: -2.1, a1: 0.95, tele, pose: hit });
+      else swing(b, { r, a0: 1.0, a1: -2.0, tele, pose: hit });
+      if (fast && i === 0) {
+        yield* keys(b, tele, [[0, null], [0.35, 'quickSet', E.outQuad], [0.78, 'quickSet'], [1, 'quickA', E.outQuad]],
+          { rate: 36, fx: (p, k, e) => { if (k < 0.78) p[1] += 1.8 * Math.abs(Math.sin(e * Math.PI / 0.19)); } });
+      } else if (fast) {
+        yield* keys(b, tele, [[0, null], [0.55, A ? 'quickA' : 'quickB', E.outQuad], [1, A ? 'quickA' : 'quickB']], { rate: 44 });
+      } else if (i === 0) {
+        yield* keys(b, tele, [[0, null], [0.28, 'cutDip', E.outQuad], [0.7, 'cutHighA', E.inOutQuad], [1, 'cutHighA']],
+          { fx: (p, k) => { const u = Math.max(0, k - 0.7) / 0.3; p[1] -= 1.5 * u; p[0] -= 0.05 * u; } });
+      } else {
+        yield* keys(b, tele, [[0, null], [A ? 0.45 : 0.4, A ? 'cutHighA' : 'cutLowB', A ? E.inOutQuad : E.outQuad], [1, A ? 'cutHighA' : 'cutLowB']],
+          { fx: (p, k) => { p[1] += (A ? -1.5 : 1.5) * Math.max(0, k - 0.5) / 0.5; } });
+      }
+      // (the blow sets its own pose as it lands; if this frame beat it there, the same pose)
+      if (b.pose === 'live') b.pose = hit;
       // each cut carries it forward: a full step when it is taking its time, a shuffle when it is not
       const x1 = G.clamp(b.x + b.face * (fast ? 12 : 46), WL + 30, WR - 30);
       yield* tween(b, { x: x1 }, fast ? 0.06 : 0.1, E.outCubic);
@@ -428,21 +594,28 @@
     const away = b.x > P.x ? 1 : -1, tx = G.clamp(b.x + away * 200, WL + 50, WR - 50), x0 = b.x;
     b.face = -away; b.pose = 'air';
     e = 0;
-    while (e < 0.3) { e += yield; const k = Math.min(1, e / 0.3); b.x = G.lerp(x0, tx, k); b.y = FLOOR - 4 * 90 * k * (1 - k); }
-    b.y = FLOOR; b.face = P.x > b.x ? 1 : -1; b.pose = 'crouch';
+    let from = null;
+    while (e < 0.3) {
+      e += yield; const k = Math.min(1, e / 0.3); b.x = G.lerp(x0, tx, k); b.y = FLOOR - 4 * 90 * k * (1 - k);
+      if (!from) from = b.p.slice();
+      poseAt(b, SPRING, k, from); b.liveRate = 30;
+    }
+    b.y = FLOOR; b.face = P.x > b.x ? 1 : -1; b.pose = 'crouch'; b.sq = 0.1;
     const ox = b.x + b.face * 22, oy = b.y - 60;
     if (!fast) {
       const base = Math.atan2(P.y - 24 - oy, P.x - ox), angs = [];
       for (let i = 0; i < 5; i++) angs.push(base + (i - 2) * 0.14);
       const tele = 0.42 * T;
       volley(ox, oy, angs, tele, 780);
-      yield* wait(tele);
-      b.pose = 'throw';
+      // the fan: the arm drawn across the body to the far hip, and backhanded out flat
+      yield* keys(b, tele, [[0, null], [0.3, 'crouch', E.outQuad], [0.72, 'fanLow', E.inOutQuad], [1, 'fanLow']], { fx: (p, k, e2) => { if (k > 0.72) tremble(p, 0.5, e2); } });
+      b.pose = 'fanSweep';
       yield* wait(0.3);
     } else {
       // one knife, lobbed to where the hero stands: it sticks, hisses, and takes two health from anyone still near
-      yield* wait(0.26 * T);
-      b.pose = 'throw';
+      // (the bursting knife: the arm goes straight back and up over the head, the body leaning away)
+      yield* keys(b, 0.26 * T, [[0, null], [0.3, 'crouch', E.outQuad], [0.78, 'lobWind', E.inOutQuad], [1, 'lobWind']], { fx: (p, k, e2) => { if (k > 0.78) tremble(p, 0.6, e2); } });
+      b.pose = 'lobThrow';
       G.audio.play('arrowHeavy');
       const tf = 0.5, g = 1400, lx = G.clamp(P.x, WL + 60, WR - 60);
       H.orb(ox, oy, (lx - ox) / tf, (FLOOR - 14 - oy) / tf - 0.5 * g * tf, {
@@ -462,17 +635,23 @@
     if (Math.abs(P.x - b.x) > 20) b.face = P.x > b.x ? 1 : -1;
     const hold = 0.95 * T;
     swing(b, { r: 134, a0: -2.35, a1: 1.05, tele: hold, pose: 'slashA' });
-    let e = 0;
+    // (v2.5c: a dip with the blade drawn low, then up onto its toes with it high behind the head; held
+    // there trembling, the body leaning further back the longer it waits)
+    const HK = [[0, null], [0.12, 'cutDip', E.outQuad], [0.42, 'slashHold', E.inOutQuad], [1, 'slashHold']];
+    let e = 0, from = null;
     while (e < hold) {
       e += yield;
       const k = Math.min(1, e / hold);
-      const p = mixPose(b, POSES.crouch, POSES.slashHold, E.outQuad(Math.min(1, k * 2.4)));
-      if (k > 0.42) { p[1] += Math.sin(B.t * 70) * 0.8; p[0] += Math.sin(B.t * 53) * 0.015; p[8] += Math.sin(B.t * 81) * 1.1; }
+      if (!from) from = b.p.slice();
+      const p = poseAt(b, HK, k, from);
+      b.liveRate = 30;
+      if (k > 0.42) { const u = (k - 0.42) / 0.58; p[1] -= 2 * u; p[0] -= 0.08 * u; p[1] += Math.sin(B.t * 70) * 0.8; p[0] += Math.sin(B.t * 53) * 0.015; p[8] += Math.sin(B.t * 81) * 1.1; }
     }
+    if (b.pose === 'live') b.pose = 'slashA';
     G.audio.play('cleave'); G.fx.shake(6);
     b.recV = (b.recV || 0) + b.face * 2.2;
     yield* tween(b, { x: G.clamp(b.x + b.face * 70, WL + 30, WR - 30) }, 0.16, E.outCubic);
-    b.pose = 'stuck'; b.exposed = true;
+    b.pose = 'stuckDeep'; b.exposed = true; b.sq = 0.1;
     G.fx.dust(b.x, FLOOR, 4, { dir: b.face, speed: [60, 240], size: [6, 11], up: 24 });
     yield* wait(1.0);
     b.exposed = false;
@@ -483,12 +662,16 @@
     const away = b.x > P.x ? 1 : -1;
     const tx = G.clamp(b.x + away * 190, WL + 50, WR - 50), x0 = b.x;
     b.face = -away; b.pose = 'air';
-    let e = 0;
-    while (e < 0.34) { e += yield; const k = Math.min(1, e / 0.34); b.x = G.lerp(x0, tx, k); b.y = FLOOR - 4 * 96 * k * (1 - k); }
-    b.y = FLOOR;
+    let e = 0, from = null;
+    while (e < 0.34) {
+      e += yield; const k = Math.min(1, e / 0.34); b.x = G.lerp(x0, tx, k); b.y = FLOOR - 4 * 96 * k * (1 - k);
+      if (!from) from = b.p.slice();
+      poseAt(b, SPRING, k, from); b.liveRate = 30;
+    }
+    b.y = FLOOR; b.pose = 'crouch'; b.sq = 0.1;
     const vol = (B.phase >= 2 ? 2 : 1) + (K.hard() ? 1 : 0);
     for (let v = 0; v < vol; v++) {
-      b.face = P.x > b.x ? 1 : -1; b.pose = 'crouch';
+      b.face = P.x > b.x ? 1 : -1;
       const ox = b.x + b.face * 22, oy = b.y - 60;
       const base = Math.atan2(P.y - 24 - oy, P.x - ox);
       const n = B.phase === 1 ? 3 : 5, spread = B.phase === 1 ? 0.12 : 0.15;
@@ -496,9 +679,12 @@
       for (let i = 0; i < n; i++) angs.push(base + (i - (n - 1) / 2) * spread + (v % 2 ? spread / 2 : 0));
       const tele = (v ? 0.4 : 0.55) * T;
       volley(ox, oy, angs, tele, 780);
-      yield* wait(tele);
-      b.pose = 'throw';
-      yield* wait(0.3);
+      // (v2.5c: side-on, the fan cocked behind its head, the free hand pointing it at the hero; the
+      // next volley from the other hand)
+      const L = v % 2 ? 'fanHighB' : 'fanHigh';
+      yield* keys(b, tele, [[0, null], [0.3, 'crouch', E.outQuad], [0.68, L, E.inOutQuad], [1, L]], { fx: (p, k, e2) => { if (k > 0.68) { p[0] -= 0.06 * (k - 0.68) / 0.32; tremble(p, 0.5, e2); } } });
+      b.pose = v % 2 ? 'throwB' : 'throw';
+      yield* keys(b, 0.3, [[0, b.pose], [0.25, b.pose], [1, v % 2 ? 'throwFolB' : 'throwFol', E.outQuad]], { rate: 24 });
     }
     yield* wait(0.6);
   }
@@ -529,7 +715,8 @@
     K.crush(b.x, FLOOR - 24, 42, 24, 1); // (v2.1b: from 58 by 44 at FLOOR - 40: it lands laid out low, and that blow reached well over it)
     K.impact(b.x, false);
     if (K.hard()) { H.shockwave(b.x - 20, -1, 380, 36); H.shockwave(b.x + 20, 1, 380, 36); }
-    b.pose = 'stuck'; b.exposed = true;
+    // (v2.5c: the weight goes on down through the knee, squashed, before it holds)
+    b.pose = 'stuckDeep'; b.exposed = true; b.sq = 0.2;
     yield* wait(B.phase === 3 ? 1.1 : 1.35);
     b.exposed = false;
   }
@@ -550,11 +737,14 @@
     const n = 1 + (B.phase >= 2 ? 1 : 0) + (B.phase === 3 && K.hard() ? 1 : 0);
     for (let i = 0; i < n; i++) {
       if (Math.abs(P.x - b.x) > 16) b.face = P.x > b.x ? 1 : -1;
-      b.pose = 'crouch';
       const tele = (i ? 0.3 : 0.44) * T;
       if (i % 2 === 0) swing(b, { r: 110, a0: -2.1, a1: 0.95, tele, pose: 'slashA' });
       else swing(b, { r: 110, a0: 1.0, a1: -2.0, tele, pose: 'slashB' });
-      yield* wait(tele);
+      // (v2.5c: out of the smoke low, the blade raised point-down over its shoulder and the free hand
+      // reaching for the hero; a second cut back up from by the knee, a third down from high)
+      const W = i === 0 ? 'stabSet' : i % 2 ? 'cutLowB' : 'cutHighA';
+      yield* keys(b, tele, [[0, null], [i ? 0.45 : 0.32, W, E.outQuad], [1, W]], { fx: (p, k, e2) => { if (k > 0.75) tremble(p, 0.5, e2); } });
+      if (b.pose === 'live') b.pose = i % 2 ? 'slashB' : 'slashA';
       yield* tween(b, { x: G.clamp(b.x + b.face * 50, lo, hi) }, 0.1, E.outCubic);
       yield* wait(0.08);
     }
@@ -605,19 +795,19 @@
     const vol = 2 + (K.hard() ? 1 : 0), n = K.gentle() ? 5 : 7;
     const lo = 0.42, hi = Math.PI - 0.42, stepA = (hi - lo) / (n - 1);
     for (let v = 0; v < vol; v++) {
-      b.pose = 'air';
       const off = (v % 2 ? 0.5 : 0) * stepA + G.rrand(-0.06, 0.06);
       const angs = [];
       for (let i = 0; i < n - (v % 2); i++) angs.push(lo + i * stepA + off);
       const tele = (v ? 0.5 : 0.62) * T;
       volley(b.x, b.y - 50, angs, tele, 720);
-      yield* wait(tele);
-      b.pose = 'throw';
-      yield* wait(0.32);
+      // (v2.5c: hanging, the arms cross over its chest with the knives in them, and fling out wide)
+      yield* keys(b, tele, [[0, null], [0.25, 'air', E.outQuad], [0.7, 'rainWind', E.inOutQuad], [1, 'rainWind']], { fx: (p, k, e2) => { if (k > 0.7) tremble(p, 0.5, e2); } });
+      b.pose = 'rainThrow';
+      yield* keys(b, 0.32, [[0, 'rainThrow'], [0.3, 'rainThrow'], [1, 'air', E.inOutQuad]], { rate: 24 });
     }
     b.pose = 'dive';
     yield* tween(b, { y: FLOOR }, 0.2, E.inQuad);
-    b.pose = 'skid';
+    b.pose = 'skidOver'; b.sq = 0.14;
     G.fx.shake(5); G.audio.play('land');
     G.fx.thud(b.x, FLOOR, 0.7, { noCrack: true });
     yield* wait(0.85);
@@ -640,7 +830,8 @@
       ex = px;
       yield* wait(0.75 * T + 0.3);
     }
-    appear(G.clamp(ex + (G.rng() < 0.5 ? -150 : 150), WL + 50, WR - 50), FLOOR, 'skid');
+    // (v2.5c: out of the dark laid low with the blade still out, as if it had just come through)
+    appear(G.clamp(ex + (G.rng() < 0.5 ? -150 : 150), WL + 50, WR - 50), FLOOR, 'skidOver');
     yield* wait(0.8);
   }
 
@@ -733,13 +924,19 @@
       update(dt) { aim.left -= dt; if (c.gone || aim.left < -0.5) this.dead = true; },
       danger() { return aim.set && aim.left > -0.3 ? [aim.x, 46, Math.max(0, aim.left)] : null; },
     });
+    // (v2.5c) it stands up out of the floor head down, into a sprinter's set with the blade out at the
+    // hero (in the air: tucked, blade out), breathing; as its aim sets it sinks and trembles
+    const SK = air ? [[0, 'air'], [0.45, 'airSet', E.outQuad], [1, 'airSet']] : [[0, 'shadeRise'], [0.5, 'lungeSet', E.outQuad], [1, 'lungeSet']];
     let e = 0;
     while (e < prep && !c.gone) {
       const dt = yield;
       e += dt;
       if (!real) c.vis = Math.min(1, e / ECHO_FADE);
       if (air) c.y = sy - 5 * Math.sin(e * 8); // hanging in the air
-      c.pose = air ? 'air' : 'crouch';
+      const p = poseAt(c, SK, Math.min(1, e / prep), null);
+      c.liveRate = 26; c.liveBox = air ? 'air' : null;
+      p[1] += Math.sin(e * 9) * 0.8;
+      if (aim.set) { const u = Math.min(1, (e - (prep - ECHO_LOCK)) / ECHO_LOCK); p[1] += 2 * u; p[0] += 0.05 * u; tremble(p, u, e); }
       if (!aim.set) { aim.x = P.x; aim.y = P.y; if (Math.abs(P.x - c.x) > 10) c.face = P.x > c.x ? 1 : -1; }
       if (!aim.set && prep - e <= ECHO_LOCK) {
         // the eye settles and the blade catches the light: from here it goes where the hero is now
@@ -765,12 +962,13 @@
     }
     c.hurt = false; c.tilt = 0;
     if (c.gone) return;
-    c.pose = c.y < FLOOR - 4 ? 'air' : 'skid';
+    c.pose = c.y < FLOOR - 4 ? 'air' : 'skidOver';
     if (c.y >= FLOOR - 4) G.fx.dust(c.x, FLOOR, 4, { dir: c.face, speed: [60, 220], size: [6, 11], up: 26 });
     if (real) {
       // out of the working, down onto its heels: open
-      if (c.y < FLOOR - 4) { yield* tween(c, { y: FLOOR }, 0.2, E.inQuad); G.fx.thud(c.x, FLOOR, 0.45, { noCrack: true }); }
-      c.pose = 'skid'; b.exposed = true;
+      if (c.y < FLOOR - 4) { yield* tween(c, { y: FLOOR }, 0.2, E.inQuad); G.fx.thud(c.x, FLOOR, 0.45, { noCrack: true }); b.sq = 0.14; }
+      if (c.pose !== 'skidOver') c.pose = 'skid';
+      b.exposed = true;
       yield* wait(0.85);
       b.exposed = false;
       return;
@@ -801,13 +999,19 @@
     const end = plan[plan.length - 1].at + prep + 0.6;
     G.audio.play('veilchannel', { dur: end });
     const running = [], used = [];
-    let e = 0, side = G.rng() < 0.5 ? -1 : 1, next = 0, real = false;
+    let e = 0, side = G.rng() < 0.5 ? -1 : 1, next = 0, real = false, pulse = 0;
     while ((next < plan.length || running.length) && e < end + 3) {
       const dt = yield;
       e += dt;
       if (!real) {
         // the working: kneeling, blades crossed before the face, the dark drawn up out of the floor into it
-        b.pose = 'channel';
+        // (v2.5c: a slow breath under it, and each time a shadow is let out the head lifts and the blades
+        // part a little, then close again)
+        pulse = Math.max(0, pulse - dt * 4);
+        const p = poseAt(b, [[0, 'channel']], 0, null), q = pulse > 0 ? Math.sin(Math.PI * (1 - pulse)) : 0;
+        b.liveRate = 30;
+        p[1] += Math.sin(e * 2.6) * 1.1 - 2 * q; p[0] -= 0.12 * q;
+        p[9] -= 0.35 * q; p[12] += 0.35 * q; p[7] += 4 * q; p[10] -= 3 * q;
         if (Math.random() < dt * 20) {
           const x = b.x + G.rand(-70, 70);
           G.fx.spawn({ x, y: FLOOR - G.rand(0, 8), vx: (b.x - x) * 1.2, vy: -G.rand(60, 150), life: G.rand(0.4, 0.8), size: G.rand(3, 7), color: '24,18,40', drag: 1.5 });
@@ -815,6 +1019,7 @@
       }
       while (next < plan.length && e >= plan[next].at) {
         const s = plan[next++], live = used.slice(-4);
+        pulse = 1;
         if (s.kind === 'cut' || s.kind === 'air') {
           const x = shadeSpot(P, side, live), y = s.kind === 'air' ? FLOOR - G.rrand(150, 210) : FLOOR;
           used.push(x); side = -side;
@@ -856,15 +1061,19 @@
       const tele = (i ? 0.26 : 0.36) * T;
       if (i % 2 === 0) swing(b, { r: 112, a0: -2.1, a1: 0.95, tele, pose: 'slashA' });
       else swing(b, { r: 112, a0: 1.0, a1: -2.0, tele, pose: 'slashB' });
-      yield* wait(tele + 0.1);
+      // (v2.5c: it comes out with both blades crossed high over its head, on the floor or tucked in the
+      // air; the second cut comes back up from by the knee. The blow sets its own pose as it lands,
+      // and these keys let go of it then.)
+      const W = i ? 'cutLowB' : air ? 'airCock' : 'huntSet', at = tele / (tele + 0.1);
+      yield* keys(b, tele + 0.1, [[0, null], [at * 0.4, W, E.outQuad], [at, W]], { box: air ? 'air' : null, fx: (p, k, e2) => { if (k > at * 0.7 && k < at) tremble(p, 0.5, e2); } });
     }
-    if (b.y < FLOOR) { b.pose = 'air'; yield* tween(b, { y: FLOOR }, 0.2, E.inQuad); }
-    b.face = P.x > b.x ? 1 : -1; b.pose = 'crouch';
+    if (b.y < FLOOR) { b.pose = 'air'; yield* tween(b, { y: FLOOR }, 0.2, E.inQuad); b.sq = 0.1; }
+    b.face = P.x > b.x ? 1 : -1;
     const ox = b.x + b.face * 22, oy = b.y - 60, base = Math.atan2(P.y - 24 - oy, P.x - ox), tele = 0.4 * T;
     volley(ox, oy, [base - 0.13, base, base + 0.13], tele, 820);
-    yield* wait(tele);
+    yield* keys(b, tele, [[0, null], [0.3, 'crouch', E.outQuad], [0.68, 'fanHigh', E.inOutQuad], [1, 'fanHigh']]);
     b.pose = 'throw';
-    yield* wait(0.3);
+    yield* keys(b, 0.3, [[0, 'throw'], [0.25, 'throw'], [1, 'throwFol', E.outQuad]], { rate: 24 });
     b.pose = 'skid';
     yield* wait(0.7);
   }
@@ -894,6 +1103,8 @@
       const dt = yield;
       e += dt;
       stanceTo(a, high, (from || 0) + (1 - (from || 0)) * E.inQuad(Math.min(1, e / dur)));
+      // (v2.5c) in its last breath the weight tips onto the front foot and the hand at the hilt trembles
+      if (dur - e < 0.22) { const u = G.clamp(1 - (dur - e) / 0.22, 0, 1), p = a.live; p[0] += 0.07 * u; p[1] += 1.5 * u; p[7] += Math.sin(e * 77) * 0.9 * u; p[8] += Math.sin(e * 91) * 0.9 * u; }
       if (!glinted && dur - e < 0.2) {
         glinted = true;
         const hx = a.x + a.face * a.p[7], hy = a.y + a.p[8];
@@ -950,8 +1161,9 @@
   }
   // The blade home, with a dry click, and the line of each cut it made shows for a moment.
   function* sheatheHome(a, trails) {
-    a.pose = 'sheathe';
-    yield* wait(0.16);
+    // (v2.5c: held a breath low with the blade out flat, then home)
+    yield* keys(a, 0.16, [[0, 'drawFol'], [0.4, 'drawFol'], [1, 'sheathe', E.inOutQuad]], { rate: 34 });
+    if (!a.gone) a.pose = 'sheathe';
     if (a.gone) return;
     G.audio.play('veilclick');
     for (const tr of trails) {
@@ -967,8 +1179,9 @@
     const high = K.chance(0.5, 'high');
     b.face = P.x > b.x ? 1 : -1;
     // the blades go home, a turn of each wrist, and it settles its weight
+    // (v2.5c: up through the sheathing, both blades turned along the forearms, then down into the grip)
     stanceTo(b, high, 0);
-    yield* wait(0.16);
+    yield* keys(b, 0.16, [[0, null], [0.45, 'sheathe', E.outQuad], [1, high ? 'stanceHi' : 'stanceLo', E.inOutQuad]], { rate: 36 });
     G.audio.play('veilclick');
     G.fx.dust(b.x, FLOOR, 2, { speed: [10, 60], size: [4, 7], up: 10 });
     // its shadow, on the hero's other side (a fierce third phase too)
@@ -1077,8 +1290,8 @@
   }
   // Held in the lead hand, its points forward along the hand, before it is thrown (or after a catch).
   function heldCrescent(ctx, a, al, gleamOnly) {
-    const p = a.p, f = a.face, hx = a.x + f * p[7], hy = a.y + p[8];
-    const an = f > 0 ? p[9] : Math.PI - p[9];
+    const f = a.face, hd = handAt(a, 0), hx = hd.x, hy = hd.y; // (the hand as drawn: see living)
+    const an = f > 0 ? hd.an : Math.PI - hd.an;
     const cx = hx + Math.cos(an) * 12, cy = hy + Math.sin(an) * 12, pal = G.pal();
     const col = a.clone ? '120,110,160' : pal.boss, hot = a.clone ? '200,195,230' : pal.hot;
     if (gleamOnly) {
@@ -1189,13 +1402,19 @@
     const W = POSES[over ? 'windOver' : 'windSide'];
     // (as with a lunge, the low throw has a lane that is never drawn: the wind-up is the warning)
     if (!over) H.lane({ x: WL, y: FLOOR - 66, w: WR - WL, h: 66, dir: a.face, dur: wind, quiet: true });
-    let e = 0, glinted = false;
+    // (v2.5c) overhand: a reach over the shoulder for the blade, then wound up high behind the head;
+    // sidearm: down into a dip with the arm already going back low, then swept back by the hip
+    const CK = over ? [[0, null], [0.25, 'reachBack', E.outQuad], [0.8, W, E.inOutQuad], [1, W]] : [[0, null], [0.25, 'sideDip', E.outQuad], [0.8, W, E.inOutQuad], [1, W]];
+    let e = 0, glinted = false, from = null;
     while (e < wind && !a.gone) {
       const dt = yield;
       e += dt;
       const k = Math.min(1, e / wind);
       if (k < 0.6 && Math.abs(P.x - a.x) > 20) a.face = P.x > a.x ? 1 : -1;
-      const p = mixPose(a, POSES.idle, W, 0.55 + 0.45 * E.inQuad(k));
+      if (!from) from = a.p.slice();
+      const p = poseAt(a, CK, k, from);
+      a.liveRate = 30; a.liveBox = null;
+      if (k > 0.8) tremble(p, 0.4, e);
       // a last settle onto the back foot before it lets go
       if (k > 0.8) { p[1] += 2.5 * (k - 0.8) / 0.2; p[0] -= (over ? 0.08 : 0.05) * (k - 0.8) / 0.2; }
       if (!glinted && wind - e < 0.15) {
@@ -1237,7 +1456,8 @@
     const hx = a.x + a.face * 30, hy = a.y - 60;
     G.fx.burst(hx, hy, { n: 6, color: a.clone ? '150,140,190' : G.pal().hot, speed: [80, 260], angle: blade.dir > 0 ? 0 : Math.PI, spread: 1.2, life: [0.1, 0.25], kind: 'spark', size: [1.2, 2.2], grav: 500 });
     if (!a.clone) b0Recoil(blade.dir * 1.8);
-    a.pose = 'watch';
+    // (v2.5c: the arm is carried back by the blade's weight, then comes in)
+    a.pose = 'catchJolt';
     yield* tween(a, { x: G.clamp(a.x + blade.dir * 10, WL + 30, WR - 30) }, 0.12, E.outQuad);
     return true;
   }
@@ -1248,9 +1468,13 @@
     if (Math.abs(P.x - b.x) >= 160) return;
     const away = b.x > P.x ? 1 : -1, tx = G.clamp(b.x + away * 170, WL + 50, WR - 50), x0 = b.x;
     b.face = -away; b.pose = 'air';
-    let e = 0;
-    while (e < 0.3) { e += yield; const k = Math.min(1, e / 0.3); b.x = G.lerp(x0, tx, k); b.y = FLOOR - 4 * 80 * k * (1 - k); }
-    b.y = FLOOR; b.pose = 'crouch';
+    let e = 0, from = null;
+    while (e < 0.3) {
+      e += yield; const k = Math.min(1, e / 0.3); b.x = G.lerp(x0, tx, k); b.y = FLOOR - 4 * 80 * k * (1 - k);
+      if (!from) from = b.p.slice();
+      poseAt(b, SPRING, k, from); b.liveRate = 30;
+    }
+    b.y = FLOOR; b.pose = 'crouch'; b.sq = 0.08;
     G.fx.dust(b.x, FLOOR, 3, { speed: [30, 140], size: [5, 9], up: 24 });
     yield* wait(0.06);
   }
@@ -1300,9 +1524,14 @@
     const P = G.player, away = a.x > P.x ? 1 : -1, x0 = a.x, tx = G.clamp(a.x + away * dist, WL + 50, WR - 50);
     a.face = -away; a.pose = 'air';
     G.fx.dust(a.x, FLOOR, 3, { dir: away, speed: [30, 140], size: [5, 9], up: 20 });
-    let e = 0;
-    while (e < dur && !a.gone) { e += yield; const k = Math.min(1, e / dur); a.x = G.lerp(x0, tx, E.outQuad(k)); a.y = FLOOR - 4 * h * k * (1 - k); }
+    let e = 0, from = null;
+    while (e < dur && !a.gone) {
+      e += yield; const k = Math.min(1, e / dur); a.x = G.lerp(x0, tx, E.outQuad(k)); a.y = FLOOR - 4 * h * k * (1 - k);
+      if (!from) from = a.p.slice();
+      poseAt(a, SPRING, k, from); a.liveRate = 30; a.liveBox = 'air';
+    }
     a.y = FLOOR; a.pose = 'crouch';
+    if (!a.clone) a.sq = 0.08;
     G.fx.dust(a.x, FLOOR, 3, { speed: [30, 140], size: [5, 9], up: 20 });
   }
   // Down out of the air onto the floor, if it is up there.
@@ -1410,7 +1639,7 @@
       G.fx.burst(x, gy - 4, { n: 8, color: sh ? '150,140,190' : G.pal().hot, speed: [100, 340], angle: -Math.PI / 2, spread: 2.4, life: [0.15, 0.35], kind: 'spark', size: [1.4, 2.6], grav: 900 });
     }
     // it lands crouched over the heel, the weight carried down into one knee
-    a.sq = 0.16; a.pose = 'stuck';
+    a.sq = 0.16; a.pose = 'stuckDeep';
   }
   // Straight up through x from the floor: a deep crouch, then the cut, then a float down beside it.
   function* skyRise(a, tele) {
@@ -1496,7 +1725,7 @@
       yield* skyStrike(b, r3, (r3 ? 0.36 : 0.4) * T);
     }
     b.exposed = true;
-    if (b.pose !== 'stuck') b.pose = 'kneel';
+    if (b.pose !== 'stuck' && b.pose !== 'stuckDeep') b.pose = 'kneel';
     yield* wait(ph === 1 ? 0.9 : ph === 2 ? 0.8 : 0.7);
     b.exposed = false;
   }
@@ -1610,14 +1839,19 @@
   function* snareSet(under, wind, hold, stagger) {
     const b = B.body, P = G.player, ph = B.phase;
     b.face = P.x > b.x ? 1 : -1;
-    const W = POSES[under ? 'windUnder' : 'windOver'];
-    let e = 0;
+    // (v2.5c: two-handed, a knife in each with the thread between, so never the crescent's one-armed
+    // throw: under, both hands sink low and spread by the knees; over, both stretch wide over its head)
+    const W = under ? 'snareUnder' : 'snareOver';
+    const SK = [[0, null], [0.3, under ? 'crouch' : 'snareHold', E.outQuad], [0.78, W, E.inOutQuad], [1, W]];
+    let e = 0, from = null;
     while (e < wind) {
       e += yield;
       const k = Math.min(1, e / wind);
       if (k < 0.7 && Math.abs(P.x - b.x) > 20) b.face = P.x > b.x ? 1 : -1;
-      const p = mixPose(b, POSES.idle, W, 0.4 + 0.6 * E.inQuad(k));
-      if (k > 0.75) { p[1] += 2.5 * (k - 0.75) / 0.25; p[0] -= 0.06 * (k - 0.75) / 0.25; }
+      if (!from) from = b.p.slice();
+      const p = poseAt(b, SK, k, from);
+      b.liveRate = 30;
+      if (k > 0.75) { p[1] += 2.5 * (k - 0.75) / 0.25; p[0] -= 0.06 * (k - 0.75) / 0.25; tremble(p, 0.5, e); }
       if (!b.glinted && wind - e < 0.15) { b.glinted = true; G.fx.glint(b.x + b.face * b.p[7], b.y + b.p[8], 22, G.pal().hot, 0.18); G.audio.play('glint'); }
     }
     b.glinted = false;
@@ -1643,7 +1877,7 @@
         if (Math.abs(ox - fx) > 60) set.push([fx, THREAD_LOW, ox, THREAD_LOW]); // ankle threads outside the cross
       }
     }
-    b.pose = under ? 'flickUnder' : 'throwOver';
+    b.pose = under ? 'snareFlick' : 'snareCast';
     G.audio.play('arrowHeavy');
     b.recV = (b.recV || 0) + b.face * 1.2;
     const ox = b.x + b.face * 30, oy = b.y + (under ? -40 : -80), flyT = 0.2;
@@ -1653,10 +1887,18 @@
     yield* wait(flyT + 0.08);
     // it holds the slack in its fingers, and draws it tighter
     G.audio.play('veilstrain', { dur: hold - 0.1 });
-    b.pose = 'watch';
     const first = Math.min(...threads.map((h) => h.flyT + h.hold)), last = Math.max(...threads.map((h) => h.flyT + h.hold));
     e = flyT + 0.08;
-    while (e < first - 0.12) e += yield;
+    // (v2.5c: the fists come in to its chest and draw apart, leaning back into the strain; it shakes
+    // harder as the thread tightens)
+    const e0 = e, span = Math.max(0.01, first - 0.12 - e0);
+    while (e < first - 0.12) {
+      e += yield;
+      const k = G.clamp((e - e0) / span, 0, 1), p = poseAt(b, [[0, 'snareHold']], 0, null);
+      b.liveRate = k < 0.25 ? 18 : 30;
+      p[0] -= 0.1 * E.inQuad(k); p[1] += 1.5 * k; p[7] += 3 * k; p[10] -= 3 * k;
+      tremble(p, 0.2 + 0.8 * k * k, e);
+    }
     // the yank: its hand comes back hard as the threads go
     b.pose = 'pull'; b.recV = (b.recV || 0) - b.face * 1.4;
     while (e < last + 0.02) e += yield;
@@ -1708,8 +1950,8 @@
       }
       b.tapped = false;
     }
-    b.pose = 'crouch';
-    yield* wait(0.1);
+    // (v2.5c: from the last tap straight down into its coil, the blades still crossed)
+    yield* keys(b, 0.1, [[0, null], [1, 'danceCoil', E.outQuad]], { rate: 36 });
     for (let i = 0; i < n; i++) {
       const tele = (i === 0 ? 0.46 : ph === 3 ? 0.28 : 0.32) * T;
       yield* danceCut(tele, i === n - 1);
@@ -1742,12 +1984,14 @@
     if (s < -0.02) len = Math.min(len, (oy - 110) / -s);
     len = Math.max(len, Math.min(G.dist(ox, oy, tx, ty) + 40, 900));
     b.face = c >= 0 ? 1 : -1;
-    b.pose = b.y < FLOOR - 1 ? 'air' : 'crouch';
     cutLine(ox, oy, ang, len, tele);
-    yield* wait(Math.max(0, tele - 0.16));
+    // (v2.5c: coiled with the blades crossed, the body turning to lie along the line it will cut; at
+    // the glint the cross opens and it sinks to go)
+    const tilt = b.face > 0 ? ang : Math.PI - ang, lean = Math.atan2(Math.sin(tilt), Math.cos(tilt)) * 0.3;
+    const W = b.y < FLOOR - 1 ? 'airCoil' : 'danceCoil';
+    yield* keys(b, Math.max(0, tele - 0.16), [[0, null], [0.4, W, E.outQuad], [1, W]], { fx: (p, k) => { p[2] += lean * E.inOutQuad(k); } });
     G.fx.glint(b.x + b.face * 18, b.y - 44, 22, G.pal().hot, 0.16); G.audio.play('glint');
-    yield* wait(Math.min(tele, 0.16));
-    const tilt = b.face > 0 ? ang : Math.PI - ang;
+    yield* keys(b, Math.min(tele, 0.16), [[0, W], [1, W]], { rate: 40, fx: (p, k, e2) => { p[2] += lean; p[9] += 0.5 * k; p[12] -= 0.5 * k; p[1] += 2 * k; tremble(p, k, e2); } });
     POSES.streak = POSES.dash.slice(); POSES.streak[2] = Math.atan2(Math.sin(tilt), Math.cos(tilt));
     b.pose = 'streak'; G.audio.play('streak');
     const x0 = b.x, y0 = b.y;
@@ -1762,7 +2006,7 @@
     }
     G.fx.cut((x0 + x1) / 2, (y0 + y1) / 2 - 40, ang, len, 4, G.pal().boss, G.pal().hot, 0.3);
     if (b.y >= FLOOR - 1) {
-      b.y = FLOOR; b.pose = 'skid';
+      b.y = FLOOR; b.pose = 'skidOver';
       G.fx.dust(b.x, FLOOR, 4, { dir: b.face, speed: [60, 240], size: [6, 11], up: 30 });
     } else {
       // it hangs where the cut ended, turning back towards the hero
@@ -1894,12 +2138,17 @@
     b.face = P.x > b.x ? 1 : -1;
     // it sinks, and the dark comes in around it
     G.audio.play('veilmoon', { dur: 1.8 });
-    let e = 0;
+    // (v2.5c: as the light goes its arms open wide and its head comes up; then it sinks with both
+    // arms swept back behind it, and goes)
+    const MK = [[0, null], [0.4, 'moonSpread', E.outQuad], [1, 'moonSink', E.inQuad]];
+    let e = 0, from = null;
     while (e < 0.42) {
       e += yield;
       const k = Math.min(1, e / 0.42);
       B.dim = Math.max(B.dim || 0, E.inOutQuad(k));
-      const p = mixPose(b, POSES.crouch, POSES.coilUp, E.inQuad(k));
+      if (!from) from = b.p.slice();
+      const p = poseAt(b, MK, k, from);
+      b.liveRate = 30;
       p[1] += 3 * k;
     }
     // and up out of sight
@@ -1940,7 +2189,7 @@
     G.audio.play('streak');
     yield* tween(b, { y: FLOOR }, 0.2, E.inQuad);
     G.fx.thud(b.x, FLOOR, 0.9, { noCrack: true }); G.audio.play('land'); G.fx.shake(6);
-    b.pose = 'kneel'; b.exposed = true;
+    b.pose = 'kneel'; b.exposed = true; b.sq = 0.18;
     B.moon = false;
     yield* wait(ph === 1 ? 1.6 : ph === 2 ? 1.45 : 1.3);
     b.exposed = false;
@@ -2423,7 +2672,7 @@
   B.recover = function* (name) {
     const b = B.body, P = G.player;
     if (b.hidden || b.y < FLOOR - 1) return;
-    if (b.pose === 'stuck' || b.pose === 'kneel') {
+    if (b.pose === 'stuck' || b.pose === 'stuckDeep' || b.pose === 'kneel') {
       G.audio.play('tink');
       G.fx.dust(b.x, FLOOR, 4, { speed: [30, 150], size: [5, 9], up: 40 });
       G.fx.burst(b.x + b.face * 14, FLOOR - 6, { n: 6, color: G.pal().hot, speed: [100, 380], angle: -Math.PI / 2, spread: 1.6, life: [0.15, 0.35], kind: 'spark', size: [1.6, 3], grav: 800 });
@@ -2549,23 +2798,51 @@
     else b.pose = 'idle';
   };
 
+  const TGT = new Array(NP);
   function stepPose(a, dt) {
+    // (v2.5c) a pose that carries on into the next by itself (NEXT)
+    if (a.pose !== a.poseWas) { a.poseWas = a.pose; a.poseT = 0; } else a.poseT = (a.poseT || 0) + dt;
+    const nx = NEXT[a.pose];
+    if (nx && a.poseT >= nx[1]) { a.pose = a.poseWas = nx[0]; a.poseT = 0; }
     if (a.pose === 'run') a.runT += dt * 15;
-    const target = a.pose === 'run' ? runPose(a.runT) : a.pose === 'live' && a.live ? a.live : (POSES[a.pose] || POSES.idle);
-    const k = 1 - Math.exp(-(SNAP[a.pose] || 24) * dt);
+    let target = a.pose === 'run' ? runPose(a.runT) : a.pose === 'live' && a.live ? a.live : (POSES[a.pose] || POSES.idle);
+    const br = !a.clone && BREATH[a.pose];
+    if (br) {
+      // the chest rises and falls; the hands ride it a little
+      const s = Math.sin(G.t * br[1]) * br[0];
+      for (let i = 0; i < NP; i++) TGT[i] = target[i];
+      TGT[1] += s; TGT[0] -= s * 0.012; TGT[8] += s * 0.6; TGT[11] += s * 0.6;
+      target = TGT;
+    }
+    const rate = a.pose === 'live' ? (a.liveRate || 24) : (SNAP[a.pose] || 24);
+    const k = 1 - Math.exp(-rate * dt);
     for (let i = 0; i < NP; i++) a.p[i] += (target[i] - a.p[i]) * k;
   }
 
   B.tick = function (dt) {
     const b = B.body, P = G.player;
     stepPose(b, dt);
+    living(b, dt);
     if (b.vis == null) b.vis = 1;
     else if (b.vis < 1 && !b.fading && !b.hidden) b.vis = Math.min(1, b.vis + dt / 0.09);
     // (in its stance the scarf stops lifting and hangs)
     b.calm = G.damp(b.calm || 0, b.still ? 1 : 0, b.still ? 2.5 : 6, dt);
-    D.chainStep(B.scarf, b.x - b.face * 4, b.y + b.p[1] - 36, dt, { seg: 8, grav: 30 + 40 * b.calm, drift: 46 * (1 - 0.75 * b.calm), face: b.face, wave: 14 * (1 - 0.85 * b.calm), rate: 9 });
+    // the scarf: tied at the back of the neck where the drawing has it, and (v2.5c) carried on by its
+    // own weight through the body's starts, stops and landings, so it whips past and falls back
+    {
+      const o = liveOf(b), T = trunk(b, o), r = b.p[2] + (b.tilt || 0), fxw = K.faceX(b);
+      let lx = T.shx - 9 + o.hdx, ly = T.shy - 3 + o.hdy - b.p[1];
+      if (r) { const c = Math.cos(r), s = Math.sin(r), x2 = lx * c - ly * s; ly = lx * s + ly * c; lx = x2; }
+      const sv = B.scarfV || (B.scarfV = B.scarf.map(() => ({ x: 0, y: 0 }))), L = b.liv, ix = L ? L.ix : 0, iy = L ? L.iy : 0, n = B.scarf.length, keep = Math.exp(-5 * dt);
+      for (let i = 1; i < n; i++) {
+        const q = i / (n - 1), v = sv[i], pt = B.scarf[i];
+        v.x = v.x * keep - ix * 0.35 * q; v.y = v.y * keep - iy * 0.3 * q;
+        pt.x += v.x * dt; pt.y += v.y * dt;
+      }
+      D.chainStep(B.scarf, b.x + fxw * lx, b.y + b.p[1] + ly, dt, { seg: 8, grav: 30 + 40 * b.calm, drift: 46 * (1 - 0.75 * b.calm), face: b.face, wave: 14 * (1 - 0.85 * b.calm), rate: 9 });
+    }
     for (const a of [b].concat(B.clones)) a.gleam = G.damp(a.gleam || 0, a.still || a.held ? 1 : 0, 6, dt);
-    for (const c of B.clones) stepPose(c, dt);
+    for (const c of B.clones) { stepPose(c, dt); living(c, dt); }
     B.clones = B.clones.filter((c) => !c.gone);
     // the dark: full while the lights are out, thinner while it is staggered, gone when it dies
     if (!B.moon) B.dim = G.damp(B.dim || 0, 0, 2.2, dt);
@@ -2606,15 +2883,144 @@
     stand: [22, 18, 96, 0], low: [48, 32, 80, 0], drawHi: [56, 36, 78, 0], stuck: [60, 32, 56, 0],
     dive: [20, 20, 84, -20], air: [34, 18, 88, 0],
   };
-  const BODY_OF = { dash: 'low', skid: 'low', kneel: 'low', streak: 'low', drawHi: 'drawHi', stuck: 'stuck', dive: 'dive', air: 'air' };
+  const BODY_OF = { dash: 'low', skid: 'low', skidOver: 'low', kneel: 'low', streak: 'low', drawHi: 'drawHi', stuck: 'stuck', stuckDeep: 'stuck', dive: 'dive', air: 'air' };
   function bodyAt(a) {
-    const [fw, bk, top, bot] = BODY[BODY_OF[a.pose] || 'stand'], f = a.face || 1;
+    // (a keyed pose keeps the shape of the pose it stands in for: keys(o.box))
+    const [fw, bk, top, bot] = BODY[a.pose === 'live' ? (a.liveBox || 'stand') : (BODY_OF[a.pose] || 'stand')], f = a.face || 1;
     const l = f > 0 ? a.x - bk : a.x - fw, r = f > 0 ? a.x + fw : a.x + bk;
     return { cx: (l + r) / 2, cy: a.y - (top + bot) / 2, hw: (r - l) / 2, hh: (top - bot) / 2 };
   }
   B.extraTargets = function (out) {
     for (const c of B.clones) out.push(Object.assign({ id: c.id, kind: 'extra', ref: c }, bodyAt(c)));
   };
+
+  // ------------------------------------------------------------------ the living figure (v2.5c)
+  // Drawing only. Every part on its own spring over where the pose (a.p) puts it: the hips first, then
+  // the chest, the head on its neck and the loose point of the hood; each hand, each upper arm and each
+  // blade (a blade lags the hand through a fast cut and swings past before it settles); each thigh and
+  // ankle (a foot that lifts points its toe, a leg stretched behind rolls up onto the toe, a footfall
+  // sinks the hips); the half-cape and the sash as chains of joints, stiff at the shoulder and loose at
+  // the hem, thrown about by the body's starts, stops, landings and the blows it takes. a.p is never
+  // written: knives, cuts, boxes and the crescent read it. Each figure (the Veil, each shadow, the road's
+  // shade) keeps its own springs in a.liv; one with none (an afterimage copy) draws the bare pose.
+  const LN_UP = 15, LN_FORE = 15;
+  const CAPE_N = 4, CAPE_SEG = [14, 14, 9, 8], CAPE_REST = [2.05, 1.95, 1.75, 1.6];
+  const SASH_N = 3, SASH_SEG = [5, 5, 4.5], SASH_REST = [1.75, 1.85, 1.95];
+  const CAPE_W = new Array(CAPE_N), SASH_W = new Array(SASH_N);
+  const MOVING = { run: 1, dash: 1, streak: 1, drawHi: 1, dive: 1, air: 1, heel: 1 };
+  const NO_LIVE = { lean: 0, hip: 0, hipX: 0, br: 0, head: 0, hdx: 0, hdy: 0, tip: 0, tipY: 0, h0x: 0, h0y: 0, h1x: 0, h1y: 0, bl0: 0, bl1: 0, ua0: 0, ua1: 0, th0: 0, th1: 0, an0: 0, an1: 0, cape: null, sash: null };
+  const liveOf = (a) => (a.liv && a.liv.o) || NO_LIVE;
+  const angNear = (cur, t) => t + Math.round((cur - t) / G.TAU) * G.TAU; // t, unwrapped next to cur
+  // the shape a hanging cloth takes with nothing moving it (a cape follows the chest's lean a little)
+  function clothRest(out, rest, lean, k) { for (let i = 0; i < out.length; i++) out[i] = rest[i] + lean * k; return out; }
+  // where the pose and the springs put the hips and shoulders (the springs and the drawing share these)
+  function trunk(a, o) {
+    const p = a.p, lean = p[0] + o.lean, hip = p[1] + o.hip;
+    return { lean, hip, hipX: o.hipX, shx: o.hipX * 0.5 + Math.sin(lean) * 34, shy: hip - Math.cos(lean) * 34 + o.br, on: Math.abs(p[2]) < 0.3 };
+  }
+  function armRaw(a, o, T, i) {
+    const p = a.p, sx = T.shx + (i ? -4 : 4), sy = T.shy + 2;
+    const k = D.ik(sx, sy, p[7 + i * 3] + (i ? o.h1x : o.h0x), p[8 + i * 3] + (i ? o.h1y : o.h0y), LN_UP, LN_FORE, 1);
+    return { sx, sy, k, ang: Math.atan2(k.jy - sy, k.jx - sx) };
+  }
+  function legRaw(a, o, T, i) {
+    const p = a.p, rx = (i ? -3 : 3) + T.hipX, ry = T.hip, fx = p[3 + i * 2];
+    let fy = p[4 + i * 2], heel = 0;
+    // a planted foot the leg cannot reach (stretched out behind) comes up onto its toe
+    if (T.on && fy > -1.5) { heel = G.clamp(Math.hypot(fx - rx, fy - ry) - 37.5, 0, 6); fy -= heel; }
+    const k = D.ik(rx, ry, fx, fy, 20, 20, -1);
+    return { rx, ry, k, heel, lift: Math.max(0, -p[4 + i * 2]), ang: Math.atan2(k.jy - ry, k.jx - rx) };
+  }
+  // a hand as it is drawn, in the arena (for what the drawing lays in it: the crescent, the gleam, strings)
+  function handAt(a, i) {
+    const p = a.p, o = liveOf(a), j = i * 3;
+    return { x: a.x + a.face * (p[7 + j] + (i ? o.h1x : o.h0x)), y: a.y + p[8 + j] + (i ? o.h1y : o.h0y), an: p[9 + j] + (i ? o.bl1 : o.bl0) };
+  }
+  let livN = 0;
+  function living(a, dt) {
+    if (!a.p || dt <= 0) return;
+    let L = a.liv;
+    if (!L) L = a.liv = { R: D.rig(), cape: {}, sash: {}, vx: 0, vy: 0, skip: true, flash: 0, pose: a.pose, up: [false, false], ix: 0, iy: 0, ph: (livN++) * 2.399, o: Object.assign({}, NO_LIVE) };
+    const R = L.R, o = L.o, p = a.p, f = a.face || 1;
+    L.ix = 0; L.iy = 0;
+    // (out of sight, or just put somewhere: it starts again from the pose, unpushed)
+    if (a.hidden || a.gone || a.vis === 0) { L.fresh = true; return; }
+    if (L.fresh) { L.fresh = false; R.reset(); L.cape.a = null; L.sash.a = null; L.skip = true; for (const k in NO_LIVE) if (typeof NO_LIVE[k] === 'number') o[k] = 0; }
+    // the body's change of speed this frame (a push to every loose part), in its own frame
+    const ac = R.accel(a.x, a.y, dt);
+    let iF = 0, iY = 0, land = 0;
+    if (ac.vx == null) L.skip = true;
+    else {
+      if (!L.skip) {
+        const ix = G.clamp(ac.vx - L.vx, -2400, 2400), iy = G.clamp(ac.vy - L.vy, -2400, 2400);
+        iF = ix * f; iY = iy; L.ix = ix; L.iy = iy;
+        if (L.vy > 120 && iy < 0) land = Math.min(-iy, L.vy); // (a fall stopped short)
+      }
+      L.skip = false; L.vx = ac.vx; L.vy = ac.vy;
+    }
+    const vF = G.clamp(L.vx * f, -1800, 1800), vY = G.clamp(L.vy, -1800, 1800);
+    // a blow taken (it rocks away from it), a blow thrown (a pose it snaps into), a foot coming down
+    const fl = a.flash || 0, hit = fl > L.flash + 0.4 ? (G.sign(a.kx || 0) * f || -1) : 0;
+    L.flash = fl;
+    let blow = 0, strike = 0;
+    if (a.pose !== L.pose) { L.pose = a.pose; if ((SNAP[a.pose] || 0) >= 44) blow = 1; }
+    for (let i = 0; i < 2; i++) {
+      const fy = p[4 + i * 2];
+      if (L.up[i] && fy > -1.5) { strike++; R.kick('an' + i, -5); }
+      if (fy < -3) L.up[i] = true; else if (fy > -1.5) L.up[i] = false;
+    }
+    const sp = (k, t, w, z) => R.spring(k, t, dt, w, z);
+    // the hips: sunk by a landing, a footfall or the weight of its own blow, and back up
+    R.kick('hip', land * 0.09 + strike * 22 + blow * 16);
+    o.hip = G.clamp(sp('hip', p[1], 26, 0.42) - p[1], -5, 8);
+    // standing, the weight goes from foot to foot; the shoulders rise and fall with its breath
+    const rest = !MOVING[a.pose] && Math.abs(L.vy) < 30;
+    o.hipX = sp('hipX', rest ? Math.sin(G.t * 1.3 + L.ph) * (a.still ? 0.6 : 1.6) : 0, 9, 0.85);
+    o.br = -(0.5 + 0.5 * Math.sin(G.t * (a.clone ? 2.4 : 2.8) + L.ph)) * (rest ? 0.9 : 0.4);
+    // the chest: thrown back as the body drives off, pitched on as it stops, bowed by a landing
+    R.kick('lean', -iF * 0.0045 + land * 0.0012 + hit * 3.5 + blow * 1.2);
+    o.lean = G.clamp(sp('lean', p[0], 17, 0.5) - p[0], -0.5, 0.5);
+    const lw = p[0] + o.lean;
+    // the head rides its neck behind the chest, and nods against a running stride
+    R.kick('head', -iF * 0.007 + land * 0.002 + hit * 5);
+    const nod = a.pose === 'run' ? Math.sin((a.runT || 0) * 2) * 0.06 : 0;
+    o.head = G.clamp(sp('head', lw * 0.55 + nod, 12, 0.4) - lw * 0.55, -0.6, 0.6);
+    R.kick('hdx', -iF * 0.012 + hit * 30); R.kick('hdy', land * 0.02 + strike * 10);
+    o.hdx = G.clamp(sp('hdx', 0, 16, 0.45), -3.5, 3.5);
+    o.hdy = G.clamp(sp('hdy', 0, 18, 0.45), -3, 3);
+    // the hood's point, the loosest part of it: streams back at speed, flicks on as it stops
+    R.kick('tip', -iF * 0.05 + hit * 40); R.kick('tipY', land * 0.03 - iY * 0.01);
+    o.tip = G.clamp(sp('tip', -G.clamp(vF * 0.003, -2, 4), 11, 0.3), -6, 6);
+    o.tipY = G.clamp(sp('tipY', -G.clamp(vY * 0.003, -2, 4), 11, 0.3), -5, 5);
+    const T = trunk(a, o);
+    for (let i = 0; i < 2; i++) {
+      const j = i * 3, X = 'h' + i + 'x', Y = 'h' + i + 'y', BL = 'bl' + i, UA = 'ua' + i, TH = 'th' + i, AN = 'an' + i;
+      // the hand trails the pose a touch; the blade in it trails the hand and swings past
+      R.kick(X, -iF * 0.08 + hit * 40); R.kick(Y, land * 0.05 + strike * 6);
+      o[X] = G.clamp(sp(X, p[7 + j], 40, 0.55) - p[7 + j], -7, 7);
+      o[Y] = G.clamp(sp(Y, p[8 + j], 40, 0.55) - p[8 + j], -7, 7);
+      R.kick(BL, hit * 8 * (i ? -1 : 1));
+      o[BL] = G.clamp(sp(BL, p[9 + j], 32, 0.36) - p[9 + j], -0.75, 0.75);
+      // the upper arm on its own spring about the shoulder (the forearm takes up the difference)
+      const ar = armRaw(a, o, T, i), ua = R.s[UA] ? angNear(R.s[UA].x, ar.ang) : ar.ang;
+      o[UA] = G.clamp(sp(UA, ua, 36, 0.5) - ua, -0.28, 0.28);
+      // the thigh about the hip (a landing drives the knees forward); the ankle: toe down as the
+      // foot lifts, slapped flat as it lands
+      R.kick(TH, -land * 0.003 - strike * 0.6);
+      const lr = legRaw(a, o, T, i), th = R.s[TH] ? angNear(R.s[TH].x, lr.ang) : lr.ang;
+      o[TH] = G.clamp(sp(TH, th, 34, 0.5) - th, -0.35, 0.35);
+      o[AN] = G.clamp(sp(AN, lr.lift > 0.5 ? Math.min(0.85, 0.12 + lr.lift * 0.05) : 0, 24, 0.45), -0.5, 1.1);
+    }
+    // the cape and the sash: streamed back by speed, lifted by a fall, flung by every start and stop
+    const str = G.clamp(vF * 0.0009, -0.5, 1.15), fall = G.clamp(vY * 0.0007, -0.25, 0.9), calm = a.still ? 0.3 : 1;
+    const push = (iF * 0.004 - land * 0.001 + hit * 4) / dt;
+    clothRest(CAPE_W, CAPE_REST, lw, 0.55);
+    for (let i = 0; i < CAPE_N; i++) CAPE_W[i] += (str + fall) * (0.5 + 0.5 * i / (CAPE_N - 1)) + Math.sin(G.t * 3.1 + i * 0.9 + L.ph) * 0.05 * calm * (1 + i);
+    o.cape = D.angleChain(L.cape, CAPE_W, dt, { w0: 20, w1: 9, z0: 0.5, z1: 0.3, follow: 0.6, push });
+    clothRest(SASH_W, SASH_REST, lw, 0.3);
+    for (let i = 0; i < SASH_N; i++) SASH_W[i] += (str + fall) * 0.6 + Math.sin(G.t * 3.7 + i * 1.1 + L.ph) * 0.07 * calm * (1 + i);
+    o.sash = D.angleChain(L.sash, SASH_W, dt, { w0: 16, w1: 8, z0: 0.45, z1: 0.28, follow: 0.65, push: push * 1.2 });
+  }
 
   // ------------------------------------------------------------------ drawing
   function dagger(ctx, x, y, ang, col, hot, dim) {
@@ -2631,7 +3037,7 @@
 
   function figure(ctx, a, alpha) {
     const p = a.p, pal = G.pal(), col = pal.boss, hot = pal.hot, sh = !!a.clone;
-    const lean = p[0], hip = p[1];
+    const o = liveOf(a), T = trunk(a, o), lean = T.lean, hip = T.hip, hipX = T.hipX;
     const body = sh ? '#0a0814' : '#14112a', mid = sh ? '#0e0c1a' : '#262244', plate = sh ? '#131022' : '#3c3668';
     ctx.save();
     ctx.translate(a.x + (a.kx || 0) + (a.jit ? G.rand(-a.jit, a.jit) : 0), a.y);
@@ -2639,61 +3045,89 @@
     ctx.scale(K.faceX(a), 1); // (a turn narrows the figure through it: see K.turn; a shade just faces)
     ctx.globalAlpha = alpha;
     ctx.lineJoin = 'round'; ctx.lineCap = 'round';
-    if (p[2]) { ctx.translate(0, hip); ctx.rotate(p[2]); ctx.translate(0, -hip); }
-    if (a.tilt) { ctx.translate(0, hip); ctx.rotate(a.tilt); ctx.translate(0, -hip); } // laid along a line it dashes down (the echo's shadows)
+    if (p[2]) { ctx.translate(0, p[1]); ctx.rotate(p[2]); ctx.translate(0, -p[1]); }
+    if (a.tilt) { ctx.translate(0, p[1]); ctx.rotate(a.tilt); ctx.translate(0, -p[1]); } // laid along a line it dashes down (the echo's shadows)
     if (!sh) D.glow(ctx, col, 0, -44, 70, 0.22);
 
-    const shx = Math.sin(lean) * 34, shy = hip - Math.cos(lean) * 34; // shoulders
+    const shx = T.shx, shy = T.shy; // shoulders
     const leg = (i) => {
-      const hx = i ? -3 : 3, k = D.ik(hx, hip, p[3 + i * 2], p[4 + i * 2], 20, 20, -1);
+      const lr = legRaw(a, o, T, i), k = lr.k, th = lr.ang + (i ? o.th1 : o.th0);
+      const jx = lr.rx + Math.cos(th) * 20, jy = lr.ry + Math.sin(th) * 20; // (the knee, where its thigh's spring has it)
       ctx.fillStyle = i ? body : mid;
-      D.limb(ctx, hx, hip, k.jx, k.jy, 9, 6.5); ctx.fill();
-      D.limb(ctx, k.jx, k.jy, k.ex, k.ey - 2, 6.5, 4.5); ctx.fill();
-      // shin guard and a pointed boot
+      D.limb(ctx, lr.rx, lr.ry, jx, jy, 9, 6.5); ctx.fill();
+      D.limb(ctx, jx, jy, k.ex, k.ey - 2, 6.5, 4.5); ctx.fill();
+      // shin guard and a pointed boot: rolled up onto its toe by a stretched leg, toe pointed as it lifts
       ctx.fillStyle = i ? mid : plate;
-      D.poly(ctx, [k.jx + 2, k.jy + 1, G.lerp(k.jx, k.ex, 0.85) + 3.4, G.lerp(k.jy, k.ey, 0.85), G.lerp(k.jx, k.ex, 0.85) - 0.5, G.lerp(k.jy, k.ey, 0.85) + 1]); ctx.fill();
-      D.poly(ctx, [k.ex - 3.5, k.ey - 4, k.ex + 3, k.ey - 4.5, k.ex + 10, k.ey, k.ex - 3.5, k.ey]); ctx.fill();
+      D.poly(ctx, [jx + 2, jy + 1, G.lerp(jx, k.ex, 0.85) + 3.4, G.lerp(jy, k.ey, 0.85), G.lerp(jx, k.ex, 0.85) - 0.5, G.lerp(jy, k.ey, 0.85) + 1]); ctx.fill();
+      const fold = Math.min(1, lr.lift / 10);
+      ctx.save();
+      ctx.translate(k.ex, k.ey); ctx.rotate(Math.asin(Math.min(1, lr.heel / 10.5)) + (i ? o.an1 : o.an0));
+      D.poly(ctx, [-3.5, -4, 3, -4.5, 10 - 1.5 * fold, 0.6 * fold, -3.5, 0]); ctx.fill();
+      ctx.restore();
     };
     const arm = (i) => {
-      const sx = shx + (i ? -4 : 4), sy = shy + 2;
-      const k = D.ik(sx, sy, p[7 + i * 3], p[8 + i * 3], 15, 15, 1);
-      dagger(ctx, k.ex, k.ey, p[9 + i * 3], col, hot, sh);
+      const ar = armRaw(a, o, T, i), k = ar.k, ua = ar.ang + (i ? o.ua1 : o.ua0);
+      const sx = ar.sx, sy = ar.sy, jx = sx + Math.cos(ua) * LN_UP, jy = sy + Math.sin(ua) * LN_UP; // (the elbow, on its own spring)
+      dagger(ctx, k.ex, k.ey, p[9 + i * 3] + (i ? o.bl1 : o.bl0), col, hot, sh);
       ctx.fillStyle = i ? body : mid;
-      D.limb(ctx, sx, sy, k.jx, k.jy, 7, 5.5); ctx.fill();
-      D.limb(ctx, k.jx, k.jy, k.ex, k.ey, 5.5, 4.5); ctx.fill();
+      D.limb(ctx, sx, sy, jx, jy, 7, 5.5); ctx.fill();
+      D.limb(ctx, jx, jy, k.ex, k.ey, 5.5, 4.5); ctx.fill();
       // wrapped forearm
       ctx.strokeStyle = G.rgba(col, sh ? 0.25 : 0.6); ctx.lineWidth = 1.2;
       for (const q of [0.45, 0.7]) {
-        const wx = G.lerp(k.jx, k.ex, q), wy = G.lerp(k.jy, k.ey, q), nx = -(k.ey - k.jy), ny = k.ex - k.jx, nl = Math.hypot(nx, ny) || 1;
+        const wx = G.lerp(jx, k.ex, q), wy = G.lerp(jy, k.ey, q), nx = -(k.ey - jy), ny = k.ex - jx, nl = Math.hypot(nx, ny) || 1;
         D.line(ctx, wx - nx / nl * 2.6, wy - ny / nl * 2.6, wx + nx / nl * 2.6, wy + ny / nl * 2.6);
       }
     };
+    // a chain of cloth from (x, y), joint angles in the arena turned into the figure's own frame
+    const rot = p[2] + (a.tilt || 0);
+    const cloth = (x, y, ang, seg) => {
+      const pts = [{ x, y }];
+      for (let i = 0; i < ang.length; i++) { const an = ang[i] - rot; x += Math.cos(an) * seg[i]; y += Math.sin(an) * seg[i]; pts.push({ x, y }); }
+      return pts;
+    };
 
-    // cloak: a torn half-cape hanging from the shoulders
-    const sway = Math.sin(G.t * 3 + a.x * 0.01) * 2 - lean * 10;
+    // cloak: a torn half-cape hanging from the shoulders, its back edge a chain of springs and its hem
+    // hung from the waist after it
+    const capeA = o.cape || clothRest(CAPE_W, CAPE_REST, lean, 0.55);
+    const cp = cloth(shx - 9, shy + 2, capeA, CAPE_SEG), tip = cp[CAPE_N];
+    const wx = 3 + hipX, wy = hip + 2, ha = capeA[2] + 0.08 - rot, fx = wx + Math.cos(ha) * 19, fy = wy + Math.sin(ha) * 19;
+    const dx = tip.x - fx, dy = tip.y - fy, dl = Math.hypot(dx, dy) || 1, nx = dy / dl, ny = -dx / dl;
+    const cpts = [shx + 5, shy - 1, wx, wy, fx, fy, G.lerp(fx, tip.x, 0.33) - nx * 5, G.lerp(fy, tip.y, 0.33) - ny * 5, G.lerp(fx, tip.x, 0.66) + nx * 10, G.lerp(fy, tip.y, 0.66) + ny * 10];
+    for (let i = CAPE_N; i >= 0; i--) cpts.push(cp[i].x, cp[i].y);
+    cpts.push(shx - 7, shy - 2);
     ctx.fillStyle = sh ? '#07060e' : '#090812';
-    D.poly(ctx, [shx - 7, shy - 2, shx + 5, shy - 1, 3, hip + 2, -4 + sway, hip + 20, -10 + sway, hip + 12, -16 + sway * 1.3, hip + 24, -20 + sway * 1.4, hip + 10, -17 + sway, hip - 6, shx - 12, shy + 8]);
+    D.poly(ctx, cpts);
     ctx.fill();
     ctx.strokeStyle = G.rgba(col, sh ? 0.3 : 0.45); ctx.lineWidth = 1.1; ctx.stroke();
 
     leg(1); arm(1);
-    // torso: narrow waist, crossed straps
+    // torso: narrow waist, crossed straps; the spine bows as the chest lags (rounded as it pitches on,
+    // arched as it is thrown back) and the chest swells with each breath
+    const bow = G.clamp(o.lean * 7, -3, 3), chest = -o.br * 0.8;
+    const efx = shx + 8 - 5.5 - hipX, efy = shy - hip - 3, efl = Math.hypot(efx, efy) || 1;
+    const ebx = -5 + hipX - (shx - 6), eby = hip + 3 - (shy - 3), ebl = Math.hypot(ebx, eby) || 1;
+    const fo = 1 - bow * 0.5 + chest, bo = 0.4 + bow;
     ctx.fillStyle = mid;
-    D.poly(ctx, [-5, hip + 3, 5.5, hip + 3, shx + 8, shy, shx + 3, shy - 5, shx - 6, shy - 3]); ctx.fill();
+    D.poly(ctx, [-5 + hipX, hip + 3, 5.5 + hipX, hip + 3,
+      (5.5 + hipX + shx + 8) / 2 - efy / efl * fo, (hip + 3 + shy) / 2 + efx / efl * fo,
+      shx + 8, shy, shx + 3, shy - 5, shx - 6, shy - 3,
+      (shx - 6 - 5 + hipX) / 2 - eby / ebl * bo, (shy - 3 + hip + 3) / 2 + ebx / ebl * bo]); ctx.fill();
     ctx.strokeStyle = G.rgba(col, sh ? 0.3 : 0.75); ctx.lineWidth = 1.5;
-    D.line(ctx, -4.5, hip - 2, 5, hip - 3.5);
-    D.line(ctx, G.lerp(-4, shx - 4, 0.25), G.lerp(hip, shy, 0.25), G.lerp(5, shx + 7, 0.8), G.lerp(hip, shy, 0.8));
-    // sash ends
+    D.line(ctx, -4.5 + hipX, hip - 2, 5 + hipX, hip - 3.5);
+    D.line(ctx, G.lerp(-4 + hipX, shx - 4, 0.25), G.lerp(hip, shy, 0.25), G.lerp(5 + hipX, shx + 7, 0.8), G.lerp(hip, shy, 0.8));
+    // sash ends, on their own chain
     ctx.fillStyle = G.rgba(col, sh ? 0.3 : 0.85);
-    D.poly(ctx, [-4, hip - 2, -1, hip - 2, -5 + sway * 0.5, hip + 13, -8 + sway * 0.5, hip + 9]); ctx.fill();
+    D.ribbon(ctx, cloth(-2.5 + hipX, hip - 2, o.sash || clothRest(SASH_W, SASH_REST, lean, 0.3), SASH_SEG), 3.2, 1.6, 0); ctx.fill();
     leg(0);
 
-    // hood: a sharp cowl with the point swept back, over a mask with two eyes
-    const hx = shx + Math.sin(lean) * 9 + 2, hy = shy - Math.cos(lean) * 9 - 2;
+    // hood: a sharp cowl with the point swept back, over a mask with two eyes; the head rides its neck
+    // on its own spring, and the point of the cowl on another, looser
+    const hx = shx + Math.sin(lean) * 9 + 2 + o.hdx, hy = shy - Math.cos(lean) * 9 - 2 + o.hdy;
     ctx.save();
-    ctx.translate(hx, hy); ctx.rotate(lean * 0.55);
+    ctx.translate(hx, hy); ctx.rotate(lean * 0.55 + o.head);
     ctx.fillStyle = plate;
-    D.poly(ctx, [-8, 7, -10.5, -1, -8, -9, -17, -15, -3, -13.5, 5, -11.5, 10.5, -4, 10, 4, 6, 9, 0, 6.5]); ctx.fill();
+    D.poly(ctx, [-8, 7, -10.5, -1, -8, -9, -17 + o.tip, -15 + o.tipY, -3, -13.5, 5, -11.5, 10.5, -4, 10, 4, 6, 9, 0, 6.5]); ctx.fill();
     ctx.strokeStyle = G.rgba(col, sh ? 0.35 : 0.7); ctx.lineWidth = 1.1; ctx.stroke();
     ctx.fillStyle = '#020206';
     D.poly(ctx, [0, -8.5, 7.5, -6.5, 9.6, -1, 8.6, 4.5, 4.5, 6.5, 0.5, 2]); ctx.fill();
@@ -2772,8 +3206,8 @@
 
   // Where a figure's eyes are, near enough, for showing them through the dark.
   function eyeAt(a) {
-    const lean = a.p[0], hip = a.p[1];
-    return { x: a.x + a.face * (Math.sin(lean) * 34 + 7), y: a.y + hip - Math.cos(lean) * 34 - 13 };
+    const o = liveOf(a), T = trunk(a, o);
+    return { x: a.x + a.face * (T.shx + 7 + o.hdx), y: a.y + T.shy - 13 + o.hdy };
   }
   let darkCv = null;
   B.drawOver = function (ctx) {
@@ -2816,7 +3250,7 @@
       if ((a.gleam || 0) < 0.02) continue;
       const k = a.gleam * B.dark * (a.clone ? 0.75 : 1);
       if (a.held) { heldCrescent(ctx, a, k, true); continue; }
-      const hx = a.x + a.face * a.p[7], hy = a.y + a.p[8], an = a.face > 0 ? a.p[9] : Math.PI - a.p[9];
+      const hd = handAt(a, 0), hx = hd.x, hy = hd.y, an = a.face > 0 ? hd.an : Math.PI - hd.an;
       D.glow(ctx, pal.boss, hx, hy, 18, 0.7 * k);
       ctx.strokeStyle = G.rgba(pal.hot, 0.85 * k); ctx.lineWidth = 1.6; ctx.lineCap = 'round';
       D.line(ctx, hx + Math.cos(an) * 3, hy + Math.sin(an) * 3, hx + Math.cos(an) * 26, hy + Math.sin(an) * 26);
@@ -2905,8 +3339,8 @@
   function drawStrings(ctx, al) {
     const b = B.body;
     if (B.strings > 0.01 && !b.hidden && al > 0.01) {
-      const C = G.corrupt.COL, k = B.strings * al, p = b.p;
-      const h1x = b.x + b.face * p[7], h1y = b.y + p[8], h2x = b.x + b.face * p[10], h2y = b.y + p[11];
+      const C = G.corrupt.COL, k = B.strings * al, q0 = handAt(b, 0), q1 = handAt(b, 1);
+      const h1x = q0.x, h1y = q0.y, h2x = q1.x, h2y = q1.y;
       ctx.globalCompositeOperation = 'lighter'; ctx.lineWidth = 1.2;
       for (let j = 0; j < 4; j++) {
         const o = (j - 1.5) * 4.5;

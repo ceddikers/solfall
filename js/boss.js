@@ -24,11 +24,208 @@
   const HOME_Y = [0, 214, 214, 250];
 
   function mkHand(side) {
-    return {
+    return mkPose({
       id: 'hand' + side, side, x: 640 + side * 320, y: -120, rot: 0, curl: 0.12,
       ctrl: true, hurt: false, hurtDmg: 1, alive: true, flash: 0, stuck: false, hot: 0,
       hp: 1, maxHp: 1, broken: 0, // a hand that runs out of health lies broken for a while
+      fc: [0.12, 0.12, 0.12, 0.12], tc: 0.12, fp: 0, fpT: 0, // (drawn: each finger's curl, the thumb's, the index pointing)
+      rg: mkHandRig(), // (drawn: its bones)
+    });
+  }
+
+  // ------------------------------------------------------------------ the pose layer (v2.5c)
+  // Where a hand or the core is *drawn* can lead or trail where it *is*: a dip before a heave, a wrist
+  // cocked back, a squash on landing, a tremble, fingers that close one after another. Scripts set
+  // targets for it each step (o.pt: cleared before every step, so a pose lets go by itself when a move
+  // ends or is cut short) and kick it (o.pv); the drawn pose (o.pp) follows on springs a little under
+  // damped, so it lags, carries past once and settles. None of it moves a hit area: boxes, hazards and
+  // targets still come from x, y, rot and curl alone.
+  const PCH = ['x', 'y', 'r', 'c', 's', 'g'];
+  // x, y: offset (px); r: turn (rad); c: curl (a hand's fingers; below 0 they splay); s: stretch (taller
+  // and narrower above 0, squashed below); g: grow (both ways)
+  const PSPR = { x: [330, 22], y: [330, 22], r: [300, 20], c: [520, 34], s: [400, 18], g: [360, 17] };
+  const FRATE = [34, 27, 21, 16]; // (the fingers follow the hand's curl, the first finger first, the little one last)
+  function mkPose(o) {
+    o.pt = { x: 0, y: 0, r: 0, c: 0, s: 0, g: 0, sh: 0 };
+    o.pp = { x: 0, y: 0, r: 0, c: 0, s: 0, g: 0 };
+    o.pv = { x: 0, y: 0, r: 0, c: 0, s: 0, g: 0 };
+    o.shk = 0; o.tilt = 0; o.tiltV = 0; o.st = 0; o.va = 0; o.svx = 0; o.svy = 0; o.ox0 = o.x; o.oy0 = o.y;
+    return o;
+  }
+  function poseClear(o) { const t = o.pt; t.x = t.y = t.r = t.c = t.s = t.g = t.sh = 0; o.fpT = 0; }
+  // tiltK: how far the top of it trails sideways motion; stK: how fast it must go to stretch
+  function poseStep(o, dt, tiltK, stK) {
+    if (!(dt > 0)) return;
+    for (const ch of PCH) {
+      const sp = PSPR[ch];
+      o.pv[ch] += ((o.pt[ch] - o.pp[ch]) * sp[0] - o.pv[ch] * sp[1]) * dt;
+      o.pp[ch] += o.pv[ch] * dt;
+    }
+    o.shk = G.damp(o.shk, o.pt.sh, 14, dt);
+    // how fast it really moves (a jump of hundreds of px in one step is a teleport, not motion)
+    let vx = (o.x - o.ox0) / dt, vy = (o.y - o.oy0) / dt;
+    if (Math.abs(o.x - o.ox0) > 260 || Math.abs(o.y - o.oy0) > 260) vx = vy = 0;
+    o.ox0 = o.x; o.oy0 = o.y;
+    o.svx = G.damp(o.svx, G.clamp(vx, -5000, 5000), 30, dt); o.svy = G.damp(o.svy, G.clamp(vy, -5000, 5000), 30, dt);
+    // drawn out a little along its path when it moves fast
+    const sp = Math.hypot(o.svx, o.svy);
+    if (sp > 1) o.va = Math.atan2(o.svy, o.svx);
+    o.st = G.damp(o.st, G.clamp((sp - 500) / stK, 0, 0.09), 20, dt);
+    // a hanging weight: its top trails behind sideways motion and swings past once when it stops
+    if (tiltK) {
+      const tt = G.clamp(-o.svx * tiltK, -0.2, 0.2) * (o.hurt ? 0.35 : 1);
+      o.tiltV += ((tt - o.tilt) * 150 - o.tiltV * 9) * dt;
+      o.tilt += o.tiltV * dt;
+    }
+    if (o.fc) {
+      const cd = G.clamp(o.curl + o.pp.c, -0.3, 1);
+      for (let i = 0; i < 4; i++) o.fc[i] = G.damp(o.fc[i], cd, FRATE[i], dt);
+      o.tc = G.damp(o.tc, cd, 20, dt);
+      o.fp = G.damp(o.fp, o.fpT, 16, dt);
+    }
+  }
+  // a tremble with no per-frame randomness in it: two sines, out of step
+  const NOPOSE = { x: 0, y: 0, r: 0, c: 0, s: 0, g: 0 };
+  const quiver = (t, s) => Math.sin(t * 61 + s) * 0.62 + Math.sin(t * 37.3 + s * 2.1) * 0.38;
+
+  // ------------------------------------------------------------------ the bones (v2.5c, drawing only)
+  // Under the pose layer, every piece on its own spring: each finger a chain of three joints (the thumb
+  // two) that fold one after another, fling apart as the hand lets go and trail a fast move; the wrist
+  // bends between the palm and the stub of void below it, which trails two wisps; the palm flops on the
+  // wrist when the hand stops short; the core's halo, corona, rim, eye and iris each lag and settle on
+  // their own; the Pendulum's chain bows and whips; the shards rock one after another. Kept on h.rg and
+  // c.rg and stepped after the pose (rigStep). No hit area reads any of it, and nothing in it draws a
+  // random number, so a seeded fight plays out exactly as before. A hand with no rig (the Afterhands'
+  // fist) is drawn from its curl alone.
+  const FJ = [1.4, 1.5, 0.9], FSEG = [0.44, 0.32, 0.24], FW = [23, 21.5, 19.5]; // a finger: fold per joint at a full fist, bone lengths, widths
+  const TJ = [0.62, 0.72], TSEG = [0.62, 0.38], TW = [23, 21];                  // the thumb
+  const SPLAY = [-1, -0.35, 0.35, 1];                                           // how far each finger leans out as they spread
+  function sprung(o, t, dt, w, z) { // one value on a spring (sub-stepped as js/draw.js does)
+    const n = Math.max(1, Math.ceil(w * dt / 0.35)), s = dt / n;
+    for (let i = 0; i < n; i++) { o.v += ((t - o.x) * w * w - 2 * z * w * o.v) * s; o.x += o.v * s; }
+    if (!isFinite(o.x) || !isFinite(o.v)) { o.x = t; o.v = 0; }
+    return o.x;
+  }
+  const sp0 = (x) => ({ x: x || 0, v: 0 });
+  const clampSp = (o, m) => { if (o.x > m) { o.x = m; if (o.v > 0) o.v = 0; } else if (o.x < -m) { o.x = -m; if (o.v < 0) o.v = 0; } };
+  function bones(st, want, dt, o) { // G.draw.angleChain, guarded: a chain that ever goes wrong starts over from its pose
+    const a = G.draw.angleChain(st, want, dt, o);
+    for (let i = 0; i < a.length; i++) if (!isFinite(a[i]) || !isFinite(st.v[i]) || Math.abs(a[i]) > 6) { st.a = null; return G.draw.angleChain(st, want, 0, o); }
+    return a;
+  }
+  function mkHandRig() {
+    return {
+      fin: [0, 1, 2, 3].map(() => ({ c: {}, l: {} })), th: { c: {}, l: {} }, wisp: [{}, {}],
+      spread: sp0(), wr: sp0(), fl: sp0(), w3: [0, 0, 0], w5: [0, 0, 0, 0, 0],
+      pvx: 0, pvy: 0, kx: 0, pR: null, pcd: null,
     };
+  }
+  function mkCoreRig() {
+    return {
+      pvx: 0, pvy: 0, pk: 0,
+      hx: sp0(), hy: sp0(), kx: sp0(), ky: sp0(), rx: sp0(), ry: sp0(), sx: sp0(), sy: sp0(), // offsets: halo, corona, rim, eye
+      ex: sp0(), ey: sp0(), dx: sp0(), dy: sp0(), tw: sp0(),  // the rim's wobble; the corona's flames leaning back, its twist
+      lid: sp0(1), ix: sp0(), iy: sp0(), b1: sp0(), b2: sp0(), // the lid, the iris; the chain's bow and whip
+      sh: {}, w6: [0, 0, 0, 0, 0, 0],
+    };
+  }
+  function handRig(h, dt) {
+    const g = h.rg;
+    if (!g || !h.alive || !(dt > 0)) return;
+    const pp = h.pp, R = h.rot + pp.r + (h.tilt || 0), cs = Math.cos(R), sn = Math.sin(R), sd = h.side, t = B.t;
+    // how it moves (from its smoothed speed), put in the hand's own frame: fingers up, thumb to the left
+    const ax = G.clamp((h.svx - g.pvx) / dt, -14000, 14000), ay = G.clamp((h.svy - g.pvy) / dt, -14000, 14000);
+    g.pvx = h.svx; g.pvy = h.svy;
+    const alx = (ax * cs + ay * sn) * sd, aly = -ax * sn + ay * cs, vlx = (h.svx * cs + h.svy * sn) * sd;
+    // a blow landing on it (its knock-back, or a tremble a script puts in it) jolts it sideways
+    const kj = G.clamp(((h.kx || 0) - g.kx) / dt, -4000, 4000), klx = kj * cs * sd; g.kx = h.kx || 0;
+    let dR = g.pR == null ? 0 : G.angDiff(g.pR, R) / dt; g.pR = R; dR = G.clamp(dR, -30, 30);
+    // the curl it is told to make, and how fast it opens or closes
+    const cd = G.clamp(h.curl + pp.c, -0.3, 1), dc = g.pcd == null ? 0 : G.clamp((cd - g.pcd) / dt, -60, 60); g.pcd = cd;
+    // letting go fast flings the fingers apart (closing fast bunches them), and they settle back
+    sprung(g.spread, Math.max(0, -cd) * 1.4, dt, 10, 0.34);
+    g.spread.v += (Math.max(0, -dc - 1.5) * 10 - Math.max(0, dc - 1.5) * 3) * dt;
+    if (g.spread.x > 1.6) { g.spread.x = 1.6; g.spread.v = Math.min(0, g.spread.v); } else if (g.spread.x < -0.6) { g.spread.x = -0.6; g.spread.v = Math.max(0, g.spread.v); }
+    const drag = G.clamp(-vlx * 0.00011, -0.32, 0.32), push = -alx * 0.0032, cpush = aly * 0.0025 + Math.abs(alx) * 0.0004, w = g.w3;
+    for (let i = 0; i < 4; i++) {
+      let fc = G.clamp(h.fc[i], -0.3, 1);
+      if (i === 0 && h.fp > 0.01) fc = G.lerp(fc, -0.12, h.fp);
+      fc += 0.035 * Math.sin(t * 1.25 + i * 0.85 + sd) * (1 - Math.abs(fc)); // (a slow ripple through them at rest)
+      const f = g.fin[i];
+      // folding: the knuckle first, the tip last, each tip swinging a little past
+      for (let k = 0; k < 3; k++) w[k] = FJ[k] * fc;
+      bones(f.c, w, dt, { w0: 36, w1: 21, z0: 0.55, z1: 0.3, follow: 0.3, push: cpush });
+      // leaning in the plane: trailing a fast move, thrown by a stop or a blow
+      for (let k = 0; k < 3; k++) w[k] = drag * (0.22 + 0.14 * k);
+      bones(f.l, w, dt, { w0: 30, w1: 17, z0: 0.5, z1: 0.27, follow: 0.45, push });
+      if (klx) for (let k = 0; k < 3; k++) f.l.v[k] -= klx * 0.0011 * (0.5 + 0.25 * k);
+    }
+    const tc = G.clamp(h.tc, -0.3, 1), th = g.th, w2 = [TJ[0] * tc, TJ[1] * tc];
+    bones(th.c, w2, dt, { w0: 30, w1: 19, z0: 0.55, z1: 0.32, follow: 0.3, push: cpush });
+    w2[0] = drag * 0.2; w2[1] = drag * 0.3;
+    bones(th.l, w2, dt, { w0: 26, w1: 16, z0: 0.5, z1: 0.3, follow: 0.45, push });
+    // the wrist: the stub below the palm trails the way it moves and the way it turns, and holds back
+    // against a cocked palm; the palm itself flops forward on the wrist when the hand stops short
+    sprung(g.wr, G.clamp(vlx * 0.00017 - (pp.r * 0.45 + dR * 0.035) * sd, -0.55, 0.55), dt, 10, 0.3);
+    g.wr.v += alx * 0.0016 * dt + klx * 0.0012;
+    clampSp(g.wr, 0.7);
+    sprung(g.fl, 0, dt, 13, 0.38);
+    g.fl.v -= alx * 0.0011 * dt + klx * 0.0006;
+    clampSp(g.fl, 0.12);
+    // two wisps of void off the end of it: stiff at the root, loose at the tip
+    const wd = G.clamp(vlx * 0.00028, -0.8, 0.8) - g.wr.x * 0.5, w5 = g.w5;
+    for (let s = 0; s < 2; s++) {
+      for (let k = 0; k < 5; k++) w5[k] = wd * 0.2 + 0.06 * Math.sin(t * 1.7 + k * 0.9 + s * 2.3 + sd);
+      bones(g.wisp[s], w5, dt, { w0: 16, w1: 8, z0: 0.42, z1: 0.3, follow: 0.7, push: alx * 0.0012 });
+    }
+  }
+  function coreRig(c, dt) {
+    const g = c.rg;
+    if (!g || !(dt > 0)) return;
+    const ax = G.clamp((c.svx - g.pvx) / dt, -14000, 14000), ay = G.clamp((c.svy - g.pvy) / dt, -14000, 14000);
+    g.pvx = c.svx; g.pvy = c.svy;
+    // each part lags the disc by its own amount and swings back past it: the halo of light loosest
+    const off = (ox, oy, k, w, z, m) => {
+      sprung(ox, 0, dt, w, z); sprung(oy, 0, dt, w, z);
+      ox.v -= ax * k * dt; oy.v -= ay * k * dt;
+      const d = Math.hypot(ox.x, oy.x);
+      if (d > m) { ox.x *= m / d; oy.x *= m / d; }
+    };
+    off(g.hx, g.hy, 0.5, 7.5, 0.4, 30);
+    off(g.kx, g.ky, 0.35, 10, 0.36, 20);
+    off(g.rx, g.ry, 0.22, 17, 0.42, 6);
+    off(g.sx, g.sy, 0.3, 13, 0.3, c.r * 0.1);
+    // the rim stretches along a hard start or stop and wobbles back; a blow landing squashes it
+    sprung(g.ex, 0, dt, 15, 0.22); sprung(g.ey, 0, dt, 15, 0.22);
+    g.ex.v += (Math.abs(ax) - Math.abs(ay)) * 0.0003 * dt; g.ey.v += (Math.abs(ay) - Math.abs(ax)) * 0.0003 * dt;
+    const dk = (c.kick || 0) - g.pk; g.pk = c.kick || 0;
+    if (dk > 0.04) { g.ex.v += dk * 1.4; g.ey.v -= dk * 1.4; g.sy.v += dk * 60; }
+    clampSp(g.ex, 0.06); clampSp(g.ey, 0.06);
+    // the corona's flames lean back from the way it moves, and the ring of them twists a little
+    sprung(g.dx, G.clamp(-c.svx * 0.012, -26, 26), dt, 7, 0.42); sprung(g.dy, G.clamp(-c.svy * 0.012, -26, 26), dt, 7, 0.42);
+    g.dx.v -= ax * 0.004 * dt; g.dy.v -= ay * 0.004 * dt;
+    clampSp(g.dx, 34); clampSp(g.dy, 34);
+    sprung(g.tw, G.clamp(c.svx * 0.00022, -0.2, 0.2), dt, 5.5, 0.32);
+    g.tw.v += ax * 0.00002 * dt; clampSp(g.tw, 0.3);
+    // the lid opens wide past where it is told and settles (it is never drawn more shut than told,
+    // so the blinks that count the lances stay as crisp as they were); the iris overshoots a glance
+    const lidT = (c.blink > 0 ? Math.max(0.06, Math.abs(c.blink / 0.17 * 2 - 1)) : 1) * c.open;
+    sprung(g.lid, lidT, dt, 30, 0.5); clampSp(g.lid, 1.18);
+    sprung(g.ix, c.lx, dt, 20, 0.38); sprung(g.iy, c.ly, dt, 20, 0.38);
+    clampSp(g.ix, 1.3); clampSp(g.iy, 1.3);
+    // the Pendulum's chain bows away from a sideways pull and whips back
+    let ap = 0;
+    if (B.chain && !B.chain.snap) {
+      const ux = PIV_X - c.x, uy = PIV_Y - c.y, L = Math.hypot(ux, uy) || 1;
+      ap = (ax * -uy + ay * ux) / L;
+    }
+    sprung(g.b1, 0, dt, 6, 0.22); sprung(g.b2, 0, dt, 15, 0.3);
+    g.b1.v -= ap * 0.04 * dt; g.b2.v += ap * 0.02 * dt;
+    clampSp(g.b1, 45); clampSp(g.b2, 16);
+    // the shards rock one after another as it moves
+    const w6 = g.w6;
+    for (let i = 0; i < 6; i++) w6[i] = 0;
+    bones(g.sh, w6, dt, { w0: 14, w1: 9, z0: 0.35, z1: 0.25, follow: 0.5, push: -ax * 0.0012 });
   }
 
   B.reset = function () {
@@ -45,6 +242,7 @@
       vx: 0, vy: 0, swell: 0, swellT: 0, swellV: 0, flA: 0, flK: 0, // (the Flare and the Sunspot)
       crA: -Math.PI / 2, crK: 0, daze: 0, hurtDmg: 0, // (the Corona's crown, the Charge's daze, v2.1a)
     };
+    mkPose(B.core); B.core.rg = mkCoreRig();
     B.spots = []; B.orbit = []; B.above = 0;
     B.hands = [mkHand(-1), mkHand(1)];
     for (const h of B.hands) h.hp = h.maxHp = Math.round(B.maxHp * 0.07);
@@ -225,6 +423,7 @@
       drops.push(tween(h, { x: G.clamp(c.x + h.side * 310, 110, 1170), y: FLOOR - 56, rot: h.side * 0.55, curl: 0.35 }, 0.48, E.inCubic));
     }
     yield* par(...drops);
+    c.pv.s -= 2.6; for (const h of B.hands) if (usable(h)) { h.pv.s -= 2; h.pv.c -= 2; } // (it lands with its weight, v2.5c)
     G.fx.shake(10); G.audio.play('boom');
     G.fx.burst(c.x, FLOOR - 6, { n: 16, color: '190,190,210', speed: [60, 300], angle: -Math.PI / 2, spread: 3, life: [0.3, 0.7], size: [3, 7] });
     let e = 0;
@@ -389,6 +588,7 @@
       drops.push(tween(h, { x: G.clamp(cx + h.side * 310, 110, 1170), y: FLOOR - 56, rot: h.side * 0.55, curl: 0.35 }, 0.56, E.inCubic));
     }
     yield* par(...drops);
+    c.pv.s -= 2.6; for (const h of B.hands) if (h.alive) { h.pv.s -= 2; h.pv.c -= 2; }
     G.fx.shake(12); G.audio.play('boom');
     G.fx.burst(c.x, FLOOR - 6, { n: 16, color: '190,190,210', speed: [60, 300], angle: -Math.PI / 2, spread: 3, life: [0.3, 0.7], size: [3, 7] });
     yield* wait(0.15);
@@ -608,23 +808,40 @@
     let e = 0;
     // heavy: the fist glows and trembles all the way up. It lands for two, and a second wave follows the first.
     const trackT = o.track * T * (o.heavy ? 1.2 : 1);
+    // (v2.5c) Each form has its own body from the first moment it comes over:
+    //   plain: a tight fist upright, drawn up a little as it clenches (one finger after another)
+    //   heavy: the fist swells, its wrist turned back, glowing and trembling all the way
+    //   late:  plain until the lock, where it already starts to open and cock back as it rises
     while (e < trackT) {
       const dt = yield;
       e += dt;
-      if (o.heavy) { h.hot = 1; h.kx = G.rand(-6, 6); if (Math.random() < dt * 40) G.fx.spawn({ x: h.x + G.rand(-50, 50), y: h.y + G.rand(-40, 60), vx: G.rand(-30, 30), vy: -G.rand(40, 140), life: G.rand(0.3, 0.6), size: G.rand(2, 4.5), color: DANGER, wob: 50, rot: G.rand(0, 6) }); }
+      const k = e / trackT, g = E.outCubic(Math.min(1, k / 0.35));
+      if (o.heavy) {
+        h.hot = 1; h.pt.g = 0.09 * g; h.pt.r = h.side * 0.3 * g; h.pt.sh = 3 + 2.5 * k;
+        if (Math.random() < dt * 40) G.fx.spawn({ x: h.x + G.rand(-50, 50), y: h.y + G.rand(-40, 60), vx: G.rand(-30, 30), vy: -G.rand(40, 140), life: G.rand(0.3, 0.6), size: G.rand(2, 4.5), color: DANGER, wob: 50, rot: G.rand(0, 6) });
+      } else {
+        h.pt.y = -12 * Math.sin(Math.PI * Math.min(1, k / 0.5)); h.pt.s = 0.03 * g;
+      }
       const tx = G.clamp(P.x + P.vx * 0.14, WL + 80, WR - 80);
       h.x = G.damp(h.x, tx, 7.5, dt); h.y = G.damp(h.y, 226, 7, dt);
       h.curl = G.damp(h.curl, 1, 12, dt); h.rot = G.damp(h.rot, 0, 12, dt);
       m.x = h.x; m.k = e / trackT * 0.7;
     }
     m.locked = true; h.hot = 1;
-    const y0 = h.y, lockT = 0.27 * T;
+    const y0 = h.y, lockT = 0.27 * T, lift = o.late ? 58 : 36;
     e = 0;
     while (e < lockT) {
       e += yield;
       const k = Math.min(1, e / lockT);
-      h.y = y0 - (o.late ? 58 : 36) * E.outCubic(k);
+      h.y = y0 - lift * E.outCubic(k);
       m.k = 0.7 + 0.3 * k;
+      // drawn: the weight settles first (a short dip, squashed), then it hauls up, slowing as it rises
+      const dip = k < 0.3 ? Math.sin(Math.PI * k / 0.3) : 0, up = E.outCubic(G.clamp((k - 0.12) / 0.88, 0, 1));
+      h.pt.y = y0 + 14 * dip - lift * up - h.y;
+      h.pt.s = -0.07 * dip + 0.05 * up * (1 - 0.6 * k);
+      if (o.heavy) { h.pt.g = 0.09; h.pt.r = h.side * (0.3 + 0.16 * up); h.pt.sh = 5.5; }
+      else if (o.late) { h.pt.r = -h.side * 0.14 * up; h.pt.c = -0.22 * up; h.pt.sh = 1.5 * up; }
+      else { h.pt.r = h.side * 0.1 * up; h.pt.sh = k > 0.6 ? 1.2 : 0; }
     }
     if (o.late) {
       // the delayed blow (v2.1a): it draws up higher and hangs there, knuckles cocked back, opening and
@@ -633,32 +850,38 @@
         h.y = y0 - 58 - 8 * Math.sin(Math.PI * k);
         h.rot = -h.side * 0.18 * Math.sin(Math.PI * k);
         h.curl = 1 - 0.3 * Math.sin(Math.PI * Math.min(1, k * 1.6));
-        h.kx = G.rand(-2, 2) * k;
+        h.pt.r = -h.side * 0.14 * (1 - k * k); h.pt.c = -0.22 * (1 - k); h.pt.sh = 1.5 + 1.5 * k;
       });
       h.curl = 1; h.rot = 0;
     }
     h.hurt = true; h.hurtDmg = o.heavy ? 2 : 1;
-    yield* tween(h, { y: FLOOR - 64 }, 0.085, E.inQuad);
+    // the fall: it speeds up all the way, drawn out by it (and the cocked wrist whips straight)
+    yield* par(tween(h, { y: FLOOR - 64 }, 0.085, E.inQuad), during(0.085, () => { h.pt.s = 0.07; if (o.heavy) h.pt.g = 0.09; }));
     m.dead = true;
+    // it lands: squashed on the floor, a small rebound, the fingers jarred
+    h.pv.s -= o.heavy ? 2.6 : 2; h.pv.y -= o.heavy ? 70 : 110; h.pv.c -= 1.5;
     impactFx(h.x, !!o.heavy);
     H.shockwave(h.x - 56, -1, o.wave, 46);
     H.shockwave(h.x + 56, 1, o.wave, 46);
     yield* wait(0.07);
     h.hurt = false; h.hot = 0; h.stuck = true;
     if (o.heavy) {
-      yield* wait(0.42);
+      // the heat still in it: it pounds the floor once more, from where it lies
+      yield* during(0.42, (k) => { h.pt.s = -0.05 * E.inQuad(k); h.pt.y = -10 * E.inQuad(k); h.pt.sh = 2.5 * k; });
       G.fx.shake(8); G.audio.play('boom');
+      h.pv.s -= 2; h.pv.y += 120;
       H.shockwave(h.x - 56, -1, o.wave, 46);
       H.shockwave(h.x + 56, 1, o.wave, 46);
       yield* wait(0.4); // it took more out of the hand: it is stuck for longer
     }
-    // stuck fast: it strains to pull free, and tears loose at the end
+    // stuck fast: it strains to pull free (bunching down against the floor), and tears loose at the end
     if (o.stuck > 0.3) {
       const sy = h.y;
       yield* during(o.stuck, (k, dt, q) => {
         h.kx = Math.sin(q * 31) * (0.6 + 2.2 * k * k);
         h.rot = Math.sin(q * 6.5) * 0.05 * k;
-        if (k > 0.82) h.y = G.lerp(sy, sy - 22, E.outQuad((k - 0.82) / 0.18));
+        if (k < 0.82) h.pt.s = -0.05 * E.inQuad(k / 0.82);
+        else { h.y = G.lerp(sy, sy - 22, E.outQuad((k - 0.82) / 0.18)); h.pt.s = 0.05; }
         if (Math.random() < dt * (3 + 8 * k)) G.fx.dust(h.x + G.rand(-56, 56), FLOOR, 1, { speed: [10, 60], size: [4, 8], up: 20, a: 0.3 });
       });
       h.rot = 0;
@@ -678,7 +901,15 @@
     H.lane({ x: WL, y: FLOOR - 116, w: WR - WL, h: 116, dir, dur: tele });
     G.audio.play('charge', { dur: tele });
     h.hot = 1;
-    yield* tween(h, { x: fromX - dir * 26 }, tele, E.outCubic);
+    // (v2.5c) the wind-up: it coils, fingers drawing in to a scoop, crouches and leans back from the way
+    // it will go; then holds there, trembling more and more
+    const xs = h.x;
+    yield* during(tele, (k) => {
+      h.x = G.lerp(xs, fromX - dir * 26, E.outCubic(k));
+      const q = E.inOutQuad(Math.min(1, k / 0.55));
+      h.pt.c = 0.38 * q; h.pt.r = -dir * 0.22 * q; h.pt.s = -0.06 * q;
+      h.pt.sh = k > 0.65 ? 2.6 * (k - 0.65) / 0.35 : 0;
+    });
     h.hurtDmg = 1;
     G.audio.play('sweep');
     const dur = 0.66, x0 = h.x;
@@ -688,6 +919,8 @@
       // a beat of grace as it starts, so a jump on the flash clears it even right beside the hand
       h.hurt = e > 0.09;
       h.x = G.lerp(x0, toX, E.inOutQuad(Math.min(1, e / dur)));
+      // (it uncoils: fingers flat and splayed, dragging along the floor)
+      h.pt.c = -0.2;
       // (did the hero go over it? the Sweep's return answers a jump)
       if (seen && !G.player.onGround && Math.abs(h.x - G.player.x) < 80) seen.jumped = true;
       G.fx.shake(2.5);
@@ -695,14 +928,19 @@
       G.fx.burst(h.x - dir * 40, FLOOR - G.rand(10, 100), { n: 1, color: G.pal().boss, speed: [40, 200], angle: dir > 0 ? Math.PI : 0, spread: 0.8, life: [0.2, 0.4], size: [3, 6] });
     }
     h.hurt = false; h.hot = 0;
+    // its weight carries it a little past where it stops, and it settles back
+    h.pv.x += dir * 220;
+    G.fx.dust(h.x + dir * 50, FLOOR, 3, { dir, speed: [30, 160], size: [6, 10], up: 30 });
   }
 
   function* sweep(h, back, branch) {
     const T = G.diff().tele;
     h.ctrl = true;
     const fromX = h.side > 0 ? WR - 70 : WL + 70, toX = h.side > 0 ? WL + 70 : WR - 70;
-    // the hand lies on its side, low enough that one jump clears it
+    // the hand lies on its side, low enough that one jump clears it (it comes down with its weight, v2.5c)
     yield* tween(h, { x: fromX, y: FLOOR - 58, curl: 0.3, rot: -h.side * Math.PI / 2 }, 0.5);
+    h.pv.s -= 1.6; h.pv.c -= 2;
+    G.fx.dust(h.x, FLOOR, 3, { speed: [20, 120], size: [6, 10], up: 30 });
     const seen = {};
     yield* sweepOnce(h, fromX, toX, 0.8 * T, seen);
     if (back) {
@@ -720,6 +958,7 @@
         h.x = toX + dir * 10 * Math.sin(Math.PI * k);
         h.curl = 0.3 + 0.4 * Math.sin(Math.PI * k);
       });
+      h.pv.s -= 1.4;
       yield* sweepOnce(h, toX, fromX, 0.5 * T);
     }
     yield* wait(0.35);
@@ -741,11 +980,15 @@
     G.audio.play('charge', { dur: 0.95 * T });
     let e = 0;
     const tt = 0.65 * T;
+    // (v2.5c) two open palms held wide, fingers splayed, leaning back further and further: the silhouette
+    // only the Clap has; at the lock they draw back and up, arms cocked, and hold, trembling
     while (e < tt) {
       const dt = yield;
       e += dt;
       cx = G.damp(cx, G.clamp(P.x, 200, 1080), 5.5, dt);
       L.x = cx - 340; R.x = cx + 340; m.x = cx; m.k = e / tt * 0.7;
+      const k = e / tt;
+      for (const h of [L, R]) { h.pt.c = -0.22 * Math.min(1, k * 2); h.pt.r = h.side * 0.14 * E.inOutQuad(k); h.pt.y = 4 * Math.sin(B.t * 5 + h.side); }
     }
     m.locked = true; L.hot = R.hot = 1;
     const lockT = 0.3 * T;
@@ -755,9 +998,19 @@
       const k = Math.min(1, e / lockT);
       L.x = cx - 340 - 44 * E.outCubic(k); R.x = cx + 340 + 44 * E.outCubic(k);
       m.k = 0.7 + 0.3 * k;
+      for (const h of [L, R]) {
+        h.pt.c = -0.26; h.pt.r = h.side * (0.14 + 0.22 * E.outCubic(k)); h.pt.y = -14 * E.outCubic(k);
+        h.pt.s = 0.04 * k; h.pt.sh = k > 0.55 ? 2 : 0;
+      }
     }
-    yield* par(tween(L, { x: cx - 60, rot: 0 }, 0.1, E.inQuad), tween(R, { x: cx + 60, rot: 0 }, 0.1, E.inQuad));
+    // shut: they swing in, faster and faster, leaning into it
+    yield* par(
+      tween(L, { x: cx - 60, rot: 0 }, 0.1, E.inQuad), tween(R, { x: cx + 60, rot: 0 }, 0.1, E.inQuad),
+      during(0.1, () => { for (const h of [L, R]) { h.pt.r = -h.side * 0.1; h.pt.c = -0.1; } })
+    );
     m.dead = true;
+    // the palms meet: squeezed, they bounce apart a little and settle back, fingers flung open
+    for (const h of [L, R]) { h.pv.x += h.side * 380; h.pv.s += 2.2; h.pv.c -= 4; }
     crush(cx, FLOOR - 107, 112, 112, 2); // (from the tips of the longest fingers, 8 px under them, to the floor)
     const pal = G.pal();
     G.audio.play('clap');
@@ -797,7 +1050,7 @@
       const tele = (i === 0 ? 0.85 : 0.55) * T;
       c.charge = 1;
       G.audio.play('charge', { dur: tele });
-      H.beam({
+      const bm = H.beam({
         ox: c.x, oy: c.y, ang: Math.atan2(P.y - 22 - c.y, P.x - c.x),
         tele, lock: 0.28 * T, active: 0.34, width: 42,
         follow(b, dt) {
@@ -808,7 +1061,17 @@
           }
         },
       });
-      yield* wait(tele + 0.34 + (i < n - 1 ? 0.1 : 0.3));
+      // (v2.5c, drawn only) it draws itself in as the lance gathers and trembles once it is locked; the
+      // throw jolts it back off the line, and its free hands with it
+      let thrown = false;
+      yield* during(tele + 0.34 + (i < n - 1 ? 0.1 : 0.3), (k, dt, e) => {
+        if (e < tele) { const q = e / tele; c.pt.g = -0.045 * E.inOutQuad(q); c.pt.sh = q > 0.68 ? 1.3 : 0; }
+        else if (!thrown) {
+          thrown = true;
+          c.pv.x -= Math.cos(bm.ang) * 320; c.pv.y -= Math.sin(bm.ang) * 320; c.pv.g += 1.4;
+          for (const h of usableHands()) if (!h.ctrl) { h.pv.x -= Math.cos(bm.ang) * 200; h.pv.y -= Math.sin(bm.ang) * 200; h.pv.c -= 2; }
+        }
+      });
     }
     c.charge = 0;
   }
@@ -826,9 +1089,13 @@
     const gap = [0, 0.27, 0.23, 0.19][B.phase];
     c.charge = 1;
     G.audio.play('charge', { dur: 0.5 * T });
-    yield* wait(0.5 * T);
+    // (v2.5c, drawn only) it sinks and squats before it throws; each throw upward heaves it down a
+    // little, and its raised hands pump with it
+    yield* during(0.5 * T, (k) => { const q = E.inOutQuad(k); c.pt.y = 14 * q; c.pt.s = -0.06 * q; });
     for (let i = 0; i < n; i++) {
       G.audio.play('orb');
+      c.pv.y += 200; c.pv.s += 1.3;
+      for (const h of usableHands()) if (!h.ctrl) { h.pv.y -= 230; h.pv.c -= 2.5; }
       G.fx.spawn({ x: c.x + G.rand(-30, 30), y: c.y - c.r, vx: G.rand(-120, 120), vy: -1100, life: 0.4, size: 12, color: G.pal().boss });
       const x = i % 2 === 0
         ? G.clamp(P.x + P.vx * 0.35 + G.rrand(-24, 24), WL + 50, WR - 50)
@@ -862,8 +1129,12 @@
       c.charge = 1;
       G.audio.play('charge', { dur: tt });
       let e = 0;
-      while (e < tt) { e += yield; c.pulse = Math.min(1, e / tt); }
+      // (v2.5c, drawn only) it draws in on itself as the ring gathers, trembling at the last, and the
+      // ring bursts out of it with a swell (its free hands clench close, then are flung wide)
+      while (e < tt) { e += yield; c.pulse = Math.min(1, e / tt); c.pt.g = -0.07 * E.inQuad(c.pulse); c.pt.sh = c.pulse > 0.75 ? 1.4 : 0; }
       c.pulse = 0;
+      c.pv.g += 2.2;
+      for (const h of usableHands()) if (!h.ctrl) { h.pv.x += h.side * 300; h.pv.c -= 5; }
       H.ring({ x: c.x, y: c.y, r: c.r, speed: gentle() ? 440 : 530, thick: 26, maxR: 1000 });
       G.audio.play('ring'); G.fx.shake(8);
       yield* wait(0.5);
@@ -894,7 +1165,14 @@
         });
         first = false;
       }
-      yield* wait(0.85 * T + 0.1);
+      // (v2.5c) upside down at the top of the view, the fingers draw in to claws and the hands pull up as
+      // the columns fill; as they burst the hands rake down, fingers flung open
+      let raked = false;
+      yield* during(0.85 * T + 0.1, (k, dt, e) => {
+        const q = Math.min(1, e / (0.85 * T));
+        for (const h of [L, R]) { h.pt.c = 0.45 * E.inOutQuad(q); h.pt.y = -16 * E.outQuad(q); h.pt.sh = q > 0.75 ? 1.8 : 0; }
+        if (!raked && q >= 1) { raked = true; for (const h of [L, R]) { h.pv.y += 520; h.pv.c -= 7; } }
+      });
       parity = 1 - parity;
     }
     yield* wait(0.55);
@@ -912,14 +1190,21 @@
     const m = H.lane({ x: WL, y: h.y - 64, w: WR - WL, h: 128, dir, dur: total });
     G.audio.play('charge', { dur: total });
     let e = 0;
+    // (v2.5c) a fist on its side at the wall, knuckles leading: it settles back against the stone as it
+    // follows the hero up and down, rumbling
     while (e < 0.62 * T) {
       const dt = yield;
       e += dt;
       h.y = G.damp(h.y, aimY(), 6, dt);
       m.y = h.y - 64;
+      h.pt.x = h.side * 8 * E.outQuad(Math.min(1, e / (0.62 * T))); h.pt.sh = 0.8;
     }
     h.hot = 1;
-    yield* tween(h, { x: sx + h.side * 34 }, 0.28 * T, E.outCubic);
+    // the pull-back: it winds tight against the wall like a spring, wrist twisting back, trembling harder
+    yield* par(tween(h, { x: sx + h.side * 34 }, 0.28 * T, E.outCubic), during(0.28 * T, (k) => {
+      const q = E.outQuad(k);
+      h.pt.s = 0.09 * q; h.pt.r = h.side * 0.28 * q; h.pt.x = h.side * 8 * (1 - k); h.pt.sh = 1 + 2.6 * k;
+    }));
     h.hurt = true; h.hurtDmg = 1;
     G.audio.play('streak');
     const tx = h.side > 0 ? WL + 60 : WR - 60, x0 = h.x;
@@ -930,6 +1215,7 @@
       G.fx.burst(h.x - dir * 60, h.y + G.rand(-40, 40), { n: 2, color: G.pal().boss, speed: [40, 240], angle: dir > 0 ? Math.PI : 0, spread: 0.7, life: [0.2, 0.5], size: [4, 9] });
     }
     h.hurt = false; h.hot = 0; h.stuck = true;
+    h.pv.s += 2.4; h.pv.x -= dir * 260; // (squashed against the far wall, it rebounds a little and settles into it)
     G.fx.shake(16); G.fx.punch(0.02); G.audio.play('slam');
     G.fx.dust(h.x + dir * 50, h.y, 9, { dir: -dir, speed: [80, 420], size: [9, 16], life: [0.5, 1], up: 90, a: 0.42, jitter: 40 });
     G.fx.burst(h.x + dir * 50, h.y, { n: 10, color: '22,18,32', speed: [150, 520], angle: dir > 0 ? Math.PI : 0, spread: 2.2, life: [0.6, 1.1], size: [5, 10], kind: 'chunk', grav: 1500 });
@@ -944,13 +1230,22 @@
   function* atkTide() {
     const c = B.core, T = G.diff().tele;
     G.ui.hint('tide', 'The floor will burn. Get onto a platform');
-    c.charge = 1;
+    c.charge = 1; B.tideLit = false;
     G.audio.play('charge', { dur: 1.45 * T });
     H.zone({
       x: WL, y: FLOOR - 34, w: WR - WL, h: 34, tele: 1.45 * T, active: 2.7, style: 'tide', popVy: -780,
       onFire() { G.audio.play('tide'); G.fx.shake(7); },
     });
-    yield* wait(1.45 * T + 0.3);
+    // it sinks and bears down as the floor fills (its free hands press it), and heaves up as it burns
+    const tt = 1.45 * T;
+    yield* during(tt + 0.3, (k, dt, e) => {
+      const q = E.inOutQuad(Math.min(1, e / tt));
+      if (e < tt) { c.pt.y = 18 * q; c.pt.s = -0.06 * q; c.pt.sh = q > 0.8 ? 1.3 : 0; }
+      else if (!B.tideLit) {
+        B.tideLit = true; c.pv.y -= 340; c.pv.g += 1.2;
+        for (const h of usableHands()) if (!h.ctrl) { h.pv.y += 260; h.pv.c -= 4; }
+      }
+    });
     yield* lances(hard() ? 2 : 1);
     yield* wait(0.9);
   }
@@ -976,8 +1271,10 @@
     e = 0;
     while (e < lockT) { e += yield; m.k = 0.7 + 0.3 * Math.min(1, e / lockT); }
     c.hurt = true;
-    yield* tween(c, { y: FLOOR - c.r + 16 }, 0.16, E.inQuad);
+    // (v2.5c, drawn only) drawn out by the fall, squashed flat by the floor, and it settles
+    yield* par(tween(c, { y: FLOOR - c.r + 16 }, 0.16, E.inQuad), during(0.16, () => { c.pt.s = 0.07; }));
     m.dead = true;
+    c.pv.s -= 3; c.pv.g += 0.6;
     impactFx(c.x, true);
     crushCore(2);
     H.shockwave(c.x - 90, -1, 600, 54);
@@ -989,17 +1286,20 @@
     }
     yield* wait(0.08);
     c.hurt = false; c.embedded = true; c.open = 0.25;
-    yield* wait(hard() ? 1.2 : 1.6);
+    // stuck in the floor it strains to rise (bunching), and heaves itself up out of it
+    yield* during(hard() ? 1.2 : 1.6, (k) => { c.pt.s = -0.05 * E.inQuad(k); c.pt.sh = k > 0.75 ? 1.6 : 0; });
     c.embedded = false; c.open = 1;
+    c.pv.s += 1.6;
     yield* tween(c, { y: HOME_Y[3] }, 0.7, E.outCubic);
   }
 
   function* atkStorm() {
-    const T = G.diff().tele, P = G.player;
+    const T = G.diff().tele, P = G.player, c = B.core;
     const n = hard() ? 9 : 7;
     B.shardsOut = true;
     G.audio.play('charge', { dur: 0.4 });
-    yield* wait(0.4);
+    // (v2.5c, drawn only) it draws in as the shards fly out to their places, and each line it throws jolts it
+    yield* during(0.4, (k) => { c.pt.g = -0.06 * E.outQuad(k); c.pt.sh = 1.2 * k; });
     // aimed lines to step away from, then one flat line along the ground to jump
     const angles = [0.55, -0.55, 1.1, -1.1, Math.PI / 2];
     let lastA = null;
@@ -1014,7 +1314,8 @@
         ox: px - dx * 1500, oy: py - dy * 1500, ang: a, tele: 0.62 * T, lock: 0.16 * T,
         active: 0.14, fade: 0.22, width: 30, clip: false, sfx: 'streak', shake: 3, maxLen: 3000,
       });
-      yield* wait(hard() ? 0.32 : 0.4);
+      c.pv.g += 0.7; c.pv.x -= dx * 90; c.pv.y -= dy * 90;
+      yield* during(hard() ? 0.32 : 0.4, () => { c.pt.g = -0.03; });
     }
     yield* wait(0.62 * T + 0.3);
     B.shardsOut = false;
@@ -1037,12 +1338,16 @@
         follow(b) { b.ox = c.x; b.oy = c.y; },
       });
     }
-    yield* wait(T);
+    // (v2.5c, drawn only) it winds itself back against the way it will turn, squeezed and trembling,
+    // and the turn starting throws it the other way; while the beams turn it leans into them
+    yield* during(T, (k) => { const q = E.inOutQuad(k); c.pt.x = -dir * 10 * q; c.pt.g = -0.05 * q; c.pt.sh = k > 0.7 ? 1.4 : 0; });
+    c.pv.x += dir * 260; c.pv.g += 1.4;
     c.spinHint = 0;
     let e = 0, next = 1.0, hum = 0.5;
     while (e < total) {
       const dt = yield;
       e += dt; next -= dt; hum -= dt;
+      c.pt.x = dir * 6;
       if (hum <= 0) { hum = 0.48; G.audio.play('beam'); }
       if (next <= 0 && !gentle()) {
         next = 1.2;
@@ -1069,6 +1374,7 @@
       const dx = c.x - P.x;
       G.wind = Math.abs(dx) > 14 ? G.sign(dx) * 140 : 0;
       c.jit = 1 + 3 * e / tele;
+      c.pt.g = -0.1 * E.inQuad(e / tele); // (v2.5c, drawn only: it draws in on itself)
       for (let i = 0; i < 2; i++) {
         const a = G.rand(0, G.TAU), r = G.rand(R * 0.7, R + 160);
         G.fx.spawn({ x: c.x + Math.cos(a) * r, y: c.y + Math.sin(a) * r, vx: -Math.cos(a) * r * 1.6, vy: -Math.sin(a) * r * 1.6, life: 0.5, size: 4, color: G.pal().boss, kind: 'spark' });
@@ -1076,8 +1382,9 @@
     }
     G.wind = 0; c.charge = 0; c.jit = 0;
     G.fx.flash(G.pal().hot, 0.35, 0.4); G.fx.punch(0.04);
-    c.open = 0.12;
-    yield* wait(hard() ? 1.0 : 1.4);
+    c.open = 0.12; c.pv.g += 3;
+    // spent, it sags
+    yield* during(hard() ? 1.0 : 1.4, (k) => { c.pt.y = 10 * E.outQuad(Math.min(1, k * 3)); c.pt.s = -0.04; });
     c.open = 1;
   }
 
@@ -1106,6 +1413,10 @@
     h.ctrl = true;
     const n = (B.phase === 1 ? 3 : 4) + (hard() ? 1 : 0), aimT = 0.36 * T;
     yield* tween(h, { x: h.side > 0 ? WR - 170 : WL + 170, y: 250, curl: 0.75, rot: -h.side * 0.9 }, 0.5);
+    // (v2.5c) a pointing hand, the only one it has: the first finger straightens and the hand turns to
+    // aim it at the mark, draws back along the line and tightens; the flick snaps it back the other way
+    let aimR = 0;
+    const point = (a, u) => { h.fpT = 1; aimR = G.clamp(G.angDiff(h.rot, a + Math.PI / 2), -1.3, 1.3); h.pt.r = aimR * u; };
     for (let i = 0; i < n; i++) {
       h.hot = 1;
       G.audio.play('charge', { dur: aimT });
@@ -1117,13 +1428,20 @@
         ctx.setLineDash([]);
         ctx.beginPath(); ctx.arc(tx, ty, 16, 0, G.TAU); ctx.stroke();
       });
-      yield* wait(aimT);
+      yield* during(aimT, (k) => {
+        const a = Math.atan2(ty - h.y, tx - h.x), u = E.outCubic(Math.min(1, k / 0.6));
+        point(a, i === 0 ? u : 1);
+        h.pt.x = -Math.cos(a) * 12 * u; h.pt.y = -Math.sin(a) * 12 * u;
+        h.pt.c = 0.15 * u; h.pt.sh = k > 0.7 ? 1.4 : 0;
+      });
       m.dead = true;
       const a = Math.atan2(ty - h.y, tx - h.x);
       H.orb(h.x + Math.cos(a) * 40, h.y + Math.sin(a) * 40, Math.cos(a) * 600, Math.sin(a) * 600, { r: 14 });
       G.audio.play('orb');
-      h.kx = -Math.cos(a) * 16; h.hot = 0;
-      yield* wait(0.3);
+      h.hot = 0;
+      h.pv.x -= Math.cos(a) * 480; h.pv.y -= Math.sin(a) * 480; h.pv.c -= 3; h.pv.r -= aimR * 2.5;
+      // it stays pointing where it threw, then (between throws) follows the hero round
+      yield* during(0.3, (k) => { point(Math.atan2(P.y - 22 - h.y, P.x - h.x), 1); });
     }
     yield* wait(0.45);
   }
@@ -1148,7 +1466,19 @@
         tele: tele + i * gap, lock: tele + i * gap, active: 0.26, fade: 0.2, width: 40, clip: false, shake: 6,
       });
     });
-    yield* wait(tele + (order.length - 1) * gap + 0.45);
+    // (v2.5c) flat palms on the walls, one low and one high, fingers splayed wide and pressed back into
+    // the stone (not the curled scoop of the Sweep); the one about to fire squeezes and trembles, and
+    // each is thrown back against its wall as its beam goes
+    const fired = order.map(() => false);
+    yield* during(tele + (order.length - 1) * gap + 0.45, (k, dt, e) => {
+      const g = E.outCubic(Math.min(1, e / (tele * 0.6)));
+      for (const h of [lo, hi]) { h.pt.c = -0.28 * g; h.pt.x = h.side * 7 * g; h.pt.sh = 1.2 * g; }
+      order.forEach((h, i) => {
+        const at = tele + i * gap;
+        if (!fired[i] && e >= at) { fired[i] = true; h.pv.x += h.side * 320; h.pv.c -= 4; }
+        else if (!fired[i] && at - e < 0.32) { h.pt.s = 0.06; h.pt.c = -0.1; h.pt.sh = 2.8; }
+      });
+    });
     lo.hot = hi.hot = 0;
     yield* wait(0.3);
   }
@@ -1173,10 +1503,14 @@
           ctx.beginPath(); ctx.moveTo(c.x + Math.cos(a) * r0, c.y + Math.sin(a) * r0); ctx.lineTo(c.x + Math.cos(a) * r1, c.y + Math.sin(a) * r1); ctx.stroke();
         }
       });
-      yield* wait(aimT);
+      // (v2.5c, drawn only) it draws up and in as it aims, then is thrown back up by the fan it throws
+      // down; its spread hands sweep in with it
+      yield* during(aimT, (k) => { c.pt.y = -10 * E.outQuad(k); c.pt.g = -0.035 * k; c.pt.sh = k > 0.75 ? 1 : 0; });
       m.dead = true;
       for (const a of angs) H.orb(c.x + Math.cos(a) * c.r, c.y + Math.sin(a) * c.r, Math.cos(a) * speed, Math.sin(a) * speed, { r: 12 });
       G.audio.play('orb'); G.fx.shake(4); c.kick = 0.7;
+      c.pv.y -= 240; c.pv.g += 1;
+      for (const h of usableHands()) if (!h.ctrl) { h.pv.x -= h.side * 260; h.pv.r -= h.side * 2; }
       yield* wait(0.5);
     }
     c.charge = 0;
@@ -1197,14 +1531,24 @@
     G.audio.play('charge', { dur: tt });
     L.hot = R.hot = 1;
     let e = 0;
+    // (v2.5c) two fists, knuckles turned in toward the hero between them: they heave up together, set
+    // themselves (bunching, heavier) and hold, trembling, until they drop
     while (e < tt) {
       e += yield;
       const k = Math.min(1, e / tt);
       mL.k = mR.k = k; mL.locked = mR.locked = k > 0.7;
+      const up = k < 0.35 ? E.outQuad(k / 0.35) : 1 - E.inOutQuad(Math.min(1, (k - 0.35) / 0.4));
+      for (const h of [L, R]) {
+        h.pt.y = -26 * up; h.pt.r = -h.side * 0.26 * E.outCubic(Math.min(1, k / 0.4));
+        h.pt.s = k > 0.35 ? -0.06 * Math.min(1, (k - 0.35) / 0.4) : 0.04 * up;
+        h.pt.sh = k > 0.7 ? 2.6 : 0;
+      }
     }
     L.hurt = R.hurt = true; L.hurtDmg = R.hurtDmg = 1;
-    yield* par(tween(L, { y: FLOOR - 64 }, 0.09, E.inQuad), tween(R, { y: FLOOR - 64 }, 0.09, E.inQuad));
+    yield* par(tween(L, { y: FLOOR - 64 }, 0.09, E.inQuad), tween(R, { y: FLOOR - 64 }, 0.09, E.inQuad),
+      during(0.09, () => { L.pt.s = R.pt.s = 0.06; }));
     mL.dead = mR.dead = true;
+    for (const h of [L, R]) { h.pv.s -= 2; h.pv.y -= 100; h.pv.c -= 1.5; }
     impactFx(cx - half, false); impactFx(cx + half, false);
     yield* wait(0.07);
     L.hurt = R.hurt = false; L.hot = R.hot = 0; L.stuck = R.stuck = true;
@@ -1242,9 +1586,18 @@
     h.hot = 1;
     G.audio.play('charge', { dur: tt });
     H.zone({ x: pl.x - 4, y: pl.top - 200, w: pl.w + 8, h: 204, tele: tt, active: 0.1, fade: 0.15, style: 'column' });
-    yield* tween(h, { y: pl.top - 286 }, tt, E.outCubic);
+    // (v2.5c) a backhand: after a short dip the wrist turns right back as it rises, and holds, trembling;
+    // it whips straight on the way down and carries through
+    yield* par(tween(h, { y: pl.top - 286 }, tt, E.outCubic), during(tt, (k) => {
+      const dip = k < 0.22 ? Math.sin(Math.PI * k / 0.22) : 0;
+      h.pt.y = 12 * dip; h.pt.s = -0.06 * dip;
+      h.pt.r = h.side * 0.55 * E.outCubic(G.clamp((k - 0.1) / 0.6, 0, 1));
+      h.pt.sh = k > 0.72 ? 2 : 0;
+    }));
     h.hurt = true; h.hurtDmg = 1;
-    yield* tween(h, { y: pl.top - 60 }, 0.08, E.inQuad);
+    h.pv.r -= h.side * 4;
+    yield* par(tween(h, { y: pl.top - 60 }, 0.08, E.inQuad), during(0.08, () => { h.pt.s = 0.06; }));
+    h.pv.s -= 1.8; h.pv.y -= 90;
     G.arena.dropPlatform(pl, hard() ? 8 : 5.5);
     G.fx.shake(15); G.audio.play('slam');
     G.fx.ring(px, pl.top, { r0: 20, r1: 180, life: 0.4, color: G.pal().hot, width: 8 });
@@ -1291,7 +1644,9 @@
       ctx.setLineDash([]);
       ctx.restore();
     });
-    yield* wait(T);
+    // (v2.5c, drawn only) it settles, squat and heavy, as the ring of blades widens round it
+    yield* during(T, (k) => { c.pt.s = -0.06 * E.inOutQuad(k); c.pt.sh = k > 0.75 ? 1.2 : 0; });
+    c.pv.g += 1.4;
     B.haloHurt = true;
     G.audio.play('sweep');
     const dur = hard() ? 6.5 : 5.5;
@@ -1324,8 +1679,8 @@
       c.charge = 1;
       G.audio.play('charge', { dur: tt });
       let e = 0;
-      while (e < tt) { e += yield; c.pulse = Math.min(1, e / tt); }
-      c.pulse = 0;
+      while (e < tt) { e += yield; c.pulse = Math.min(1, e / tt); c.pt.g = -0.08 * E.inQuad(c.pulse); c.pt.sh = c.pulse > 0.7 ? 1.8 : 0; }
+      c.pulse = 0; c.pv.g += 2.6;
       H.ring({ x: c.x, y: c.y, r: c.r, speed: gentle() ? 440 : 530, thick: 26, maxR: 1000 });
       G.audio.play('ring'); G.fx.shake(8);
       yield* wait(0.55);
@@ -1385,8 +1740,10 @@
       h.ctrl = true; h.stuck = false;
       moves.push(tween(h, { x: spots ? spots[0] : (h.side < 0 ? 420 : 860), y: FLOOR - 74, rot: 0, curl: 0 }, 0.6, E.inOutCubic));
     });
+    // (v2.5c) the hands hop up and come down hard to plant themselves, palms out, fingers spread
+    moves.push(during(0.6, (k) => { for (const h of hands) { h.pt.y = -34 * Math.sin(Math.PI * Math.min(1, k * 1.12)); h.pt.c = -0.2 * k; } }));
     yield* par(...moves);
-    for (const h of hands) { G.fx.thud(h.x, FLOOR, 1.1); h.stuck = true; }
+    for (const h of hands) { G.fx.thud(h.x, FLOOR, 1.1); h.stuck = true; h.pv.s -= 2.2; h.pv.c -= 3; }
     G.fx.shake(9); G.audio.play('slam');
     const shades = hands.map((h) => (h.x < 640 ? { x0: WL, x1: h.x - 62 } : { x0: h.x + 62, x1: WR }));
     const tele = 1.7 * T, active = 0.55;
@@ -1446,7 +1803,18 @@
         }
       },
     });
-    yield* wait(tele + active + 0.3);
+    // the planted hands brace against the light (leaning away from the core, fingers digging in), and the
+    // core, high up, swells and trembles as it fills; as it burns they are rocked back
+    let rocked = false;
+    yield* during(tele + active + 0.3, (k, dt, e) => {
+      const q = Math.min(1, e / tele);
+      for (const h of hands) {
+        h.pt.r = (h.x < 640 ? -1 : 1) * 0.14 * E.inOutQuad(q); h.pt.c = 0.25 * q; h.pt.s = -0.05 * q;
+        h.pt.sh = q > 0.75 && q < 1 ? 1.6 : 0;
+      }
+      if (e < tele) { c.pt.g = 0.05 * E.inQuad(q); c.pt.sh = q > 0.8 ? 1.4 : 0; }
+      else if (!rocked) { rocked = true; c.pv.g -= 1.5; for (const h of hands) { h.pv.r += (h.x < 640 ? -1 : 1) * 2.5; h.pv.s -= 1.2; } }
+    });
     c.charge = 0;
     // the hands stay planted a moment longer: time to hit one
     yield* wait(hard() ? 0.8 : 1.2);
@@ -2404,6 +2772,29 @@
       h.rot = G.damp(h.rot, h.side * 0.3, 6, dt); h.curl = G.damp(h.curl, 0.3, 6, dt);
     }
   }
+  // A free hand's part in what the core alone is doing (v2.5c), each its own shape, so the hands say it
+  // too: lances, raised and drawn in toward the core with the palms turned out, fingers spread, as if
+  // drawing the light between them; rain, lifted, open, fingers up, heaving with each throw; the rings,
+  // clenching and drawn in as a ring gathers, flung open as it goes; the burning floor, pressed down
+  // flat, fingers out along it; the fan, turned out wide, fingers splayed. Drawn only, eased in and out
+  // (h.gk), and kept close to where the hand really drifts, which is where it can be struck.
+  function gesture(h, dt) {
+    const c = B.core, s = h.side, n = B.attackName;
+    // (the Tide presses the floor until it burns, then throws its lances like the Lance)
+    const tidePress = n === 'tide' && !B.tideLit;
+    let g = null;
+    if (n === 'lance' || n === 'lance3' || (n === 'tide' && !tidePress)) g = [-s * 22, -18, s * 0.5, -0.24, 0];
+    else if (n === 'rain') g = [-s * 10, -24, s * 0.3, -0.22, 0.03];
+    else if (n === 'pulse') { const p = c.pulse || 0; g = [-s * 26 * E.inQuad(p), 6 * p, -s * 0.25 * p, 0.85 * p, -0.04 * p]; }
+    else if (tidePress) g = [s * 8, 22, s * 0.8, -0.18, -0.05];
+    else if (n === 'fan') g = [s * 18, -6, s * 0.7, -0.26, 0];
+    h.gk = G.damp(h.gk || 0, g ? 1 : 0, 5, dt);
+    if (g) h.gl = g;
+    const k = h.gk, q = h.gl;
+    if (!q || k < 0.002) return;
+    h.pt.x += q[0] * k; h.pt.y += q[1] * k; h.pt.r += q[2] * k; h.pt.c += q[3] * k; h.pt.s += q[4] * k;
+  }
+
   // The eye shuts once for each of what is coming (the Warden's count, as for its lances).
   function* blinks(n) {
     const c = B.core;
@@ -2860,6 +3251,8 @@
     }
     for (const r of B.rays) r.t += dt;
 
+    poseClear(c);
+    for (const h of B.hands) poseClear(h);
     if (B.script) {
       if (B.script.next(dt).done) B.script = null;
     }
@@ -2876,7 +3269,7 @@
       if (!h.alive) continue;
       if (h.broken > 0) {
         // lying broken on the floor until it knits itself back together
-        h.broken -= dt;
+        h.broken -= dt; h.gk = 0;
         h.x = G.clamp(h.x, 110, 1170);
         h.y = G.damp(h.y, FLOOR - 50, 9, dt); h.rot = G.damp(h.rot, h.side * 1.25, 8, dt); h.curl = G.damp(h.curl, 0.6, 8, dt);
         if (h.broken <= 0) {
@@ -2888,7 +3281,9 @@
       }
       // a hand that sank into the floor (the Afterhands) is drawn cut off at the floor until it is clear of it
       if (h.sunk && !h.ctrl && h.y < FLOOR - 60) h.sunk = 0;
-      if (h.ctrl) continue;
+      if (h.ctrl) { h.gk = 0; continue; } // (a hand at work holds its own pose; the springs carry it over)
+      // while the core works alone, a free hand shapes what it is about to do (drawn only)
+      gesture(h, dt);
       const tx = G.clamp(c.x + h.side * (B.spread + Math.sin(B.t * 0.8 + h.side) * 16), 90, 1190);
       const ty = c.y + 128 + Math.cos(B.t * 1.1 + h.side * 2) * 18;
       h.x = G.damp(h.x, tx, 4.5, dt); h.y = G.damp(h.y, ty, 4.5, dt);
@@ -2898,6 +3293,12 @@
       h.rot = G.damp(h.rot, h.side * 0.1 + Math.sin(B.t * 27 + h.side) * 0.16 * fl * fl, 7, dt);
       h.curl = G.damp(h.curl, 0.13 + 0.07 * Math.sin(B.t * 1.3 + h.side * 1.7) + 0.8 * Math.sin(Math.PI * Math.min(1, fl * 1.25)) * (fl > 0 ? 1 : 0), fl > 0 ? 12 : 7, dt);
     }
+    // the drawn pose follows on its springs (after every script and drift has had its say this step)
+    poseStep(c, dt, 0, 14000);
+    for (const h of B.hands) poseStep(h, dt, 0.00016, 9000);
+    // and under it the bones, each on its own spring
+    coreRig(c, dt);
+    for (const h of B.hands) handRig(h, dt);
 
     // an occasional blink while it is not busy
     c.blink = Math.max(0, c.blink - dt);
@@ -2993,42 +3394,53 @@
   function drawCore(ctx) {
     const P = G.pal(), c = B.core, r = c.r, t = B.t;
     ctx.save();
-    ctx.translate(c.x + (c.jit ? G.rand(-c.jit, c.jit) : 0), c.y + (c.jit ? G.rand(-c.jit, c.jit) : 0));
+    // its tremble (c.jit, and any a script asks of the pose) is smooth, not a new random place each frame
+    const pp = c.pp || NOPOSE, jt = (c.jit || 0) + (c.shk || 0);
+    ctx.translate(c.x + pp.x + (jt ? quiver(t, 0.3) * jt : 0), c.y + pp.y + (jt ? quiver(t * 1.17, 2.9) * jt : 0));
     if (B.dead) { drawSun(ctx, c); ctx.restore(); return; }
     if (c.kick > 0.01) { const ks = 1 - 0.045 * c.kick; ctx.scale(ks, ks); }
+    // drawn out along its path when it is thrown; then the pose's squash and swell
+    if ((c.st || 0) > 0.003) { ctx.rotate(c.va); ctx.scale(1 + c.st, 1 - 0.5 * c.st); ctx.rotate(-c.va); }
+    if (Math.abs(pp.s) > 0.002 || Math.abs(pp.g) > 0.002) ctx.scale((1 + pp.g) * (1 - 0.5 * pp.s), (1 + pp.g) * (1 + pp.s));
     if (c.swell) ctx.scale(1 + c.swell, 1 + c.swell);
     const dim = B.staggered ? 0.4 : 1 - 0.5 * (c.daze || 0);
     const ch = c.charge;
+    // its parts, each lagging the disc on its own spring (see coreRig; none without a rig)
+    const cr = c.rg, gv = (o) => (cr ? o.x : 0);
+    const hx = gv(cr && cr.hx), hy = gv(cr && cr.hy), kx = gv(cr && cr.kx), ky = gv(cr && cr.ky);
+    const fdx = gv(cr && cr.dx), fdy = gv(cr && cr.dy), tw = gv(cr && cr.tw);
 
     // halo and corona
     ctx.globalCompositeOperation = 'lighter';
     ctx.globalAlpha = (0.5 + 0.25 * ch) * dim;
-    ctx.drawImage(G.fx.glow(P.boss), -r * 3.6, -r * 3.6, r * 7.2, r * 7.2);
+    ctx.drawImage(G.fx.glow(P.boss), hx - r * 3.6, hy - r * 3.6, r * 7.2, r * 7.2);
     ctx.globalAlpha = 1;
     const N = 46;
     for (let pass = 0; pass < 2; pass++) {
       ctx.fillStyle = pass === 0 ? G.rgba(P.boss, 0.5 * dim) : G.rgba(P.hot, 0.75 * dim);
       ctx.beginPath();
       for (let i = 0; i < N; i++) {
-        const a = i / N * G.TAU + t * 0.06;
+        const a = i / N * G.TAU + t * 0.06 + tw;
         const n = (Math.sin(t * 1.9 + i * 2.4) * 0.5 + 0.5) * (0.55 + 0.45 * Math.sin(t * 3.1 + i * 1.7));
         let L = r * (0.14 + 0.44 * Math.max(0, n)) * (1 + ch * 0.5) * (pass === 0 ? 1 : 0.5) * (0.4 + 0.6 * dim);
         // the Flare's tell: the corona bulges out on one side
         if (c.flK > 0.01) { const d = G.angDiff(a, c.flA); L *= 1 + 2.6 * c.flK * Math.exp(-d * d / 0.16); }
         // the Corona's tell: light gathering on its crown, leaning the way a phase II fan will sweep
         if (c.crK > 0.01) { const d = G.angDiff(a, c.crA); L *= 1 + 1.9 * c.crK * Math.exp(-d * d / 0.45); }
-        const da = G.TAU / N * (pass === 0 ? 0.48 : 0.26);
-        ctx.moveTo(Math.cos(a - da) * r * 0.97, Math.sin(a - da) * r * 0.97);
-        ctx.lineTo(Math.cos(a) * (r + L), Math.sin(a) * (r + L));
-        ctx.lineTo(Math.cos(a + da) * r * 0.97, Math.sin(a + da) * r * 0.97);
+        const da = G.TAU / N * (pass === 0 ? 0.48 : 0.26), lean = L / (r * 0.6); // (the longer a flame, the further it leans back)
+        ctx.moveTo(kx * 0.4 + Math.cos(a - da) * r * 0.97, ky * 0.4 + Math.sin(a - da) * r * 0.97);
+        ctx.lineTo(kx + fdx * lean + Math.cos(a) * (r + L), ky + fdy * lean + Math.sin(a) * (r + L));
+        ctx.lineTo(kx * 0.4 + Math.cos(a + da) * r * 0.97, ky * 0.4 + Math.sin(a + da) * r * 0.97);
         ctx.closePath();
       }
       ctx.fill();
     }
+    // the rim: lagging a little and wobbling out of round after a hard start, stop or blow
+    const rmx = gv(cr && cr.rx), rmy = gv(cr && cr.ry), wx = 1 + gv(cr && cr.ex), wy = 1 + gv(cr && cr.ey);
     ctx.strokeStyle = G.rgba(P.boss, 0.5 * dim); ctx.lineWidth = 13;
-    ctx.beginPath(); ctx.arc(0, 0, r + 3, 0, G.TAU); ctx.stroke();
+    ctx.beginPath(); ctx.ellipse(rmx, rmy, (r + 3) * wx, (r + 3) * wy, 0, 0, G.TAU); ctx.stroke();
     ctx.strokeStyle = G.rgba(P.hot, 0.95 * dim); ctx.lineWidth = 4.5;
-    ctx.beginPath(); ctx.arc(0, 0, r + 1, 0, G.TAU); ctx.stroke();
+    ctx.beginPath(); ctx.ellipse(rmx, rmy, (r + 1) * wx, (r + 1) * wy, 0, 0, G.TAU); ctx.stroke();
     ctx.globalCompositeOperation = 'source-over';
 
     // the dark disc
@@ -3085,7 +3497,11 @@
 
     // the eye
     const lid = c.blink > 0 ? Math.max(0.06, Math.abs(c.blink / 0.17 * 2 - 1)) : 1;
-    const ew = r * 0.62, eh = r * 0.36 * c.open * lid;
+    // (on its rig the lid swings wider than told as it opens, never more shut; the eye rides in its socket)
+    const lidK = cr ? Math.max(lid * c.open, cr.lid.x) : lid * c.open;
+    const ew = r * 0.62, eh = r * 0.36 * lidK;
+    ctx.save();
+    ctx.translate(gv(cr && cr.sx), gv(cr && cr.sy));
     ctx.save();
     ctx.beginPath();
     ctx.moveTo(-ew, 0); ctx.quadraticCurveTo(0, -eh * 2, ew, 0); ctx.quadraticCurveTo(0, eh * 2, -ew, 0);
@@ -3094,7 +3510,7 @@
     ctx.fill();
     ctx.clip();
     const ir = r * 0.2 * (1 + 0.15 * ch);
-    const ix = c.lx * ew * 0.42, iy = c.ly * r * 0.08;
+    const ix = (cr ? cr.ix.x : c.lx) * ew * 0.42, iy = (cr ? cr.iy.x : c.ly) * r * 0.08;
     ctx.globalCompositeOperation = 'lighter';
     const gs = ir * (2.6 + 2 * ch);
     ctx.drawImage(G.fx.glow(P.boss), ix - gs, iy - gs, gs * 2, gs * 2);
@@ -3108,6 +3524,7 @@
     ctx.beginPath();
     ctx.moveTo(-ew, 0); ctx.quadraticCurveTo(0, -eh * 2, ew, 0); ctx.quadraticCurveTo(0, eh * 2, -ew, 0);
     ctx.stroke();
+    ctx.restore();
 
     // rays of light breaking out while it dies
     if (B.rays.length) {
@@ -3174,7 +3591,7 @@
       ctx.fillStyle = G.rgba(G.COL.starHot, 0.95 * (B.staggered ? 1 : c.daze));
       for (let i = 0; i < 3; i++) {
         const a = t * 4 + i * 2.094;
-        star4(ctx, Math.cos(a) * 56, -r - 26 + Math.sin(a) * 9, 9);
+        star4(ctx, hx * 0.6 + Math.cos(a) * 56, hy * 0.6 - r - 26 + Math.sin(a) * 9, 9);
       }
     }
     ctx.restore();
@@ -3200,10 +3617,15 @@
     const ax = c.x + ux * c.r * 0.92, ay = c.y + uy * c.r * 0.92, lean = Math.atan2(uy, ux) + Math.PI / 2;
     const sTop = uy < -0.05 ? Math.min(L, (-60 - ay) / uy) : L; // where it leaves the top of the picture
     const s0 = sTop * (1 - ch.k), strain = ch.strain || 0;      // while it comes down, its end is up the line
+    const b1 = c.rg ? c.rg.b1.x : 0, b2 = c.rg ? c.rg.b2.x : 0;   // (its bow and whip: pinned at the core and the pivot)
     ctx.save();
     ctx.globalAlpha = fade;
     for (let s = s0, j = 0; s < sTop + 40; s += 19, j++) {
       let x = ax + ux * s, y = ay + uy * s, rot = lean;
+      if (b1 || b2) {
+        const q = Math.PI * G.clamp(s / L, 0, 1), o = b1 * Math.sin(q) + b2 * Math.sin(2 * q), dq = (b1 * Math.cos(q) + 2 * b2 * Math.cos(2 * q)) * Math.PI / L;
+        x -= uy * o; y += ux * o; rot += Math.atan(dq);
+      }
       if (sn) {
         // snapped: each link flies off its own way and falls
         const r = Math.abs(Math.sin(j * 12.9898) * 43758.5453) % 1;
@@ -3236,7 +3658,7 @@
     for (let i = 0; i < 6; i++) {
       const a = B.shardA + i * G.TAU / 6;
       let x = c.x + Math.cos(a) * B.shardR, y = c.y + Math.sin(a) * B.shardR;
-      let rot = a + Math.PI / 2 + (B.shardsOut ? Math.PI / 2 : 0);
+      let rot = a + Math.PI / 2 + (B.shardsOut ? Math.PI / 2 : 0) + (c.rg && c.rg.sh.a ? c.rg.sh.a[i] : 0); // (each rocking in turn: drawn only)
       if (pk > 0) {
         // held in a pose by a corrupted attack: sunk into the floor, or clamped on the chain
         const q = B.shardPose(i), k = E.inOutCubic(Math.min(1, pk));
@@ -3268,18 +3690,64 @@
     { x: 39, len: 56, ang: 0.17 },
   ];
 
+  // One finger (or the thumb) as a chain of bones, seen face on from (x, y) at angle base. Each joint
+  // folds towards the viewer (fold, rad), so a bone shortens as it folds and one folded past square lies
+  // back down behind the palm; each can also lean in the plane (lean). Drawn as tapered strokes, the lit
+  // edge of them all first and then the fill, so the bones read as one finger, with a crease at each bend.
+  function drawDigit(ctx, x, y, base, fold, lean, len, seg, wid, stroke, crease) {
+    const n = fold.length, px = [0, 0], py = [14, 0];
+    let phi = 0, psi = 0, cx = 0, cy = 0;
+    for (let k = 0; k < n; k++) {
+      phi += fold[k]; psi += lean ? lean[k] : 0;
+      const l = len * seg[k] * Math.cos(phi);
+      cx += Math.sin(psi) * l; cy -= Math.cos(psi) * l;
+      px.push(cx); py.push(cy);
+    }
+    ctx.save();
+    ctx.translate(x, y); ctx.rotate(base);
+    ctx.lineCap = 'round';
+    for (let pass = 0; pass < 2; pass++) {
+      ctx.strokeStyle = pass ? '#100d18' : stroke;
+      for (let k = 0; k <= n; k++) {
+        ctx.lineWidth = wid[Math.max(0, k - 1)] + (pass ? -2.5 : 2.5);
+        ctx.beginPath(); ctx.moveTo(px[k], py[k]); ctx.lineTo(px[k + 1], py[k + 1]); ctx.stroke();
+      }
+    }
+    // a crease across each joint that bends (towards the tip they are drawn only while the bone still points up)
+    ctx.strokeStyle = crease; ctx.lineWidth = 2;
+    phi = fold[0];
+    for (let k = 1; k < n; k++) {
+      phi += fold[k];
+      const b = Math.abs(fold[k]);
+      if (b < 0.12 || Math.cos(phi - fold[k]) < 0.2) continue;
+      const dx = px[k + 1] - px[k], dy = py[k + 1] - py[k], d = Math.hypot(dx, dy) || 1, hw = wid[k] * 0.3;
+      ctx.globalAlpha = Math.min(1, b * 1.6);
+      ctx.beginPath(); ctx.moveTo(px[k + 1] - dy / d * hw, py[k + 1] + dx / d * hw); ctx.lineTo(px[k + 1] + dy / d * hw, py[k + 1] - dx / d * hw); ctx.stroke();
+    }
+    ctx.restore();
+  }
+
   function drawHand(ctx, h) {
     if (!h.alive) return;
-    const P = G.pal(), c = h.curl;
+    const P = G.pal(), pp = h.pp || NOPOSE, c = G.clamp(h.curl + pp.c, -0.3, 1);
     const danger = h.hurt || h.hot > 0;
     const edge = danger ? DANGER : P.boss;
     const dimK = h.broken > 0 ? 0.2 : h.stuck ? 0.4 : 1;
-    const j = h.hot > 0 && !h.hurt ? 1.6 : 0;
+    // a hot hand trembles (and any tremble a script asks of it): smooth, not a new random place each frame
+    const j = (h.hot > 0 && !h.hurt ? 1.6 : 0) + (h.shk || 0), t = B.t;
     ctx.save();
     // sunk into the floor (the Afterhands): only what is above the floor shows
     if (h.sunk) { ctx.beginPath(); ctx.rect(-200, -2000, G.W + 400, FLOOR + 2002); ctx.clip(); }
-    ctx.translate(h.x + (h.kx || 0) + (j ? G.rand(-j, j) : 0), h.y + (j ? G.rand(-j, j) : 0));
-    ctx.rotate(h.rot);
+    const dx = h.x + (h.kx || 0) + pp.x + (j ? quiver(t, h.side * 1.7) * j : 0), dy = h.y + pp.y + (j ? quiver(t * 1.13, 4 + h.side) * j : 0);
+    ctx.translate(dx, dy);
+    // drawn out along its path when it moves fast; then the pose's own squash and swell (about the
+    // heel of the hand when it is down on the floor, so it stays on it)
+    if ((h.st || 0) > 0.003) { ctx.rotate(h.va); ctx.scale(1 + h.st, 1 - 0.5 * h.st); ctx.rotate(-h.va); }
+    if (Math.abs(pp.s) > 0.002 || Math.abs(pp.g) > 0.002) {
+      const ay = dy > FLOOR - 130 ? Math.max(0, FLOOR - dy) : 0;
+      ctx.translate(0, ay); ctx.scale((1 + pp.g) * (1 - 0.55 * pp.s), (1 + pp.g) * (1 + pp.s)); ctx.translate(0, -ay);
+    }
+    ctx.rotate(h.rot + pp.r + (h.tilt || 0));
     ctx.scale(h.side, 1);
 
     ctx.globalCompositeOperation = 'lighter';
@@ -3290,28 +3758,47 @@
 
     ctx.lineJoin = 'round';
     const stroke = G.rgba(edge, 0.9 * (0.45 + 0.55 * dimK));
-    // fingers
-    for (const f of FINGERS) {
-      const len = f.len * (1 - 0.74 * c);
+    const g = h.rg;
+    if (g) {
+      // the wrist: a stub of void below the palm, bending on its own, two wisps trailing off its end
       ctx.save();
-      ctx.translate(f.x, -40); ctx.rotate(f.ang * (1 - c));
-      G.roundRect(ctx, -11.5, -len, 23, len + 14, 10);
-      ctx.fillStyle = '#100d18'; ctx.fill();
-      ctx.strokeStyle = stroke; ctx.lineWidth = 2.5; ctx.stroke();
-      if (len > 30) {
-        ctx.strokeStyle = 'rgba(255,255,255,0.07)'; ctx.lineWidth = 2;
-        ctx.beginPath(); ctx.moveTo(-7, -len * 0.5); ctx.lineTo(7, -len * 0.5); ctx.stroke();
+      ctx.translate(0, 58); ctx.rotate(g.wr.x);
+      const cg = ctx.createLinearGradient(0, -10, 0, 46);
+      cg.addColorStop(0, '#120e1b'); cg.addColorStop(0.5, 'rgba(14,11,21,0.85)'); cg.addColorStop(1, 'rgba(14,11,21,0)');
+      ctx.fillStyle = cg;
+      ctx.beginPath(); ctx.moveTo(-36, -10); ctx.lineTo(36, -10); ctx.lineTo(26, 46); ctx.lineTo(-26, 46); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = 'rgba(12,9,18,0.5)';
+      for (let s = 0; s < 2; s++) {
+        const a = g.wisp[s].a, pts = [{ x: s ? 13 : -13, y: 36 }];
+        if (!a) continue;
+        let x = pts[0].x, y = pts[0].y, ang = (s ? 0.1 : -0.1);
+        for (let k = 0; k < a.length; k++) { ang += a[k]; x -= Math.sin(ang) * 11; y += Math.cos(ang) * 11; pts.push({ x, y }); }
+        G.draw.ribbon(ctx, pts, 11, 1.5); ctx.fill();
       }
+      // its lit edges: a cuff where it meets the palm, and sides that fade into the dark
+      const eg = ctx.createLinearGradient(0, 4, 0, 42);
+      eg.addColorStop(0, G.rgba(edge, 0.7 * (0.45 + 0.55 * dimK))); eg.addColorStop(1, G.rgba(edge, 0));
+      ctx.strokeStyle = eg; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(-33, 6); ctx.lineTo(-27, 42); ctx.moveTo(33, 6); ctx.lineTo(27, 42); ctx.stroke();
+      ctx.strokeStyle = stroke; ctx.lineWidth = 2.5;
+      ctx.beginPath(); ctx.moveTo(-33, 9); ctx.quadraticCurveTo(0, 15, 33, 9); ctx.stroke();
       ctx.restore();
+      // and the palm, flopping on the wrist
+      if (g.fl.x) { ctx.translate(0, 58); ctx.rotate(g.fl.x); ctx.translate(0, -58); }
+    }
+    // fingers: each a beat behind the last, each joint behind the one before it; the first one
+    // straightens to point (the Flick). Without a rig they are drawn from the curl alone.
+    const sp = g ? g.spread.x * 0.22 : 0, crease = 'rgba(255,255,255,0.08)';
+    for (let i = 0; i < 4; i++) {
+      const f = FINGERS[i];
+      let fc = h.fc ? G.clamp(h.fc[i], -0.3, 1) : c;
+      if (i === 0 && h.fp > 0.01) fc = G.lerp(fc, -0.12, h.fp);
+      const fold = g ? g.fin[i].c.a : null, lean = g ? g.fin[i].l.a : null;
+      drawDigit(ctx, f.x, -40, f.ang * (1 - fc) + SPLAY[i] * sp, fold || FJ.map((k) => k * fc), lean, f.len - 9.75, FSEG, FW, stroke, crease);
     }
     // thumb
-    ctx.save();
-    ctx.translate(-50, 14); ctx.rotate(-1.0 + 1.25 * c);
-    const tl = 52 * (1 - 0.3 * c);
-    G.roundRect(ctx, -11.5, -tl, 23, tl + 12, 10);
-    ctx.fillStyle = '#100d18'; ctx.fill();
-    ctx.strokeStyle = stroke; ctx.lineWidth = 2.5; ctx.stroke();
-    ctx.restore();
+    const tc = h.fc ? G.clamp(h.tc, -0.3, 1) : c;
+    drawDigit(ctx, -50, 14, -1.0 + 1.25 * tc - (g ? g.spread.x * 0.12 : 0), g && g.th.c.a ? g.th.c.a : TJ.map((k) => k * tc), g ? g.th.l.a : null, 41.5, TSEG, TW, stroke, crease);
     // palm
     G.roundRect(ctx, -57, -48, 114, 114, 28);
     const pg = ctx.createLinearGradient(0, -48, 0, 66);

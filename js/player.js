@@ -1808,16 +1808,57 @@
   }
 
   // The cloth that trails behind each hero: a scarf, a cape or a ponytail. A chain of points in world space.
+  // (v2.5c) Each point now carries its own speed (it is a verlet chain), so the cloth swings on past
+  // the body when it stops, whips through a turn and settles, instead of only being dragged along; the
+  // first links keep to the line they leave the body on (stiff at the root, loose at the end), and the
+  // root is tied to where the neck, shoulders or head were last drawn (drawBody leaves it in P.rig.anc).
+  const TAIL_DIR = { vesper: [0.85, 0.5], aster: [0.35, 0.94], lune: [0.7, 0.7], eos: [0.6, 0.8] };
+  const ROOT_K = [0, 30, 14, 5]; // how hard the first links keep to their line (per second)
   function updateScarf(dt) {
     const s = P.scarf;
-    if (!s.length) return;
-    const st = STYLE[H.id], seg = st.tail.seg, heavy = !st.tail.glow;
-    s[0].x = P.x + P.facing * st.anchor[0] * SC; s[0].y = P.y + st.anchor[1] * SC;
-    for (let i = 1; i < s.length; i++) {
-      const a = s[i - 1], b = s[i];
-      b.y += (heavy ? 70 : 26 + i * 3) * dt;
-      b.x -= P.facing * (heavy ? 18 : 34) * dt;
-      b.y += Math.sin(G.t * 9 + i * 0.9) * (heavy ? 4 : 10) * dt;
+    if (!s.length || !(dt > 0)) return;
+    const st = STYLE[H.id], seg = st.tail.seg, heavy = !st.tail.glow, f = P.facing || 1;
+    const an = P.rig && P.rig.anc && Math.abs(G.t - P.rig.anc.t) < 0.1 ? P.rig.anc : null;
+    const ax = P.x + (an ? an.dx : f * st.anchor[0] * SC), ay = P.y + (an ? an.dy : st.anchor[1] * SC);
+    // a jump of the root (a placement, a blink) carries the whole chain with it rather than whipping it
+    // (and a new chain is laid out hanging the way it rests, rather than dropped in a heap)
+    const fresh = s[s.length - 1].px == null || !isFinite(s[s.length - 1].x) || !isFinite(s[s.length - 1].y);
+    if (fresh || Math.abs(ax - s[0].x) > 120 || Math.abs(ay - s[0].y) > 120) {
+      const dx = ax - s[0].x, dy = ay - s[0].y, r0 = TAIL_DIR[H.id] || [0.7, 0.7];
+      for (let i = 0; i < s.length; i++) {
+        const q = s[i];
+        if (fresh) { q.x = ax - f * i * seg * r0[0]; q.y = ay + i * seg * r0[1]; } else { q.x += dx; q.y += dy; }
+        q.px = q.x; q.py = q.y;
+      }
+    }
+    s[0].x = ax; s[0].y = ay;
+    const drag = Math.exp(-(heavy ? 9 : 14) * dt), dt2 = dt * dt; // (the air, still: what holds the cloth back as the body moves through it)
+    const gx = -f * (heavy ? 260 : 900), speed = Math.min(1.5, Math.abs(P.vx) / 335);
+    // the line the root leaves the body on: the way it rests, swept by the air going past (running, a
+    // dash, a fall), so the first links do not fight the rest of the chain into a kink
+    const d0 = TAIL_DIR[H.id] || [0.7, 0.7], F0 = heavy ? 1520 : 1100, dr = heavy ? 9 : 14;
+    let wx = -f * d0[0] * F0 - G.clamp(P.vx, -1200, 1200) * dr * 0.8, wy = d0[1] * F0 - G.clamp(P.vy, -1500, 1500) * dr * 0.8;
+    const wl = Math.hypot(wx, wy) || 1; wx /= wl; wy /= wl;
+    const n = s.length;
+    for (let i = 1; i < n; i++) {
+      const a = s[i - 1], b = s[i], q = i / (n - 1);
+      if (b.px == null) { b.px = b.x; b.py = b.y; }
+      const vx = (b.x - b.px) * drag, vy = (b.y - b.py) * drag;
+      b.px = b.x; b.py = b.y;
+      // a ribbon of light always stirs a little; cloth flaps as the air goes past it
+      const fl = Math.sin(G.t * 9 + i * 0.9) * (heavy ? 50 + 110 * speed : 170 + 60 * speed) * q;
+      b.x += vx + gx * dt2;
+      b.y += vy + ((heavy ? 1500 : 620 + 60 * i) + fl) * dt2;
+      if (i < ROOT_K.length) {
+        // (moved without adding speed, so it steadies the root rather than setting it ringing)
+        const k = 1 - Math.exp(-ROOT_K[i] * dt), mx = (a.x + wx * seg - b.x) * k, my = (a.y + wy * seg - b.y) * k;
+        b.x += mx; b.y += my; b.px += mx; b.py += my;
+      } else {
+        // further out, a little stiffness against bending, so a ribbon swings in curves, not in kinks
+        const z = s[i - 2], ex = a.x - z.x, ey = a.y - z.y, el = Math.hypot(ex, ey) || 1, k = 1 - Math.exp(-(heavy ? 8 : 10) * dt);
+        const mx = (a.x + ex / el * seg - b.x) * k, my = (a.y + ey / el * seg - b.y) * k;
+        b.x += mx; b.y += my; b.px += mx; b.py += my;
+      }
       const dx = b.x - a.x, dy = b.y - a.y, d = Math.hypot(dx, dy) || 1;
       if (d > seg) { b.x = a.x + dx / d * seg; b.y = a.y + dy / d * seg; }
     }
@@ -2403,13 +2444,15 @@
     poly(ctx, [x + 3.9 * s, y - 0.2 * s, x + 6 * s, y - 1.5 * s, x + 5.7 * s, y + 0.7 * s]); ctx.fill();
   }
 
-  function backVesper(ctx, h, st, sway, hip) {
+  // (v2.5c) sw: the cloth's sway at three depths, each on its own spring and each following the one
+  // above it (a: at the waist, b: lower, c: at the hem), so a hem swings later and further than a waist
+  function backVesper(ctx, h, st, sw, hip) {
     // a short cloak, torn at the hem
     ctx.fillStyle = st.dark;
-    poly(ctx, [-5, SHY - 1, 3.4, SHY, 2.4, hip + 1, -2.4 - sway, hip + 13, -6.2 - sway, hip + 8, -9.6 - sway * 1.3, hip + 15.5, -12 - sway * 1.4, hip + 6.5, -10 - sway, hip - 4, -7.4, SHY + 5]); ctx.fill();
+    poly(ctx, [-5, SHY - 1, 3.4, SHY, 2.4, hip + 1, -2.4 - sw.c, hip + 13, -6.2 - sw.b, hip + 8, -9.6 - sw.c * 1.3, hip + 15.5, -12 - sw.b * 1.4, hip + 6.5, -10 - sw.a, hip - 4, -7.4, SHY + 5]); ctx.fill();
     ctx.strokeStyle = G.rgba(h.col, 0.42); ctx.lineWidth = 0.8; ctx.stroke();
   }
-  function bodyVesper(ctx, h, st, sway, hip) {
+  function bodyVesper(ctx, h, st, sw, hip) {
     const col = h.col;
     // tunic, narrow at the waist, with a plate across the chest
     ctx.fillStyle = st.mid;
@@ -2418,7 +2461,7 @@
     poly(ctx, [5.9, SHY + 1, 3.4, SHY - 2.6, -0.6, SHY - 2.3, 0.4, SHY + 8.6, 4.7, SHY + 7]); ctx.fill();
     // belt, and a tabard split in two tails
     ctx.fillStyle = st.dark;
-    poly(ctx, [-3.4, hip - 1.5, 3.8, hip - 1.5, 3.2 - sway * 0.5, hip + 9.5, 0.8 - sway * 0.6, hip + 5.8, -2.6 - sway, hip + 11]); ctx.fill();
+    poly(ctx, [-3.4, hip - 1.5, 3.8, hip - 1.5, 3.2 - sw.c * 0.5, hip + 9.5, 0.8 - sw.b * 0.6, hip + 5.8, -2.6 - sw.c, hip + 11]); ctx.fill();
     ctx.strokeStyle = G.rgba(col, 0.55); ctx.lineWidth = 0.8; ctx.stroke();
     ctx.strokeStyle = G.rgba(col, 0.95); ctx.lineWidth = 1.4; line(ctx, -3.4, hip - 1, 3.8, hip - 1.6);
     // a star on the chest
@@ -2426,30 +2469,32 @@
     ctx.fillStyle = G.rgba(h.hot, 1);
     poly(ctx, [2.4, SHY + 0.6, 3.1, SHY + 2.9, 5.2, SHY + 3.6, 3.1, SHY + 4.3, 2.4, SHY + 6.8, 1.7, SHY + 4.3, -0.4, SHY + 3.6, 1.7, SHY + 2.9]); ctx.fill();
   }
-  function headVesper(ctx, h, st) {
+  function headVesper(ctx, h, st, hp) {
     ctx.save();
     ctx.translate(1.2, -46.6);
-    // a deep hood with its point swept back
+    // a deep hood with its point swept back (hp: the point on its own spring, streaming back as she runs)
     ctx.fillStyle = st.plate;
-    poly(ctx, [-5.6, 5.4, -7.4, -0.6, -5.8, -6.2, -13.4, -11.4, -2.2, -9.8, 3.6, -8.4, 7.4, -3, 7.1, 2.8, 4.4, 6.6, 0, 4.8]); ctx.fill();
+    poly(ctx, [-5.6, 5.4, -7.4, -0.6, -5.8 + hp[0] * 0.3, -6.2 + hp[1] * 0.3, -13.4 + hp[0], -11.4 + hp[1], -2.2, -9.8, 3.6, -8.4, 7.4, -3, 7.1, 2.8, 4.4, 6.6, 0, 4.8]); ctx.fill();
     ctx.strokeStyle = G.rgba(h.col, 0.75); ctx.lineWidth = 0.9; ctx.stroke();
     ctx.fillStyle = '#02040a';
     poly(ctx, [0, -6.2, 5.3, -4.8, 6.8, -0.8, 6.2, 3.2, 3.4, 4.8, 0.4, 1.6]); ctx.fill();
     ctx.fillStyle = st.mid; poly(ctx, [1.2, 0.8, 6.7, -0.2, 6.2, 3.2, 3.4, 4.8]); ctx.fill(); // scarf drawn up over the mouth
     eyes(ctx, h, 1.2, -2.3, 1);
     ctx.restore();
+  }
+  function plateVesper(ctx, h, st) {
     // a plate on the sword shoulder
     ctx.fillStyle = st.hi;
     poly(ctx, [0.8, SHY - 3.6, 7.6, SHY - 2.8, 9.4, SHY + 3, 3.4, SHY + 2.4]); ctx.fill();
     ctx.strokeStyle = G.rgba(h.col, 0.85); ctx.lineWidth = 0.8; ctx.stroke();
   }
 
-  function bodyAster(ctx, h, st, sway, hip) {
+  function bodyAster(ctx, h, st, sw, hip) {
     const col = h.col;
     // tassets under the belt
     ctx.fillStyle = st.plate;
-    poly(ctx, [-6.4, hip - 1, -0.6, hip - 1, -1.4 - sway * 0.2, hip + 8.6, -6.8 - sway * 0.2, hip + 7]); ctx.fill();
-    poly(ctx, [0.6, hip - 1, 6.6, hip - 1, 7 - sway * 0.2, hip + 7, 1.6 - sway * 0.2, hip + 8.6]); ctx.fill();
+    poly(ctx, [-6.4, hip - 1, -0.6, hip - 1, -1.4 - sw.b * 0.2, hip + 8.6, -6.8 - sw.b * 0.2, hip + 7]); ctx.fill();
+    poly(ctx, [0.6, hip - 1, 6.6, hip - 1, 7 - sw.a * 0.2, hip + 7, 1.6 - sw.a * 0.2, hip + 8.6]); ctx.fill();
     // a breastplate as wide as two of anyone else
     ctx.fillStyle = st.mid;
     poly(ctx, [-6, hip + 1, 6.2, hip + 1, 10.8, SHY + 1, 7.4, SHY - 3, -7.4, SHY - 3, -10.8, SHY + 1]); ctx.fill();
@@ -2491,11 +2536,11 @@
     ctx.restore();
   }
 
-  function backLune(ctx, h, st, sway, hip) {
+  function backLune(ctx, h, st, sw, hip, qa) {
     const col = h.col;
-    // quiver across the back
+    // quiver across the back (qa: it swings on its strap)
     ctx.save();
-    ctx.translate(-4.6, SHY + 6); ctx.rotate(-0.5);
+    ctx.translate(-4.6, SHY + 6); ctx.rotate(-0.5 + qa);
     ctx.fillStyle = st.plate; poly(ctx, [-2, -8, 2, -8, 1.6, 7, -1.6, 7]); ctx.fill();
     ctx.strokeStyle = G.rgba(col, 0.7); ctx.lineWidth = 0.8; ctx.stroke();
     ctx.globalCompositeOperation = 'lighter';
@@ -2504,8 +2549,8 @@
     ctx.restore();
     // two long coat tails
     ctx.fillStyle = st.dark; ctx.strokeStyle = G.rgba(col, 0.55); ctx.lineWidth = 0.8;
-    poly(ctx, [-3, hip - 1, 0, hip - 1, -3.4 - sway * 1.1, hip + 10, -8.6 - sway * 1.3, hip + 19]); ctx.fill(); ctx.stroke();
-    poly(ctx, [0.4, hip - 1, 3.2, hip - 1, 1.4 - sway * 0.8, hip + 15]); ctx.fill(); ctx.stroke();
+    poly(ctx, [-3, hip - 1, 0, hip - 1, -3.4 - sw.b * 1.1, hip + 10, -8.6 - sw.c * 1.3, hip + 19]); ctx.fill(); ctx.stroke();
+    poly(ctx, [0.4, hip - 1, 3.2, hip - 1, 1.4 - (sw.b + sw.c) * 0.4, hip + 15]); ctx.fill(); ctx.stroke();
   }
   function bodyLune(ctx, h, st) {
     const col = h.col, hip = -24;
@@ -2521,11 +2566,11 @@
     poly(ctx, [0.2, SHY - 3, 5.8, SHY - 2.4, 8.4, SHY + 3.2, 5.4, SHY + 2, 3.2, SHY + 4.6]); ctx.fill();
     ctx.strokeStyle = G.rgba(col, 0.8); ctx.lineWidth = 0.8; ctx.stroke();
   }
-  function headLune(ctx, h, st) {
+  function headLune(ctx, h, st, mo) {
     ctx.save();
     ctx.translate(0.8, -46.6);
-    // the moon she wears: a thin crescent tilted behind her head
-    const bob = Math.sin(G.t * 2.4) * 0.5, mx = -3.2, my = -6.2 + bob;
+    // the moon she wears: a thin crescent tilted behind her head (mo: it trails the head on a soft spring)
+    const bob = Math.sin(G.t * 2.4) * 0.5, mx = -3.2 + mo[0], my = -6.2 + bob + mo[1];
     ctx.globalCompositeOperation = 'lighter';
     glowAt(ctx, h.col, mx, my, 12, 0.35);
     ctx.fillStyle = G.rgba(h.hot, 0.95);
@@ -2547,14 +2592,14 @@
   }
 
 
-  function backEos(ctx, h, st, sway, hip) {
+  function backEos(ctx, h, st, sw, hip) {
     // a long coat, split up the back
     ctx.fillStyle = st.dark; ctx.strokeStyle = G.rgba(h.col, 0.45); ctx.lineWidth = 0.8;
-    poly(ctx, [-4.6, SHY + 2, 2.6, SHY + 1, 2, hip + 2, -1.6 - sway, hip + 15, -5 - sway * 1.1, hip + 10.5, -8.4 - sway * 1.3, hip + 17, -9.8 - sway, hip + 4, -7.4, SHY + 8]);
+    poly(ctx, [-4.6, SHY + 2, 2.6, SHY + 1, 2, hip + 2, -1.6 - sw.c, hip + 15, -5 - sw.b * 1.1, hip + 10.5, -8.4 - sw.c * 1.3, hip + 17, -9.8 - sw.a, hip + 4, -7.4, SHY + 8]);
     ctx.fill(); ctx.stroke();
   }
-  function bodyEos(ctx, h, st, sway, hip) {
-    const col = h.col;
+  function bodyEos(ctx, h, st, sw, hip) {
+    const col = h.col, sway = sw.a;
     // wide trousers gathered at the waist: a pleated panel over each thigh
     ctx.fillStyle = st.mid;
     poly(ctx, [-4.6, hip - 1, 4.8, hip - 1, 6 - sway * 0.3, hip + 9.5, 1.4 - sway * 0.3, hip + 8.2, -1.4 - sway * 0.5, hip + 10.2, -6 - sway * 0.6, hip + 8.6]); ctx.fill();
@@ -2570,12 +2615,12 @@
     // a broad sash, knotted, one end hanging
     ctx.fillStyle = st.hi; poly(ctx, [-4, hip - 2.8, 4.6, hip - 3, 4.6, hip + 1, -4, hip + 1.2]); ctx.fill();
     ctx.strokeStyle = G.rgba(col, 0.7); ctx.lineWidth = 0.7; line(ctx, -4, hip - 0.9, 4.6, hip - 1.1);
-    ctx.fillStyle = G.rgba(col, 0.95); poly(ctx, [-1.6, hip - 2.2, 0.6, hip - 1.4, -0.4 - sway * 0.5, hip + 7, -2 - sway * 0.5, hip + 6]); ctx.fill();
+    ctx.fillStyle = G.rgba(col, 0.95); poly(ctx, [-1.6, hip - 2.2, 0.6, hip - 1.4, -0.4 - sw.c * 0.6, hip + 7, -2 - sw.c * 0.6, hip + 6]); ctx.fill();
     // a small sun on the breast
     glowAt(ctx, col, 3.3, SHY + 3.4, 5.5, 0.8);
     ctx.fillStyle = G.rgba(h.hot, 1); ctx.beginPath(); ctx.arc(3.3, SHY + 3.4, 1.35, 0, G.TAU); ctx.fill();
   }
-  function headEos(ctx, h, st) {
+  function headEos(ctx, h, st, hat) {
     ctx.save();
     ctx.translate(1, -46.6);
     // hair, tied back under the hat
@@ -2587,7 +2632,7 @@
     ctx.fillStyle = st.plate; poly(ctx, [0.4, 1, 6.1, 0.2, 5.8, 3.2, 3.2, 5.4, 0, 3.4]); ctx.fill();
     eyes(ctx, h, 1.1, -1.3, 0.9);
     // a wide travelling hat, tipped forward so its brim shades her eyes
-    ctx.translate(0, -3.2); ctx.rotate(0.07);
+    ctx.translate(0, -3.2); ctx.rotate(0.07 + hat); // (hat: its own spring; it tips back as she sets off, forward as she stops)
     ctx.fillStyle = st.plate;
     poly(ctx, [-13.5, -1.4, -1.6, -9.6, 1.4, -9.8, 15, -1.9, 14.2, -0.4, -12.6, 0.2]); ctx.fill();
     ctx.strokeStyle = G.rgba(h.col, 0.8); ctx.lineWidth = 0.9; ctx.stroke();
@@ -2599,6 +2644,30 @@
     ctx.restore();
   }
 
+  // ---- the living layer (v2.5c). Drawing only: no hit box, timing or physics reads any of it.
+  // Every part of a hero is its own piece on its own spring, on top of where the pose puts it: the
+  // hips sink through the knees on a landing and come back up past where they rest; the chest lags the
+  // hips; the spine bows and stretches about the hips as the body sets off, stops and lands; the head
+  // rides the neck (thrown back as the body drives off, carrying on as it stops, nodding against the
+  // stride); the weapon carried at rest swings on the hand; a free hand trails; hoods, hats, pauldrons,
+  // a quiver, a sheath, sleeves and coat tails each swing with their own weight, a hem later and
+  // further than a waist; feet roll up onto the toe and fold as they lift. At rest the chest breathes and
+  // the weight shifts from foot to foot. Only the live hero carries springs (s.rig.sp); a figure drawn
+  // with no state (an echo in the Hall, a portrait, an afterimage) still breathes and shifts its weight.
+  const PHASE = { vesper: 0, aster: 1.9, lune: 3.7, eos: 5.1 }; // (so the heroes in the Hall do not breathe as one)
+  // How far a running foot has rolled (+: heel up and toe down) at its point of the stride (p, as footTargets has it).
+  function runRoll(p) {
+    const PI = Math.PI, u = ((p % G.TAU) + G.TAU) % G.TAU;
+    if (u >= 0.5 * PI && u < 1.5 * PI) {
+      // planted, the body passing over it: the heel strikes with the toe still up, then rolls onto the toe
+      if (u < 0.7 * PI) return -0.22 * (1 - smooth((u - 0.5 * PI) / (0.2 * PI)));
+      return 0.75 * smooth((u - 1.1 * PI) / (0.4 * PI));
+    }
+    // lifted and carried through: it folds under, then opens out to reach for the next strike
+    const v = (u >= 1.5 * PI ? u - 1.5 * PI : u + 0.5 * PI) / PI;
+    return v < 0.25 ? G.lerp(0.75, 0.95, smooth(v / 0.25)) : G.lerp(0.95, -0.22, smooth((v - 0.25) / 0.75));
+  }
+
   // One hero, drawn from a state:
   // { x, y, facing, vx, vy, onGround, squash, runT, atk, primed, hurtFlash, dash }.
   // Used for the live hero, dash afterimages and the portraits on the hero-select screen.
@@ -2606,7 +2675,8 @@
     const st = STYLE[h.id], col = h.col, id = h.id;
     const a = s.atk, air = !s.onGround, sp = Math.abs(s.vx);
     const run = !air && sp > 40, idle = !air && !run && !a;
-    const breath = idle ? Math.sin(G.t * 3) : 0;
+    const ph = PHASE[id] || 0;
+    const breath = idle ? Math.sin(G.t * 3 + ph) : 0;
     const gold = s.primed || !!(a && a.heavy) || !!(s.recov && s.recov.lvl >= 3);
     // Pose memory. Only the live hero has one (afterimages, echoes and portraits are drawn exactly as
     // posed). With it the limbs, the lean and the weapon at rest ease from one pose to the next over
@@ -2615,6 +2685,25 @@
     let rdt = 0;
     if (R) { rdt = R.t == null ? 0 : G.clamp(G.t - R.t, 0, 0.05); R.t = G.t; }
     const ease = (key, v, rate) => { if (!R) return v; R[key] = R[key] == null ? v : G.damp(R[key], v, rate, rdt); return R[key]; };
+    // the springs of the living layer, and what pushes them this frame: the change in the body's speed
+    // (in its own frame, forward the way it faces), a landing, a blow (the squash dropping at once) and a footfall
+    const K = R ? (R.sp || (R.sp = DR.rig())) : null;
+    const spr = (k, t, w, z) => (K ? K.spring(k, t, rdt, w, z) : t);
+    const kick = (k, v) => { if (K && rdt > 0 && v && isFinite(v)) K.kick(k, v); };
+    let dvx = 0, dvy = 0, land = 0, hit = 0, foot = false;
+    if (R && rdt > 0) {
+      if (R.pvx != null) {
+        dvx = (s.vx - R.pvx) * s.facing; dvy = s.vy - R.pvy;
+        if (!isFinite(dvx) || Math.abs(dvx) > 2600) dvx = 0; // (a placement, not a push)
+        if (!isFinite(dvy) || Math.abs(dvy) > 2600) dvy = 0;
+        dvx = G.clamp(dvx, -1500, 1500); dvy = G.clamp(dvy, -1600, 1600);
+        if (R.pAir && !air) land = G.clamp(R.pvy || 0, 0, 1600);
+        const dq = (R.psq || 0) - (s.squash || 0);
+        if (!land && dq > 0.025 && (s.squash || 0) < -0.02) hit = Math.min(0.4, dq);
+        foot = run && Math.floor(s.runT / Math.PI) !== R.pstep;
+      }
+      R.pvx = s.vx; R.pvy = s.vy; R.pAir = air; R.psq = s.squash || 0; R.pstep = Math.floor(s.runT / Math.PI);
+    }
     let turnW = 1;
     if (R) {
       // turning round: the figure narrows through the turn and opens out the other way, over about
@@ -2628,6 +2717,13 @@
       R.tk = R.tp >= 1 ? 1 : R.tq0 + (1 - R.tq0) * e;
       turnW = Math.abs(R.tk) < 0.28 ? 0.28 * (R.tk < 0 ? -1 : 1) : R.tk;
     }
+    // (where the cloth that trails behind is tied, measured as drawn, for updateScarf)
+    const M0 = R && s.scarf && ctx.getTransform ? ctx.getTransform() : null;
+    const anchorHere = () => {
+      if (!M0) return;
+      const m = M0.inverse().multiply(ctx.getTransform()), p = m.transformPoint(new DOMPoint(st.anchor[0], st.anchor[1]));
+      if (isFinite(p.x) && isFinite(p.y)) R.anc = { dx: p.x - s.x, dy: p.y - s.y, t: G.t };
+    };
     ctx.save();
     ctx.translate(s.x, s.y);
     ctx.scale(s.facing * SC * turnW, SC);
@@ -2657,11 +2753,64 @@
       else if (s.hold && s.focus > 0.12 && !s.dash) crouchT = 3 + 0.8 * focusMark(s.focus);
     }
     const crouch = h.draw ? ease('crouch', crouchT, drawing ? 60 : 22) : 0;
-    ctx.scale(1 - s.squash * 0.55, 1 + s.squash);
+    // (v2.5c) a squash that presses the hero down is taken mostly in the knees (see sink), not by
+    // squeezing the whole figure; a stretch (a jump) still stretches it
+    const squash = s.squash || 0, sq = squash < 0 ? squash * 0.4 : squash;
+    ctx.scale(1 - sq * 0.55, 1 + sq);
     ctx.lineCap = 'round'; ctx.lineJoin = 'round';
 
+    // -- the hips: they sink through the knees on a landing or a blow and come back up past rest; at
+    // rest the weight drifts from one foot to the other
+    const restK = R ? ease('restK', idle && !s.hold ? 1 : 0, 5) : (idle && !s.hold ? 1 : 0);
+    const ws = Math.sin(G.t * 0.75 + ph) * restK, hipX = ws * 1.1;
+    const sink = G.clamp(spr('sink', Math.max(0, -squash) * 20, 20, 0.42), -2.5, 8);
+    kick('sink', land * 0.03 + hit * 60);
     const bob = run ? Math.abs(Math.sin(s.runT)) * 1.3 : 0;
-    const hip = -24 + bob + crouch;
+    const hip = Math.min(-13, -24 + bob + crouch + sink + ws * ws * 0.35);
+    // -- the chest rides the hips a beat late; the spine bows and stretches about the hips
+    const chest = G.clamp(spr('ch', 0, 16, 0.36), -2.5, 4);
+    kick('ch', land * 0.022 + hit * 45 - dvy * 0.01 + (foot ? (h.heavy ? 9 : 4) : 0));
+    const spine = G.clamp(spr('sp', run ? 0.03 : 0, 10, 0.45), -0.16, 0.16) - ws * 0.02 + breath * 0.008;
+    kick('sp', -dvx * 0.0013 + land * 0.0005 + hit * 0.6);
+    const upY = hip + 24 - breath * 0.5 + chest;
+    const upper = () => { ctx.translate(hipX, upY - 24); ctx.rotate(spine); ctx.translate(0, 24); };
+    // -- the head on its neck
+    const nod = run ? Math.sin(2 * s.runT - 1.1) * 0.7 : 0;
+    const hx = G.clamp(spr('hx', 0, 15, 0.42), -3.5, 3.5), hy = G.clamp(spr('hy', nod, 15, 0.42), -3, 4);
+    kick('hx', -dvx * 0.08); kick('hy', -dvy * 0.035 + hit * 40 + (foot ? 6 : 0));
+    const ht = G.clamp(spr('ht', -leanNow * 0.3 + Math.sin(G.t * 0.7 + ph) * 0.03 * restK, 12, 0.4), -0.3, 0.3);
+    kick('ht', -dvx * 0.0011 - dvy * 0.0004);
+    // -- cloth at three depths, each following the one above it
+    const swayT = G.clamp(s.vx * s.facing * 0.02, -6, 6) + (air ? G.clamp(s.vy * 0.004, -3, 4) : 0) + breath * 0.3 + Math.sin(G.t * 1.3 + ph) * 0.4 * restK;
+    const c1 = G.clamp(spr('c1', swayT, 12, 0.42), -9, 9);
+    const c2 = G.clamp(spr('c2', c1, 9.5, 0.34), -9, 9);
+    const c3 = G.clamp(spr('c3', c2, 7.5, 0.28), -10, 10);
+    kick('c1', dvx * 0.008); kick('c2', dvx * 0.012); kick('c3', dvx * 0.018);
+    const sw = { a: c1, b: c2, c: c3 };
+    // -- each hero's own hanging and riding pieces
+    let hood = null, moon = null, hat = 0, qa = 0, pa0 = 0, pa1 = 0;
+    if (id === 'vesper') {
+      const hpx = G.clamp(spr('hpx', -G.clamp(s.vx * s.facing / 335, 0, 1.5) * 1.5, 11, 0.3), -3, 3);
+      const hpy = G.clamp(spr('hpy', air ? G.clamp(s.vy * 0.002, -1.5, 1.5) : 0, 11, 0.3), -3, 3);
+      kick('hpx', -dvx * 0.04); kick('hpy', -dvy * 0.02);
+      hood = [hpx, hpy];
+    } else if (id === 'lune') {
+      const mx = spr('mnx', hx, 7, 0.5), my = spr('mny', hy, 7, 0.5);
+      moon = [G.clamp(mx - hx, -4, 4), G.clamp(my - hy, -4, 4)];
+      qa = G.clamp(spr('qa', 0, 10, 0.3), -0.45, 0.45);
+      kick('qa', (Math.sin(1.07) * dvx - Math.cos(1.07) * dvy) * 0.0016 + (foot ? 0.25 : 0));
+    } else if (id === 'eos') {
+      hat = G.clamp(spr('hat', 0, 13, 0.32), -0.25, 0.25);
+      kick('hat', -dvx * 0.0012 - dvy * 0.0005 + hit * 0.8);
+    } else if (id === 'aster') {
+      // the pauldrons are separate plates: they jolt on every step and landing, each on its own spring
+      pa0 = G.clamp(spr('pa0', 0, 21, 0.28), -3, 3); pa1 = G.clamp(spr('pa1', 0, 18, 0.3), -3, 3);
+      const pk = -dvy * 0.02 + hit * 50 + (foot ? 10 : 0);
+      kick('pa0', pk); kick('pa1', pk * 1.2);
+    }
+
+    // -- legs: two bones each, solved to the foot; the foot rolls up onto its toe as the heel lifts
+    // and folds as it leaves the ground, and a planted foot lies flat however the body leans
     const ft = footTargets(s, st), L = st.leg, A = st.arm, fr = run ? 44 : 26;
     if (st.lunge && !air && !s.dash && (drawing || !run)) {
       // her wide stances are planted: the lean must not lift one foot and bury the other
@@ -2669,32 +2818,46 @@
       for (const f of ft) { const X = f[0], Y = f[1]; f[0] = X * cl + Y * sl; f[1] = -X * sl + Y * cl; }
     }
     const feet = R ? [[ease('f0x', ft[0][0], fr), ease('f0y', ft[0][1], fr)], [ease('f1x', ft[1][0], fr), ease('f1y', ft[1][1], fr)]] : ft;
+    const rollT = (i) => {
+      if (s.dash) return i ? 0.5 : 0.95;
+      if (air) return s.vy < 0 ? (i ? 0.8 : 0.5) : (i ? 0.7 : 0.25);
+      if (run) return runRoll(s.runT + (i ? Math.PI : 0));
+      return G.clamp(-ft[i][1] / 7, 0, 1) * 0.6;
+    };
+    const rolls = [G.clamp(spr('fr0', rollT(0), 40, 0.6), -0.4, 1.1), G.clamp(spr('fr1', rollT(1), 40, 0.6), -0.4, 1.1)];
     const leg = (i) => {
-      const hx = i ? -1.6 : 1.6, k = ik(hx, hip, feet[i][0], feet[i][1], 12.7, 12.7, -1);
+      const hx0 = (i ? -1.6 : 1.6) + hipX, f = feet[i], L2 = L[2];
+      // a planted foot turns about its toe (heel up) or its heel (toe up); a lifted one about its ankle
+      const th = rolls[i], g = air ? 0 : 1 - G.clamp(-f[1] / 2.5, 0, 1), pd = th > 0 ? L2 * 0.55 + 4.4 : -L2 * 0.9;
+      const ax = f[0] + g * pd * (1 - Math.cos(th)), ay = f[1] - g * pd * Math.sin(th);
+      const k = ik(hx0, hip, ax, ay, 12.7, 12.7, -1);
       ctx.fillStyle = i ? st.dark : st.mid;
-      DR.limb(ctx, hx, hip, k.jx, k.jy, L[0], L[1]); ctx.fill();
+      DR.limb(ctx, hx0, hip, k.jx, k.jy, L[0], L[1]); ctx.fill();
       DR.limb(ctx, k.jx, k.jy, k.ex, k.ey - 1.6, L[1], L[2]); ctx.fill();
       // greave, knee and a pointed boot
       const gx = G.lerp(k.jx, k.ex, 0.82), gy = G.lerp(k.jy, k.ey, 0.82);
       ctx.fillStyle = i ? st.mid : st.plate;
-      poly(ctx, [k.jx - L[1] * 0.25, k.jy + 0.5, k.jx + L[1] * 0.72, k.jy - 0.4, gx + L[2] * 0.85, gy, gx - L[2] * 0.2, gy + 0.6]); ctx.fill();
+      poly(ctx, [k.jx - L[1] * 0.25, k.jy + 0.5, k.jx + L[1] * 0.72, k.jy - 0.4, gx + L2 * 0.85, gy, gx - L2 * 0.2, gy + 0.6]); ctx.fill();
       if (id !== 'lune' && id !== 'eos') { poly(ctx, [k.jx - 0.6, k.jy - L[1] * 0.6, k.jx + L[1] * 0.95, k.jy - 0.6, k.jx + 0.6, k.jy + L[1] * 0.5]); ctx.fill(); }
-      poly(ctx, [k.ex - L[2] * 0.9, k.ey - 3.2, k.ex + L[2] * 0.55, k.ey - 3.4, k.ex + L[2] * 0.55 + 4.4, k.ey, k.ex - L[2] * 0.9, k.ey]); ctx.fill();
-      if (!i) { ctx.strokeStyle = G.rgba(col, 0.55); ctx.lineWidth = 0.8; line(ctx, k.jx + L[1] * 0.72, k.jy - 0.4, gx + L[2] * 0.85, gy); }
+      const ba = th - g * leanNow, cb = Math.cos(ba), sb = Math.sin(ba);
+      const bx = (dx, dy) => k.ex + dx * cb - dy * sb, by = (dx, dy) => k.ey + dx * sb + dy * cb;
+      const hl = -L2 * 0.9, tp = L2 * 0.55;
+      poly(ctx, [bx(hl, -3.2), by(hl, -3.2), bx(tp, -3.4), by(tp, -3.4), bx(tp + 4.4, 0), by(tp + 4.4, 0), bx(hl, 0), by(hl, 0)]); ctx.fill();
+      if (!i) { ctx.strokeStyle = G.rgba(col, 0.55); ctx.lineWidth = 0.8; line(ctx, k.jx + L[1] * 0.72, k.jy - 0.4, gx + L2 * 0.85, gy); }
     };
 
-    const sway = G.clamp(s.vx * s.facing * 0.02, -6, 6) + (air ? G.clamp(s.vy * 0.004, -3, 4) : 0) + breath * 0.3;
     // what hangs behind the legs
     ctx.save();
-    ctx.translate(0, bob + crouch - breath * 0.5);
-    if (id === 'vesper') backVesper(ctx, h, st, sway, -24);
-    else if (id === 'lune') backLune(ctx, h, st, sway, -24);
-    else if (id === 'eos') backEos(ctx, h, st, sway, -24);
+    upper();
+    if (id === 'vesper') backVesper(ctx, h, st, sw, -24);
+    else if (id === 'lune') backLune(ctx, h, st, sw, -24, qa);
+    else if (id === 'eos') backEos(ctx, h, st, sw, -24);
     ctx.restore();
     leg(1);
 
-    // everything above the hips rides the run bob and the idle breath
-    ctx.translate(0, bob + crouch - breath * 0.5);
+    // everything above the hips rides the hips, the chest, the spine and the idle breath
+    ctx.save();
+    upper();
     let W = weaponPose(h, s, breath);
     if (R) {
       if (a || s.flT > 0 || s.cast || s.recov || R.wang == null) {
@@ -2717,21 +2880,63 @@
     }
     W.fy -= LIFT; W.by -= LIFT;
     if (W.sy != null) { W.sy -= LIFT; W.hy -= LIFT; }
+    // -- (v2.5c) what is carried at rest swings on its own: the weapon on the hand like a pendulum
+    // (pushed the way the body's change of speed throws its far end), the hands bounce, a free hand
+    // trails, and Eos's sheath swings from her belt. Never in a swing, a shot, a cast or on the way
+    // back from one: those are shown exactly, to match the cuts they draw.
+    const wfree = !a && !(s.flT > 0) && !s.cast && !s.recov && !(s.stun > 0) && !(s.healT > 0) && !s.plunge && !(s.hold && s.focus > 0.12);
+    if (h.weapon === 'blade') {
+      let sh = 0;
+      if (K) {
+        if (wfree && !W.free) {
+          sh = G.clamp(spr('sh', 0, 8, 0.3), -0.5, 0.5);
+          kick('sh', (Math.sin(W.sang) * dvx - Math.cos(W.sang) * dvy) * 0.0028 + (foot ? -0.2 : 0));
+        } else K.set('sh', 0);
+      }
+      if (sh) {
+        const ox = W.hx, oy = W.hy;
+        W.sang += sh; W.ang = W.sang;
+        W.hx = W.sx - Math.cos(W.sang) * (1.6 + W.vis); W.hy = W.sy - Math.sin(W.sang) * (1.6 + W.vis);
+        if (Math.hypot(W.fx - ox, W.fy - oy) < 13) { W.fx += W.hx - ox; W.fy += W.hy - oy; } // a hand on the grip goes with it
+      }
+    } else {
+      let wa = 0, wy = 0, bhx = 0, bhy = 0;
+      if (K) {
+        if (wfree) {
+          const maul = h.weapon === 'maul';
+          wa = G.clamp(spr('wa', 0, maul ? 7 : 9, 0.32), -0.35, 0.35);
+          kick('wa', (Math.sin(W.ang) * dvx - Math.cos(W.ang) * dvy) * (maul ? 0.0015 : 0.002) + hit * (maul ? -1.2 : 0.8));
+          wy = G.clamp(spr('wy', 0, 14, 0.35), -3, 3);
+          kick('wy', -dvy * 0.012 + hit * 30 + (foot ? (maul ? 6 : 3) : 0));
+          bhx = G.clamp(spr('bhx', 0, 12, 0.35), -3.5, 3.5); bhy = G.clamp(spr('bhy', 0, 12, 0.35), -3.5, 3.5);
+          kick('bhx', -dvx * 0.05); kick('bhy', -dvy * 0.03 + (foot ? 4 : 0));
+        } else for (const k of ['wa', 'wy', 'bhx', 'bhy']) K.set(k, 0);
+      }
+      if (wa || wy || bhx || bhy) {
+        W.ang += h.weapon === 'bow' ? wa * 0.5 : wa;
+        W.fy += wy;
+        if (h.weapon === 'maul') { W.bx = W.fx - Math.cos(W.ang) * 7.5; W.by = W.fy - Math.sin(W.ang) * 7.5; } // both hands on the haft
+        else { W.bx += bhx; W.by += bhy + wy * 0.6; }
+      }
+    }
+    const shY = SHY - breath * 0.25; // the shoulders rise a little more than the chest as she breathes in
     const arm = (front) => {
       const sx = front ? (id === 'aster' ? 6.4 : 3) : (id === 'aster' ? -6 : -2.6), held = front !== !!W.swap, tx = held ? W.fx : W.bx, ty = held ? W.fy : W.by;
-      const k = ik(sx, SHY, tx, ty, 8.4, 8.8, 1);
+      const k = ik(sx, shY, tx, ty, 8.4, 8.8, 1);
       ctx.fillStyle = front ? st.mid : st.dark;
-      DR.limb(ctx, sx, SHY, k.jx, k.jy, A[0], A[1]); ctx.fill();
+      DR.limb(ctx, sx, shY, k.jx, k.jy, A[0], A[1]); ctx.fill();
       DR.limb(ctx, k.jx, k.jy, k.ex, k.ey, A[1], A[2]); ctx.fill();
       // bracer and glove
       ctx.fillStyle = front ? st.plate : st.mid;
       DR.limb(ctx, G.lerp(k.jx, k.ex, 0.3), G.lerp(k.jy, k.ey, 0.3), G.lerp(k.jx, k.ex, 0.88), G.lerp(k.jy, k.ey, 0.88), A[1] + 1, A[2] + 0.8); ctx.fill();
       if (front) { ctx.strokeStyle = G.rgba(col, 0.6); ctx.lineWidth = 0.7; ctx.stroke(); }
       if (id === 'eos') {
-        // a wide sleeve hangs from her forearm
-        const mx2 = G.lerp(k.jx, k.ex, 0.5), my2 = G.lerp(k.jy, k.ey, 0.5);
+        // a wide sleeve hangs from her forearm; its hem trails the arm on its own spring, so it
+        // billows behind a cut and swings on past when the arm stops
+        const mx2 = G.lerp(k.jx, k.ex, 0.5), my2 = G.lerp(k.jy, k.ey, 0.5), key = front ? 'slf' : 'slb';
+        const ox = G.clamp(spr(key + 'x', mx2, 13, 0.35) - mx2, -5, 5), oy = G.clamp(spr(key + 'y', my2, 13, 0.35) - my2, -4, 4);
         ctx.fillStyle = front ? st.mid : st.dark;
-        poly(ctx, [sx - 1.6, SHY + 0.6, k.jx + 0.6, k.jy - A[1] * 0.7, G.lerp(k.jx, k.ex, 0.78), G.lerp(k.jy, k.ey, 0.78) - 1.2, mx2 - 1 - sway * 0.3, my2 + 6.8, k.jx - 2.4 - sway * 0.2, k.jy + 3.6]); ctx.fill();
+        poly(ctx, [sx - 1.6, shY + 0.6, k.jx + 0.6, k.jy - A[1] * 0.7, G.lerp(k.jx, k.ex, 0.78), G.lerp(k.jy, k.ey, 0.78) - 1.2, mx2 - 1 - sw.b * 0.3 + ox, my2 + 6.8 + oy * 0.6, k.jx - 2.4 - sw.b * 0.2 + ox * 0.5, k.jy + 3.6 + oy * 0.3]); ctx.fill();
         if (front) { ctx.strokeStyle = G.rgba(col, 0.5); ctx.lineWidth = 0.7; ctx.stroke(); }
       }
       ctx.fillStyle = front ? st.hi : st.plate;
@@ -2746,25 +2951,32 @@
 
     arm(false);
     if (W.behind) weapon(); // the shouldered maul sits behind the body
-    if (id === 'aster') pauldron(ctx, h, st, -9.4, SHY - 1, 0.9, st.mid);
-    if (id === 'vesper') bodyVesper(ctx, h, st, sway, -24);
-    else if (id === 'aster') bodyAster(ctx, h, st, sway, -24);
-    else if (id === 'eos') bodyEos(ctx, h, st, sway, -24);
+    if (id === 'aster') pauldron(ctx, h, st, -9.4, SHY - 1 + pa1, 0.9, st.mid);
+    if (id === 'vesper') bodyVesper(ctx, h, st, sw, -24);
+    else if (id === 'aster') bodyAster(ctx, h, st, sw, -24);
+    else if (id === 'eos') bodyEos(ctx, h, st, sw, -24);
     else bodyLune(ctx, h, st);
-    ctx.translate(0, breath * 0.5);
-    leg(0);
-    ctx.translate(0, -breath * 0.5);
-    ctx.save();
-    ctx.translate(0, -breath * 0.35);
-    if (id === 'vesper') headVesper(ctx, h, st);
-    else if (id === 'aster') headAster(ctx, h, st);
-    else if (id === 'eos') headEos(ctx, h, st);
-    else headLune(ctx, h, st);
+    if (id === 'aster' || id === 'vesper') anchorHere(); // the cape at his shoulders, the scarf at her neck
     ctx.restore();
+    leg(0);
+    ctx.save();
+    upper();
+    // the head: on its neck, tipping about it
+    ctx.save();
+    ctx.translate(hx, hy - breath * 0.35);
+    ctx.translate(1, -41); ctx.rotate(ht); ctx.translate(-1, 41);
+    if (id === 'vesper') headVesper(ctx, h, st, hood);
+    else if (id === 'aster') headAster(ctx, h, st);
+    else if (id === 'eos') headEos(ctx, h, st, hat);
+    else headLune(ctx, h, st, moon);
+    if (id === 'lune' || id === 'eos') anchorHere(); // her hair, their hat ribbons: tied at the head
+    ctx.restore();
+    if (id === 'vesper') plateVesper(ctx, h, st);
     if (!W.behind) weapon();
     arm(true);
-    if (id === 'aster') pauldron(ctx, h, st, 9.2, SHY - 1, 1, st.plate);
+    if (id === 'aster') pauldron(ctx, h, st, 9.2, SHY - 1 + pa0, 1, st.plate);
     if (W.javelin) drawJavelin(ctx, W, h, s.cast.t);
+    ctx.restore();
 
     if (s.hurtFlash > 0) glowAt(ctx, '255,90,90', 0, -30, 38, s.hurtFlash);
     ctx.restore();

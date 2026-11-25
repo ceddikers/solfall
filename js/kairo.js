@@ -208,17 +208,26 @@
     idle: [0.1, -44, 14, 0, -15, 0, 22, -72, 9, -66, 0],
     dashLow: [0.55, -35, 20, 0, -27, -5, 24, -56, 12, -52, 0],
     tap: [0.18, -43, 15, 0, -15, 0, 36, -73, 9, -66, 0],
-    jab: [0.26, -42, 20, 0, -18, 0, 42, -70, 7, -66, 0],
-    cross: [0.36, -41, 22, 0, -16, -1, 14, -68, 44, -68, 0],
+    jab: [0.26, -42, 20, 0, -18, 0, 45, -70, 7, -66, 0],
+    cross: [0.42, -40, 24, 0, -15, -3, 12, -66, 46, -68, 0],     // (v2.5c: the hips come through with it)
     jabL: [0.26, -42, 20, 0, -18, 0, 42, -70, -6, -50, 0],  // the lead jabs while the rear hand waits at the hip
     guardL: [0.12, -43, 15, 0, -15, 0, 22, -72, -6, -50, 0],
-    hips: [-0.05, -44, 13, 0, -14, -7, 20, -74, -2, -66, 0], // the kick's tell: hips turned, back heel up
+    hips: [-0.2, -44, 11, 0, -12, -12, 18, -78, -8, -62, -0.04], // the kick's tell: hips turned, back heel up (v2.5c: further)
     spinKick: [-0.25, -41, -5, 0, 54, -26, -11, -70, 9, -63, 0],
     riseKick: [-0.55, -49, -2, 0, 20, -112, -12, -72, 11, -66, 0],
     // the wind-ups his punches come out of: the fist drawn back, the shoulder turned away
     jabC: [0.04, -43, 16, 0, -16, 0, 13, -75, 7, -66, 0],
     crossC: [-0.04, -42, 19, 0, -18, 0, 27, -72, -11, -63, 0],
     jabLC: [0.04, -43, 16, 0, -16, 0, 13, -75, -8, -49, 0],
+    // (v2.5c) the second stage of each wind-up, its peak: what tells one blow from another
+    jabP: [-0.06, -41, 18, 0, -17, 0, 6, -73, 9, -64, 0.06],    // jab: tucked behind the lead shoulder, chin down
+    crossP: [-0.26, -41, 21, 0, -21, -3, 28, -74, -24, -70, 0.04], // cross: rocked right back, rear fist by the ear, heel up
+    jabLP: [-0.08, -42, 18, 0, -17, 0, 5, -74, -10, -46, 0.06],
+    hayC: [-0.12, -38, 23, 0, -22, 0, 26, -72, -18, -74, 0.08],   // the last punch: sinking low...
+    hayP: [-0.36, -36, 25, 0, -24, -4, 30, -70, -30, -84, 0.12],  // ...and wound right round, the fist high behind his head
+    hayJ: [-0.3, -36, 25, 0, -24, -4, -10, -82, 22, -72, 0.12],   // (a lead-hand last punch: the lead fist high behind instead)
+    hipsP: [-0.4, -45, 8, 0, -8, -20, 18, -84, -18, -58, -0.1],  // the kick tell at its peak: turned away, heel high, arm up
+    riseC: [0.22, -36, 22, 0, -18, 0, 20, -64, 4, -58, 0.12],     // down on the front leg before the rising kick
     // the beam ending's charge: low and wide, the lead hand out to aim, the glowing hand right back at the hip
     beamC: [-0.16, -37, 27, 0, -27, 0, 31, -64, -25, -45, 0],
     palmShot: [0.3, -41, 22, 0, -20, 0, 16, -68, 48, -58, 0],
@@ -258,6 +267,8 @@
   };
   // poses snapped into rather than eased (the rest settle at the usual rate)
   const SNAP = { jab: 1, cross: 1, jabL: 1, tap: 1, spinKick: 1, riseKick: 1, palmShot: 1, push: 1, shootA: 1, shootB: 1, palmUp: 1, throwP: 1, smash: 1, fling: 1, grabBack: 1, throwSun: 1, dive: 1, fly: 1 };
+  // (v2.5c) wind-ups are reached quicker than a relaxed pose, so each stage shows before the blow comes
+  const WIND = { jabC: 1, crossC: 1, jabLC: 1, hayC: 1, jabP: 1, crossP: 1, jabLP: 1, hayP: 1, hayJ: 1, hips: 1, hipsP: 1, riseC: 1 };
   function walkPose(t) {
     const s = Math.sin(t), c = Math.cos(t), p = POSES.idle.slice();
     p[0] = 0.22; p[2] = 14 + s * 14; p[3] = -Math.max(0, c) * 8; p[4] = -15 - s * 14; p[5] = -Math.max(0, -c) * 8; p[1] = -44 + Math.abs(s) * 2;
@@ -365,6 +376,7 @@
       x: 900, y: -140, face: -1, pose: 'fly', p: POSES.fly.slice(), pv: new Array(NP).fill(0), walkT: 0, stepN: 0,
       fast: false, air: true, hurt: false, open: 0, handHip: 0, glow: 0, hips: 0, orb: 0, held: false, sweepUp: 0,
       spin: 0, eyesShut: 0, lie: 0, sway: 0, flick: 0, risen: 0, still: 0, flareK: 0, sputter: 0, sunK: 0, laughing: 0,
+      rig: null, lv: null, dp: null, rg: null, // (his bones, drawing only: see living)
     });
     B.hair = D.chain(8, b.x, b.y - 80);
     B.sash = D.chain(5, b.x, b.y - 44);
@@ -526,10 +538,16 @@
       onFire() { b.fast = true; b.pose = o.pose; G.audio.play('whoosh'); G.audio.play('kSnap'); G.fx.shake(5); },
     });
   }
-  function* stepIn(dur, dist) {
-    const b = B.body, x0 = b.x, x1 = clampX(b.x + b.face * dist);
+  function* stepIn(dur, dist, peak) {
+    const b = B.body, x0 = b.x, x1 = clampX(b.x + b.face * dist), load = b.pose;
     let e = 0;
-    while (e < dur) { const dt = yield; e += dt; b.x = G.lerp(x0, x1, Math.min(1, e / dur)); }
+    while (e < dur) {
+      const dt = yield; e += dt;
+      // (v2.5c) the step lands late, as the weight comes forward into the blow
+      b.x = G.lerp(x0, x1, E.inQuad(Math.min(1, e / dur)));
+      // the second stage of the wind-up: from just past halfway he coils to its peak
+      if (peak && b.pose === load && e >= dur * 0.5) b.pose = peak;
+    }
   }
   // low along the floor, fists up
   function* dashTo(x, speed) {
@@ -618,10 +636,15 @@
       const tele = base * T * speed, lead = i % 2 === 1, last = i === n;
       if (end === 'beam' && i === beamAt) { b.handHip = 1; b.glow = 0.5; G.audio.play('kHum', { dur: (n - i + 1) * 0.24 * T * speed + 0.5, vol: ph === 3 ? 0.5 : 1 }); }
       if (end === 'kick' && i === kickAt) { b.hips = 1; G.audio.play('kBreath'); }
-      // the wind-up he punches out of: the fist drawn back (the kick tell: hips turned, back heel up)
-      b.pose = b.hips ? 'hips' : b.handHip ? 'jabLC' : lead ? 'jabC' : 'crossC';
+      // the wind-up he punches out of, in two stages: it loads, then coils to a peak that is its own for
+      // each blow (v2.5c): the jab tucks behind the lead shoulder; the cross rocks his whole body back with
+      // the rear fist by his ear; the last of the string sinks low and winds right round (a haymaker);
+      // the kick tell turns him away with the back heel high; the beam tell drops a glowing hand to his hip
+      const hay = last && !b.hips && !b.handHip;
+      b.pose = b.hips ? 'hips' : b.handHip ? 'jabLC' : hay ? 'hayC' : lead ? 'jabC' : 'crossC';
+      const peak = b.hips ? 'hipsP' : b.handHip ? 'jabLP' : hay ? (lead ? 'hayJ' : 'hayP') : lead ? 'jabP' : 'crossP';
       punch({ tele, pose: b.handHip ? 'jabL' : (lead ? 'jab' : 'cross'), soft: ph === 3, r: last ? 112 : 100, heavy: !lead || last, last });
-      yield* stepIn(tele, lead ? 10 : 18);
+      yield* stepIn(tele, lead ? 10 : 18, peak);
       yield* wait(last ? 0.1 : 0.06);
       b.fast = false;
       // the turn grab: the hero went through to his back
@@ -680,7 +703,9 @@
     // a wide spinning kick, low and long, round in front of him
     kick({ r: 150, a0: -0.2, a1: 0.95, tele: 0.16 * T, pose: 'spinKick', y: -40 });
     yield* wait(0.16 * T + 0.16);
-    // then one that rises from the floor in front of him to over his head (no jumping it)
+    // then one that rises from the floor in front of him to over his head (no jumping it): down on the
+    // front leg first (v2.5c)
+    b.fast = false; b.pose = 'riseC';
     kick({ r: 165, a0: 0.75, a1: -2.0, tele: 0.2 * T, pose: 'riseKick', y: -44 });
     yield* wait(0.2 * T + 0.14);
     // he lands from it facing the way he kicked: a hero who went through is at his back
@@ -1562,21 +1587,24 @@
     }
     // the pose: each part on a spring, snappier for blows
     const target = b.pose === 'walk' ? walkPose(b.walkT) : (POSES[b.pose] || POSES.idle);
-    const w0 = b.fast || SNAP[b.pose] ? 46 : 18, z = b.fast ? 0.8 : 0.9; // (v2.5b: firmer, so a blow lands and holds instead of wobbling past)
+    const w0 = b.fast || SNAP[b.pose] ? 46 : WIND[b.pose] ? 34 : 18, z = b.fast ? 0.8 : 0.9; // (v2.5b: firmer, so a blow lands and holds instead of wobbling past)
     for (let i = 0; i < NP; i++) {
       b.pv[i] += ((target[i] - b.p[i]) * w0 * w0 - 2 * z * w0 * b.pv[i]) * dt;
       b.p[i] += b.pv[i] * dt;
     }
     // on his toes in his stance
     b.bob = (b.pose === 'idle' && !b.air) ? Math.sin(G.t * 7.5) * 1.6 : 0;
-    // hair and sash: the aura lifts them
+    // (v2.5c) each part of him on its own spring, on top of the pose (drawing only: see living)
+    living(b, b.p, target, b.pose, dt, !b.air && b.y >= gy(b.x) - 3, b.fast || !!SNAP[b.pose], false);
+    // hair and sash: the aura lifts them, and they keep their swing (his starts and stops fling them)
     const lift = Math.max(b.risen, b.flareK * (B.flare > 0 ? 1 : 0), b.still * 0.4);
-    const sh = shoulderOf(b), hx = sh.x - b.face * 7, hy = sh.y - 14;
-    D.chainStep(B.hair, hx, hy, dt, { seg: 6, grav: G.lerp(70, -35, lift), drift: 34 + 30 * lift, face: b.face, wave: 6 + 14 * lift, rate: 6 + 5 * lift });
-    D.chainStep(B.sash, b.x - b.face * 9, b.y + b.p[1] + 2, dt, { seg: 6, grav: G.lerp(90, 10, lift), drift: 20, face: b.face, wave: 5, rate: 5, floor: FLOOR - 1 });
+    const ga = geo(b), ct = Math.cos(ga.tilt), st = Math.sin(ga.tilt), fs = b.face;
+    const tx = ga.hx - 10 * ct + 3 * st, ty = ga.hy - 10 * st - 3 * ct; // the tie at the back of his head
+    chainV(B.hair, b.x + fs * tx, b.y + ty, dt, { seg: 6, grav: G.lerp(70, -35, lift), drift: 34 + 30 * lift, face: fs, wave: 6 + 14 * lift, rate: 6 + 5 * lift });
+    chainV(B.sash, b.x + fs * (ga.r.wx - 9), b.y + ga.hip + 2, dt, { seg: 6, grav: G.lerp(90, 10, lift), drift: 20, face: fs, wave: 5, rate: 5, floor: FLOOR - 1 });
     // afterimages fade
     for (let i = B.ghosts.length - 1; i >= 0; i--) { const g = B.ghosts[i]; g.t += dt; if (g.t >= g.life) B.ghosts.splice(i, 1); }
-    if (B.shade) B.shade.a = Math.min(1, B.shade.a + dt * 4);
+    if (B.shade) { B.shade.a = Math.min(1, B.shade.a + dt * 4); shadeTick(B.shade, b, dt); }
     b.flick = Math.max(0, b.flick - dt * 3);
     b.pulse = Math.max(0, (b.pulse || 0) - dt * 3);
     b.sputter = Math.max(0, b.sputter - dt * 0.6);
@@ -1635,9 +1663,178 @@
     for (let i = 0; i < 4; i++) { px += Math.cos(a + G.rand(-0.9, 0.9)) * len / 4; py += Math.sin(a + G.rand(-0.9, 0.9)) * len / 4; pts.push([px, py]); }
     return pts;
   }
-  function shoulderOf(f) {
-    const lean = f.p[0];
-    return { x: f.x + f.face * Math.sin(lean) * 30, y: f.y + (f.bob || 0) + f.p[1] - Math.cos(lean) * 30 };
+
+  // ------------------------------------------------------------------ bones (v2.5c)
+  // Drawing only. The pose (f.p) is what the game reads (the beam's hand, the glints' fists) and is
+  // left alone; on top of it each part of him moves on its own spring (D.rig):
+  //   f.dp  the pose as drawn: each fist on a looser spring than the pose, so a blow snaps out past its
+  //         mark and recoils; a foot off the ground the same (a kick snaps and swings back); the hips
+  //         dipping on a landing or a footfall; the spine thrown back as he drives off, on as he stops
+  //   f.rg  the rest: the head (its own lean, lagging the shoulders, snapped on by a blow and back by a
+  //         blow taken), the shoulders twisting into a punch (the rear shoulder comes through on a cross,
+  //         goes back on a wind-up), the weight shifting between his feet, the breath (harder after a
+  //         flurry), the wrists, the arms stretching at full speed, each foot rolling off its toes and
+  //         pointing in the air, the toes gripping as a foot lands, each trouser leg's cloth swinging
+  // A figure without them (an afterimage) is drawn straight from its pose.
+  const REST = { wx: 0, tw: 0, br: 0, hl: null, hx: 0, hy: 0, ht: null, fa: null, toe: null, cl: null, ha: null, st: [0, 0] };
+  // how hard a blow's start throws his parts (the fists and feet towards where they are going, the head
+  // back, the hips down into it)
+  const SNAPK = { jab: 1, cross: 1.2, jabL: 1, tap: 0.35, palmShot: 1, push: 1, shootA: 0.6, shootB: 0.6, palmUp: 0.6, throwP: 1, throwSun: 1, fling: 0.8, smash: 1.2, spinKick: 1, riseKick: 1, knee: 0.8, grabBack: 0.8, dive: 0.5 };
+  const wrapA = (a) => a - Math.round(a / G.TAU) * G.TAU;
+  // where the drawn parts sit, in the figure's own frame (facing right, from the point between his feet)
+  function geo(f) {
+    const p = f.dp || f.p, r = f.rg || REST, lean = p[0], hip = p[1] + (f.bob || 0);
+    const shx = r.wx + Math.sin(lean) * 30, shy = hip - Math.cos(lean) * 30 - r.br * 0.6;
+    const hl = r.hl == null ? lean : r.hl;
+    return {
+      p, r, lean, hip, shx, shy,
+      hx: shx + Math.sin(hl) * 12 + 1.5 + r.hx, hy: shy - Math.cos(hl) * 12 - 1 + r.hy,
+      tilt: r.ht == null ? lean * 0.35 + (p[10] || 0) * 0.6 : r.ht,
+    };
+  }
+  function armAt(g, front) {
+    const tw = g.r.tw, ax = g.shx + (front ? 5 - tw * 2 : -6 + tw * 5), ay = g.shy + 3 + (front ? 0 : tw * 0.6);
+    return { ax, ay, k: D.ik(ax, ay, g.p[front ? 6 : 8], g.p[front ? 7 : 9], 17, 17 + g.r.st[front ? 0 : 1], 1) };
+  }
+  function legAt(g, front) {
+    const lx = (front ? 4 : -4) + g.r.wx, fy = g.p[front ? 3 : 5];
+    return { lx, fy, k: D.ik(lx, g.hip, g.p[front ? 2 : 4], fy - 2, 24, 23, -1) };
+  }
+  // the foot the leg asks for: flat on the floor; rolled up on to the ball as the heel lifts (the toes
+  // staying flat); off the floor, pointed along the shin with the toes curled
+  function footWant(lg, grounded) {
+    const k = lg.k, lift = grounded ? Math.max(0, -lg.fy) : 30;
+    const roll = Math.min(1.1, Math.asin(G.clamp(lift / 6.6, 0, 1)));
+    const pointed = Math.atan2(k.ey - k.jy, k.ex - k.jx) - 0.4;
+    const aK = G.clamp((lift - 6) / 12, 0, 1);
+    return { fa: G.lerp(roll, pointed, aK), toe: G.lerp(-roll, 0.3, aK) };
+  }
+  // a landing: the hips sink, the head nods, the toes spread and grip, the trousers flop
+  function landK(R, k) {
+    R.kick('hd', 85 * k); R.kick('hy', 60 * k); R.kick('sp', 0.6 * k);
+    for (let n = 0; n < 2; n++) { R.kick('toe' + n, -6); R.kick('cy' + n, 70 * k); }
+  }
+  // f: the figure; base: its pose; target: the pose it is heading for; pose: its name; grounded; fast:
+  // a blow under way; still: no pushing from its own motion (the Shadow Partner is moved, not moving)
+  function living(f, base, target, pose, dt, grounded, fast, still) {
+    if (!f.dp || f.dp.length !== base.length) f.dp = base.slice();
+    const R = f.rig || (f.rig = D.rig()), dp = f.dp;
+    const r = f.rg || (f.rg = { wx: 0, tw: 0, br: 0, hl: base[0], hx: 0, hy: 0, ht: 0, fa: [0, 0], toe: [0, 0], cl: [0, 0, 0, 0], ha: [0, 0], st: [0, 0] });
+    const L = f.lv || (f.lv = { pose, gr: grounded, fy: [base[3], base[5]], flash: 0, ex: 0 });
+    if (!(dt > 0)) return;
+    const fc = f.face || 1, A = still ? { ax: 0, ay: 0 } : R.accel(f.x, f.y, dt);
+    const ax = A.ax * fc, ay = A.ay, vx = (A.vx || 0) * fc;
+    // what just happened: a blow starting, a landing, a blow taken, a footfall
+    if (pose !== L.pose) {
+      const k = SNAPK[pose];
+      if (k && target) {
+        for (let i = 2; i < 10; i++) R.kick('o' + i, G.clamp((target[i] - base[i]) * 4 * k, -220, 220));
+        R.kick('hx', -55 * k); R.kick('ht', -2.2 * k); R.kick('hd', 22 * k);
+      }
+      if (pose === 'land' || pose === 'kneel' || pose === 'smash') landK(R, pose === 'smash' ? 1.4 : 1);
+      L.pose = pose;
+    }
+    if (grounded && !L.gr && pose !== 'land') landK(R, 1);
+    L.gr = grounded;
+    if ((f.flash || 0) > L.flash + 0.25) { R.kick('hx', -80); R.kick('ht', -2.6); R.kick('sp', -1.2); }
+    L.flash = f.flash || 0;
+    for (let n = 0; n < 2; n++) {
+      const fy = base[3 + n * 2];
+      if (grounded && L.fy[n] < -2.5 && fy >= -1) { R.kick('toe' + n, -5); R.kick('hd', 14); R.kick('cy' + n, 40); }
+      L.fy[n] = fy;
+    }
+    // the core: the spine, and the hips' dip
+    dp[0] = base[0] + R.spring('sp', G.clamp(-ax * 0.000016, -0.13, 0.13), dt, 14, 0.42);
+    dp[1] = base[1] + R.spring('hd', 0, dt, 15, 0.38);
+    // the fists and feet: where the pose puts them, plus a follow-through of their own that the pose's
+    // stopping throws on (only its stopping: on the way out a fist or a kick is never behind the pose),
+    // so a blow snaps past its mark and recoils, and a fist drawn back bobs before it settles. A foot on
+    // the floor stays planted where the pose puts it.
+    const pb = L.pb || (L.pb = base.slice()), pvb = L.pvb || (L.pvb = new Array(base.length).fill(0));
+    for (let ix = 2; ix < 10; ix += 2) {
+      const iy = ix + 1, ux = (base[ix] - pb[ix]) / dt, uy = (base[iy] - pb[iy]) / dt;
+      const qx = (ux - pvb[ix]) / dt, qy = (uy - pvb[iy]) / dt;
+      if (qx * ux + qy * uy < 0) { R.kick('o' + ix, G.clamp(-qx * dt * 0.3, -200, 200)); R.kick('o' + iy, G.clamp(-qy * dt * 0.3, -200, 200)); }
+      pvb[ix] = ux; pvb[iy] = uy;
+      const ox = R.spring('o' + ix, 0, dt, 38, 0.32), oy = R.spring('o' + iy, 0, dt, 38, 0.32);
+      const free = ix < 6 ? (grounded ? G.clamp(-base[iy] / 5, 0, 1) : 1) : 1;
+      dp[ix] = base[ix] + ox * free; dp[iy] = base[iy] + oy * free;
+    }
+    for (let i = 0; i < base.length; i++) pb[i] = base[i];
+    for (let i = 10; i < base.length; i++) dp[i] = base[i];
+    // breath: harder for a while after a flurry
+    const ex = L.ex = G.clamp(L.ex + (fast ? dt * 0.8 : -dt * 0.1), 0, 1);
+    r.br = Math.sin(G.t * (2.2 + 1.4 * ex)) * (0.8 + 1.0 * ex);
+    // the weight: the hips lead a push, and drift between his feet while he waits
+    const calm = pose === 'idle' || pose === 'guardL' || pose === 'empty';
+    r.wx = R.spring('wx', G.clamp(ax * 0.00018, -3, 3) + (calm ? Math.sin(G.t * 0.85) * 1.6 : 0), dt, 9, 0.5);
+    // the shoulders: the rear one comes through as the rear fist goes out, and goes back as it draws back
+    r.tw = R.spring('tw', G.clamp((base[8] - base[6] + 13) / 48, -1, 1), dt, 24, 0.5);
+    // the head: its own lean, a beat behind the spine; thrown back by a push, nodding on a stop
+    r.hl = R.spring('hl', dp[0], dt, 27, 0.5);
+    r.hx = R.spring('hx', G.clamp(-ax * 0.0005, -6, 6), dt, 17, 0.4);
+    r.hy = R.spring('hy', G.clamp(-ay * 0.0004, -5, 6) - r.br * 0.25, dt, 17, 0.4);
+    r.ht = R.spring('ht', dp[0] * 0.35 + (base[10] || 0) * 0.6 + G.clamp(-ax * 0.000012, -0.1, 0.1), dt, 19, 0.45);
+    const g = geo(f);
+    for (let n = 0; n < 2; n++) {
+      // the wrist a beat behind the forearm; the arm stretching a little at full speed
+      const a = armAt(g, n === 0), fa = Math.atan2(a.k.ey - a.k.jy, a.k.ex - a.k.jx);
+      const hp = R.s['ha' + n] ? R.s['ha' + n].x : fa;
+      r.ha[n] = R.spring('ha' + n, hp + wrapA(fa - hp), dt, 26, 0.45);
+      r.st[n] = R.spring('st' + n, G.clamp((Math.hypot(pvb[6 + n * 2], pvb[7 + n * 2]) - 300) * 0.005, 0, 2.5), dt, 30, 0.7);
+      // the foot rolling and pointing, the toes gripping
+      const lg = legAt(g, n === 0), w = footWant(lg, grounded);
+      const fp = R.s['fa' + n] ? R.s['fa' + n].x : w.fa;
+      r.fa[n] = R.spring('fa' + n, fp + wrapA(w.fa - fp), dt, 24, 0.5);
+      r.toe[n] = R.spring('toe' + n, w.toe, dt, 30, 0.4);
+      // the trouser leg: left behind by his motion and the leg's swing, flung up and down by falls
+      const fv = pvb[2 + n * 2];
+      r.cl[n * 2] = R.spring('cx' + n, G.clamp(-vx * 0.006 - fv * 0.015, -7, 7), dt, 11, 0.32);
+      r.cl[n * 2 + 1] = R.spring('cy' + n, G.clamp(-ay * 0.0005, -5, 5), dt, 11, 0.32);
+    }
+  }
+  // A chain that keeps its swing (D.chainStep's points have no speed of their own): each point eases
+  // towards the drift D.chainStep would give it (o: the same options) over a fifth of a second or so,
+  // looser towards the tip, so it trails as he sets off, flies on as he stops and swings past.
+  function chainV(pts, ax, ay, dt, o) {
+    const p0 = pts[0], jx = ax - p0.x, jy = ay - p0.y;
+    if (Math.abs(jx) > 160 || Math.abs(jy) > 160) for (const q of pts) { q.x += jx; q.y += jy; q.vx = 0; q.vy = 0; } // (a blink: carried whole)
+    p0.x = ax; p0.y = ay;
+    if (!(dt > 0)) return;
+    // (the drift and the fall at two and a half times D.chainStep's rates: the same hang at rest, but
+    // with weight enough to come back from a fling)
+    const n = pts.length, wind = -(o.face || 1) * (o.drift || 30) * 2.5;
+    for (let i = 1; i < n; i++) {
+      const a = pts[i - 1], b = pts[i], q = i / (n - 1), k = G.lerp(7, 3.4, q);
+      const ox = b.x, oy = b.y, rip = Math.sin(G.t * (o.rate || 8) + i * 0.9) * (o.wave || 8);
+      let vx = b.vx || 0, vy = b.vy || 0;
+      vx += (wind - vx) * k * dt;
+      vy += ((o.grav || 40) * 2.5 + rip * 1.5 - vy) * k * dt;
+      b.x += vx * dt; b.y += vy * dt;
+      const dx = b.x - a.x, dy = b.y - a.y, d = Math.hypot(dx, dy) || 1;
+      if (d > o.seg) { b.x = a.x + dx / d * o.seg; b.y = a.y + dy / d * o.seg; }
+      if (o.floor != null && b.y > o.floor) b.y = o.floor;
+      // (its own speed, kept from frame to frame but bled off, and capped: a stop flings it on, not over)
+      const keep = Math.exp(-8 * dt), vm = o.vmax || 380;
+      b.vx = G.clamp((b.x - ox) / dt * keep, -vm, vm); b.vy = G.clamp((b.y - oy) / dt * keep, -vm, vm);
+      if (!isFinite(b.x + b.y + b.vx + b.vy)) { b.x = a.x; b.y = a.y + o.seg; b.vx = 0; b.vy = 0; }
+    }
+  }
+  // The Shadow Partner's own motion: it makes each of his blows half a second after he does (as its
+  // hazard does), winding up for it first, then back to its guard; and its parts on springs like his.
+  const SH_WIND = { jab: 'jabP', cross: 'crossP', jabL: 'jabLP' };
+  function shadeTick(sh, b, dt) {
+    if (!sh.bp) { sh.bp = sh.p.slice(); sh.bv = new Array(NP).fill(0); sh.q = []; sh.ck = 0; sh.dpose = 'guardL'; sh.bpose = b.pose; }
+    sh.ck += dt;
+    if (b.pose !== sh.bpose) { if (SH_WIND[b.pose] && B.partnerOn) sh.q.push({ pose: b.pose, at: sh.ck + 0.5 }); sh.bpose = b.pose; }
+    while (sh.q.length && sh.ck > sh.q[0].at + 0.18) sh.q.shift();
+    const nx = sh.q[0];
+    let name = 'guardL';
+    if (nx) name = sh.ck >= nx.at ? nx.pose : sh.ck >= nx.at - 0.3 ? SH_WIND[nx.pose] : 'guardL';
+    const target = POSES[name], w0 = SNAP[name] ? 46 : WIND[name] ? 34 : 18, z = 0.85;
+    for (let i = 0; i < NP; i++) { sh.bv[i] += ((target[i] - sh.bp[i]) * w0 * w0 - 2 * z * w0 * sh.bv[i]) * dt; sh.bp[i] += sh.bv[i] * dt; }
+    sh.dpose = name;
+    living(sh, sh.bp, target, name, dt, true, !!SNAP[name], true);
   }
 
   // ------------------------------------------------------------------ drawing
@@ -1651,7 +1848,7 @@
     o = o || {};
     if (alpha <= 0.01) return;
     const c = o.shade ? CS : CL, pal = G.pal(), rim = o.shade ? G.corrupt.COL.blood : pal.rim;
-    const p = f.p, lean = p[0], hip = p[1] + (f.bob || 0);
+    const g = geo(f), p = g.p, r = g.r, hip = g.hip, wx = r.wx, tw = r.tw;
     ctx.save();
     ctx.globalAlpha *= alpha;
     ctx.lineJoin = 'round'; ctx.lineCap = 'round';
@@ -1665,56 +1862,78 @@
     ctx.scale(sx, 1);
     if (o.real && f.flash > 0) D.glow(ctx, '255,255,255', 0, -48, 66, f.flash * 0.3);
 
-    const shx = Math.sin(lean) * 30, shy = hip - Math.cos(lean) * 30;
-    const hx = shx + Math.sin(lean) * 12 + 1.5, hy = shy - Math.cos(lean) * 12 - 1;
+    const shx = g.shx, shy = g.shy, hx = g.hx, hy = g.hy;
     const rimS = (w) => { ctx.strokeStyle = G.rgba(rim, 0.2); ctx.lineWidth = w || 0.9; ctx.stroke(); };
     const leg = (front) => {
-      const lx = front ? 4 : -4, fx = p[front ? 2 : 4], fy = p[front ? 3 : 5];
-      const k = D.ik(lx, hip, fx, fy - 2, 24, 23, -1);
+      const n = front ? 0 : 1, lg = legAt(g, front), k = lg.k, lx = lg.lx;
       ctx.fillStyle = front ? c.pants : c.pantsD;
       D.limb(ctx, lx, hip, k.jx, k.jy, 16, 13); ctx.fill(); if (front) rimS();
-      D.limb(ctx, k.jx, k.jy, k.ex, k.ey - 3, 13, 10); ctx.fill(); if (front) rimS();
+      // the shin: wide cloth gathered into the wrap, billowing behind the leg and swinging on its own
+      // spring (the back of the leg is n, the shin's left-hand normal)
+      const wx0 = G.lerp(k.jx, k.ex, 0.8), wy0 = G.lerp(k.jy, k.ey, 0.8);
+      const sl = Math.hypot(k.ex - k.jx, k.ey - k.jy) || 1, nx = -(k.ey - k.jy) / sl, ny = (k.ex - k.jx) / sl;
+      const cx = r.cl ? r.cl[n * 2] : 0, cy = r.cl ? r.cl[n * 2 + 1] : 0, mx = (k.jx + wx0) / 2, my = (k.jy + wy0) / 2;
+      ctx.beginPath();
+      ctx.moveTo(k.jx + nx * 6.5, k.jy + ny * 6.5);
+      ctx.quadraticCurveTo(mx + nx * 8.5 + cx, my + ny * 8.5 + cy, wx0 + nx * 4.6, wy0 + ny * 4.6);
+      ctx.lineTo(wx0 - nx * 4.6, wy0 - ny * 4.6);
+      ctx.quadraticCurveTo(mx - nx * 6.5 + cx * 0.5, my - ny * 6.5 + cy * 0.5, k.jx - nx * 6.5, k.jy - ny * 6.5);
+      ctx.arc(k.jx, k.jy, 6.5, Math.atan2(-ny, -nx), Math.atan2(ny, nx), true);
+      ctx.closePath(); ctx.fill(); if (front) rimS();
       ctx.fillStyle = front ? c.wrap : c.wrapD;
       D.limb(ctx, G.lerp(k.jx, k.ex, 0.78), G.lerp(k.jy, k.ey, 0.78), k.ex, k.ey - 2, 8, 7.5); ctx.fill();
+      // the bare foot from the ankle, and the toes from the ball: it rolls up on to them as the heel
+      // lifts, points in the air, and the toes grip as it lands
+      let fa, toe;
+      if (r.fa) { fa = r.fa[n]; toe = r.toe[n]; } else { const w = footWant(lg, !f.air); fa = w.fa; toe = w.toe; }
       ctx.fillStyle = front ? c.skin : c.skinD;
-      D.poly(ctx, [k.ex - 4, k.ey - 4, k.ex + 4, k.ey - 3, k.ex + 10, k.ey - 0.5, k.ex + 9, k.ey + 1, k.ex - 5, k.ey + 1]); ctx.fill();
+      ctx.save(); ctx.translate(k.ex, k.ey); ctx.rotate(fa);
+      D.poly(ctx, [-4, -4, 4, -3, 7, -1.5, 7, 1, -5, 1]); ctx.fill();
+      ctx.translate(6.5, 0); ctx.rotate(toe);
+      D.poly(ctx, [-1, -1.6, 3.5, -0.5, 3.6, 0.6, 2.5, 1.1, -1, 1]); ctx.fill();
+      ctx.restore();
     };
     const arm = (front) => {
-      const ax = shx + (front ? 5 : -6), ay = shy + 3, tx = p[front ? 6 : 8], ty = p[front ? 7 : 9];
-      const k = D.ik(ax, ay, tx, ty, 17, 17, 1);
+      const n = front ? 0 : 1, a = armAt(g, front), ax = a.ax, ay = a.ay, k = a.k;
       ctx.fillStyle = front ? c.skin : c.skinD;
       D.limb(ctx, ax, ay, k.jx, k.jy, 10, 8); ctx.fill(); if (front) rimS();
       D.limb(ctx, k.jx, k.jy, k.ex, k.ey, 8, 7); ctx.fill();
       ctx.fillStyle = front ? c.wrap : c.wrapD;
       D.limb(ctx, G.lerp(k.jx, k.ex, 0.45), G.lerp(k.jy, k.ey, 0.45), k.ex, k.ey, 8.5, 8); ctx.fill();
+      // the hand turns a beat behind the forearm (the wrist)
+      const ha = r.ha ? r.ha[n] : Math.atan2(k.ey - k.jy, k.ex - k.jx);
       if (f.open) {
-        const a = Math.atan2(k.ey - k.jy, k.ex - k.jx);
-        ctx.save(); ctx.translate(k.ex, k.ey); ctx.rotate(a);
+        ctx.save(); ctx.translate(k.ex, k.ey); ctx.rotate(ha);
         ctx.fillStyle = front ? c.skin : c.skinD;
         D.poly(ctx, [0, -4, 8, -5.5, 12, -2, 12, 2, 8, 5, 0, 4]); ctx.fill();
         ctx.strokeStyle = 'rgba(0,0,0,0.4)'; ctx.lineWidth = 0.8; D.line(ctx, 6, -1.5, 11, -1.5); D.line(ctx, 6, 1.5, 11, 1.5);
         ctx.restore();
       } else {
-        ctx.beginPath(); ctx.arc(k.ex, k.ey, 5, 0, G.TAU); ctx.fill(); if (front) rimS(1);
+        // the fist, drawn out along its line as it snaps (the arm's stretch)
+        const s = r.st[n];
+        ctx.beginPath(); ctx.ellipse(k.ex, k.ey, 5 + s * 0.5, 5 - s * 0.3, ha, 0, G.TAU); ctx.fill(); if (front) rimS(1);
       }
     };
 
     leg(false);
     arm(false);
     // the top: a sleeveless wrap, crossed at the chest, with skin at the neck
+    // (its shoulders follow the twist: the lead one back a little, the rear one through; the chest
+    // swelling with each breath)
+    const tf = -tw * 1.5, tb = tw * 4, br = r.br * 0.5;
     ctx.fillStyle = c.top;
-    D.poly(ctx, [-9, hip + 2, 9, hip + 2, shx + 12, shy + 7, shx + 9, shy - 2, shx + 3, shy - 4, shx - 5, shy - 4, shx - 11, shy, shx - 12, shy + 8]); ctx.fill(); rimS();
+    D.poly(ctx, [wx - 9, hip + 2, wx + 9, hip + 2, shx + 12 + tf + br, shy + 7, shx + 9 + tf, shy - 2, shx + 3 + tf, shy - 4, shx - 5 + tb, shy - 4, shx - 11 + tb, shy, shx - 12 + tb - br * 0.5, shy + 8]); ctx.fill(); rimS();
     ctx.fillStyle = c.skin;
-    const vx = G.lerp(0, shx, 0.62) + 3, vy = G.lerp(hip, shy, 0.62);
-    D.poly(ctx, [shx - 1, shy - 3, shx + 7, shy - 2, vx, vy]); ctx.fill();
-    ctx.strokeStyle = c.topD; ctx.lineWidth = 2; D.line(ctx, shx + 7, shy - 1, -4, hip + 1);
+    const vx = G.lerp(wx, shx, 0.62) + 3, vy = G.lerp(hip, shy, 0.62);
+    D.poly(ctx, [shx - 1 + tf, shy - 3, shx + 7 + tf, shy - 2, vx, vy]); ctx.fill();
+    ctx.strokeStyle = c.topD; ctx.lineWidth = 2; D.line(ctx, shx + 7 + tf, shy - 1, wx - 4, hip + 1);
     // the sash
-    ctx.fillStyle = c.belt; D.poly(ctx, [-10, hip - 5, 10, hip - 5, 10, hip + 3, -10, hip + 3]); ctx.fill();
-    ctx.fillStyle = 'rgba(0,0,0,0.25)'; ctx.fillRect(-10, hip + 1, 20, 2);
+    ctx.fillStyle = c.belt; D.poly(ctx, [wx - 10, hip - 5, wx + 10, hip - 5, wx + 10, hip + 3, wx - 10, hip + 3]); ctx.fill();
+    ctx.fillStyle = 'rgba(0,0,0,0.25)'; ctx.fillRect(wx - 10, hip + 1, 20, 2);
     leg(true);
     // the head: hair swept back to its tie, a lit slit of an eye
     ctx.save();
-    ctx.translate(hx, hy); ctx.rotate(lean * 0.35 + (p[10] || 0) * 0.6);
+    ctx.translate(hx, hy); ctx.rotate(g.tilt);
     ctx.fillStyle = c.hair;
     D.poly(ctx, [-10, 2, -9, -7, -3, -11.5, 5, -11, 10, -6, 9, -3, 3, -6, -2, -4, -5, 3]); ctx.fill();
     ctx.fillStyle = c.skin;
@@ -1822,6 +2041,22 @@
     }
     ctx.restore();
   }
+  // The Shadow Partner, see-through: drawn whole to a canvas of its own first, then laid down at its
+  // alpha, so it reads as one dark shape (its limbs drawn one over another at 0.6 each showed every
+  // overlap as a darker seam)
+  let shadeCv = null;
+  function drawShade(ctx, sh, alpha) {
+    if (alpha <= 0.01) return;
+    const m = ctx.getTransform(), s = Math.max(0.25, Math.hypot(m.a, m.b));
+    const W = Math.ceil(320 * s), Hh = Math.ceil(320 * s), ox = W / 2, oy = Math.round(Hh * 0.72);
+    if (!shadeCv) { shadeCv = document.createElement('canvas'); shadeCv.x = shadeCv.getContext('2d'); }
+    if (shadeCv.width !== W || shadeCv.height !== Hh) { shadeCv.width = W; shadeCv.height = Hh; }
+    const x = shadeCv.x, dx = Math.round(m.a * sh.x + m.c * sh.y + m.e), dy = Math.round(m.b * sh.x + m.d * sh.y + m.f);
+    x.setTransform(1, 0, 0, 1, 0, 0); x.globalAlpha = 1; x.globalCompositeOperation = 'source-over'; x.clearRect(0, 0, W, Hh);
+    x.setTransform(m.a, m.b, m.c, m.d, m.e - dx + ox, m.f - dy + oy);
+    drawFig(x, sh, 1, { shade: true });
+    ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha *= alpha; ctx.drawImage(shadeCv, dx - ox, dy - oy); ctx.restore();
+  }
   function drawGhost(ctx, g) {
     const a = 0.45 * (1 - g.t / g.life);
     if (a <= 0.01) return;
@@ -1890,7 +2125,7 @@
       ctx.beginPath(); ctx.ellipse(b.x, FLOOR + 3, 34 * k, 6 * k, 0, 0, G.TAU); ctx.fill();
     }
     for (const g of B.ghosts) drawGhost(ctx, g);
-    if (B.shade) drawFig(ctx, B.shade, 0.6 * B.shade.a, { shade: true });
+    if (B.shade) drawShade(ctx, B.shade, 0.6 * B.shade.a);
   };
   B.draw = function (ctx) {
     if (B.dead) return;

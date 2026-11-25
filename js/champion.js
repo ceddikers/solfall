@@ -232,6 +232,18 @@
     offer: [0.12, -24, 21, 0, -17, -1, 38, -50, 6, -40, 0.12, -0.15],         // a hilt held out, hilt first
     mend: [0.4, -22, 20, 0, -18, -1, 14, -48, 6, -46, 0.4, 1.45],
   };
+  // (v2.5c) the second stage of a wind-up: from halfway through it he coils further, to a peak (see cut())
+  Object.assign(POSES, {
+    upP: [-0.18, -44, 13, 0, -17, -3, 0, -90, -6, -76, -0.18, -2.6],     // up on his toes, the blade further back
+    lowP: [0.26, -34, 21, 0, -19, 0, 8, -26, 0, -34, 0.1, 2.75],         // lower, the point near the floor behind
+    thrustP: [0.0, -34, 16, 0, -26, 0, -16, -54, 2, -56, 0, 0],          // the point drawn right back
+    sweepP: [-0.12, -37, 20, 0, -21, 0, -30, -50, -20, -52, 0, 3.3],    // the head swung out behind
+    maulP: [-0.22, -44, 15, 0, -18, -3, -4, -96, -10, -92, -0.3, -2.2], // up on his toes, the head over his back
+    riseP: [0.36, -28, 21, 0, -21, 0, 14, -22, 4, -26, 0.25, 3.0],      // down on one knee nearly, ready to spring
+  });
+  const PEAK = { upC: 'upP', lowC: 'lowP', thrustC: 'thrustP', sweepC: 'sweepP', maulUp: 'maulP', riseC: 'riseP' };
+  // wind-ups are reached quicker than a relaxed pose, so each stage shows before the blow comes
+  const WIND = { upC: 1, lowC: 1, thrustC: 1, sweepC: 1, maulUp: 1, riseC: 1, upP: 1, lowP: 1, thrustP: 1, sweepP: 1, maulP: 1, riseP: 1, breath: 1, throwC: 1, beamC: 1 };
   const SNAP = { cutDown: 1, cutUp: 1, thrust: 1, rise: 1, sweep: 1, smash: 1, drawn: 1, throwP: 1, push: 1, beam: 1, dashLow: 1 };
   function walkPose(t) {
     const s = Math.sin(t), c = Math.cos(t), w = B.body.wpn;
@@ -298,6 +310,8 @@
       follow(h) {
         if (h.fired) return;
         h.x = b.x + b.face * 6; h.y = b.y + ay;
+        // (v2.5c) halfway through the wind-up he coils on to its peak
+        if (h.t >= h.tele * 0.5 && PEAK[b.pose]) b.pose = PEAK[b.pose];
         // (v2.5b: the blade starts down a few frames early, so it sweeps with the drawn cut, not after it)
         if (h.t >= h.tele - 0.05 && o.pose) { b.fast = true; b.pose = o.pose; }
       },
@@ -352,7 +366,7 @@
   }
   function afterimage(life, shade) {
     const b = B.body;
-    B.ghosts.push({ x: b.x, y: b.y, face: b.face, p: b.p.slice(), wpn: b.wpn, t: 0, life: life || 0.3, marks: b.marks, pull: b.pull, shade: !!shade, corruptK: b.corruptK, rot: b.rot || 0 });
+    B.ghosts.push({ x: b.x, y: b.y, face: b.face, p: b.p.slice(), wpn: b.wpn, t: 0, life: life || 0.3, marks: b.marks, pull: b.pull, shade: !!shade, corruptK: b.corruptK, rot: b.rot || 0, rigQ: snapQ(b.rigQ) });
   }
   // the hero went through to his back
   const behindNow = () => (G.player.x - B.body.x) * B.body.face < -10;
@@ -371,6 +385,7 @@
       x: 880, y: FLOOR, face: 1, pose: 'sit', p: POSES.sit.slice(), pv: new Array(NP).fill(0), walkT: 0, stepN: 0,
       fast: false, air: false, hurt: false, wpn: null, marks: 0, pull: 0, corruptK: 0, fade: 1, hood: 1, smile: 0,
       offerW: null, charge: 0, rack: {}, hand: { x: 0, y: 0 }, eye: { x: 0, y: 0 }, unwrapped: false, sitting: 1,
+      rig: D.rig(), rigQ: null, rigL: null, // (v2.5c: the drawn springs, see living)
     });
     B.cloak = [0, 1, 2].map(() => D.chain(7, b.x, b.y - 70));
     B.rackK = { sword: 0, maul: 0, bow: 0, blade: 0 }; B.rackT = { sword: 0, maul: 0, bow: 0, blade: 0 };
@@ -400,7 +415,7 @@
   B.onInterrupt = function () {
     const P = G.player;
     if (P.grabbed) { P.grabbed = null; P.vy = -200; }
-    B.bd = null; B.guardOn = false; B.mending = false; B.body.rot = 0;
+    B.bd = null; B.guardOn = false; B.mending = false; B.body.rot = 0; B.body.kx = 0;
     for (const s of B.shades) s.dead = true;
     dark();
     G.fx.cine.to = 0;
@@ -478,7 +493,7 @@
   B.vuln = () => (B.loose ? 1.15 : 1); // disarmed, he takes a little more
   B.dying0 = function () {
     const b = B.body;
-    b.hurt = false; b.charge = 0; b.marks = 0; b.pull = 0; b.rot = 0; B.guardOn = false; B.mending = false; B.bd = null; dark();
+    b.hurt = false; b.charge = 0; b.marks = 0; b.pull = 0; b.rot = 0; b.kx = 0; B.guardOn = false; B.mending = false; B.bd = null; dark();
     for (const s of B.shades) s.dead = true;
   };
   B.choose = function () {
@@ -536,6 +551,7 @@
     b.pose = 'thrustC'; b.set = 1;
     yield* wait(0.12 * T);
     G.fx.glint(b.x + b.face * 30, b.y - 54, 30, heroOf('sword').hot, 0.25); G.audio.play('glint');
+    b.pose = 'thrustP'; // (v2.5c) with the glint the point goes right back: the coil before the spring
     yield* wait((far ? 0.4 : 0.36) * T);
     b.set = 0;
     const dir = b.face, gap = Math.abs(P.x - b.x);
@@ -579,8 +595,15 @@
       if (charged) H.shockwave(x, b.face, 760, 54, tintOf('maul'));
     } });
     let e = 0;
-    while (e < tele) { const dt = yield; e += dt; if (charged) b.charge = Math.min(1, e / tele); }
-    b.charge = 0;
+    while (e < tele) {
+      const dt = yield; e += dt;
+      if (charged) {
+        b.charge = Math.min(1, e / tele);
+        // (v2.5c) the weight of it held up there: he trembles under it, more as it fills
+        b.kx = Math.sin(G.t * 70) * 1.4 * b.charge;
+      }
+    }
+    b.charge = 0; b.kx = 0;
     yield* wait(0.1);
     b.exposed = true;
     yield* wait(1.0 * PW());
@@ -1364,6 +1387,120 @@
     b.air = false; b.y = FLOOR;
   };
 
+  // ------------------------------------------------------------------ (v2.5c) a bone for every part
+  // Drawing only, on top of the pose (b.p, which nothing here changes): each part of him on its own
+  // spring, pushed by his body's acceleration and by impacts, so he never moves as one rigid piece.
+  // Everything lands in b.rigQ, a set of drawn offsets that drawFig reads; a figure without one (an
+  // afterimage made before it, a Veil shade, him seated on the road) draws from RZ, the plain pose.
+  const HOOD_N = 3, HOOD_SEG = 4.6;
+  const hoodWant = (out) => { for (let i = 0; i < HOOD_N; i++) out[i] = Math.PI - 0.55 - 0.32 * i; return out; };
+  const RZ = Object.freeze({ bow: 0, sq: 0, sh: 0, hx: 0, hdx: 0, hdy: 0, nod: 0, lhx: 0, lhy: 0, rhx: 0, rhy: 0, wa: null, fr: [0, 0], rk: { sword: [0, 0, 0], maul: [0, 0, 0], bow: [0, 0, 0], blade: [0, 0, 0] }, hood: hoodWant([]) });
+  // each racked weapon's own spring: stiffness, damping, how far its weight carries it
+  const RKS = { sword: [21, 0.28, 0.8], maul: [13, 0.3, 1.4], bow: [17, 0.32, 1], blade: [19, 0.28, 0.9] };
+  // the weapon in hand: stiffness, damping, how far it may trail the hand's angle, how heavy it is
+  const WSP = { sword: [30, 0.6, 0.3, 0.7], maul: [15, 0.42, 0.6, 1.6], bow: [26, 0.6, 0.25, 0.8], blade: [34, 0.6, 0.28, 0.6] };
+  function snapQ(Q) {
+    if (!Q) return null;
+    return Object.assign({}, Q, { fr: Q.fr.slice(), hood: Q.hood.slice(), rk: { sword: Q.rk.sword.slice(), maul: Q.rk.maul.slice(), bow: Q.rk.bow.slice(), blade: Q.rk.blade.slice() } });
+  }
+  // him seated on the road: no rig, just his breath (from the clock alone)
+  function seatedQ() {
+    const Q = snapQ(RZ), br = Math.sin(G.t * 1.7);
+    Q.sh = -br * 0.9; Q.hdy = -br * 0.5; Q.nod = 0.03 * Math.sin(G.t * 0.6); Q.hood = hoodWant([]);
+    return Q;
+  }
+  function living(b, dt) {
+    const R = b.rig || (b.rig = D.rig());
+    const Q = b.rigQ || (b.rigQ = Object.assign(snapQ(RZ), { fax: 0, fay: 0, wax: 0, way: 0, ex: 0, bph: 0, sq2: 0, hood: hoodWant([]), hst: {} }));
+    const L = b.rigL || (b.rigL = { air: false, y: b.y, fast: false, stepN: b.stepN, wpn: b.wpn, flash: 0, lit: { sword: 0, maul: 0, bow: 0, blade: 0 } });
+    if (dt <= 0) return;
+    // his acceleration, smoothed (a frame's jump in speed is a push, not a spike), in his own frame too
+    const A = b.hidden ? { ax: 0, ay: 0 } : R.accel(b.x + (b.kx || 0), b.y, dt);
+    const sm = Math.min(1, dt * 28);
+    Q.wax += (A.ax - Q.wax) * sm; Q.way += (A.ay - Q.way) * sm;
+    const ax = Q.wax * b.face, ay = Q.way;
+    Q.fax = ax; Q.fay = ay;
+    // what just happened to him: a landing, a blow thrown, a foot down, a blow taken, a weapon drawn
+    const landed = (L.air && !b.air) || (L.y < FLOOR - 6 && b.y >= FLOOR - 0.5);
+    const blow = b.fast && !L.fast;
+    const step = b.pose === 'walk' && b.stepN !== L.stepN;
+    const struck = (b.flash || 0) > L.flash + 0.3;
+    if (b.wpn !== L.wpn && b.wpn) R.set('wa', b.pose === 'bow' ? (b.aim || 0) : b.p[11]);
+    L.air = b.air; L.y = b.y; L.fast = b.fast; L.stepN = b.stepN; L.wpn = b.wpn; L.flash = b.flash || 0;
+    const heavy = b.wpn === 'maul' ? 1.6 : 1;
+    if (landed) {
+      R.kick('sq', 70); R.kick('hdy', 50); R.kick('nod', 2.2); R.kick('bow', 1.4);
+      R.kick('lhy', 60 * heavy); R.kick('rhy', 50);
+      for (const w of WPN) { R.kick('rk' + w + 'y', 60 * RKS[w][2]); R.kick('rk' + w + 'a', (w === 'sword' || w === 'bow' ? 4 : -4) * RKS[w][2]); }
+      R.kick('fr0', -5); R.kick('fr1', -5);
+    }
+    if (blow) {
+      Q.ex = Math.min(1, Q.ex + 0.3);
+      R.kick('bow', 1.6); R.kick('nod', 1.2); R.kick('hdx', 30);
+      for (const w of WPN) R.kick('rk' + w + 'a', (w === 'maul' ? -1.6 : 1.6) * RKS[w][2]);
+    }
+    if (step) { R.kick('sq', 14); R.kick('hdy', 10); for (const w of WPN) { R.kick('rk' + w + 'y', 14 * RKS[w][2]); R.kick('rk' + w + 'a', (b.stepN & 1 ? 0.7 : -0.7) * RKS[w][2]); } }
+    if (struck) { R.kick('bow', -2.2); R.kick('nod', -2.6); R.kick('hdx', -60); R.kick('lhx', -50); for (const w of WPN) R.kick('rk' + w + 'a', 2 * RKS[w][2]); }
+    // a weapon lighting on his rack gives a little start, so the tell shows in its motion as well
+    for (const w of WPN) {
+      const t = B.rackT ? B.rackT[w] : 0;
+      if (t > 0.3 && L.lit[w] <= 0.3) R.kick('rk' + w + 'a', (w === 'maul' ? -3 : 3) * (0.5 + 0.5 * t));
+      L.lit[w] = t;
+    }
+    // breath: quicker and deeper after he has been swinging, shallow in the middle of a blow
+    Q.ex = Math.max(0, Q.ex - dt * 0.22);
+    const still = !b.fast && !b.air && b.pose !== 'walk';
+    Q.bph += dt * (2.1 + 1.8 * Q.ex);
+    const br = Math.sin(Q.bph) * (0.55 + 0.9 * Q.ex) * (still ? 1 : 0.4);
+    // the spine: the chest lags his starts and stops (back as he drives, over as he stops), bows on landing
+    Q.bow = R.spring('bow', G.clamp(-ax * 0.000035, -0.13, 0.15), dt, 13, 0.5);
+    // the hips: down with a landing and back up; the weight moves from foot to foot while he waits
+    Q.sq = G.clamp(R.spring('sq', G.clamp(-ay * 0.0007, -3, 6), dt, 17, 0.45), -4, 9);
+    Q.hx = R.spring('hx', still && b.pose !== 'guard' ? Math.sin(G.t * 0.8) * 1.3 : 0, dt, 6, 0.8);
+    // the shoulders ride down after the hips, later and further, and rise with each breath
+    Q.sq2 = R.spring('sq2', Q.sq, dt, 11, 0.36);
+    Q.sh = G.clamp(Q.sq2 - Q.sq, -5, 5) - br;
+    // the head on its neck: thrown back as he drives off, on as he stops, down as he lands, nodding
+    Q.hdx = G.clamp(R.spring('hdx', G.clamp(-ax * 0.0009, -4, 4), dt, 15, 0.45), -5, 5);
+    Q.hdy = G.clamp(R.spring('hdy', G.clamp(-ay * 0.0006, -3, 4) - br * 0.4, dt, 15, 0.45), -5, 6);
+    Q.nod = G.clamp(R.spring('nod', G.clamp(-ax * 0.00005, -0.25, 0.25), dt, 12, 0.42), -0.4, 0.4);
+    // the hands trail his motion, the weapon hand by the weight of what it holds
+    const hw = b.wpn ? WSP[b.wpn][3] : 1;
+    Q.lhx = G.clamp(R.spring('lhx', G.clamp(-ax * 0.0008 * hw, -5, 5), dt, 17 / Math.sqrt(hw), 0.45), -6, 6);
+    Q.lhy = G.clamp(R.spring('lhy', G.clamp(-ay * 0.0007 * hw, -4, 5) - br * 0.5, dt, 17 / Math.sqrt(hw), 0.45), -6, 7);
+    Q.rhx = G.clamp(R.spring('rhx', G.clamp(-ax * 0.001, -5, 5), dt, 14, 0.4), -6, 6);
+    Q.rhy = G.clamp(R.spring('rhy', G.clamp(-ay * 0.0008, -4, 5) - br * 0.5, dt, 14, 0.4), -6, 7);
+    // the weapon in hand: its own angle on its own spring, the maul heavy and late, the sword light
+    if (b.wpn) {
+      const s = WSP[b.wpn], tgt = b.pose === 'bow' ? (b.aim || 0) : b.p[11];
+      if (landed) R.kick('wa', 3 * s[3] * Math.cos(tgt));
+      if (struck) R.kick('wa', -3);
+      const a = R.spring('wa', tgt, dt, s[0], s[1]);
+      Q.wa = tgt + s[2] * Math.tanh((a - tgt) / s[2]); // (a soft limit: it trails, it never hangs off a blow)
+    } else Q.wa = null;
+    // each weapon on his back on its own small spring: they jostle with his motion and rattle on landings
+    for (const w of WPN) {
+      const s = RKS[w], k = s[2], r = Q.rk[w];
+      r[0] = G.clamp(R.spring('rk' + w + 'x', G.clamp(-ax * 0.0005 * k, -2.5, 2.5), dt, s[0], s[1]), -3.5, 3.5);
+      r[1] = G.clamp(R.spring('rk' + w + 'y', G.clamp(-ay * 0.0004 * k, -2, 3), dt, s[0], s[1]), -3.5, 4);
+      r[2] = G.clamp(R.spring('rk' + w + 'a', G.clamp(-ax * 0.00003 * k, -0.1, 0.1), dt, s[0] * 0.9, s[1]), -0.22, 0.22);
+    }
+    // the boots: a lifted foot points its toe, a foot behind him in the stride rolls off its toe, and
+    // a landing slaps them flat
+    for (let i = 0; i < 2; i++) {
+      const fx = b.p[i ? 4 : 2], lift = Math.max(0, -b.p[i ? 5 : 3]);
+      const push = b.pose === 'walk' && fx < -4 && lift < 2.5 ? 0.32 : 0;
+      Q.fr[i] = G.clamp(R.spring('fr' + i, G.clamp(lift * 0.07, 0, 0.8) + push, dt, 20, 0.55), -0.2, 0.95);
+    }
+    // the hood's point: a short chain off the crown, stiff at the root, loose at the tip
+    const want = hoodWant(HOOD_WANT);
+    const tilt = Q.bow * 0.5 + Q.nod;
+    for (let i = 0; i < HOOD_N; i++) want[i] += tilt * (1 - i / HOOD_N) * 0.6;
+    const ha = D.angleChain(Q.hst, want, dt, { w0: 22, w1: 10, z0: 0.45, z1: 0.3, follow: 0.55, push: G.clamp(ax * 0.006 + ay * 0.004, -60, 60) });
+    for (let i = 0; i < HOOD_N; i++) Q.hood[i] = G.clamp(ha[i], 1.4, 3.6);
+  }
+  const HOOD_WANT = new Array(HOOD_N);
+
   B.tick = function (dt) {
     const b = B.body, P = G.player;
     // thrown open, he goes after his weapon, but not past you
@@ -1388,18 +1525,29 @@
     }
     // the pose: each part on a spring, snappier for blows
     const target = b.pose === 'walk' ? walkPose(b.walkT) : (POSES[b.pose] || POSES.idle);
-    const w0 = b.fast || SNAP[b.pose] ? 46 : 18, z = b.fast ? 0.8 : 0.9; // (v2.5b: firmer, so a blow lands and holds instead of wobbling past)
+    const w0 = b.fast || SNAP[b.pose] ? 46 : WIND[b.pose] ? 32 : 18, z = b.fast ? 0.8 : 0.9; // (v2.5b: firmer, so a blow lands and holds instead of wobbling past)
     for (let i = 0; i < NP; i++) {
       b.pv[i] += ((target[i] - b.p[i]) * w0 * w0 - 2 * z * w0 * b.pv[i]) * dt;
       b.p[i] += b.pv[i] * dt;
     }
     b.bob = (b.pose === 'idle' && !b.air) ? Math.sin(G.t * 3.2) * 1.2 : 0;
+    // (v2.5c) every part of him on its own spring (drawing only: see living)
+    living(b, dt);
     // the rack's glows: quick to light, slower to fade
     for (const w of WPN) { const t = B.rackT[w], k = B.rackK[w]; B.rackK[w] = k + (t - k) * Math.min(1, dt * (t > k ? 30 : 7)); }
-    // the cloak, in three tails from his shoulders
-    const sh = shoulderOf(b);
+    // the cloak, in three tails from his shoulders; (v2.5c) thrown about by his starts, stops and
+    // landings as well as its drift, the outer tail the loosest
+    const sh = shoulderOf(b), RQ = b.rigQ;
     for (let i = 0; i < 3; i++) {
-      D.chainStep(B.cloak[i], sh.x - b.face * (6 + i * 4), sh.y + 2 + i * 2, dt, { seg: 9 - i, grav: b.air ? 30 : 120, drift: 24 + (b.fast ? 60 : 0), face: b.face, wave: 7, rate: 4 + i, floor: FLOOR - 2 });
+      const tail = B.cloak[i];
+      D.chainStep(tail, sh.x - b.face * (6 + i * 4), sh.y + 2 + i * 2, dt, { seg: 9 - i, grav: b.air ? 30 : 120, drift: 24 + (b.fast ? 60 : 0), face: b.face, wave: 3, rate: 4 + i, floor: FLOOR - 2 });
+      if (RQ && !b.hidden) {
+        const kx = -RQ.wax * dt * (0.011 + 0.003 * i), ky = -RQ.way * dt * (0.008 + 0.002 * i);
+        for (let j = 1; j < tail.length; j++) {
+          const q = j / (tail.length - 1);
+          tail[j].x += G.clamp(kx * q, -4, 4); tail[j].y = Math.min(FLOOR - 2, tail[j].y + G.clamp(ky * q, -4, 4));
+        }
+      }
     }
     b.twang = Math.max(0, (b.twang || 0) - dt * 3);
     // (v2.5b) the weapon's trail: a ribbon from the last few frames of a fast blow
@@ -1445,8 +1593,8 @@
     return pts;
   }
   function shoulderOf(f) {
-    const lean = f.p[0];
-    let lx = Math.sin(lean) * 30, ly = (f.bob || 0) + f.p[1] - STAND - Math.cos(lean) * 30;
+    const Q = f.rigQ || RZ, lean = f.p[0] + Q.bow;
+    let lx = Q.hx + Math.sin(lean) * 30, ly = (f.bob || 0) + f.p[1] - STAND + Q.sq + Q.sh - Math.cos(lean) * 30;
     // (through a flip the shoulder turns about his middle, as drawFig turns him)
     if (f.rot) { const c = Math.cos(f.rot), s = Math.sin(f.rot), x0 = lx, y0 = ly + 44; lx = c * x0 - s * y0; ly = s * x0 + c * y0 - 44; }
     return { x: f.x + f.face * lx, y: f.y + ly };
@@ -1550,7 +1698,9 @@
     if (alpha <= 0.01) return;
     const ck = f.corruptK || 0;
     const c = o.shade ? CSH : ck > 0.55 ? CB : CL, pal = G.pal(), rim = o.shade ? '120,60,160' : ck > 0.55 ? VOID.boss : pal.rim;
-    const p = f.p, lean = p[0], hip = p[1] - STAND + (f.bob || 0);
+    // (v2.5c) the drawn springs on top of the pose (RZ, none, for a figure without them)
+    const Q = f.rigQ || RZ, hx0 = Q.hx;
+    const p = f.p, lean = p[0] + Q.bow, hip = p[1] - STAND + (f.bob || 0) + Q.sq;
     ctx.save();
     ctx.globalAlpha *= alpha;
     ctx.lineJoin = 'round'; ctx.lineCap = 'round';
@@ -1562,8 +1712,8 @@
     if (o.real && f.flash > 0) D.glow(ctx, '255,255,255', 0, -48, 66, f.flash * 0.3);
     if (ck > 0.05 && !o.shade) D.glow(ctx, VOID.boss, 0, -46, 70, 0.22 * ck);
 
-    const shx = Math.sin(lean) * 30, shy = hip - Math.cos(lean) * 30;
-    const hx = shx + Math.sin(lean) * 12 + 1.5, hy = shy - Math.cos(lean) * 12 - 1;
+    const shx = hx0 + Math.sin(lean) * 30, shy = hip + Q.sh - Math.cos(lean) * 30;
+    const hx = shx + Math.sin(lean) * 12 + 1.5 + Q.hdx, hy = shy - Math.cos(lean) * 12 - 1 + Q.hdy;
     const rimS = (w) => { ctx.strokeStyle = G.rgba(rim, 0.22); ctx.lineWidth = w || 0.9; ctx.stroke(); };
     const toWorld = (lx, ly) => ({ x: f.x + sx * lx, y: f.y + ly });
     const rk = o.real ? B.rackK : null;
@@ -1572,7 +1722,9 @@
     for (const w of WPN) {
       if (f.wpn === w || f.offerW === w) continue;
       if (o.real && B.loose && B.loose.w === w) continue;
-      const r = RACK[w](shx, shy, hip), g = rk ? rk[w] : 0;
+      // (each rides on its own small spring: Q.rk, an offset and a tilt about its grip)
+      const r0 = RACK[w](shx, shy, hip), j = Q.rk[w], low = w === 'maul' || w === 'blade';
+      const r = [r0[0] + j[0] + (low ? hx0 : 0), r0[1] + j[1], r0[2] + j[2]], g = rk ? rk[w] : 0;
       const kind = w === 'blade' ? 'sheath' : w;
       drawWeapon(ctx, kind, r[0], r[1], r[2], 0.86, o.shade ? { col: '90,50,130', hot: '140,100,190', dim: 0.3 } : { glow: g, marks: 0, dim: g });
       // his twin of your weapon is wrapped in cloth until the trophies
@@ -1589,16 +1741,23 @@
       }
     }
     const leg = (front) => {
-      const lx = front ? 4 : -4, fx = p[front ? 2 : 4], fy = p[front ? 3 : 5];
-      const k = D.ik(lx, hip, fx, fy - 2, 24, 23, -1);
+      const lx = hx0 + (front ? 4 : -4), fx = p[front ? 2 : 4], fy = p[front ? 3 : 5];
+      // (v2.5c) the boot rolls: a lifted foot points its toe; one still on the floor lifts its heel and
+      // pivots on the toe, so the ankle rises with it
+      const roll = Q.fr[front ? 0 : 1], ground = G.clamp(1 - Math.max(0, -fy) / 4, 0, 1);
+      const heel = Math.max(0, Math.sin(roll)) * 9 * ground;
+      const k = D.ik(lx, hip, fx, fy - 2 - heel, 24, 23, -1);
       ctx.fillStyle = front ? c.tunic : c.tunicD;
       D.limb(ctx, lx, hip, k.jx, k.jy, 11.5, 9); ctx.fill(); if (front) rimS();
       ctx.fillStyle = c.boot;
       D.limb(ctx, k.jx, k.jy, k.ex, k.ey - 3, 9, 7.5); ctx.fill(); if (front) rimS();
-      D.poly(ctx, [k.ex - 4, k.ey - 6, k.ex + 3, k.ey - 5, k.ex + 10, k.ey - 1, k.ex + 9, k.ey + 1, k.ex - 5, k.ey + 1]); ctx.fill();
+      if (roll) { ctx.save(); ctx.translate(k.ex, k.ey); ctx.rotate(roll); D.poly(ctx, [-4, -6, 3, -5, 10, -1, 9, 1, -5, 1]); ctx.fill(); ctx.restore(); }
+      else { D.poly(ctx, [k.ex - 4, k.ey - 6, k.ex + 3, k.ey - 5, k.ex + 10, k.ey - 1, k.ex + 9, k.ey + 1, k.ex - 5, k.ey + 1]); ctx.fill(); }
     };
     const arm = (front) => {
-      const ax = shx + (front ? 5 : -6), ay = shy + 3, tx = p[front ? 6 : 8], ty = p[front ? 7 : 9];
+      // (v2.5c) the shoulder rides the chest; the hand rides the body's drop and trails its motion on its own spring
+      const ax = shx + (front ? 5 : -6), ay = shy + 3;
+      const tx = p[front ? 6 : 8] + hx0 * 0.5 + (front ? Q.lhx : Q.rhx), ty = p[front ? 7 : 9] + Q.sq * 0.8 + (front ? Q.lhy : Q.rhy);
       const k = D.ik(ax, ay, tx, ty, 17, 17, 1);
       ctx.fillStyle = front ? c.tunic : c.tunicD;
       D.limb(ctx, ax, ay, k.jx, k.jy, 8.5, 7); ctx.fill(); if (front) rimS();
@@ -1612,17 +1771,33 @@
     const rear = arm(false);
     // the tunic, the cuirass and its line of gold, the harness strap
     ctx.fillStyle = c.tunic;
-    D.poly(ctx, [-10, hip + 8, 10, hip + 8, shx + 12, shy + 7, shx + 9, shy - 2, shx - 6, shy - 3, shx - 12, shy + 6]); ctx.fill(); rimS();
+    // ((v2.5c) the hips shift under him by hx0; the chest heaves with Q.sh)
+    const h0 = hx0;
+    D.poly(ctx, [h0 - 10, hip + 8, h0 + 10, hip + 8, shx + 12, shy + 7, shx + 9, shy - 2, shx - 6, shy - 3, shx - 12, shy + 6]); ctx.fill(); rimS();
     ctx.fillStyle = c.leather;
-    D.poly(ctx, [-9, hip - 2, 9, hip - 2, shx + 10, shy + 8, shx - 10, shy + 7]); ctx.fill();
-    ctx.strokeStyle = G.rgba(c.trim, o.shade ? 0.2 : 0.55); ctx.lineWidth = 1.2; D.line(ctx, -8, hip - 2, 8, hip - 2);
-    ctx.strokeStyle = c.leatherD; ctx.lineWidth = 2.6; D.line(ctx, shx + 8, shy + 1, -8, hip - 3);
-    ctx.fillStyle = c.leatherD; ctx.fillRect(-10, hip - 5, 20, 5);
+    D.poly(ctx, [h0 - 9, hip - 2, h0 + 9, hip - 2, shx + 10, shy + 8, shx - 10, shy + 7]); ctx.fill();
+    ctx.strokeStyle = G.rgba(c.trim, o.shade ? 0.2 : 0.55); ctx.lineWidth = 1.2; D.line(ctx, h0 - 8, hip - 2, h0 + 8, hip - 2);
+    ctx.strokeStyle = c.leatherD; ctx.lineWidth = 2.6; D.line(ctx, shx + 8, shy + 1, h0 - 8, hip - 3);
+    ctx.fillStyle = c.leatherD; ctx.fillRect(h0 - 10, hip - 5, 20, 5);
     leg(true);
-    // the head, under its hood (or the hood down, at the end)
+    // the head, under its hood (or the hood down, at the end); (v2.5c) it lags on its neck and nods
+    const hood = f.hood == null ? 1 : f.hood, hrot = lean * 0.35 + (p[10] || 0) * 0.6 + Q.nod;
+    // (v2.5c) the hood's point, a short chain off the crown, behind the hood
+    if (hood > 0.01) {
+      const hc = Math.cos(hrot), hs = Math.sin(hrot);
+      let px = hx + hc * -8 - hs * -11, py = hy + hs * -8 + hc * -11;
+      const up = [], dn = [];
+      for (let i = 0; i <= HOOD_N; i++) {
+        const a = Q.hood[Math.min(i, HOOD_N - 1)], wd = 3.4 * (1 - i / HOOD_N) + 0.3;
+        up.push(px - Math.sin(a) * wd, py + Math.cos(a) * wd); dn.unshift(px + Math.sin(a) * wd, py - Math.cos(a) * wd);
+        if (i < HOOD_N) { px += Math.cos(a) * HOOD_SEG; py += Math.sin(a) * HOOD_SEG; }
+      }
+      ctx.save(); ctx.globalAlpha *= hood;
+      ctx.fillStyle = c.hoodD; D.poly(ctx, up.concat(dn)); ctx.fill(); rimS(0.8);
+      ctx.restore();
+    }
     ctx.save();
-    ctx.translate(hx, hy); ctx.rotate(lean * 0.35 + (p[10] || 0) * 0.6);
-    const hood = f.hood == null ? 1 : f.hood;
+    ctx.translate(hx, hy); ctx.rotate(hrot);
     if (hood < 1) {
       // the face: pale cropped hair, a short beard's shadow, a scar through one brow
       ctx.fillStyle = c.skin;
@@ -1650,25 +1825,26 @@
     const lead = arm(true);
     const pose = f.pose;
     if (o.real) f.hand = toWorld(lead.ex, lead.ey);
+    // (v2.5c) the weapon's angle on its own spring (Q.wa: the maul trails heavily, the sword lightly)
+    const wa = Q.wa != null ? Q.wa : pose === 'bow' && f.wpn === 'bow' ? (f.aim || 0) : p[11];
     if (f.wpn === 'blade') {
       const sheathed = (f.marks > 0) || pose === 'crouch' || pose === 'noto' || pose === 'guard';
-      drawWeapon(ctx, 'sheath', -5, hip - 3, sheathed ? 2.95 : 2.75, 0.95, { marks: f.marks, empty: !sheathed });
-      if (!sheathed) drawWeapon(ctx, 'blade', lead.ex, lead.ey, p[11], 1.05, {});
+      drawWeapon(ctx, 'sheath', h0 - 5, hip - 3, sheathed ? 2.95 : 2.75, 0.95, { marks: f.marks, empty: !sheathed });
+      if (!sheathed) drawWeapon(ctx, 'blade', lead.ex, lead.ey, wa, 1.05, {});
     } else if (f.wpn === 'bow') {
-      const a = pose === 'bow' ? (f.aim || 0) : p[11];
-      drawWeapon(ctx, 'bow', lead.ex, lead.ey, a, 1.05, { pull: f.pull, twang: f.twang });
+      drawWeapon(ctx, 'bow', lead.ex, lead.ey, wa, 1.05, { pull: f.pull, twang: f.twang });
     } else if (f.wpn) {
-      drawWeapon(ctx, f.wpn, lead.ex, lead.ey, p[11], f.wpn === 'maul' ? 1.25 : 1.05, { charge: f.charge });
+      drawWeapon(ctx, f.wpn, lead.ex, lead.ey, wa, f.wpn === 'maul' ? 1.25 : 1.05, { charge: f.charge });
     }
     // (where the weapon's end is, for its trail: see B.tick)
     if (o.real) {
       const drawn = f.wpn === 'sword' || f.wpn === 'maul' || (f.wpn === 'blade' && !((f.marks > 0) || pose === 'crouch' || pose === 'noto' || pose === 'guard'));
       const len = f.wpn === 'maul' ? 58 : 46;
-      f.tip = drawn ? toWorld(lead.ex + Math.cos(p[11]) * len, lead.ey + Math.sin(p[11]) * len) : null;
-      f.hilt = drawn ? toWorld(lead.ex + Math.cos(p[11]) * len * 0.35, lead.ey + Math.sin(p[11]) * len * 0.35) : null;
+      f.tip = drawn ? toWorld(lead.ex + Math.cos(wa) * len, lead.ey + Math.sin(wa) * len) : null;
+      f.hilt = drawn ? toWorld(lead.ex + Math.cos(wa) * len * 0.35, lead.ey + Math.sin(wa) * len * 0.35) : null;
     }
     if (f.offerW) drawWeapon(ctx, f.offerW === 'blade' ? 'blade' : f.offerW, lead.ex, lead.ey, p[11] + Math.PI, 1.05, { glow: 0.5 });
-    if (f.dual && f.wpn !== 'bow') drawWeapon(ctx, 'blade', rear.ex, rear.ey, p[11] + 0.5, 1, { col: VOID.boss, hot: VOID.hot });
+    if (f.dual && f.wpn !== 'bow') drawWeapon(ctx, 'blade', rear.ex, rear.ey, wa + 0.5, 1, { col: VOID.boss, hot: VOID.hot });
     ctx.restore();
   }
   function drawTrail(ctx) {
@@ -2004,7 +2180,7 @@
     ownW, beaten: runBeaten,
     // him sitting in his doorway on the road (rest.js), hood up, all four on his back
     drawSeated(ctx, x, y, face, alpha) {
-      drawFig(ctx, { x, y, face, p: POSES.sit, wpn: null, marks: 0, pull: 0, hood: 1, corruptK: 0, pose: 'sit' }, alpha, {});
+      drawFig(ctx, { x, y, face, p: POSES.sit, wpn: null, marks: 0, pull: 0, hood: 1, corruptK: 0, pose: 'sit', rigQ: seatedQ() }, alpha, {});
     },
   };
 })();

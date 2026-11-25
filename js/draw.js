@@ -83,4 +83,65 @@
       if (o.floor != null && b.y > o.floor) b.y = o.floor;
     }
   };
+
+  // ------------------------------------------------------------------ spring bones (v2.5c)
+  // Each drawn part on its own spring, on top of where the pose (or the game) puts it, so it lags behind,
+  // swings past and settles instead of moving as one rigid piece (the user's word for the old way was
+  // "robotic"). Drawing only: a hit area never reads these. js/wolf.js (living) is the first worked example.
+  //   const R = D.rig();
+  //   R.spring(key, target, dt, w, z)   one value on a spring (w: stiffness, about 8 loose to 40 snappy;
+  //                                     z: damping, 0.3 bouncy to 1 none past). dt 0 reads it without stepping.
+  //   R.kick(key, dv)                   a push to that spring's speed (a blow landing, a foot striking)
+  //   R.accel(x, y, dt)                 the acceleration of a point (a body), capped, and 0 across a jump of
+  //                                     more than 160 px in a frame (a blink, a placement), for pushing parts
+  //   D.angleChain(state, want, dt, o)  a chain of joint angles (a tail, a scarf, a plait, a sleeve): each
+  //                                     joint on its own spring towards want[i], stiff at the root (o.w0) and
+  //                                     loose at the tip (o.w1), carrying on what the joint before it does
+  //                                     (o.follow, 0-1), pushed by o.push (rad/s², growing towards the tip).
+  //                                     Returns state.a, the angles to draw with.
+  function springStep(o, t, dt, w, z) {
+    // (sub-stepped, so a stiff spring stays steady on a slow frame)
+    const n = Math.max(1, Math.ceil(w * dt / 0.35)), h = dt / n;
+    for (let i = 0; i < n; i++) { o.v += ((t - o.x) * w * w - 2 * z * w * o.v) * h; o.x += o.v * h; }
+  }
+  D.rig = function () {
+    const s = {};
+    let lx = null, ly = 0, lvx = 0, lvy = 0;
+    return {
+      s,
+      spring(k, t, dt, w, z) {
+        let o = s[k];
+        if (!o || !isFinite(o.x)) o = s[k] = { x: t, v: 0 };
+        if (dt > 0) springStep(o, t, dt, w || 18, z == null ? 0.6 : z);
+        return o.x;
+      },
+      kick(k, dv) { if (s[k]) s[k].v += dv; },
+      set(k, v) { s[k] = { x: v, v: 0 }; },
+      accel(x, y, dt) {
+        if (lx == null) { lx = x; ly = y; lvx = 0; lvy = 0; return { ax: 0, ay: 0 }; }
+        if (dt <= 0) return { ax: 0, ay: 0, vx: lvx, vy: lvy }; // (a frame drawn twice: keep what it knew)
+        if (Math.abs(x - lx) > 160 || Math.abs(y - ly) > 160) { lx = x; ly = y; lvx = 0; lvy = 0; return { ax: 0, ay: 0 }; }
+        const vx = (x - lx) / dt, vy = (y - ly) / dt;
+        const ax = G.clamp((vx - lvx) / dt, -16000, 16000), ay = G.clamp((vy - lvy) / dt, -16000, 16000);
+        lx = x; ly = y; lvx = vx; lvy = vy;
+        return { ax, ay, vx, vy };
+      },
+      reset() { for (const k in s) delete s[k]; lx = null; },
+    };
+  };
+  D.angleChain = function (st, want, dt, o) {
+    o = o || {};
+    const n = want.length;
+    if (!st.a || st.a.length !== n) { st.a = want.slice(); st.v = new Array(n).fill(0); }
+    if (dt <= 0) return st.a;
+    const w0 = o.w0 || 26, w1 = o.w1 || 11, z0 = o.z0 == null ? 0.5 : o.z0, z1 = o.z1 == null ? 0.3 : o.z1, fol = o.follow == null ? 0.6 : o.follow, push = o.push || 0;
+    for (let i = 0; i < n; i++) {
+      const q = n > 1 ? i / (n - 1) : 1, w = G.lerp(w0, w1, q), z = G.lerp(z0, z1, q);
+      const goal = want[i] + (i ? (st.a[i - 1] - want[i - 1]) * fol : 0);
+      const c = { x: st.a[i], v: st.v[i] + push * (0.3 + 0.7 * q) * dt };
+      springStep(c, goal, dt, w, z);
+      st.a[i] = c.x; st.v[i] = c.v;
+    }
+    return st.a;
+  };
 })();
