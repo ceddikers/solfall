@@ -3000,7 +3000,7 @@
   function living(dt, hv) {
     const b = B.body, rg = B.rig || (B.rig = {
       R: D.rig(), RT: D.rig(), hu: null, jo: 0, jv: 0, jp: null, jpv: 0, lure: {}, frill: [{}, {}, {}], barb: [{}, {}],
-      neck: { p: [], v: [] }, fin: [], finV: [], tail: { p: [], v: [] }, humps: [{ p: [], v: [] }, { p: [], v: [] }], gyre: { p: [], v: [] },
+      neck: { p: [], v: [] }, fin: [], finV: [], finS: [], tail: { p: [], v: [] }, humps: [{ p: [], v: [] }, { p: [], v: [] }], gyre: { p: [], v: [] },
       tailOn: false, gyreOn: false, fl: { a: null, v: 0, bend: 0, x: 0, y: 0, s: 1, z: 0 }, weed: [{}, {}, {}, {}], rope: [{}, {}], wet: 0, prevD: [],
     });
     if (!(dt > 0)) return;
@@ -3037,15 +3037,18 @@
       dev: (t) => 6 + 80 * Math.pow(Math.sin(Math.PI * t), 0.7), push: (t) => 0.2 * Math.sin(Math.PI * t),
     }, ax, ay, snapN);
     // the crest's spines: each stands (b.fin) on its own spring, the ones by the head first, and lies
-    // back as its length of body moves fast
-    const sd = B.spineD, pd = rg.prevD, n = sd.length;
+    // back a little as its length of body moves fast. (v2.5d) The user saw them "flip up and down so much":
+    // the speed they lie back with is now smoothed (it was read fresh each frame from springy points, so
+    // it jittered), the springs are well damped, and the swing is smaller and rounds off at its ends.
+    const sd = B.spineD, pd = rg.prevD, n = sd.length, fs = rg.finS || (rg.finS = []);
     for (let i = 0; i < n; i++) {
       const p = sd[i], sp = snapN || pd.length !== 2 * n ? 0 : Math.hypot(p.x - pd[2 * i], p.y - pd[2 * i + 1]) / dt;
-      if (rg.fin[i] == null || snapN) { rg.fin[i] = b.fin; rg.finV[i] = 0; }
+      if (rg.fin[i] == null || snapN) { rg.fin[i] = b.fin; rg.finV[i] = 0; fs[i] = 0; }
+      fs[i] = G.damp(fs[i] || 0, Math.min(sp, 1400), 5, dt);
       const t = i / Math.max(1, n - 1);
-      spr(rg.fin, rg.finV, i, b.fin - 0.4 * G.clamp(sp / 900, 0, 1), dt, G.lerp(6, 22, t), 0.4);
-      rg.fin[i] = G.clamp(rg.fin[i], -0.6, 1.6);
-      p.fin = rg.fin[i];
+      spr(rg.fin, rg.finV, i, b.fin - 0.22 * G.clamp(fs[i] / 900, 0, 1), dt, G.lerp(9, 22, t), 0.8);
+      const f = rg.fin[i];
+      p.fin = f > 1 ? 1 + 0.25 * Math.tanh((f - 1) / 0.25) : f < -0.2 ? -0.2 + 0.2 * Math.tanh((f + 0.2) / 0.2) : f;
       pd[2 * i] = p.x; pd[2 * i + 1] = p.y;
     }
     pd.length = 2 * n;

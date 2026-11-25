@@ -114,6 +114,29 @@ hero (`tools/feel-check.js`).
 
 Not done: touch controls, a colour-blind alternative to red-orange warnings, gamepad rebinding.
 
+## Quick turns and a calmer crest (v2.5e)
+
+Asked: how Hollow Knight turns its enemies ("does it do the silly spin thing this game does or just flip it"),
+then "can we try an instant flip on the non heavy enemies", and "the spikes on the leviathans back shouldnt flip
+up and down so much".
+
+**Instant turns.** The Magus, the Veil, the Knight, Kairo and Aurel now flip the moment they face the other way,
+frame to frame, instead of narrowing through a turn over about a fifth of a second (a `snapTurn: true` on the
+boss, read by `K.turn` in `js/bosskit.js`). The Warden keeps the narrowing turn; the Wolf and the Leviathan keep
+their own. The heroes are unchanged. `tools/motion-check.js` will now flag these five bosses' turns as one-frame
+pops: expected, not a fault.
+
+**The Leviathan's crest.** The spines along its back lie back a little as the body moves fast. The speed they
+used was read fresh every frame from points that are themselves on springs, so it jittered, and each spine's
+spring was bouncy; now the speed is smoothed, the springs are well damped, and the swing is smaller and rounds
+off at its ends. Over the same 20 s of fight they move about a fifth as much per frame and reverse about a third
+as often. Standing up and rattling before the coil comes back off the far wall is unchanged.
+
+Playtest checklist:
+- Run from one side of each of those five bosses to the other: they face you at once, with nothing squeezing.
+- The Knight in particular: if he should feel heavier, he can go back to the old turn (one line in `js/knight.js`).
+- The Leviathan's back spines ride the body smoothly, and still stand up and rattle before the coil returns.
+
 ## Softer landings (v2.5d)
 
 Asked: "are the animations like natural? do they feel weird now?" Checked with `tools/motion-check.js` against

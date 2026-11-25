@@ -110,10 +110,13 @@
   // narrows through the turn and opens out the other way, eased in and out over TURN_T, as the hero's
   // does. Turning back mid-turn carries on from where it is. A boss that is out of sight just faces
   // the new way. (The Wolf has its own, slower turn: w.tf in wolf.js.)
+  // (v2.5e) A boss with snapTurn: true flips at once instead, frame to frame, as the quick fighters in
+  // Hollow Knight do: the user wanted to try it on the bosses that are not heavy (the Magus, the Veil,
+  // the Knight, Kairo, Aurel). The Warden keeps the turn; the Wolf and the Leviathan have their own.
   const TURN_T = 0.16;
-  K.turn = function (b, dt) {
+  K.turn = function (b, dt, snap) {
     if (b.tqf !== b.face) {
-      const unseen = b.tqf == null || b.hidden || b.alpha === 0;
+      const unseen = snap || b.tqf == null || b.hidden || b.alpha === 0;
       b.tq0 = unseen ? 1 : -K.turnK(b); b.tqP = unseen ? 1 : 0; b.tqf = b.face;
     }
     if (b.tqP < 1) b.tqP = Math.min(1, b.tqP + dt / TURN_T);
@@ -529,7 +532,7 @@
         B.above = G.clamp(B.above + (over ? dt : -dt * 0.5), 0, ABOVE_T + 1);
       }
       B.tick(dt);
-      K.turn(b, dt);
+      K.turn(b, dt, B.snapTurn);
       B.core.x = b.x; B.core.y = b.y - B.h * 0.55;
     };
 

@@ -167,6 +167,7 @@
   // ------------------------------------------------------------------ the boss
   const B = {
     id: 'kairo', name: 'KAIRO, THE CANYON FIST', short: 'Kairo', theme: 'kairo',
+    snapTurn: true, // (v2.5e) flips at once when it turns: see K.turn
     sub: 'He came to spar', taunt: 'he wants another round',
     blurb: 'A martial artist who powers up as the fight goes on',
     tips: [

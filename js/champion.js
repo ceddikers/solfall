@@ -148,6 +148,7 @@
   // ------------------------------------------------------------------ the boss
   const B = {
     id: 'champion', name: 'AUREL, THE FIRST LIGHT', short: 'Aurel', theme: 'champion', event: true,
+    snapTurn: true, // (v2.5e) flips at once when it turns: see K.turn
     sub: 'He waited on the other side', taunt: 'he waited on the other side',
     blurb: 'The hero who ran the trials before you',
     tips: [

@@ -8,6 +8,7 @@
 
   const B = {
     id: 'assassin', name: 'THE SILENT VEIL', short: 'The Veil', theme: 'assassin',
+    snapTurn: true, // (v2.5e) flips at once when it turns: see K.turn
     sub: 'You will not hear it coming', taunt: 'it has studied you',
     blurb: 'A hooded killer that strikes from nowhere',
     tips: [

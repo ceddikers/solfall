@@ -10,6 +10,7 @@
 
   const B = {
     id: 'knight', name: 'THE UNBURIED KNIGHT', short: 'The Knight', theme: 'knight',
+    snapTurn: true, // (v2.5e) flips at once when it turns: see K.turn
     sub: 'An oath that outlived its keeper', taunt: 'it rises again',
     blurb: 'A death knight whose back is its weakness',
     tips: [

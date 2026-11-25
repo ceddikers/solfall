@@ -18,6 +18,7 @@
 
   const B = {
     id: 'mage', name: 'THE THREEFOLD MAGUS', short: 'The Magus', theme: 'mage',
+    snapTurn: true, // (v2.5e) flips at once when it turns: see K.turn
     sub: 'Three tongues, one voice', taunt: 'the verses quicken',
     blurb: 'A blinking caster of ice, fire and lightning',
     tips: [
