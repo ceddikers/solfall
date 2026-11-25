@@ -7,6 +7,10 @@
 // random boons and a random relic, as a real run would have; false: bare hero), god (true: the hero
 // cannot be hurt, so the time to win measures damage alone), draws (false: Eos only taps his string,
 // never holds for a draw).
+// (v2.6c) build: 'duo' gives every fight a crown + duo build instead (three set boons of one set and
+// two of another, in shuffled slots, turning through all six duos and which set is the crown), a
+// random relic at stage awake (0..3, default 3; with the ordinary boons, awake sets the relic's stage too), and the bosses before it as beaten; the Champion (name him in
+// bosses) is then met with every boss beaten, his full seven-stone second phase.
 //
 // The fights run in small slices on a message loop, so the page stays usable and a hidden pane keeps
 // going. Everything the fights write to localStorage is put back when they finish (CLEAR.restore()).
@@ -331,7 +335,14 @@
     G.debug.boss = job.boss; G.debug.forceAttack = ''; G.debug.god = !!job.god;
     for (const k in I.down) I.down[k] = false;
     R.reset();
-    if (job.boons) {
+    if (job.build === 'duo') {
+      const rel = R.rollRelics();
+      R.relic = rel.length ? G.pick(rel).id : null; R.awake = job.awake == null ? 3 : job.awake;
+      const d = G.DUOS[job.duo % G.DUOS.length], main = d.of[job.flip ? 1 : 0], side = d.of[job.flip ? 0 : 1];
+      const slots = G.shuffle(G.SLOTS.slice());
+      for (let i = 0; i < 5; i++) { const set = i < 3 ? main : side; R.grant(G.BOONS.find((b) => b.set === set && b.slot === slots[i])); }
+      R.beaten = job.boss === 'champion' ? G.BOSS_IDS.slice() : G.shuffle(G.BOSS_IDS.filter((id) => id !== job.boss)).slice(0, job.trial - 1);
+    } else if (job.boons) {
       const rel = R.rollRelics();
       R.relic = rel.length ? G.pick(rel).id : null;
       // the bosses met before this one, and a boon after each
@@ -344,6 +355,7 @@
         R.lastOmens = [];
       }
     }
+    if (job.awake != null && job.build !== 'duo') R.awake = job.awake; // (the relic's stage, if asked for)
     R.trial = job.trial; R.current = job.boss;
     G.startFight();
     const B = G.boss, st = { draws: job.draws };
@@ -381,6 +393,7 @@
       boss: job.boss, hero: job.hero, trial: job.trial, won, timeout: !won && !lost,
       time: +G.time.toFixed(1), phase: maxPhase, bossLeft: B.maxHp ? +(B.hp / B.maxHp).toFixed(2) : 0,
       hpLeft: P.hp, maxHp: P.maxHp, hits, killer, cause, omens: (R.omens || []).slice(), boons: R.order.slice(), relic: R.relic,
+      duo: R.duo && R.duo() ? R.duo().id : null, crown: R.crownSet ? R.crownSet() : null, awake: R.awake || 0,
     };
   }
 
@@ -417,8 +430,9 @@
       const runs = o.runs || 10;
       queue = []; results = []; errors.length = 0;
       // interleaved, so a partial run already covers every cell a little
-      for (let r = 0; r < runs; r++) for (const boss of bosses) for (const hero of heroes) for (const trial of trials)
-        queue.push({ boss, hero, trial, diff: o.difficulty == null ? 1 : o.difficulty, maxT: o.maxT || 420, boons: o.boons !== false, god: !!o.god, draws: o.draws !== false });
+      for (let r = 0; r < runs; r++) for (const boss of bosses) for (const [hi, hero] of heroes.entries()) for (const trial of trials)
+        queue.push({ boss, hero, trial, diff: o.difficulty == null ? 1 : o.difficulty, maxT: o.maxT || 420, boons: o.boons !== false, god: !!o.god, draws: o.draws !== false,
+          build: o.build, awake: o.awake, duo: r, flip: (r + hi) % 2 === 1 });
       CLEAR.total = queue.length;
       running = true; started = performance.now();
       ch.port2.postMessage(0);

@@ -230,7 +230,7 @@
     });
     const got = G.TROPHIES.filter((t) => M.trophy[t.boss]);
     el.shrineTrophies.textContent = 'Trophy relics ' + got.length + ' of ' + G.TROPHIES.length
-      + (got.length ? ': ' + got.map((t) => t.name).join(', ') + '.' : '. Beat a boss as your sixth trial, at its strongest, and its relic joins those you can be offered.');
+      + (got.length ? ': ' + got.map((t) => t.name).join(', ') + '.' : '. Beat a boss in your last trial, at its strongest, and its relic joins those you can be offered.');
   };
   U.showShrine = function () { U.fillShrine(); U.show('shrine', true); };
   // ---- the Cleansing Fountain (rest.js): one row for each corrupted boon whose bane you still carry
@@ -284,7 +284,7 @@
   // ---- Help: how a fight goes, and every word the game uses, by subject
   // steps: a numbered account. words: [the word, what it means].
   const HELP = [
-    { name: 'How a fight works', lead: 'One hero, one boss, one arena. A run is six of them: the first at random, then each one you choose at its portal, until you win or fall.', steps: [
+    { name: 'How a fight works', lead: 'One hero, one boss, one arena. A run is seven of them, one for each boss: the first at random, then each one you choose at its portal, until you win or fall.', steps: [
       '<b>The boss has three phases.</b> Its health bar is cut in three. Each time a third is gone it changes: new attacks, less rest.',
       '<b>Red-orange is a warning.</b> It marks where an attack will land. When it fills and flashes, the attack fires.',
       '<b>Leave the marked place, or dash through the attack.</b> A dash passes straight through anything.',
@@ -337,11 +337,12 @@
       ['Relic', 'One power chosen at the reliquary before the gate. It lasts the whole run, and stays with you if you fall and go again; it is given up only by going back to the camp.'],
       ['Boon', 'A smaller power chosen after each victory. They add up through the run.'],
       ['Pair', 'A gold boon offered only once you hold both of the two boons it joins. A card that would open one says so.'],
+      ['Sets and duos', 'Ember, Storm, Tide and Gloam boons each fill a slot: Strike, Special, Dash, Mend or Jump. Three of one set open its crown; two each of two sets wake their duo, which works for as long as both sets stay slotted.'],
       ['Corrupted boon', 'A crimson boon, far stronger than the rest, with a drawback written under it. Once a boss has fallen, one sometimes takes a card\u2019s place.'],
       ['Cleansing Fountain', 'At the crossroads. Spend Sunshards to purge a corrupted boon\u2019s drawback and keep the rest of it. Each use in a run costs twice the last.'],
       ['Grade', 'S, A, B or C for a victory. Every blow you take lowers it, and so does a fight that runs past two and a half minutes; perfect dodges raise it. A better grade pays more.'],
       ['Sunshards', 'What every fight pays, win or lose. They are kept between runs and spent at the Shrine.'],
-      ['Trophy', 'The boss you beat as your sixth trial, at its strongest, adds its relic to those the reliquary can offer. One a run.'],
+      ['Trophy', 'The boss you beat in your last trial, at its strongest, adds its relic to those the reliquary can offer. One a run.'],
       ['Feat', 'One of eighteen things worth doing once, each paying Sunshards. The Tally stone in the Vigil lists them.'],
     ] },
     { name: 'The Vigil', lead: 'Your camp, from left to right.', words: [
@@ -471,6 +472,7 @@
         + (relic ? '<p><b>' + esc(G.relics.title(relic.id)) + '</b> ' + G.relics.html(relic.id, { next: true }) + '</p>' : '')
         + (G.run.extraRelics || []).map((id) => G.relicDef(id)).filter(Boolean).map((r) => '<p><b>' + esc(G.relics.title(r.id)) + '</b> ' + G.relics.html(r.id) + ' <i>(' + (r.id === 'hilt' ? 'his gift, for this run' : 'from a corrupted portal') + ')</i></p>').join('')
         + (G.run.crownSet() ? '<p class="crownline" style="--tagc:' + G.SETS[G.run.crownSet()].css + '"><b>Crown · ' + G.SETS[G.run.crownSet()].crown + '</b> ' + esc(G.SETS[G.run.crownSet()].crownDesc) + '</p>' : '')
+        + (G.run.duo() ? '<p class="crownline" style="--tagc:#ffaadc"><b>Duo · ' + esc(G.run.duo().name) + '</b> <i>' + G.run.duo().of.map((s) => G.SETS[s].name).join(' + ') + '.</i> ' + esc(G.run.duo().desc) + '</p>' : '')
         + held.map((h) => '<p' + (h.def.cursed ? ' class="cursed"' : '') + '><b>' + h.def.name + (h.n > 1 ? ' \u00d7' + h.n : '') + '</b> ' + (h.def.set ? '<i>' + G.SETS[h.def.set].name + ' · ' + G.SLOT_NAMES[h.def.slot] + '.</i> ' : '') + esc(h.def.desc) + U.pairNote(h.def)
           + (h.def.cursed ? (G.bane(h.def.id) ? '<span class="bane">' + esc(h.def.bane) + '</span>' : ' <i>(cleansed)</i>') : '') + '</p>').join('')
       : '';
@@ -511,6 +513,7 @@
     el.stage.style.setProperty('--star', hero.css);
     el.boons.innerHTML = (relic ? '<span class="t-relic">' + esc(G.relics.title(relic.id)) + '</span>' : '')
       + (R.extraRelics || []).map((id) => G.relicDef(id)).filter(Boolean).map((r) => '<span class="t-relic">' + esc(G.relics.title(r.id)) + '</span>').join('')
+      + (R.duo() ? '<span class="t-duo">Duo · ' + esc(R.duo().name) + '</span>' : '')
       + R.held().map((h) => '<span class="t-' + h.def.tag.toLowerCase() + (h.def.cursed && !G.bane(h.def.id) ? ' clean' : '') + '">' + h.def.name + (h.n > 1 ? ' \u00d7' + h.n : '') + '</span>').join('');
     const label = el.ember.querySelector('.elabel');
     el.ember.querySelectorAll('.seg').forEach((s) => s.remove());
@@ -739,7 +742,7 @@
   };
   // A set boon's card: its set and slot on the tag line; under the text, the set's rule, what it
   // would push out of its slot, and how near it brings the crown.
-  U.boonTag = (b) => (b.set ? b.tag + ' · ' + G.SLOT_NAMES[b.slot] : b.tag);
+  U.boonTag = (b) => (b.set ? b.tag + ' · ' + G.SLOT_NAMES[b.slot] : b.duo ? 'Duo · ' + b.of.map((s) => G.SETS[s].name).join(' + ') : b.tag);
   U.setNote = function (b) {
     if (!b.set || G.boon(b.id)) return '';
     const R = G.run, S = G.SETS[b.set], old = R.slots()[b.slot];
@@ -748,7 +751,16 @@
       + (old ? '<span class="setswap">Replaces ' + esc(G.boonDef(old).name) + '.</span>' : '')
       + (old && R.crownSet() && R.crownSet() !== b.set && G.boonDef(old).set === R.crownSet() ? '<span class="setswap">Your crown ' + esc(G.SETS[R.crownSet()].crown) + ' goes dark.</span>' : '')
       + '<span class="setcrown">' + (n >= 3 ? (R.crownSet() === b.set ? 'Keeps the crown ' : 'Opens the crown ') + esc(S.crown) + '.'
-        : n + ' of 3 toward the crown ' + esc(S.crown) + '.') + '</span>';
+        : n + ' of 3 toward the crown ' + esc(S.crown) + '.') + '</span>'
+      + U.duoNote(b);
+  };
+  // (v2.6c) what a set boon does to the duo: wakes one, or puts the one you have to sleep
+  U.duoNote = function (b) {
+    const R = G.run, old = R.slots()[b.slot], now = R.duo();
+    const after = R.duoOf((s) => R.setCount(s) + (s === b.set ? 1 : 0) - (old && G.boonDef(old).set === s ? 1 : 0));
+    if (after && after !== now) return '<span class="setcrown duonote">Wakes the duo ' + esc(after.name) + ': ' + esc(after.desc) + '</span>';
+    if (now && after !== now) return '<span class="setswap">Your duo ' + esc(now.name) + ' goes quiet.</span>';
+    return '';
   };
   U.pairNote = function (b) {
     if (b.pair) return '';

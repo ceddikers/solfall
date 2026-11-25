@@ -364,6 +364,7 @@
         G.fx.dust(P.x, P.y, 5, { speed: [20, 100], size: [4, 8], up: 60 });
       } else if (P.airJumps > 0) {
         P.airJumps--; P.vy = -C.JUMP2; P.jumpBuf = 0; P.jumpHeld = true; P.squash = 0.2;
+        G.sets.airJump(); // (Skybreak, the Jump slot: sets.js)
         G.audio.play('jump2');
         G.fx.ring(P.x, P.y, { r0: 6, r1: 38, life: 0.25, color: STAR, width: 3 });
         G.fx.burst(P.x, P.y, { n: 6, color: STAR, speed: [40, 150], angle: Math.PI / 2, spread: 1.6, life: [0.2, 0.4], size: [2, 4] });
@@ -416,6 +417,7 @@
         }
       }
     }
+    if (landed) G.sets.landed(fallSpeed); // (Cinderfall, Splashdown: the Jump slot, sets.js)
     if (P.plunge && P.onGround) {
       // Starfall lands
       P.plunge = false; P.squash = -0.3; P.iframes = Math.max(P.iframes, 0.12);

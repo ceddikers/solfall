@@ -11,7 +11,7 @@
   const FLOOR = G.FLOOR, F = G.fx, rnd = G.rand, W = G.W, TAU = G.TAU;
   const RW = 3820, WALL_L = 120, WALL_R = RW - 110, PAD = 48;
   const ARCH_X = 210, FIRE_X = 600, ALTAR_X = 1090, STONE_X = 1400, FOUNT_X = 1610, EVENT_X = 1900, PORTAL_X = 2160, PORTAL_GAP = 192, SEVENTH_X = 3560;
-  const TAG_COL = { movement: '127,227,176', weapon: '255,186,92', starlight: '150,225,255', survival: '255,154,166', risk: '255,96,56', pair: '255,210,122', relic: '255,224,138', corrupted: '235,30,80' };
+  const TAG_COL = { movement: '127,227,176', weapon: '255,186,92', starlight: '150,225,255', survival: '255,154,166', risk: '255,96,56', pair: '255,210,122', relic: '255,224,138', corrupted: '235,30,80', duo: '255,170,220' };
   // (a hero's own boons are in the hero's colour)
   const colOf = (b) => (b.tag === 'Signature' ? G.hero().col : b.set ? G.SETS[b.set].col : TAG_COL[b.tag.toLowerCase()] || '255,214,140');
   const BLOOD = '235,30,80';
@@ -199,6 +199,20 @@
     say('The ' + S.name + ' crown: ' + S.crown);
   }
   REST.crowned = crowned;
+  // (v2.6c) Two boons each of two sets wake their duo: the two sets' lights wind round the hero.
+  // A swap that breaks it puts it to sleep, and the road says that too.
+  function duoed(was) {
+    const d = R().duo(), p = P();
+    if (d === was) return;
+    if (!d) { G.audio.play('uiMove'); say('Your duo ' + was.name + ' goes quiet'); return; }
+    G.audio.play('crownTaken');
+    for (const s of d.of) {
+      const c = G.SETS[s].col;
+      F.ring(p.x, p.y - 40, { r0: 10, r1: 170, life: 0.6, color: c, width: 5 });
+      F.burst(p.x, p.y - 40, { n: 16, color: c, speed: [40, 240], life: [0.6, 1.2], size: [2, 4], grav: -160, wob: 120, jitter: 20 });
+    }
+    say('Duo: ' + d.name);
+  }
 
   // ------------------------------------------------------------------ the relic awakens (v2.6a)
   // On the road after trials II, IV and VI the run's relic stirs in the fire: it turns in the flames,
@@ -244,7 +258,7 @@
     if (s.id === 'boon') {
       if (turning(s.i)) { startTurn(); return; } // (nothing can be taken while it turns)
       if (mineI(s.i) || closed()) { G.audio.play('uiMove'); say(mineI(s.i) ? 'Yours for the run' : 'One each rest'); return; }
-      const b = run.offer[s.i], c = colOf(b), crownWas = run.crownSet();
+      const b = run.offer[s.i], c = colOf(b), crownWas = run.crownSet(), duoWas = run.duo();
       if (b.relicReward) run.extraRelics.push(b.id); else run.take(s.i);
       if (REST.taken < 0) REST.taken = s.i; else REST.taken2 = s.i;
       retake();
@@ -255,6 +269,7 @@
       F.burst(p.x, p.y - 10, { n: 16, color: c, speed: [20, 130], life: [0.6, 1.2], size: [2, 4], grav: -220, wob: 130, jitter: 22 });
       say(run.replaced ? b.name + ' (for ' + run.replaced.name + ')' : b.name);
       crowned(crownWas);
+      duoed(duoWas);
     } else if (s.id === 'stone') {
       if (run.reroll()) {
         G.audio.play('uiSelect'); G.audio.play('whoosh'); F.shake(4);
@@ -763,7 +778,7 @@
     const b = G.run.offer[s.i], own = b.relicReward ? 0 : G.boon(b.id), mine = mineI(s.i);
     el.className = 'item card focus show t-' + b.tag.toLowerCase();
     document.body.classList.toggle('pad', G.input.device === 'gamepad');
-    el.querySelector('.ctag').textContent = b.relicReward ? 'A second relic' : b.pair ? 'Pair · ' + b.of.map((id) => G.boonDef(id).name).join(' + ') : G.ui.boonTag(b);
+    el.querySelector('.ctag').textContent = b.relicReward ? 'A second relic' : b.duo ? G.ui.boonTag(b) : b.pair ? 'Pair · ' + b.of.map((id) => G.boonDef(id).name).join(' + ') : G.ui.boonTag(b);
     el.querySelector('.cname').textContent = b.name;
     el.querySelector('.cdesc').innerHTML = G.ui.esc(b.desc) + (own && !mine ? ' You hold ' + own + '.' : '') + (mine || b.relicReward ? '' : G.ui.pairNote(b) + G.ui.setNote(b))
       + (b.cursed ? '<span class="bane">' + G.ui.esc(b.bane) + '</span>' : '');
@@ -1036,7 +1051,7 @@
     }
   }
 
-  // The seventh portal, for the final trial: taller than the rest, dark and still. Once all six are
+  // The seventh portal, for the final trial: taller than the rest, dark and still. Once every trial is
   // beaten it stirs, a slow pulse of pale light behind the stone, but it does not open (not yet).
   function drawSeventh(ctx, t) {
     const x = SEVENTH_X;
@@ -1057,7 +1072,7 @@
     }
     ctx.restore();
     for (const side of [-1, 1]) poly(ctx, [x + side * hw, FLOOR - 16, x + side * hw, top + hw, x + side * (hw + 26), top + hw - 10, x + side * (hw + 32), FLOOR - 16], STONE);
-    // six sockets round the arch, one lit for each boss beaten this run
+    // a socket round the arch for each boss, lit when it is beaten this run
     const n = G.BOSS_IDS.length, beaten = R().beaten;
     ctx.globalCompositeOperation = 'lighter';
     G.BOSS_IDS.forEach((id, i) => {
@@ -1101,7 +1116,7 @@
   function label(s) {
     const run = R(), next = G.roman(run.trial + 1), of = G.roman(G.RUN_FIGHTS);
     if (s.id === 'fire' && G.relics.pending()) return ['The Fire', 'Your relic stirs in the flames. Hold it to the fire.', 'awaken it'];
-    if (s.id === 'fire') return ['The Fire', run.runWon() ? 'All six trials won. Rest a while.' : 'Trial ' + G.roman(run.trial) + ' won. Rest a while; nothing here can hurt you.', 'warm your hands'];
+    if (s.id === 'fire') return ['The Fire', run.runWon() ? 'All ' + G.roman(G.RUN_FIGHTS) + ' trials won. Rest a while.' : 'Trial ' + G.roman(run.trial) + ' won. Rest a while; nothing here can hurt you.', 'warm your hands'];
     if (s.id === 'stone') return ['Second Thoughts', 'Redraw the offering (' + run.rerolls + ' left this run)', 'redraw'];
     if (s.id === 'home') return ['The Way Home', 'The run is won. Back to the camp.', 'go home'];
     if (s.id === 'fountain') {
@@ -1123,7 +1138,7 @@
     }
     if (s.id === 'door') return ['The Doorway', 'Someone sits in the light inside, waiting. A duel: lose it, and you lose nothing.', 'step through'];
     if (s.id === 'duel') return ['The Duelling Shade', 'It dashes at you, six times at most. Strike it three times before its blade touches you and it leaves a relic.', 'duel'];
-    if (s.id === 'seventh') return ['The Seventh Portal', run.runWon() ? 'It stirs, but does not open. Not yet.' : 'Dormant. It waits for six trials won (' + run.beaten.length + ' of ' + G.RUN_FIGHTS + ').', run.runWon() ? 'touch it' : ''];
+    if (s.id === 'seventh') return ['The Seventh Portal', run.runWon() ? 'It stirs, but does not open. Not yet.' : 'Dormant. It waits for ' + G.roman(G.RUN_FIGHTS) + ' trials won (' + run.beaten.length + ' of ' + G.RUN_FIGHTS + ').', run.runWon() ? 'touch it' : ''];
     if (s.id === 'portal') {
       const B = G.bosses[s.boss], st = portalState(s.boss), ready = offerTaken();
       if (st === 'corrupt') return ['Corrupted: ' + B.name, 'Optional. Far stronger, and it does not count as a trial. Win it for a second relic and triple Sunshards.', ready ? 'enter, if you dare' : 'take from the offering first'];

@@ -225,7 +225,7 @@
     const depth = G.store.load('depth', {});
     const newDepth = !depth[d] || trial > depth[d];
     if (newDepth) { depth[d] = trial; G.store.save('depth', depth); }
-    // the boss is beaten (or a corrupted one cleansed); the sixth wins the run (the seventh, final
+    // the boss is beaten (or a corrupted one cleansed); the last trial wins the run (the final
     // fight is still to come); now and then a portal already beaten turns corrupted
     const R = G.run, corrupt = R.corrupt, wasWon = R.runWon(), id = G.boss.id;
     if (!G.practice) {

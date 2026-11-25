@@ -1,5 +1,5 @@
 // Solfall - what lasts between runs: Sunshards, the Shrine's permanent upgrades, and the trophy
-// relics won from bosses (v2.6b: only from the boss beaten as trial VI, at its strongest). Kept in the
+// relics won from bosses (v2.6b: only from the boss beaten in the last trial, at its strongest). Kept in the
 // browser's storage.
 'use strict';
 (function () {

@@ -1,9 +1,11 @@
 // Solfall - sets (v2.3a). Ember, Storm, Tide and Gloam: four kinds of boon (defined in run.js, G.SETS),
-// each fitting one of four slots (Strike, Special, Dash, Mend) and each leaving its own mark on the foe:
+// each fitting one of five slots (Strike, Special, Dash, Mend, Jump) and each leaving its own mark on the foe:
 //   Ember  embers that burn it (five at most, dying down unless more are set)
 //   Storm  static that builds to a bolt
 //   Tide   soaking, which slows it (the boss's clock runs slower: see G.step in game.js)
 //   Gloam  a dark ring: the next finisher or special deals double and spends it
+// (v2.6c) A fifth slot, Jump, and duos: two boons of each of two sets open a duo boon that joins
+// their marks (G.DUOS in run.js; worked here, marked "duo").
 // Three boons of one set open its crown, a move of its own on the crown key, charged by the set's
 // mark doing its work and carried between trials like Dawnbreak:
 //   Pyre (Ember), Thunderstep (Storm), Undertow (Tide), Nightfall (Gloam).
@@ -28,6 +30,10 @@
     PYRE_DMG: 16, PYRE_T: 6,
     STEP_DMG: 24, STEP_N: 3, STEP_T: 2,
     UNDERTOW_DMG: 20, NIGHT_T: 3,
+    // the Jump slot (v2.6c): how hard a landing must be, how far it reaches, what Skybreak does
+    LAND_V: 420, LAND_R: 200, CINDERS: 2, SKY_DMG: 24, SKY_W: 70, SKY_STATIC: 2,
+    // the duos (v2.6c)
+    BLACK_DMG: 12, MARK_BACK_NIGHT: 2, ABYSS_K: 0.25, BOLT2_T: 0.16,
   };
   const has = (id) => G.boon(id) > 0;
   // where each ember sits on the foe, as a share of its half-size (one for each of the five)
@@ -43,6 +49,7 @@
       mark: G.run.setCount && G.run.setCount('gloam') > 0, markT: 0, markPop: 0,
       cloud: null, trail: [], trailCd: 0, lastToken: null,
       bolts: [], arcs: [], pyreT: 0, step: null, wave: null, night: null, nightK: 0,
+      black: null, bolt2: null, // (duos: Black Flame's burst and Conductor's second bolt, on their way)
     };
     // a crown that changed hands starts empty
     const R = G.run, cs = R.crownSet ? R.crownSet() : null;
@@ -89,6 +96,7 @@
   };
   S.zap = function (n) {
     if (!fighting() || !main()) return;
+    if (has('heat') && st.embers > 0) n *= 2; // (duo: Heat Lightning)
     st.stat += n; st.statHold = K.STATIC_HOLD;
     charge('storm', K.CH_STATIC * n);
     if (st.stat >= K.STATIC_MAX) { st.stat = 0; bolt(K.BOLT_DMG); }
@@ -105,11 +113,13 @@
     G.audio.play('markBack');
   };
   // A bolt from above onto the foe.
-  function bolt(dmg) {
+  function bolt(dmg, again) {
     const t = main();
     if (!t) return;
     const h = half(t), x = t.cx + G.rand(-0.4, 0.4) * h.w, y = t.cy - h.h * 0.3;
-    if (!hurt(dmg, { heavy: true, x, y })) return;
+    if (!hurt(dmg, { heavy: true, x, y, bolt: true })) return;
+    if (has('heat')) S.ember(2); // (duo: Heat Lightning)
+    if (has('conductor') && st.soak > 0 && !again) st.bolt2 = { t: K.BOLT2_T, dmg }; // (duo: Conductor, the second strike)
     st.bolts.push({ pts: jag(x + G.rand(-40, 40), -30, x, y, 9, 34), life: 0.24, max: 0.24 });
     charge('storm', K.CH_BOLT);
     G.audio.play('bolt'); G.fx.shake(5); G.fx.stop(0.03);
@@ -150,6 +160,37 @@
     if (fin && has('emstrike')) S.ember(2);
     if (has('ststrike')) S.zap(fin ? 2 : 1);
     if (fin && has('tdstrike')) S.soak(1);
+    if (has('conductor') && st.soak > 0) S.zap(st.soak); // (duo: Conductor)
+  };
+  // ------------------------------------------------------------------ the Jump slot (v2.6c)
+  // A landing from a jump (player.js, with how fast the hero came down): Cinderfall and Splashdown.
+  S.landed = function (speed) {
+    if (!fighting() || speed < K.LAND_V) return;
+    const P = G.player, t = main(), near = t && gap(t, P.x, P.y - 30) < K.LAND_R;
+    if (has('emjump')) {
+      G.fx.burst(P.x, P.y - 4, { n: 14, color: col('ember'), speed: [120, 380], angle: -Math.PI / 2, spread: 2.6, life: [0.3, 0.7], size: [2, 3.5], grav: 700 });
+      if (near) S.ember(K.CINDERS);
+    }
+    if (has('tdjump')) {
+      G.fx.burst(P.x, P.y - 4, { n: 16, color: col('tide'), speed: [150, 420], angle: -Math.PI / 2, spread: 2.2, life: [0.3, 0.6], size: [2, 4], grav: 1100 });
+      G.fx.ring(P.x, P.y - 6, { r0: 10, r1: K.LAND_R, life: 0.35, color: col('tide'), width: 3 });
+      if (near) S.soak(1);
+    }
+  };
+  // A jump in the air (player.js): Skybreak sends lightning straight down.
+  S.airJump = function () {
+    if (!fighting() || !has('stjump')) return;
+    const P = G.player, t = main(), x = P.x, y0 = P.y - 10;
+    st.bolts.push({ pts: jag(x, y0, x + G.rand(-12, 12), FLOOR, 7, 16), life: 0.22, max: 0.22 });
+    G.audio.play('bolt'); G.fx.shake(3);
+    G.fx.burst(x, FLOOR - 4, { n: 10, color: col('storm'), speed: [120, 420], angle: -Math.PI / 2, spread: 2.4, life: [0.12, 0.3], kind: 'spark', size: [1.5, 3] });
+    if (!t) return;
+    // the column under the hero, as wide as Skybreak's reach, from where they are to the floor
+    const h = half(t), under = Math.abs(t.cx - x) < h.w + K.SKY_W && t.cy + h.h > y0;
+    if (under && hurt(K.SKY_DMG, { heavy: true, x: G.clamp(x, t.cx - h.w, t.cx + h.w), y: Math.max(y0, t.cy - h.h), bolt: true })) {
+      charge('storm', K.CH_BOLT);
+      S.zap(K.SKY_STATIC);
+    }
   };
   S.perfect = function () {
     if (!fighting()) return;
@@ -194,8 +235,8 @@
   // ------------------------------------------------------------------ the boss's side of a blow
   // Before the blow lands: the Gloam mark doubles a finisher or a special, and is spent.
   S.amp = function (amount, info) {
-    if (!st || !st.mark || !fighting() || info.crown || info.tick || !(info.finisher || info.lance)) return amount;
-    st.mark = false; st.markT = K.MARK_BACK;
+    if (!st || !st.mark || !fighting() || info.crown || info.tick || !(info.finisher || info.lance || (info.bolt && has('nightthunder')))) return amount;
+    st.mark = false; st.markT = has('nightthunder') ? K.MARK_BACK_NIGHT : K.MARK_BACK; // (duo: Night Thunder)
     charge('gloam', K.CH_MARK);
     const P = G.player;
     if (has('glstrike') && info.finisher) { P.ember = Math.min(G.PLAYER.SEG * P.segs, P.ember + G.PLAYER.SEG / 3); P.emberFlash = 1; }
@@ -204,7 +245,18 @@
       G.fx.ring(info.x, info.y, { r0: 70, r1: 8, life: 0.25, color: col('gloam'), width: 5 });
       G.fx.burst(info.x, info.y, { n: 12, color: '24,10,40', speed: [80, 360], life: [0.3, 0.7], size: [4, 9] });
     }
-    return amount * 2;
+    // (duo: Black Flame) every ember bursts, a moment later (not inside this blow)
+    if (has('blackflame') && st.embers > 0) st.black = { t: 0.06, n: st.embers };
+    // (duo: Abyss) a foe soaked three deep is dragged towards its stagger
+    const B = G.boss;
+    if (has('abyss') && st.soak >= K.SOAK_MAX && !B.staggered && !B.ward && B.poiseMax) {
+      B.poise = Math.min(B.poiseMax, B.poise + B.poiseMax * K.ABYSS_K);
+      const a = anchor();
+      if (a) { G.fx.ring(a.cx, a.cy, { r0: 120, r1: 20, life: 0.4, color: col('tide'), width: 6 }); G.fx.burst(a.cx, a.cy, { n: 14, color: '10,30,40', speed: [60, 260], life: [0.4, 0.8], size: [4, 8], grav: 400 }); }
+      G.audio.play('soak');
+    }
+    // (Nightglide, the Jump slot) in the air the mark is spent for triple
+    return amount * (has('gljump') && !G.player.onGround ? 3 : 2);
   };
   // After it lands: Nightfall counts it.
   S.dealt = function (amount, info) {
@@ -320,9 +372,11 @@
       st.emberT -= dt;
       if (st.emberT <= 0) {
         st.emberT += K.EMBER_TICK;
-        if (t) { hurt(Math.max(1, K.EMBER_DMG * st.embers), { tick: true }); charge('ember', K.CH_EMBER * st.embers); }
+        const scald = has('scald') && st.soak > 0; // (duo: Scald) steam burns for double
+        if (t) { hurt(Math.max(1, K.EMBER_DMG * st.embers * (scald ? 2 : 1)), { tick: true }); charge('ember', K.CH_EMBER * st.embers); }
+        if (scald && a) { const h = half(a); for (let i = 0; i < 3; i++) G.fx.spawn({ x: a.cx + G.rand(-0.7, 0.7) * h.w, y: a.cy + G.rand(-0.6, 0.3) * h.h, vx: G.rand(-20, 20), vy: -G.rand(40, 110), life: G.rand(0.6, 1.1), size: G.rand(6, 11), color: '220,235,240', grav: -60, wob: 30 }); }
       }
-      st.emberFade -= dt;
+      if (!(has('scald') && st.soak > 0)) st.emberFade -= dt; // (duo: Scald) they do not die down while it is soaked
       if (st.emberFade <= 0) { st.embers--; st.emberFade = K.EMBER_FADE; }
     } else st.emberT = K.EMBER_TICK;
     if (st.pyreT > 0) {
@@ -351,6 +405,23 @@
       }
     }
     if (st.step && (st.step.t -= dt) <= 0) st.step = null;
+    // (duo: Conductor) the second strike of a bolt on a soaked foe
+    if (st.bolt2 && (st.bolt2.t -= dt) <= 0) { const d = st.bolt2.dmg; st.bolt2 = null; bolt(d, true); }
+    // (duo: Black Flame) every ember bursts
+    if (st.black && (st.black.t -= dt) <= 0) {
+      const n = st.black.n; st.black = null;
+      if (t) {
+        const h = half(t);
+        hurt(K.BLACK_DMG * n, { heavy: true, x: t.cx, y: t.cy });
+        G.audio.play('pyre'); G.fx.shake(4 + n);
+        for (let i = 0; i < n; i++) {
+          const c = COALS[i], x = t.cx + c[0] * h.w, y = t.cy + c[1] * h.h;
+          G.fx.ring(x, y, { r0: 6, r1: 56, life: 0.3, color: '120,40,200', width: 4 });
+          G.fx.burst(x, y, { n: 8, color: '30,8,40', speed: [80, 320], life: [0.3, 0.6], size: [3, 6], grav: -160 });
+          G.fx.burst(x, y, { n: 6, color: col('ember'), speed: [100, 380], life: [0.15, 0.35], kind: 'spark', size: [1.5, 3] });
+        }
+      }
+    }
     // Tide: soaking runs out all at once
     if (st.soak > 0) {
       if (t) charge('tide', K.CH_SOAK * st.soak * dt);

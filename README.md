@@ -2,7 +2,7 @@
 
 A side-on boss rush for the browser: four heroes, seven three-phase bosses, played as a run of
 ever-harder trials. You pick a hero and a relic before the run and win a boon after each victory.
-Version 2.6b.
+Version 2.6c.
 
 This is an early slice of a planned boss-rush roguelite (short runs, a boon after each boss,
 bosses drawn from a pool). A run meets the four bosses in a shuffled order, then meets them again, harder.
@@ -113,6 +113,93 @@ hero (`tools/feel-check.js`).
 - Settings, Reset progress erases Sunshards, upgrades, trophies and records (it has to be chosen twice).
 
 Not done: touch controls, a colour-blind alternative to red-orange warnings, gamepad rebinding.
+
+## A Jump slot, and duos (v2.6c)
+
+Asked: "duo boons is cool, maybe add a 5th slot so you can do a 3 boon main and a 2 boon side for a crown + duo
+build idea", then "lets get some duo synergy ideas pumped out"; the pitch was approved as it stood.
+
+**The Jump slot.** Set boons now fill five slots: Strike, Special, Dash, Mend and Jump. Five slots allow one crown
+(three of a set) and one duo (two each of two sets) at once: three of your main set and two of a side set.
+
+| Set | Jump boon | What it does |
+|---|---|---|
+| Ember | Cinderfall | landing from a jump scatters cinders: a foe within 200 px catches two embers |
+| Storm | Skybreak | a jump in the air sends lightning straight down: a foe below takes 24, and static builds by two |
+| Tide | Splashdown | landing from a jump soaks a foe within 200 px |
+| Gloam | Nightglide | in the air, the dark mark is spent for triple, not double |
+
+**Duos.** Then: "the duo should just automatically activate in the case of having 2 2 or 2 3 or 2 2 1". A duo is
+not taken from the road: it is on while two boons of each of its sets sit in their slots (2 + 2, 3 + 2 or
+2 + 2 + 1), and goes quiet again if a swap breaks that. Five slots never hold two duos. A set boon's card says if
+it would wake a duo, or put yours to sleep; waking one rings the hero in both sets' colours on the road, and the
+active duo is listed in the run panel and the pause menu.
+
+**The offering prefers empty slots.** "offering prefer empty slots and can replace already equipped if choosing
+same": a set boon for a slot still empty is four times as likely to be drawn as one for a slot already filled,
+which still replaces what is there if you take it (the card says what it replaces).
+
+| Duo | Sets | What it does |
+|---|---|---|
+| Heat Lightning | Ember + Storm | every bolt sets two embers; static builds twice as fast on a burning foe |
+| Scald | Ember + Tide | on a soaked foe, embers burn as steam for double and do not die down |
+| Black Flame | Ember + Gloam | spending the dark mark makes every ember burst for 12; they burn on |
+| Conductor | Storm + Tide | a bolt on a soaked foe strikes twice; every blow on it builds one static per layer of soak |
+| Night Thunder | Storm + Gloam | bolts can spend the dark mark (double); the mark comes back in 2 s, not 4 |
+| Abyss | Tide + Gloam | spending the mark on a foe soaked three deep fills a quarter of its stagger bar |
+
+Built in `js/run.js` (the slot, the boons, `G.DUOS`, the offering) and `js/sets.js` (what they do); the hero calls
+in on an air jump and on landing. Checked: each duo and Jump boon in a fight (Heat Lightning: static 2 for 1 on a
+burning foe and two embers per bolt; Scald: 16 damage in a second against 6, no ember lost; Black Flame: 48 from
+four embers; Conductor: two bolts and two static from a blow at two soak; Night Thunder: a bolt spent the mark,
+back in 2 s; Abyss: a quarter of the stagger bar; Cinderfall, Splashdown, Skybreak hit and miss by reach;
+Nightglide triple in the air); duos on at 2 + 2, 3 + 2 and 2 + 2 + 1, off at 2 + 1 and after a breaking swap, never on the offering; set cards for
+empty slots 87% of the time (60% unweighted); a 3 + 2 build holds a crown and a duo; six builds through scripted fights with all four heroes, no errors.
+
+**Seven trials.** "lets add trial 7 since there are 7 bosses": a run is now seven fights, one for each boss
+(`G.RUN_FIGHTS` 7), and the final fight, still to come, would be the eighth. The relic's last awakening moves to
+after trial VII and the trophy to the boss beaten in trial VII. Aurel's doorway still opens on the roads after
+trials II to V. (The dormant final door is still called the Seventh Portal on the road and in Aurel's lines; with
+seven boss portals beside it, it may want a new name.)
+
+**Clear rates at trial VII.** Asked: "run tests of all the duos activated a crown + duo level on trial 7 ... and
+at max level aurel (full 7 boss version) ... on each character 10 runs each for each boss at trial 7 diff with
+omens". `tools/clear-rates.js` has a new option for it, `CLEAR.start({ build: 'duo', awake: 3, trials: [7],
+runs: 10, bosses: G.BOSS_IDS.concat(['champion']) })`: each fight gets a crown + duo build (three set boons of
+one set and two of another in shuffled slots, turning through all six duos and which set is the crown), a random
+relic at Ascendant, trial VII's health, pace and two omens, and Aurel is fought with all seven bosses beaten (his
+full seven-stone second phase). 320 fights on Standard, against the same 320 with a normal run's random boons
+and the same Ascendant relic:
+
+| Boss | Crown + duo | Random boons |
+|---|---|---|
+| Warden | 85% | 73% |
+| Magus | 100% | 98% |
+| Veil | 98% | 98% |
+| Knight | 93% | 98% |
+| Wolf | 80% | 85% |
+| Leviathan | 100% | 95% |
+| Kairo | 55% | 38% |
+| Aurel (all seven stones) | 75% | 70% |
+| All | 86% | 82% |
+
+By hero (crown + duo, random boons): Vesper 88% and 86%, Aster 88% and 79%, Lune 78% and 73%, Eos 90% and 89%.
+Aurel by hero (crown + duo): Vesper 90%, Aster 70%, Lune 40%, Eos 100%. Duos: Heat Lightning 81%, Scald 88%,
+Black Flame 88%, Conductor 84%, Night Thunder 91%, Abyss 84% (Night Thunder and Abyss over 32 fights, the others
+64); wins took 71 to 101 seconds, about as long as with random boons (87 s against 84 s on average). No errors,
+no stalemates. Read with care: the scripted player fires crowns but does not play to a set (it does not save a
+finisher for the dark mark or jump for Nightglide), each hero-and-boss cell is only ten fights, and Aurel was
+fought with omens and trial VII's health, which his duel never has. What it shows: no duo runs away with the game;
+Kairo is the wall at trial VII; Lune struggles most against Aurel.
+
+Playtest checklist:
+- Take two Ember and two Storm boons in different slots: "Duo: Heat Lightning" as the fourth is taken, and it
+  shows in the run panel. Swap one of them for another set: it goes quiet.
+- The offering mostly shows set boons for slots you have not filled.
+- Try a 3 + 2 build: the crown key works and the duo does its part.
+- Skybreak: double jump over the boss and the lightning falls on it. Cinderfall and Splashdown on a landing near it.
+- Are any duos too strong (Conductor and Night Thunder can chain a lot of bolts) or not worth building toward?
+- A run is seven trials: the last road names trial VII, and the relic's third awakening comes after it.
 
 ## The Chalice retuned, and trophies won at trial VI (v2.6b)
 

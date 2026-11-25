@@ -404,6 +404,8 @@ ul.tips b { color: var(--ink); font-weight: 600; }
 .t-storm { --tagc: #ffec8c; }
 .t-tide { --tagc: #50d6cc; }
 .t-gloam { --tagc: #a878f0; }
+.t-duo { --tagc: #ffaadc; } /* (v2.6c) a duo joins two sets */
+.item.card.t-duo { background: linear-gradient(180deg, rgba(255, 170, 220, 0.1), rgba(255, 255, 255, 0.03)); }
 .setrule { display: block; margin-top: 0.45em; opacity: 0.72; font-style: italic; }
 .setswap { display: block; margin-top: 0.35em; color: #ffb38a; }
 .setcrown { display: block; margin-top: 0.35em; color: var(--tagc, #fff); letter-spacing: 0.04em; }

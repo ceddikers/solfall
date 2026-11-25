@@ -158,8 +158,8 @@
     { id: 'hanging', name: 'Hanging Cut', tag: 'Signature', max: 1, heroes: ['eos'], desc: 'The cut of a full draw hangs in the air, and a second later cuts again for half.' },
     { id: 'secondsun', name: 'Second Sun', tag: 'Signature', max: 1, heroes: ['eos'], desc: 'After a full draw, holding again starts at two marks.' },
   ];
-  // Sets (v2.3a): four kinds of boon, each leaving its own mark on the foe. A set boon fits one of four
-  // slots (Strike, Special, Dash, Mend), one boon to a slot: a new one for a full slot replaces the
+  // Sets (v2.3a): four kinds of boon, each leaving its own mark on the foe. A set boon fits one of five
+  // slots (Strike, Special, Dash, Mend, and since v2.6c Jump), one boon to a slot: a new one for a full slot replaces the
   // old. Three of one set opens its crown, a move of its own on the crown key, charged by the set's
   // mark doing its work (the mechanics are in sets.js).
   G.SETS = {
@@ -177,25 +177,30 @@
       crownDesc: 'The arena goes dark for three seconds. Every blow you land in the dark lands again when the light returns.' },
   };
   G.SET_IDS = ['ember', 'storm', 'tide', 'gloam'];
-  G.SLOTS = ['strike', 'special', 'dash', 'mend'];
-  G.SLOT_NAMES = { strike: 'Strike', special: 'Special', dash: 'Dash', mend: 'Mend' };
+  // (v2.6c) a fifth slot, Jump: three boons of one set and two of another make a crown and a duo
+  G.SLOTS = ['strike', 'special', 'dash', 'mend', 'jump'];
+  G.SLOT_NAMES = { strike: 'Strike', special: 'Special', dash: 'Dash', mend: 'Mend', jump: 'Jump' };
   for (const b of [
     { id: 'emstrike', set: 'ember', slot: 'strike', name: 'Searing Edge', desc: 'Finishers set two embers on the foe.' },
     { id: 'emspecial', set: 'ember', slot: 'special', name: 'Kindled Star', desc: 'Your special sets three embers on the foe.' },
     { id: 'emdash', set: 'ember', slot: 'dash', name: 'Ashen Trail', desc: 'A dash along the ground leaves fire on the floor. A foe that touches it catches an ember.' },
     { id: 'emmend', set: 'ember', slot: 'mend', name: 'Hearthwave', desc: 'Mending sends out a wave of heat: a foe close by catches three embers.' },
+    { id: 'emjump', set: 'ember', slot: 'jump', name: 'Cinderfall', desc: 'Landing from a jump scatters cinders: a foe close by catches two embers.' },
     { id: 'ststrike', set: 'storm', slot: 'strike', name: 'Charged Edge', desc: 'Every blow of your weapon builds static on the foe, and a finisher builds two.' },
     { id: 'stspecial', set: 'storm', slot: 'special', name: 'Thunderhead', desc: 'Your special leaves a storm cloud over the foe. It strikes four times for 10, each building two static.' },
     { id: 'stdash', set: 'storm', slot: 'dash', name: 'Lightning Step', desc: 'A perfect dodge calls a bolt down on the foe for 24.' },
     { id: 'stmend', set: 'storm', slot: 'mend', name: 'Quickening', desc: 'Mending takes 30% less time, and when it ends a bolt strikes the foe for 24.' },
+    { id: 'stjump', set: 'storm', slot: 'jump', name: 'Skybreak', desc: 'A jump in the air sends lightning straight down: a foe below you takes 24, and static builds by two.' },
     { id: 'tdstrike', set: 'tide', slot: 'strike', name: 'Undercurrent', desc: 'Finishers soak the foe.' },
     { id: 'tdspecial', set: 'tide', slot: 'special', name: 'Breaking Wave', desc: 'Your special soaks the foe twice, and washes away what it has thrown near you.' },
     { id: 'tddash', set: 'tide', slot: 'dash', name: 'Slack Water', desc: 'A perfect dodge soaks the foe, and the attack you slipped runs at half speed for a second.' },
     { id: 'tdmend', set: 'tide', slot: 'mend', name: 'Tidewall', desc: 'Mending raises a wall of water around you that turns the next blow aside.' },
+    { id: 'tdjump', set: 'tide', slot: 'jump', name: 'Splashdown', desc: 'Landing from a jump throws up a splash: a foe close by is soaked.' },
     { id: 'glstrike', set: 'gloam', slot: 'strike', name: 'Nightblade', desc: 'A finisher that spends the mark gives back a third of a segment of Starlight.' },
     { id: 'glspecial', set: 'gloam', slot: 'special', name: 'Shadow Star', desc: 'Your special hits 30% harder and marks the foe at once.' },
     { id: 'gldash', set: 'gloam', slot: 'dash', name: 'Umbral Step', desc: 'A perfect dodge marks the foe at once, and its Riposte waits twice as long.' },
     { id: 'glmend', set: 'gloam', slot: 'mend', name: 'Fade', desc: 'When mending ends you fade for a second and a half, and blows pass through you.' },
+    { id: 'gljump', set: 'gloam', slot: 'jump', name: 'Nightglide', desc: 'In the air, the dark mark is spent for triple, not double.' },
   ]) { b.tag = G.SETS[b.set].name; b.max = 1; G.BOONS.push(b); }
   // Pairs: a boon only offered once you hold both of the boons it joins. When one is open to you it
   // takes the place of one of the cards on half the offers, and a card that would open one says so.
@@ -208,6 +213,19 @@
     { id: 'dayedge', name: 'Edge of Day', of: ['keen', 'quick'], desc: 'Finishers deal 60% more.' },
   ];
   for (const p of G.PAIRS) { p.tag = 'Pair'; p.max = 1; p.pair = true; }
+  // Duos (v2.6c): what two sets do together. Not taken from the road: a duo is simply on while two
+  // boons of each of its sets sit in their slots (2 + 2, 3 + 2 or 2 + 2 + 1), and off again if a swap
+  // breaks that. Five slots allow one crown (three of a set) and one duo at once, and never two duos.
+  // The mechanics are in sets.js, which asks G.boon(id) like any boon.
+  G.DUOS = [
+    { id: 'heat', name: 'Heat Lightning', of: ['ember', 'storm'], desc: 'Every bolt sets two embers, and static builds twice as fast on a burning foe.' },
+    { id: 'scald', name: 'Scald', of: ['ember', 'tide'], desc: 'On a soaked foe, embers burn as steam for double, and do not die down while it stays soaked.' },
+    { id: 'blackflame', name: 'Black Flame', of: ['ember', 'gloam'], desc: 'Spending the dark mark makes every ember on the foe burst for 12, and they burn on.' },
+    { id: 'conductor', name: 'Conductor', of: ['storm', 'tide'], desc: 'A bolt on a soaked foe strikes twice, and every blow on it builds one static for each layer of soak.' },
+    { id: 'nightthunder', name: 'Night Thunder', of: ['storm', 'gloam'], desc: 'Bolts can spend the dark mark too, for double, and the mark comes back in 2 seconds, not 4.' },
+    { id: 'abyss', name: 'Abyss', of: ['tide', 'gloam'], desc: 'Spending the dark mark on a foe soaked three deep fills a quarter of its stagger bar.' },
+  ];
+  for (const d of G.DUOS) { d.tag = 'Duo'; d.max = 1; d.duo = true; }
   // Corrupted boons: far stronger than the others, each with a drawback (its bane) that the Cleansing
   // Fountain can purge. Each is a twisted form of an ordinary boon (`from`), and on the road it first
   // stands on its plinth looking like that boon, then turns as you come near (rest.js). The
@@ -225,14 +243,16 @@
   ];
   for (const b of G.CURSED) { b.tag = 'Corrupted'; b.max = 1; b.cursed = true; }
   const boonById = {};
-  for (const b of G.BOONS.concat(G.PAIRS, G.CURSED)) boonById[b.id] = b;
+  for (const b of G.BOONS.concat(G.PAIRS, G.CURSED, G.DUOS)) boonById[b.id] = b;
+  const duoById = {};
+  for (const d of G.DUOS) duoById[d.id] = d;
   G.boonDef = (id) => boonById[id];
   // the pairs a boon can lead to, and the ones open to you now
   G.pairsOf = (id) => G.PAIRS.filter((p) => p.of.includes(id));
   const openPairs = () => G.PAIRS.filter((p) => !G.boon(p.id) && p.of.every((id) => G.boon(id)));
 
   // How many of a boon the hero holds, and the damage multiplier that applies to everything.
-  G.boon = (id) => R.boons[id] || 0;
+  G.boon = (id) => R.boons[id] || (duoById[id] && R.duo() === duoById[id] ? 1 : 0); // (a duo is on while its sets are slotted)
   // a corrupted boon's drawback, while it is held and has not been cleansed
   G.bane = (id) => !!R.boons[id] && !(R.purged || []).includes(id);
   // Boons and relics, the Shrine's Whetstone, the Flow rank, and the two trophies that depend on the moment.
@@ -265,11 +285,12 @@
     if (typeof document !== 'undefined') document.documentElement.style.setProperty('--herocol', G.hero().css); // (a hero's own boons wear the hero's colour)
   };
 
-  // A run is six fights, then (to come) a seventh that is always the same final one. The first is
+  // A run is seven fights (v2.6c: one for each boss; it was six), then (to come) an eighth that is
+  // always the same final one. The first is
   // drawn at random; after each, on the road between (rest.js), you choose the next by walking into
   // its portal. Each boss is fought once. A beaten boss's portal may turn corrupted: an optional,
   // far harder fight for a second relic (see G.diff and rollCorruption).
-  G.RUN_FIGHTS = 6;
+  G.RUN_FIGHTS = 7;
   R.left = () => G.BOSS_IDS.filter((id) => !R.beaten.includes(id));
   R.foe = function () {
     if (!R.current) { const left = R.left(); R.current = G.pick(left.length ? left : G.BOSS_IDS); }
@@ -315,14 +336,17 @@
     if (fresh.length >= n) pool = fresh;
     R.offer = [];
     // set boons come from one set at a time (v2.3a): up to two of them, more often from a set you
-    // already lean on, so a set can be gathered without being forced
+    // already lean on, so a set can be gathered without being forced. (v2.6c) Within the set, a boon
+    // for a slot still empty is four times as likely as one that would replace what a slot holds.
     const bySet = {};
     for (const b of pool) if (b.set) (bySet[b.set] = bySet[b.set] || []).push(b);
     const sets = Object.keys(bySet);
     if (sets.length) {
       const leaned = sets.filter((s) => R.setCount(s) > 0);
       const set = leaned.length && Math.random() < 0.6 ? G.pick(leaned) : G.pick(sets);
-      R.offer.push(...G.shuffle(bySet[set].slice()).slice(0, Math.min(2, n - 1)));
+      const slots = R.slots(), w = (b) => (slots[b.slot] ? 1 : 4);
+      const drawn = bySet[set].map((b) => ({ b, k: Math.pow(Math.random(), 1 / w(b)) })).sort((x, y) => y.k - x.k); // (a weighted draw)
+      R.offer.push(...drawn.slice(0, Math.min(2, n - 1)).map((x) => x.b));
     }
     // the rest are ordinary boons, never more than one of the hero's own (v2.2a)
     let own = false;
@@ -410,8 +434,12 @@
     return out;
   };
   R.setCount = (set) => Object.values(R.slots()).filter((id) => boonById[id].set === set).length;
-  // The set whose crown is open: three of its four boons held. (With four slots only one can be.)
+  // The set whose crown is open: three of its boons held. (With five slots only one can be.)
   R.crownSet = () => G.SET_IDS.find((s) => R.setCount(s) >= 3) || null;
+  // The duo that is on: two boons of each of its sets in their slots (with five slots, one at most).
+  // R.duoOf(count) asks it of other counts per set: what taking a card would leave you with.
+  R.duoOf = (count) => G.DUOS.find((d) => d.of.every((s) => count(s) >= 2)) || null;
+  R.duo = () => R.duoOf(R.setCount);
   // Boons held, in the order taken, with counts: [{ def, n }].
   R.held = function () {
     const out = [];

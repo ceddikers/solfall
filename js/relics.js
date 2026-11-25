@@ -1,9 +1,9 @@
 // Solfall - relics that awaken (v2.6a).
-// The run's relic grows with the run. On the road after trial II, after trial IV and after trial VI
-// (the one before the final door) it stirs in the fire, and held to the flames it awakens a stage:
+// The run's relic grows with the run. On the road after trial II, after trial IV and after trial VII
+// (the last before the final door) it stirs in the fire, and held to the flames it awakens a stage:
 //   I Kindled    (after II)   mostly a stronger form of what it already does
 //   II Awakened  (after IV)   a twist: something it did not do before
-//   III Ascendant (after VI)  its full form
+//   III Ascendant (after VII) its full form
 // Stages build on each other, and every relic held (a second one from a corrupted portal, the
 // Offered Hilt) wakes with the run: G.run.awake is the run's stage, 0 to 3.
 // Everything a relic does is asked of this file (player.js, run.js, bosskit.js, boss.js, flow.js,
@@ -14,7 +14,7 @@
   const RL = G.relics = {};
   const F = G.fx;
   RL.STAGES = ['', 'Kindled', 'Awakened', 'Ascendant'];
-  RL.AT = [2, 4, 6]; // trials won (bosses beaten) for each stage
+  RL.AT = [2, 4, 7]; // trials won (bosses beaten) for each stage (the last: the trial before the final door)
 
   // What each stage adds, as the cards say it. Stages build on each other.
   RL.AWAKE = {
