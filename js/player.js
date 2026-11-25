@@ -526,12 +526,14 @@
   };
 
   // Unit direction for a shot: the cursor if the press came from the mouse, otherwise the held keys.
-  function aim(mx, up, down, mouse) {
+  // (floorOk, v2.7b: Lune's arrows may be aimed down while she stands; they burst on the floor. Anything
+  // else, a lance or a draw, is kept level rather than driven into the floor.)
+  function aim(mx, up, down, mouse, floorOk) {
     const I = G.input;
     let dx = mx, dy = up ? -1 : (down && !P.onGround ? 1 : 0);
     if (mouse) {
       dx = I.mx + G.cam.x - P.x; dy = I.my + G.cam.y - (P.y - 36);
-      if (P.onGround && dy > 0) dy = 0; // never into the floor while standing
+      if (P.onGround && dy > 0 && !floorOk) dy = 0; // never into the floor while standing
     }
     if (!dx && !dy) dx = P.facing;
     if (dx) P.facing = dx > 0 ? 1 : -1;
@@ -841,7 +843,7 @@
   // ---------------------------------------------------------------- bow
   // Lune's attack is a shot in any direction; the third in a chain is a heavy arrow that pierces.
   function startShot(mx, up, down) {
-    const d = aim(mx, up, down, G.input.aim.attack);
+    const d = aim(mx, up, down, G.input.aim.attack, true);
     const idx = nextStep(true);
     const heavy = idx === 2;
     const st = H.combo[idx];

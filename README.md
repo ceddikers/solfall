@@ -2,7 +2,7 @@
 
 A side-on boss rush for the browser: four heroes, seven three-phase bosses, played as a run of
 ever-harder trials. You pick a hero and a relic before the run and win a boon after each victory.
-Version 2.7a.
+Version 2.7b.
 
 This is an early slice of a planned boss-rush roguelite (short runs, a boon after each boss,
 bosses drawn from a pool). A run is seven trials, one for each boss, each harder than the last: the first boss
@@ -114,6 +114,20 @@ hero (`tools/feel-check.js`).
 - Settings, Reset progress erases Sunshards, upgrades, trophies and records (it has to be chosen twice).
 
 Not done: touch controls, a colour-blind alternative to red-orange warnings, gamepad rebinding.
+
+## Lune aims down from the ground (v2.7b)
+
+Asked: "lune should be able to aim down when standing, which it cant aim lower than a straight line in front of
+her rn". A shot aimed with the mouse below her shoulder while she stood was flattened to level (a rule for every
+hero, so nothing is driven into the floor). Her arrows are now exempt: aimed down, they fly down and burst where
+they meet the floor, so a foe low in front of her (a crouching Veil, the Leviathan's head at the shore) can be shot
+from where she stands. Specials aimed with the mouse (hers and Vesper's lance) and Eos's draw keep the old rule.
+
+Checked: aimed 29 degrees down from the ground, the arrow flew at 29 degrees and burst on the floor; level shots
+unchanged; a still of the bow tipped down.
+
+Playtest checklist:
+- Stand as Lune and shoot at something low in front of you: does it go where the cursor is?
 
 ## Quality of life: saved runs, quick starts, a recap (v2.7a)
 
