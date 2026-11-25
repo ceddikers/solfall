@@ -189,11 +189,17 @@ kbd {
 .track i { position: absolute; left: 0; top: 0; bottom: 0; background: var(--gold); box-shadow: 0 0 8px rgba(255, 186, 92, 0.7); }
 
 /* title */
+/* (v2.9b) the title sits over the camp: the menu on the dark left, the fire and the hero to the right.
+   Play fades it off (.out) while the view eases onto the hero. */
+#s-title { transition: opacity 0.8s ease-out; }
+#s-title.out { opacity: 0; pointer-events: none; }
 #s-title .shade {
   position: absolute; inset: 0;
-  background: linear-gradient(180deg, rgba(4, 3, 10, 0.3) 0%, rgba(4, 3, 10, 0.12) 34%, rgba(4, 3, 10, 0.8) 66%, rgba(4, 3, 10, 0.96) 100%);
+  background: linear-gradient(90deg, rgba(4, 3, 10, 0.88) 0%, rgba(4, 3, 10, 0.7) 30%, rgba(4, 3, 10, 0.12) 52%, rgba(4, 3, 10, 0) 70%),
+              linear-gradient(180deg, rgba(4, 3, 10, 0) 70%, rgba(4, 3, 10, 0.6) 100%);
 }
-.titleblock { position: absolute; left: 0; right: 0; top: 356px; text-align: center; }
+.titleblock { position: absolute; left: 86px; top: 168px; text-align: left; }
+.titleblock h1 { padding-left: 0 !important; }
 .titleblock h1 {
   margin: 0; font: 400 88px/1.08 var(--display); letter-spacing: 0.4em; padding-left: 0.4em;
   background: linear-gradient(180deg, #fff 18%, #ffd9a0 58%, #ff9a4a 100%);
@@ -202,7 +208,7 @@ kbd {
 }
 .titleblock .tag { margin: 2px 0 14px; font: italic 400 18px var(--display); color: var(--dim); letter-spacing: 0.06em; }
 .titleblock nav { display: inline-flex; flex-direction: column; align-items: stretch; min-width: 420px; }
-.titleblock nav .item { text-align: center; padding: 7px 34px; }
+.titleblock nav .item { text-align: left; padding: 7px 34px 7px 30px; }
 .titleblock nav .item.opt .k { text-align: right; flex: 1; }
 .titleblock nav .item.opt .v { text-align: left; min-width: 0; flex: 1; }
 .titleblock .note { margin: 4px 0 0; min-height: 18px; font-size: 13px; letter-spacing: 0.06em; color: var(--faint); }

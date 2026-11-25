@@ -2,7 +2,7 @@
 
 A side-on boss rush for the browser: four heroes, seven three-phase bosses, played as a run of
 ever-harder trials. You pick a hero and a relic before the run and win a boon after each victory.
-Version 2.9a.
+Version 2.9b.
 
 This is an early slice of a planned boss-rush roguelite (short runs, a boon after each boss,
 bosses drawn from a pool). A run is seven trials, one for each boss, each harder than the last: the first boss
@@ -114,6 +114,38 @@ hero (`tools/feel-check.js`).
 - Settings, Reset progress erases Sunshards, upgrades, trophies and records (it has to be chosen twice).
 
 Not done: touch controls, a colour-blind alternative to red-orange warnings, gamepad rebinding.
+
+## The title in the camp, and the daily trial at the gate (v2.9b)
+
+Asked: "i think the daily trial should not be on the menu and we can change the opening screen to something else
+not the boss, but maybe even like, iw ant it to be so that when you click play it transitions into the character in
+the hub world seamlessly without flashing to black".
+
+- **The title screen is the camp.** The Warden is gone from behind the menu. You see the Vigil at night: your
+  hero stands warming at the fire, with the tent, the sparring post and the eclipse over the ruins. The menu sits
+  on the left over a dark band, and the view is drawn in a little closer than in play.
+- **Enter the Vigil glides in.** Nothing goes black:
+  - The menu fades off over 0.8 s, and the view eases back out to its usual distance.
+  - The HUD, the camp's names and the controls line fade in.
+  - The hero is yours at once, from where they stood.
+
+  The camp was already running behind the title, so nothing is rebuilt. Quitting to the title from the pause
+  menu still fades through black, as it leaves a fight or the road.
+- **The daily trial is off the title menu.** It is now on the relic menu at the gate, beside Back. That menu opens
+  when you walk into the gate without taking a relic from the reliquary. It shows the day's hero and relic and your
+  best of the day, as before.
+
+Checked in the preview:
+- The title draws the camp with the hero by the fire.
+- Enter the Vigil crossfades: no black frame, the menu fades off, and the HUD and the camp's names fade in.
+- The hero walks straight away.
+- Quitting to the title and entering again works the same.
+- The daily trial shows on the gate's relic menu and is gone from the title.
+
+Playtest checklist:
+- Does the first screen feel like the game now, and is the menu easy to read over the camp?
+- Is the glide into the camp smooth on your screen, or would a slower or bigger camera move feel better?
+- Is the daily trial easy enough to find at the gate?
 
 ## Sol, the Falling Sun: the final boss (v2.9a)
 

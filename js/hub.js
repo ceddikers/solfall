@@ -27,7 +27,10 @@
   HUB.maxCam = HW - W;
   // Where the view wants to be: on the hero, a little ahead of the way they face.
   HUB.camTarget = () => G.clamp(G.player.x - W / 2 + G.player.facing * 70, 0, HUB.maxCam);
-  HUB.spawn = (where) => (where === 'gate' ? GATE_X - 150 : where === 'ring' ? RING_X - 40 : FIRE_X - 70);
+  HUB.spawn = (where) => (where === 'gate' ? GATE_X - 150 : where === 'ring' ? RING_X - 40 : where === 'title' ? FIRE_X + 78 : FIRE_X - 70);
+  // (v2.9b) the title's view: the fire and the hero right of the middle, the menu over the empty ground to the left
+  HUB.titleCam = () => G.clamp(FIRE_X - W * 0.56, 0, HUB.maxCam);
+  HUB.labelK = 0; // (v2.9b) the camp's names and lines fade in once the title has gone
 
   function lcg(seed) { let s = seed; return () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; }; }
 
@@ -452,6 +455,7 @@
       if (usable(s) && d < s.reach && d < bd && P.y > FLOOR - 150) { best = s; bd = d; }
     }
     HUB.near = best;
+    HUB.labelK = G.damp(HUB.labelK, G.state === 'hub' ? 1 : 0, 2.5, dt);
     if (best && G.playerControl() && !P.ulting && (I.pressed.heal || I.pressed.confirm)) use(best);
 
     toysUpdate(dt);
@@ -1123,6 +1127,12 @@
 
   // Names over each place, what the nearest one does, and a line on how to move. In front of everything.
   HUB.drawOver = function (ctx) {
+    if (HUB.labelK < 0.01) return;
+    ctx.save(); ctx.globalAlpha *= HUB.labelK;
+    drawOver0(ctx);
+    ctx.restore();
+  };
+  function drawOver0(ctx) {
     const P = G.player, near = HUB.near, pad = G.input.device === 'gamepad', cam = G.cam.x;
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     for (const s of places()) {
@@ -1160,5 +1170,5 @@
       // which way the gate lies, until it is in view
       if (GATE_X > cam + W + 40) text(ctx, 'THE GATE  ›', cam + W - 96, 40, 12, GOLD, 0.5 + 0.2 * Math.sin(HUB.t * 3));
     }
-  };
+  }
 })();

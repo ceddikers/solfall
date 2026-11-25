@@ -16,6 +16,8 @@
   G.cam = { x: 0, y: 0 }; // small view offset that follows the hero
 
   G.canHurt = () => G.state === 'fight' && !G.player.dead && !G.boss.dying && !G.boss.dead;
+  // (v2.9b) the title is set in the camp: the hero by the fire, the menu over the left of it
+  G.inCamp = () => G.state === 'hub' || G.state === 'title';
   G.playerControl = () => (G.state === 'fight' || G.state === 'won' || G.state === 'hub' || G.state === 'rest') && !G.paused && !G.ui.current;
 
   function resize() {
@@ -227,21 +229,36 @@
     G.saveRun('fight');
   };
 
+  // (v2.9b) The title is the camp at rest: the hero by the fire, the menu over the left. Play does not cut
+  // to black: the menu fades, the view eases onto the hero and the camp is yours (G.enterVigil).
   G.toTitle = function () {
     G.rest.leave();
     G.practice = null;
     G.run.reset();
-    G.cam.x = 0; G.cam.y = 0;
-    G.setBoss('warden');
+    G.setBoss('dummy');
     G.arena.reset(); G.hazards.clear(); F.reset();
-    G.player.reset(); G.flow.reset(); G.player.hidden = true;
-    G.boss.attract(); G.moments.reset(); G.sets.reset();
+    G.hub.offer();
+    G.player.reset(); G.flow.reset(); G.boss.reset(); G.moments.reset(); G.sets.reset();
+    G.player.x = G.hub.spawn('title'); G.player.facing = -1; // (the hero warms at the fire)
+    G.cam.x = G.hub.titleCam(); G.cam.y = 0;
+    G.player.ember = G.PLAYER.SEG * G.player.segs;
     G.state = 'title'; G.paused = false; G.hitstop = 0; G.slowT = 0;
     G.ui.resetHud(); G.ui.hud(false); G.ui.close(); G.ui.show('title');
     G.ui.fade(); G.ui.mood('menu');
     G.audio.setIntensity(0); G.audio.duck(1);
     G.input.endStep();
   };
+  G.enterVigil = function () {
+    if (G.state !== 'title') { G.toHub('fire'); return; }
+    G.state = 'hub';
+    G.ui.leaveTitle();
+    G.ui.resetHud(); G.ui.buildHp(G.player.maxHp); G.ui.buildRun(); G.ui.hud(true, true);
+    G.ui.campHint();
+    G.ui.mood('fight');
+    G.audio.init(); G.audio.startMusic(); G.audio.setIntensity(0); G.audio.duck(1);
+    G.input.endStep();
+  };
+
 
   G.pause = function () {
     if ((G.state !== 'fight' && G.state !== 'hub' && G.state !== 'rest') || G.paused || G.ui.current || G.player.dead || (G.boss.dying && !G.boss.toppled) || G.debug.freeze) return;
@@ -366,7 +383,7 @@
     const sdt = dt * ts;
     G.t += sdt;
     G.arena.update(sdt);
-    if (G.state === 'hub') G.hub.update(sdt);
+    if (G.inCamp()) G.hub.update(sdt);
     if (G.state === 'rest') { G.rest.update(sdt); if ((G.saveT = (G.saveT || 0) - dt) <= 0) { G.saveT = 0.5; G.saveRun('rest'); } }
     G.finish.update(sdt);
     G.player.update(sdt);
@@ -394,6 +411,7 @@
     const P = G.player;
     const follow = G.state === 'title' || P.hidden ? 0 : 1;
     if (G.state === 'hub') G.cam.x = G.damp(G.cam.x, G.hub.camTarget(), 5, dt); // the camp is wide: the view follows the hero across it
+    else if (G.state === 'title') G.cam.x = G.damp(G.cam.x, G.hub.titleCam(), 3, dt);
     else if (G.state === 'rest') G.cam.x = G.damp(G.cam.x, G.rest.camTarget(), 5, dt);
     else G.cam.x = G.damp(G.cam.x, follow * (P.x - G.W / 2) * 0.026, 3.5, dt);
     G.cam.y = G.damp(G.cam.y, follow * G.clamp((P.y - G.FLOOR) * 0.035, -10, 0), 3.5, dt);
@@ -404,6 +422,7 @@
       for (const t of G.boss.targets()) d = Math.min(d, Math.hypot(t.cx - P.x, (t.cy - (P.y - 24)) * 0.7) - (t.r || t.hw || 0));
       lean = 0.025 * G.clamp(1 - (d - 70) / 260, 0, 1) + (G.boss.staggered ? 0.012 : 0);
     }
+    if (G.state === 'title') lean = 0.06; // (v2.9b) the title sits a little closer in on the fire; Play eases it back out
     F.zoomBase = G.damp(F.zoomBase, lean, lean > F.zoomBase ? 2.4 : 1.4, dt);
     if (G.state === 'fight' && G.boss.active && !G.boss.dying && !G.boss.dead) G.time += sdt;
     if (G.state === 'dead') {
@@ -439,7 +458,7 @@
     ctx.translate(G.W / 2 + F.shakeX, G.H / 2 + F.shakeY);
     ctx.scale(z, z);
     ctx.translate(-v.fx - G.cam.x, -v.fy - G.cam.y);
-    if (G.state === 'hub') G.hub.drawBack(ctx); else if (G.state === 'rest') G.rest.drawBack(ctx); else G.arena.drawBack(ctx);
+    if (G.inCamp()) G.hub.drawBack(ctx); else if (G.state === 'rest') G.rest.drawBack(ctx); else G.arena.drawBack(ctx);
     G.flow.drawVeil(ctx);
     G.moments.drawGloom(ctx);
     G.sets.drawBack(ctx); // Nightfall's dark
@@ -453,7 +472,7 @@
     F.drawSmoke(ctx);
     G.hazards.draw(ctx, 'under');
     G.arena.drawPlatforms(ctx);
-    if (G.state === 'hub') G.hub.draw(ctx);
+    if (G.inCamp()) G.hub.draw(ctx);
     if (G.state === 'rest') G.rest.draw(ctx);
     if (G.boss.kit) drawBoss();
     G.moments.draw(ctx);
@@ -465,7 +484,7 @@
     G.hazards.draw(ctx, 'over');
     F.draw(ctx);
     G.finish.drawPrompt(ctx);
-    if (G.state === 'hub') {
+    if (G.inCamp()) {
       G.hub.drawFore(ctx); G.hub.drawOver(ctx);
       ctx.translate(G.cam.x, 0); // the vignette stays on the view, not on the ground
     } else if (G.state === 'rest') {

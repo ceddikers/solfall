@@ -96,15 +96,23 @@
   };
   U.show = function (name, push) {
     if (push && U.current) U.stack.push(U.current);
-    document.querySelectorAll('.screen').forEach((s) => s.classList.remove('on'));
+    document.querySelectorAll('.screen').forEach((s) => s.classList.remove('on', 'out'));
     $('s-' + name).classList.add('on');
     U.current = name;
     U.refresh();
     U.setFocus(REMEMBER.includes(name) && U.mem[name] != null ? U.mem[name] : 0);
   };
   U.close = function () {
-    document.querySelectorAll('.screen').forEach((s) => s.classList.remove('on'));
+    document.querySelectorAll('.screen').forEach((s) => s.classList.remove('on', 'out'));
     U.current = null; U.stack.length = 0;
+  };
+  // (v2.9b) Play: the title fades off the camp instead of going at once (the camp is already behind it)
+  U.leaveTitle = function () {
+    const s = $('s-title');
+    U.current = null; U.stack.length = 0;
+    s.classList.add('out');
+    const tok = U.titleTok = (U.titleTok || 0) + 1;
+    setTimeout(() => { if (U.titleTok === tok && s.classList.contains('out')) s.classList.remove('on', 'out'); }, 900);
   };
   U.back = function () {
     const prev = U.stack.pop();
@@ -134,7 +142,7 @@
   }
   function act(name) {
     G.audio.play(name === 'back' ? 'uiBack' : 'uiSelect');
-    if (name === 'begin') G.toHub('fire');
+    if (name === 'begin') G.enterVigil();
     else if (name === 'continue') { if (!G.continueRun()) { G.audio.play('empty'); U.refresh(); } }
     else if (name === 'quick') G.quickStart();
     else if (name === 'daily') G.startDaily();
