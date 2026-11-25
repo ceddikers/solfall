@@ -443,16 +443,16 @@
     const h = G.hero(), I = G.input, k = (a) => I.keys(a).map((n) => '<kbd>' + n + '</kbd>').join(' ');
     const jumps = 1 + h.air + G.boon('wind') + (G.relic('cloak') ? 1 : 0);
     const rows = [
-      ['Move', k('left') + ' ' + k('right'), 'Run. ' + (h.heavy ? 'She is heavy: slower to start, slower to stop.' : h.id === 'lune' ? 'The fastest of them.' : h.draw ? 'He slows to a walk while he holds his stance.' : 'Quick on her feet.')],
-      ['Jump', k('jump'), 'Jump; press again in the air (' + jumps + ' jumps in all). Hold for height. Down and jump drops through a platform.'],
+      ['Move', k('left') + ' ' + k('right'), 'Run.' + (h.heavy ? ' Heavy: slow to start and stop.' : h.id === 'lune' ? ' The fastest of them.' : '')],
+      ['Jump', k('jump'), jumps + ' jumps. Hold for height. Down and jump drops through a platform.'],
       ['Attack', '<kbd>Left click</kbd> or ' + k('attack'), h.how.attack],
       ['Aim', k('up') + ' ' + k('down'), h.how.aim],
-      ['Dash', k('dash'), 'A burst of speed that passes straight through any attack. Dash through one at the last moment for a perfect dodge: time slows, Starlight fills, and your next hit is a Riposte for double. ' + h.how.dash],
-      ['Special', '<kbd>Right click</kbd> or ' + k('flare'), h.how.special + ' Costs one segment of Starlight.'],
-      ['Mend', 'hold ' + k('heal'), 'Stand still and hold to turn one segment of Starlight into one health. Jumping or dashing cancels it.'],
-      ['Dawnbreak', k('ult') + ' or middle click', h.how.ult + ' The bar fills as you deal damage; nothing can hurt you while it plays.'],
-      ...(G.run.crownSet() ? [['Crown', k('crown'), G.SETS[G.run.crownSet()].crown + ': ' + G.SETS[G.run.crownSet()].crownDesc + ' The bar fills as your ' + G.SETS[G.run.crownSet()].name + ' set does its work.']] : []),
-      ['Flourish', k('taunt'), 'A salute, for most of a second, in which you can do nothing else. Finish it and Flow and Dawnbreak rise a little; finish it while the boss is in the middle of an attack and it is BRAZEN, worth three times as much. Being struck ends it.'],
+      ['Dash', k('dash'), 'Passes through attacks. Through one at the last moment is a perfect dodge: time slows, and your next hit deals double. ' + h.how.dash],
+      ['Special', '<kbd>Right click</kbd> or ' + k('flare'), h.how.special + ' Costs one Starlight.'],
+      ['Mend', 'hold ' + k('heal'), 'Stand still and hold: one Starlight becomes one health.'],
+      ['Dawnbreak', k('ult') + ' or middle click', h.how.ult + ' Fills as you deal damage. Nothing can hurt you while it plays.'],
+      ...(G.run.crownSet() ? [['Crown', k('crown'), G.SETS[G.run.crownSet()].crown + ': ' + G.SETS[G.run.crownSet()].crownDesc + '']] : []),
+      ['Flourish', k('taunt'), 'A short salute that raises Flow and Dawnbreak, three times as much during a boss attack. Getting hit ends it.'],
     ];
     el.movesOver.textContent = h.title; el.movesOver.style.color = h.css;
     el.movesTitle.textContent = h.name + '\u2019s moves';

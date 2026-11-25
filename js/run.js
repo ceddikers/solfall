@@ -26,11 +26,11 @@
       blurb: 'Balanced and quick. The one to learn the fight with.',
       lines: ['Sword: a fast three-hit combo', 'Star Lance: a piercing shot at any range', 'A slash out of a dash becomes a thrust'],
       how: {
-        attack: 'Sword. A cut down (10), a cut back up (12), then a finisher (26). Hold the button to keep cutting.',
-        aim: 'Hold up to cut overhead. In the air, hold down to strike below and bounce off what you hit, getting your jump and dash back.',
-        dash: 'A cut thrown straight out of a dash becomes a thrust: 40% more damage and a longer reach.',
-        special: 'Star Lance: she draws back and throws a piercing lance of 42 that crosses the arena. Aim with the mouse, or hold a direction. Dash during the throw and it flies at once; get hit first and the Starlight comes back.',
-        ult: 'Thousand Stars: you vanish and cut from every side, eight times for 20 and once for 80.',
+        attack: 'Sword: cut (10), cut (12), finisher (26). Hold to keep cutting.',
+        aim: 'Up cuts overhead. Down in the air strikes below and bounces, giving back your jump and dash.',
+        dash: 'Attack straight out of a dash for a thrust: 40% more damage and reach.',
+        special: 'Star Lance: a piercing lance for 42 across the arena. Dash during the throw to send it at once.',
+        ult: 'Thousand Stars: eight cuts of 20, then one of 80.',
       },
     },
     {
@@ -47,11 +47,11 @@
       blurb: 'Slow, heavy and hard to kill. Every swing counts.',
       lines: ['Maul: a wide sweep, then a smash you can hold to charge', 'Starfall: slam down for a blast around you, passing through attacks as you fall', 'One more health; she cannot be knocked back while charging'],
       how: {
-        attack: 'Maul. A wide sweep in front of you (18), then a smash that shakes the ground (36). Keep the button held on the smash to charge it, up to 65; fully charged it also throws a wave along the floor (18). While you charge you move slowly, but a blow cannot knock you back or stop you.',
-        aim: 'Hold up to heave the maul overhead. In the air, hold down to strike below and bounce off what you hit.',
-        dash: 'She is slower to start and stop than the others. A sweep thrown straight out of a dash hits 40% harder.',
-        special: 'Starfall: a blast of 42 around your feet. In the air you plunge first, passing through attacks until you land.',
-        ult: 'Worldbreaker: you rise and come down for 250, and the whole floor splits.',
+        attack: 'Maul: sweep (18), then smash (36). Hold the smash to charge it to 65 with a floor wave (18); nothing knocks you back while you charge.',
+        aim: 'Up swings overhead. Down in the air strikes below and bounces.',
+        dash: 'Slower to start and stop. A sweep straight out of a dash hits 40% harder.',
+        special: 'Starfall: a blast of 42 at your feet. In the air you plunge first, through attacks.',
+        ult: 'Worldbreaker: crash down for 250 and split the floor.',
       },
     },
     {
@@ -68,18 +68,18 @@
       blurb: 'Fragile and nimble. Fights from range, hits hardest up close.',
       lines: ['Moonbow: arrows in any direction, strongest up close and weaker at long range; she slows while firing', 'Moon Volley: a fan of five arrows and a leap backwards', 'Triple jump; firing downward in the air lifts you; two less health'],
       how: {
-        attack: 'Moonbow. Arrows wherever you aim (5, 6), then a heavy arrow that pierces (13). Up to 60% stronger within 120 pixels, up to 30% weaker past 240. You slow down while firing.',
-        aim: 'Aim with the mouse, or hold a direction; with no direction held she fires the way she faces. Firing downward in the air lifts you.',
-        dash: 'Three jumps instead of two. She has two less health than the others.',
-        special: 'Moon Volley: a fan of five arrows, and a leap back from where you aimed. Like her other arrows they hit harder from close in, but they earn no Starlight back.',
-        ult: 'Moonfall: a moon rises behind you. One great arrow for 26, fourteen moonbeams for 11 each, then the cut that ends it, for 70.',
+        attack: 'Moonbow: arrows (5, 6), then a piercing arrow (13). Up to 60% stronger up close, weaker far off.',
+        aim: 'Fires at the mouse or the way you hold. Firing down in the air lifts you.',
+        dash: 'Three jumps instead of two, but two less health.',
+        special: 'Moon Volley: a fan of five arrows and a leap back. Earns no Starlight.',
+        ult: 'Moonfall: an arrow for 26, fourteen moonbeams for 11, then a cut for 70.',
       },
     },
     {
       id: 'eos', name: 'Eos', title: 'The Sheathed Dawn', col: '255,146,172', hot: '255,238,242', css: '#ff92ac',
       cloak: ['#5e2238', '#200a12'], build: 0.98, scarf: 10, scarfW: 0.8,
       hp: 0, run: 338, air: 1, weapon: 'blade', draw: true, reach: 1.12, thick: 1.1, poise: 1.1,
-      // only the string of presses uses these; the draws are in G.PLAYER (FOCUS, DRAW_DMG and the rest)
+      // only the string of presses uses these; the draw is in G.PLAYER (DRAW_DMG, SHEATH_COMBOS and the rest)
       // (v2.1b: a string of three, from three flicks of 11 every 0.36 s)
       combo: [
         { dmg: 11, cd: 0.27, dur: 0.22, wind: 0.04, act: 0.1 },  // out of the sheath, rising
@@ -88,13 +88,13 @@
       ],
       down: 11, special: 'guard', specialName: 'Still Point', verb: 'guard',
       blurb: 'Patient and exact. One cut, when it counts.',
-      lines: ['Sheathed blade: a string of three cuts; land two whole strings and the sheath is open: hold the attack to gather Focus, let go to draw through the foe', 'The draw passes through attacks; its cut lands when the blade is home. Focus gathers in the air too', 'Still Point: turn a blow aside and the next press is a full draw'],
+      lines: ['Sheathed blade: land two whole strings to fill the sheath, then one press draws through the foe', 'The draw blinks him through the foe; dash to get out of the way', 'Still Point: turn a blow aside and the sheath is full'],
       how: {
-        attack: 'His blade stays in its sheath. Press for a string: a rising cut out of the sheath (11), a falling cut back across (13), then a wide finisher that steps in (27). Land all three cuts of a string twice and the sheath is open: two lights at its mouth fill one string at a time, and it is traced in gold when it is open. Then keep the button held and he sets his feet: Focus gathers, one mark on the sheath at a time, up to three (0.3, 0.65 and 1.05 seconds). Before the sheath is open, holding does nothing. Let go to draw: he crosses the ground in a blink and cuts whatever he passes through, for 18, 46 or 100. The cut lands a moment later, when the blade clicks home. Any draw empties the sheath.',
-        aim: 'The draw goes where you aim it: at the mouse, or the way you hold, straight up included. A press with down held in the air strikes below and bounces off what it hits.',
-        dash: 'A dash or a jump keeps the Focus you have; being hit loses it, and he walks slowly while he holds it. In the air he can hold the stance too, for about a second a jump, drifting down while Focus gathers a little slower: draw up at what flies. The draw passes through attacks as a dash does, so a draw through a blow is a perfect dodge, and the cut that follows is its Riposte. It shares the dodge with the dash: it puts the dash on its cooldown.',
-        special: 'Still Point: he sets the sheath across his body and waits, for about two thirds of a second. A blow that lands in that time is turned: it does no harm, the swing is stopped, and all three marks light at once, so your next press is a full draw (100). They stay lit for two and a half seconds without the button held. If nothing lands, half the Starlight comes back.',
-        ult: 'Horizon: one cut from one side of the arena to the other, for 250. It lands when the blade is home.',
+        attack: 'Sheathed blade: cut (11), cut (13), finisher (27). Land all three cuts twice to fill the sheath (it glows gold). Then one press is the draw: he blinks through the foe for 60.',
+        aim: 'The draw goes where you aim. Down in the air strikes below and bounces.',
+        dash: 'The draw is a cut, not a dodge: it does not pass through attacks.',
+        special: 'Still Point: brace for two thirds of a second. A blow that lands is turned, does no harm, and fills the sheath. If nothing lands, half the Starlight comes back.',
+        ult: 'Horizon: one cut across the whole arena for 250.',
       },
     },
   ];
@@ -155,8 +155,8 @@
     { id: 'unbroken', name: 'Unbroken', tag: 'Signature', max: 1, heroes: ['aster'], desc: 'A blow taken while you charge the smash fills the charge at once, and the smash comes.' },
     { id: 'splitarrow', name: 'Splitting Arrow', tag: 'Signature', max: 1, heroes: ['lune'], desc: 'The heavy arrow splits into three where it first strikes.' },
     { id: 'glide', name: 'Moonglide', tag: 'Signature', max: 1, heroes: ['lune'], desc: 'Hold the attack in the air and you fall slowly while you fire.' },
-    { id: 'hanging', name: 'Hanging Cut', tag: 'Signature', max: 1, heroes: ['eos'], desc: 'The cut of a full draw hangs in the air, and a second later cuts again for half.' },
-    { id: 'secondsun', name: 'Second Sun', tag: 'Signature', max: 1, heroes: ['eos'], desc: 'After a full draw, hold again within 3 seconds and the sheath is open at once, at two marks.' },
+    { id: 'hanging', name: 'Hanging Cut', tag: 'Signature', max: 1, heroes: ['eos'], desc: 'The cut of a draw hangs in the air, and a second later cuts again for half.' },
+    { id: 'secondsun', name: 'Second Sun', tag: 'Signature', max: 1, heroes: ['eos'], desc: 'A draw leaves one string in the sheath, so the next needs only one more.' },
   ];
   // Sets (v2.3a): four kinds of boon, each leaving its own mark on the foe. A set boon fits one of five
   // slots (Strike, Special, Dash, Mend, and since v2.6c Jump), one boon to a slot: a new one for a full slot replaces the

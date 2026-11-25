@@ -2,7 +2,7 @@
 
 A side-on boss rush for the browser: four heroes, seven three-phase bosses, played as a run of
 ever-harder trials. You pick a hero and a relic before the run and win a boon after each victory.
-Version 2.9b.
+Version 2.9c.
 
 This is an early slice of a planned boss-rush roguelite (short runs, a boon after each boss,
 bosses drawn from a pool). A run is seven trials, one for each boss, each harder than the last: the first boss
@@ -114,6 +114,69 @@ hero (`tools/feel-check.js`).
 - Settings, Reset progress erases Sunshards, upgrades, trophies and records (it has to be chosen twice).
 
 Not done: touch controls, a colour-blind alternative to red-orange warnings, gamepad rebinding.
+
+## Eos: a full sheath is a ready draw; shorter Moves page (v2.9c)
+
+Asked: "after you get the two charges, then you dont need to do the bink bink bink charge, it just works from that
+instant ... hitting a right click gives you two charges instantly". Picked from my questions: a full sheath means
+"full draw at once", and Still Point fills it by **turning a blow** (pressing it alone does not). Also: "this is also
+ridiculous", about the wall of text on the Moves page.
+
+**Eos now:**
+- **Filling the sheath.** A string whose three cuts all land puts one in the sheath. Two in it and it is full: the
+  three marks light, and it is traced in gold.
+- **Drawing.** With the sheath full, the next press is the draw, at once, for **60**. Nothing is held any more:
+  the Focus stance and its 18 and 46 draws are gone. The draw empties the sheath.
+- **Still Point.** A blow turned by Still Point fills the sheath at once. The 2.5 s "edge" it used to light is
+  gone; the sheath stays full until you draw.
+- **The draw no longer passes through attacks.** A full sheath kept ready was a dodge kept ready. Wait for a blow,
+  press, and he passed through it and countered: the turtling from before, back again. It is now only a cut. Dash
+  to get out of the way. (`DRAW_DODGE` in `js/player.js` turns it back on.)
+- **Second Sun:** a draw leaves one string in the sheath, so the next needs only one more.
+- **Hanging Cut:** works on every draw.
+
+**Why 60 and not 100.** With nothing held for, an instant 100 every two strings was 88 damage a second on a boss
+that does not fight back, more than the 84 that started all this. Each big draw also lifts Flow, which raises every
+cut after it. Measured over 20 s:
+
+| Draw | Strings to fill | Damage a second |
+| --- | --- | --- |
+| 100 | 2 | 88 |
+| 70 | 2 | 72 |
+| 60 | 2 | 67 (chosen) |
+| 100 | 3 | 69 |
+
+For comparison, Vesper does 45 and v2.9a's held draw did 57.
+
+**The scripted player** (trial III, no boons, Knight, Wolf, Warden, Kairo and Assassin, 50 fights each):
+
+| Eos build | Won | Hits taken a fight | Win time |
+| --- | --- | --- | --- |
+| v2.9a (held draw, it dodges) | 62% | 5.2 | 109 s |
+| Draw for 60 at once, still dodging | 76% | 3.6 | 88 s |
+| **v2.9c: draw for 60 at once, no dodge** | **68%** | **4.4** | **86 s** |
+| Vesper, same runs | 54% to 58% | 5.0 | 105 to 107 s |
+
+He is still a little ahead and kills faster. The next lever is the draw's damage (`DRAW_DMG` in `js/player.js`).
+
+**The Moves page is short now.** Every hero's lines were rewritten to a line or two each: the numbers, what the
+button does, and the one rule that matters. The full detail stays in this README. The same goes for the Dash,
+Mend, Dawnbreak, Crown and Flourish rows and Eos's hero-card lines. Second Sun's and Hanging Cut's text follows
+the new rules.
+
+**Checked by hand in the preview:**
+- With the sheath empty, a press is a cut (11).
+- Two whole strings fill it.
+- One press then draws for the full amount at once and empties it.
+- A blow turned by Still Point fills it, and the next press draws.
+- No errors, and the Moves page fits on one panel.
+
+**Playtest checklist:**
+- Does the instant draw feel good at 60, or does it need to hit harder?
+- Is it clear when the sheath is full?
+- Do you miss the draw being a dodge? If so, `DRAW_DODGE` can come back, and the price would go up (three strings,
+  or less damage).
+- Is the Moves page short enough now?
 
 ## The title in the camp, and the daily trial at the gate (v2.9b)
 

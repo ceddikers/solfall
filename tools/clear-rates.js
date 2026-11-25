@@ -336,48 +336,31 @@
     I.pressed.crown = !!(tg && edge < 300);
   }
 
-  // Eos: whole strings up close until the sheath is full (v2.9a), then hold for the stance, aimed at
-  // the boss, and let go at three marks once the boss is within the draw's carry. With something about to
-  // land, any lit mark is let go at once: the draw passes through attacks. Returns false to leave the
-  // attack button to the plain rules (out of reach, nothing to do).
+  // Eos (v2.9c): whole strings up close until the sheath is full; then one press is the full draw, let go
+  // once the boss is within its carry, or at once to pass through something about to land. Returns false to
+  // leave the attack button to the plain rules (out of reach, nothing to do).
   function eosDraw(st, tg, edge, vgap, inReach, threat, soonest, aimAt) {
-    const C = G.PLAYER, mark = P.focusMark();
-    if (!tg) { if (st.eosHold) { lift('attack'); st.eosHold = false; } return false; }
+    const C = G.PLAYER;
+    if (!tg) return false;
     aimAt(tg.cx, G.clamp(P.y - 36, tg.cy - (tg.hh || tg.r || 0) * 0.7, tg.cy + (tg.hh || tg.r || 0) * 0.7));
     I.aim.attack = true;
-    const half = tg.hw != null ? tg.hw : (tg.r || 0);
-    const dist = Math.abs(tg.cx - P.x), carry = (k) => C.DRAW_STEP[Math.max(0, k - 1)] * (P.onGround ? 1 : C.AIR_REACH) + half - 10;
-    if (st.eosHold) {
-      st.holdT += D;
-      const ready = mark >= 3 && dist < carry(3) && vgap < 150;
-      const escape = mark >= 1 && threat && soonest < 0.3;
-      const late = st.holdT > 2.6 && mark >= 1;
-      if (ready || escape || late || (!P.hold && st.holdT > 0.2)) {
-        lift('attack'); st.eosHold = false; st.taps = 0;
-        G.drawStats = G.drawStats || { n: 0, lv: [0, 0, 0, 0], escape: 0 };
-        G.drawStats.n++; G.drawStats.lv[mark]++; if (escape && !ready) G.drawStats.escape++;
-      } else I.down.attack = true;
-      return true;
-    }
-    // (v2.9a) the stance is closed until two full strings have filled the sheath: until then, whole strings
-    const open = (P.sheath || 0) >= C.SHEATH_COMBOS || P.edge > 0 || P.sun > 0;
-    if (!open) {
+    const full = (P.sheath || 0) >= C.SHEATH_COMBOS;
+    if (!full) {
       if (!inReach) return false;
       if (st.tap) lift('attack'); else press('attack');
       st.tap = !st.tap;
       return true;
     }
-    // the string: two cuts while in reach, then into the stance on the next press
-    if (inReach && (st.taps || 0) < 2 && P.sun <= 0) {
-      if (st.tap) lift('attack'); else { press('attack'); st.taps = (st.taps || 0) + 1; }
-      st.tap = !st.tap;
+    const half = tg.hw != null ? tg.hw : (tg.r || 0);
+    const carry = C.DRAW_STEP[2] * (P.onGround ? 1 : C.AIR_REACH) + half - 10;
+    const go = (Math.abs(tg.cx - P.x) < carry && vgap < 150) || (threat && soonest < 0.3);
+    if (go) {
+      if (I.down.attack) lift('attack'); else press('attack');
+      G.drawStats = G.drawStats || { n: 0, lv: [0, 0, 0, 0], escape: 0 };
+      if (!I.down.attack) { G.drawStats.n++; G.drawStats.lv[3]++; }
       return true;
     }
-    if (edge < 240 && !(threat && soonest < 0.35) && !P.atk && P.atkCd <= 0) {
-      I.pressed.attack = true; I.down.attack = true; st.eosHold = true; st.holdT = 0;
-      return true;
-    }
-    if (!inReach) st.taps = 0;
+    lift('attack');
     return false;
   }
 
