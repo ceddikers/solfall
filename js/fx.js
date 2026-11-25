@@ -106,7 +106,7 @@
     F.kx = F.ky = F.kvx = F.kvy = 0; F.rattleA = 0; F.joltCd = 0;
     F.glints.length = 0; F.imp = null;
     F.dimA = 0; F.ripples.length = 0;
-    F.cine.k = 0; F.cine.to = 0;
+    F.cine.k = 0; F.cine.to = 0; F.cine.z = 0.3; F.cine.rate = 2.6;
   };
 
   // kind: 'glow' (soft light), 'spark' (a streak along its motion), 'chunk' (tumbling debris),
@@ -192,9 +192,14 @@
   F.zoomNow = () => 1 + F.zoom + F.zoomBase;
   // A slow push in on a point (v2.4a: Kairo's transformations). to: 0 or 1; k eases towards it.
   // F.view() is the view in use: its zoom and the world point at the middle of the screen.
-  F.cine = { x: 640, y: 360, k: 0, to: 0 };
+  // (v2.9h) z: how far in a full push goes (0.3: a third closer); rate: how fast k eases. F.cineCut(x, y, z)
+  // jumps straight to a framing, as a film cut does, instead of easing there. Once a push has eased all
+  // the way out, z and rate go back to their defaults, so a scene that changed them leaves nothing behind.
+  F.cine = { x: 640, y: 360, k: 0, to: 0, z: 0.3, rate: 2.6 };
+  F.cineCut = function (x, y, z) { const c = F.cine; c.x = x; c.y = y; c.z = z; c.k = 1; c.to = 1; };
+  F.cineEase = function (rate) { F.cine.rate = rate || 2.6; };
   F.view = function () {
-    const ck = F.cine.k, z = F.zoomNow() * (1 + 0.3 * ck);
+    const ck = F.cine.k, z = F.zoomNow() * (1 + F.cine.z * ck);
     if (ck < 0.001) return { z, fx: G.W / 2, fy: G.H / 2 };
     const hw = G.W / (2 * z), hh = G.H / (2 * z);
     const fx = G.lerp(G.W / 2, G.clamp(F.cine.x, hw - 40, G.W - hw + 40), ck), fy = G.lerp(G.H / 2, G.clamp(F.cine.y, hh - 40, G.H - hh + 40), ck);
@@ -536,8 +541,8 @@
     if (F.flashA > 0) F.flashA = Math.max(0, F.flashA - F.flashDecay * dt);
     if (F.vigA > 0) F.vigA = Math.max(0, F.vigA - F.vigDecay * dt);
     F.zoom *= Math.exp(-7 * dt);
-    F.cine.k += (F.cine.to - F.cine.k) * (1 - Math.exp(-2.6 * dt));
-    if (F.cine.to === 0 && F.cine.k < 0.001) F.cine.k = 0;
+    F.cine.k += (F.cine.to - F.cine.k) * (1 - Math.exp(-(F.cine.rate || 2.6) * dt));
+    if (F.cine.to === 0 && F.cine.k < 0.001) { F.cine.k = 0; F.cine.z = 0.3; F.cine.rate = 2.6; }
     if (F.zoom < 0.0005) F.zoom = 0;
     if (F.joltCd > 0) F.joltCd -= dt;
     if (F.imp) { F.imp.t -= dt; if (F.imp.t <= 0) F.imp = null; }

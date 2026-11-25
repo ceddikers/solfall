@@ -635,7 +635,7 @@
     const others = G.HEROES.filter((h) => h.id !== H.id);
     P.hiltN = (P.hiltN || 0) + 1;
     const o = others[P.hiltN % others.length], low = o.weapon === 'maul';
-    G.shots.push({ wave: true, echo: true, col: o.col, hot: o.hot, x: P.x + dir * 50, y: low ? FLOOR - 30 : P.y - 34, vx: dir * 860, vy: 0, t: 0, life: 0.45, hit: new Set(), dmg: Math.max(6, Math.round(dmg * 0.45)) });
+    G.shots.push({ wave: true, echo: true, col: o.col, hot: o.hot, x: P.x + dir * 50, y: low ? FLOOR - 30 : P.y - 34, vx: dir * 860, vy: 0, t: 0, life: 0.45, hit: new Set(), dmg: Math.max(8, Math.round(dmg * 0.7)) }); // (v2.9g: 45%, at least 6)
   }
 
   function swing(a) {

@@ -3,7 +3,7 @@
 
 const G = window.G = {};
 
-G.VERSION = '2.9f';
+G.VERSION = '2.9h';
 G.bgK = 1; // how many pixels per unit the painted backdrops are kept at (set in game.js, resize)
 G.W = 1280;          // logical view size
 G.H = 720;
@@ -159,7 +159,7 @@ G.saveSettings = () => G.store.save('settings', G.settings);
 // Difficulty tuning: tele scales telegraph time, pace scales the gaps between attacks.
 G.DIFFS = [
   { name: 'Gentle', hp: 7, bossHp: 0.85, tele: 1.3, pace: 1.3, stagger: 4.8 },
-  { name: 'Standard', hp: 5, bossHp: 1.0, tele: 1.0, pace: 1.0, stagger: 4.0 },
+  { name: 'Standard', hp: 5, bossHp: 1.1, tele: 0.95, pace: 0.9, stagger: 4.0 }, // (v2.9h: bossHp 1.0, tele 1.0, pace 1.0)
   { name: 'Merciless', hp: 4, bossHp: 1.15, tele: 0.8, pace: 0.7, stagger: 3.2 },
 ];
 G.diff = () => G.DIFFS[G.settings.difficulty] || G.DIFFS[1];

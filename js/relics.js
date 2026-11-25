@@ -34,7 +34,7 @@
     pelt: ['Dashes recover 30% faster.', 'Dashing through the foe scorches it for 18.', 'A dash fills twice the Starlight, and the scorch is 36.'],
     pearl: ['Starlight fills 40% faster.', 'One more health.', 'Once a fight, a blow that leaves you on your last health is answered: the pearl mends two.'],
     wraps: ['The blink’s blow deals 75% more.', 'The window lasts 3 seconds, and the blow staggers twice as hard.', 'Double damage, and the blink gives back half a segment of Starlight.'],
-    hilt: ['The echoes last 8 seconds.', 'Twice a fight.', 'Every time you break the boss.'],
+    hilt: ['The echoes last 8 seconds.', 'Three times a fight.', 'Every time you break the boss.'], // (v2.9g: twice a fight from the start)
     hourglass: ['The slow lasts 0.9 seconds.', 'Blows landed in the slow deal 40% more.', 'It lasts 1.2 seconds, and gives back your dashes and jumps in the air.'],
     anvil: ['A blow you take fills a quarter of a segment of Starlight.', 'For 3 seconds after a blow, everything you do deals 40% more.', 'A blow that would take two health takes one.'],
     sun: ['It builds to 45%.', 'Being struck costs only half of it.', 'It builds to 60%, and carries from one fight into the next.'],
@@ -290,7 +290,7 @@
   RL.onStagger = function () {
     const P = G.player;
     if (G.relic('hilt')) {
-      const s = lv('hilt'), uses = s >= 3 ? Infinity : s >= 2 ? 2 : 1;
+      const s = lv('hilt'), uses = s >= 3 ? Infinity : s >= 2 ? 3 : 2; // (v2.9g: 1 and 2)
       if (st.hiltUses < uses) { st.hiltUses++; P.hiltT = s >= 1 ? 8 : 6; G.audio.play('segment'); } // (the Offered Hilt's echoes: player.js)
     }
     if (lv('sunstone') >= 3 && fighting()) {

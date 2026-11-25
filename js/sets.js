@@ -16,7 +16,7 @@
   const FLOOR = G.FLOOR;
   const S = G.sets = {};
   const K = S.K = {
-    EMBER_MAX: 5, EMBER_TICK: 0.5, EMBER_DMG: 1, EMBER_FADE: 1.6,
+    EMBER_MAX: 5, EMBER_TICK: 0.5, EMBER_DMG: 1.5, EMBER_FADE: 2, // (v2.9g: 1 a burn, dying down every 1.6 s)
     STATIC_MAX: 10, STATIC_HOLD: 2.5, STATIC_DRAIN: 0.5, BOLT_DMG: 24,
     SOAK_MAX: 3, SOAK_T: 4, SOAK_SLOW: 0.06, SLACK_T: 1, SLACK_K: 0.5,
     MARK_BACK: 4,
@@ -27,7 +27,7 @@
     CH_STATIC: 0.01, CH_BOLT: 0.06,
     CH_SOAK: 0.02,   // each layer, each second
     CH_MARK: 0.25,   // each mark spent
-    PYRE_DMG: 16, PYRE_T: 6,
+    PYRE_DMG: 20, PYRE_T: 6, // (v2.9g: 16)
     STEP_DMG: 24, STEP_N: 3, STEP_T: 2,
     UNDERTOW_DMG: 20, NIGHT_T: 3,
     // the Jump slot (v2.6c): how hard a landing must be, how far it reaches, what Skybreak does
@@ -117,8 +117,9 @@
     const t = main();
     if (!t) return;
     const h = half(t), x = t.cx + G.rand(-0.4, 0.4) * h.w, y = t.cy - h.h * 0.3;
+    if (has('heat') && st.embers > 0) dmg = Math.round(dmg * 1.3); // (duo: Heat Lightning, v2.9g: a burning foe takes 30% more)
     if (!hurt(dmg, { heavy: true, x, y, bolt: true })) return;
-    if (has('heat')) S.ember(2); // (duo: Heat Lightning)
+    if (has('heat')) S.ember(3); // (duo: Heat Lightning; v2.9g: three, was two)
     if (has('conductor') && st.soak > 0 && !again) st.bolt2 = { t: K.BOLT2_T, dmg }; // (duo: Conductor, the second strike)
     st.bolts.push({ pts: jag(x + G.rand(-40, 40), -30, x, y, 9, 34), life: 0.24, max: 0.24 });
     charge('storm', K.CH_BOLT);
@@ -373,7 +374,7 @@
       if (st.emberT <= 0) {
         st.emberT += K.EMBER_TICK;
         const scald = has('scald') && st.soak > 0; // (duo: Scald) steam burns for double
-        if (t) { hurt(Math.max(1, K.EMBER_DMG * st.embers * (scald ? 2 : 1)), { tick: true }); charge('ember', K.CH_EMBER * st.embers); }
+        if (t) { hurt(Math.max(1, Math.round(K.EMBER_DMG * st.embers * (scald ? 2 : 1))), { tick: true }); charge('ember', K.CH_EMBER * st.embers); }
         if (scald && a) { const h = half(a); for (let i = 0; i < 3; i++) G.fx.spawn({ x: a.cx + G.rand(-0.7, 0.7) * h.w, y: a.cy + G.rand(-0.6, 0.3) * h.h, vx: G.rand(-20, 20), vy: -G.rand(40, 110), life: G.rand(0.6, 1.1), size: G.rand(6, 11), color: '220,235,240', grav: -60, wob: 30 }); }
       }
       if (!(has('scald') && st.soak > 0)) st.emberFade -= dt; // (duo: Scald) they do not die down while it is soaked

@@ -147,7 +147,7 @@
     { id: 'mirror', name: 'Mirror Step', tag: 'Starlight', max: 1, heroes: ['vesper', 'lune'], desc: 'A perfect dodge fires a free shot at the boss.' },
     { id: 'heart', name: 'Steady Heart', tag: 'Survival', max: 3, desc: 'One more health.' },
     { id: 'dawn', name: 'Second Dawn', tag: 'Survival', max: 1, desc: 'Once per trial, a killing blow leaves you on 1 health.' },
-    { id: 'glass', name: 'Glass Star', tag: 'Risk', max: 1, desc: 'All damage +35%, but one less health.' },
+    { id: 'glass', name: 'Glass Star', tag: 'Risk', max: 1, desc: 'All damage +25%, but one less health.' }, // (v2.9g: +35%)
     // signature boons (v2.2a): two for each hero that change how they play (player.js, "signature boons")
     { id: 'pinlance', name: 'Pinning Lance', tag: 'Signature', max: 1, heroes: ['vesper'], desc: 'A Star Lance that strikes stays fixed in the foe. Your next finisher on it bursts the lance for 40.' },
     { id: 'stars', name: 'Constellation', tag: 'Signature', max: 1, heroes: ['vesper'], desc: 'Each finisher that lands sets a star on the foe. The third links them and bursts for 60.' },
@@ -165,7 +165,7 @@
   G.SETS = {
     ember: { name: 'Ember', col: '255,132,64', css: '#ff8440', crown: 'Pyre',
       rule: 'Embers burn the foe, five at most, and die down unless more are set.',
-      crownDesc: 'Tear every ember off the foe at once, each bursting for 16. Then your weapon burns for six seconds, and every blow sets an ember.' },
+      crownDesc: 'Tear every ember off the foe at once, each bursting for 20. Then your weapon burns for six seconds, and every blow sets an ember.' },
     storm: { name: 'Storm', col: '255,236,140', css: '#ffec8c', crown: 'Thunderstep',
       rule: 'Static builds on the foe. At ten, a bolt strikes it for 24.',
       crownDesc: 'Streak through the foe as lightning for 24, untouchable as you pass. Press again to streak back, up to three times within two seconds.' },
@@ -218,7 +218,7 @@
   // breaks that. Five slots allow one crown (three of a set) and one duo at once, and never two duos.
   // The mechanics are in sets.js, which asks G.boon(id) like any boon.
   G.DUOS = [
-    { id: 'heat', name: 'Heat Lightning', of: ['ember', 'storm'], desc: 'Every bolt sets two embers, and static builds twice as fast on a burning foe.' },
+    { id: 'heat', name: 'Heat Lightning', of: ['ember', 'storm'], desc: 'Every bolt sets three embers and hits a burning foe 30% harder; static builds twice as fast on it.' }, // (v2.9g: two embers, no extra damage)
     { id: 'scald', name: 'Scald', of: ['ember', 'tide'], desc: 'On a soaked foe, embers burn as steam for double, and do not die down while it stays soaked.' },
     { id: 'blackflame', name: 'Black Flame', of: ['ember', 'gloam'], desc: 'Spending the dark mark makes every ember on the foe burst for 12, and they burn on.' },
     { id: 'conductor', name: 'Conductor', of: ['storm', 'tide'], desc: 'A bolt on a soaked foe strikes twice, and every blow on it builds one static for each layer of soak.' },
@@ -256,7 +256,7 @@
   // a corrupted boon's drawback, while it is held and has not been cleansed
   G.bane = (id) => !!R.boons[id] && !(R.purged || []).includes(id);
   // Boons and relics, the Shrine's Whetstone, the Flow rank, and the two trophies that depend on the moment.
-  G.dmgMult = () => (1 + 0.35 * G.boon('glass')) * (G.boon('whisper') ? 1.3 : 1)
+  G.dmgMult = () => (1 + 0.25 * G.boon('glass')) * (G.boon('whisper') ? 1.3 : 1)
     * (1 + 0.04 * G.up('edge')) * (1 + 0.03 * G.flow.rank)
     * G.relics.dmgK(); // every relic's share (Thorn Crown, the Shroud, the Oath, the Wraps...): relics.js
 

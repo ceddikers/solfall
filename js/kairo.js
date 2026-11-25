@@ -71,6 +71,11 @@
     S.noise({ dur: d, vol: 0.1, type: 'lowpass', f0: 200, f1: 1200, attack: d * 0.9 });
   });
   // one breath of a laugh
+  // (v2.9h) the Still Sky awakening: a heartbeat in the silence, the eye's gleam, the pillar, a cut
+  AU.define('kHeart', (o) => { const v = (o && o.vol) || 1; S.tone({ type: 'sine', f0: 74, f1: 38, dur: 0.22, vol: 0.55 * v }); S.tone({ type: 'sine', f0: 66, f1: 36, dur: 0.2, vol: 0.4 * v, delay: 0.21 }); S.noise({ dur: 0.08, vol: 0.12 * v, type: 'lowpass', f0: 260 }); });
+  AU.define('kGleam', () => { S.tone({ type: 'sine', f0: 2637, dur: 1.4, vol: 0.05, attack: 0.03 }); S.tone({ type: 'triangle', f0: 1318, dur: 1.1, vol: 0.05, attack: 0.02 }); S.tone({ type: 'sine', f0: 3951, dur: 0.7, vol: 0.025, attack: 0.01, delay: 0.05 }); S.noise({ dur: 0.35, vol: 0.06, type: 'highpass', f0: 6000 }); });
+  AU.define('kPillar', () => { S.noise({ dur: 1.7, vol: 0.45, type: 'lowpass', f0: 300, f1: 3000, attack: 0.04 }); S.tone({ type: 'sine', f0: 58, f1: 40, dur: 1.9, vol: 0.5 }); S.tone({ type: 'triangle', f0: 880, f1: 1760, dur: 1.5, vol: 0.05, attack: 0.3 }); S.noise({ dur: 0.25, vol: 0.4, type: 'highpass', f0: 1800 }); });
+  AU.define('kWhoom', (o) => { const v = (o && o.vol) || 1; S.noise({ dur: 0.22, vol: 0.28 * v, type: 'bandpass', f0: 400, f1: 2200, q: 1.2, attack: 0.16 }); S.tone({ type: 'sine', f0: 110, f1: 46, dur: 0.24, vol: 0.32 * v, delay: 0.17 }); });
   AU.define('kLaugh', () => { for (let i = 0; i < 3; i++) S.noise({ dur: 0.07, vol: 0.12 - i * 0.03, type: 'bandpass', f0: 700, q: 2, delay: i * 0.11 }); });
   // an energy ball loosed
   AU.define('kShot', () => { S.tone({ type: 'triangle', f0: 900, f1: 300, dur: 0.09, vol: 0.08 }); S.noise({ dur: 0.05, vol: 0.08, type: 'highpass', f0: 3000 }); });
@@ -266,6 +271,10 @@
     sky: [-0.12, -45, 16, 0, -16, 0, 7, -131, -5, -65, -0.4],
     throwSun: [0.35, -42, 22, 0, -20, 0, 47, -99, 0, -65, 0],
     empty: [0.0, -45, 10, 0, -11, 0, 14, -43, -9, -43, 0],
+    calm: [0.02, -46, 9, 0, -10, 0, 12, -41, -8, -41, 0.1],
+    thrown: [-0.55, -40, 26, -16, 12, -9, 32, -72, 22, -60, -0.5], // (v2.9h) blown back off his feet      // (v2.9h) the awakening: standing loose, hands open at his sides
+    slipB: [-0.4, -43, 13, 0, -14, 0, 9, -45, -12, -43, -0.25],  // swaying back from a stone, feet where they were
+    slipD: [0.5, -35, 15, 0, -15, 0, 15, -35, -7, -37, 0.25],    // dipping under one
     wipe: [0.1, -43, 14, 0, -15, 0, 16, -83, 7, -65, 0],
     laugh: [-0.3, -43, 14, 0, -15, 0, 18, -63, 5, -59, -0.4],
     lie: [0, -43, 12, 0, -12, 0, 27, -86, -27, -86, 0],
@@ -408,7 +417,7 @@
     });
     B.hair = D.chain(8, b.x, b.y - 80);
     B.sash = D.chain(5, b.x, b.y - 44);
-    B.ghosts = []; B.bolts = []; B.boltT = 0; B.flare = 0; B.gaspDue = false; B.thrown = null; B.counter = null;
+    B.ghosts = []; B.bolts = []; B.awk = null; B.eyeTrack = false; B.boltT = 0; B.flare = 0; B.gaspDue = false; B.thrown = null; B.counter = null;
     B.slipCd = 0; B.palmT = 0; B.lw = null; B.sunWash = 0; B.sunOn = false; B.sunT = 0; B.unbound = false; B.musicMode = '';
     B.partnerOn = false; B.shade = null; B.drain = 0;
     makeSlabs();
@@ -886,8 +895,8 @@
         G.fx.lines(b.x, b.y - 46, 10, WAVE.hot, { r0: 30, speed: [400, 900] });
         if (warps > 0) yield* wait(0.25);
       }
-      G.audio.play('kHum', { dur: 0.45 * T });
-      yield* fireWave(hands, 0.45 * T, 0.2, width, 0.7, null);
+      G.audio.play('kHum', { dur: 0.55 * T }); // (v2.9g: the point-blank shot after a warp waits 0.55, was 0.45)
+      yield* fireWave(hands, 0.55 * T, 0.2, width, 0.7, null);
     } else if (o.sweep) {
       G.audio.play('kCharge', { dur: charge });
       // aimed low in front (up) or high (down), and swept through to the other
@@ -960,7 +969,8 @@
     b.pose = 'gather';
     yield* wait(0.3 * T);
     // (v2.4c: fewer and slower: the Risen barrage was 18-22 every 0.13 s, Hailfire 10-15)
-    const n = risen ? 13 + ((G.rng() * 4) | 0) : 8 + ((G.rng() * 5) | 0);
+    // (v2.9g: again: the Risen barrage was 13-16 every 0.15 s, Hailfire 8-12)
+    const n = risen ? 10 + ((G.rng() * 4) | 0) : 7 + ((G.rng() * 5) | 0);
     for (let i = 0; i < n; i++) {
       if (P.dead) break;
       facePlayer();
@@ -969,7 +979,7 @@
       const ang = Math.atan2(P.y - 24 - hy, P.x - hx) + G.rrand(-0.3, 0.3);
       ball(hx, hy, ang, risen ? 450 : 520, risen);
       G.audio.play('kShot');
-      yield* wait((risen ? 0.15 : 0.17) * Math.max(0.75, T));
+      yield* wait((risen ? 0.17 : 0.18) * Math.max(0.75, T));
     }
     b.fast = false; b.pose = 'hover';
     yield* tween(b, { y: gy(b.x) }, 0.35, E.inQuad);
@@ -1477,10 +1487,312 @@
     G.fx.dust(b.x - b.face * 30, FLOOR, 8, { speed: [40, 220], size: [8, 15], life: [0.6, 1.2], up: 40 });
     if (B.dying) b.laughing = 1;
   }
+  // (v2.9h) Still Sky's awakening, phase III's opening. Asked for: "way, way more epic, like zoom in,
+  // like legit ultra instinct". Built in beats, each one a cut:
+  //   the fall      the hero's last blow of phase II throws him: he flies back, the gold torn off him,
+  //                 crashes on his back, bounces and slides to a stop. The music stops
+  //   the silence   the world goes dark round him and the view drops on to his face; two heartbeats
+  //   the eye       it opens, white, with a gleam that runs across the screen
+  //   the pillar    the view snaps out wide as a column of white light bursts up through the sky. His
+  //                 strength comes back inside it, and stones lift off the ridge and hang
+  //   the reveal    the light thins and he is simply standing there, loose, in a silver flame. Three
+  //                 cuts in, each closer, ending on the eye
+  //   the proof     the hanging stones come down at him and his body slips each one, feet still
+  //   the settle    the flame draws in close to the thin white aura he fights in, and the view comes back
+  const WHITE_RGB = '238,246,255', SILVER_RGB = '176,206,255';
+  function eyeAt() {
+    const b = B.body;
+    if (b.eyeW) return b.eyeW;
+    return b.lie > 0.5 ? { x: b.x - 30 * b.face, y: b.y - 14 } : { x: b.x + 7 * b.face, y: b.y - 84 };
+  }
+  function* during(t, fn) { let e = 0; while (e < t) { const dt = yield; e += dt; fn(Math.min(1, e / t), dt, e); } }
+  // The last blow of phase II, landing: it throws him back away from the hero, the gold aura shattering
+  // off him. (v2.9h, "more epic") It is shot like a finishing blow: the frame freezes on the impact with
+  // the view punched in on it, a shockwave and speed lines; he flies in slow motion, the view riding with
+  // him and afterimages left in the air; the landing craters, throws up rock and shakes the canyon; he
+  // bounces and slides, and lies still. Pits are slid across, not stopped over.
+  function* knockDown() {
+    const b = B.body, P = G.player, GC = G.PAL[2];
+    const d = G.sign(b.x - P.x) || -b.face, hx = b.x, hy = b.y - 50, ang = d > 0 ? 0 : Math.PI;
+    b.face = -d; faceNow();
+    b.air = true; b.fast = true; b.pose = 'thrown'; b.sway = 0;
+    B.flare = 0; b.flareK = 0; b.flick = 0;
+    G.audio.setIntensity(0);
+    // the impact: frozen, punched in, everything thrown out from the blow
+    G.audio.play('hitHeavy'); G.audio.play('boom'); G.audio.play('kBolt'); G.audio.play('kBreath');
+    G.fx.stop(0.16); G.fx.slow(0.2, 0.9);
+    G.fx.cineCut(hx - d * 40, hy, 0.75); G.fx.cineEase(3);
+    G.fx.flash('255,236,190', 0.45, 0.25);
+    G.fx.ring(hx, hy, { r0: 20, r1: 420, life: 0.55, width: 8, color: GC.hot, alpha: 0.75 });
+    G.fx.ring(hx, hy, { r0: 10, r1: 220, life: 0.35, width: 4, color: '255,255,255', alpha: 0.8 });
+    G.fx.lines(hx, hy, 30, GC.hot, { r0: 50, speed: [1300, 2400] });
+    G.fx.ripple(hx, hy, 560, 0.7, 1.7);
+    G.fx.light(hx, hy, 320, GC.boss, 0.4, 0.8);
+    // the gold, shattering: shards and sparks blown the way he goes
+    G.fx.burst(hx, hy, { n: 26, color: GC.boss, kind: 'chunk', speed: [300, 900], angle: ang, spread: 1.8, life: [0.6, 1.2], size: [3, 7], grav: 900 });
+    G.fx.burst(hx, hy, { n: 50, color: GC.boss, kind: 'spark', speed: [350, 1100], angle: ang, spread: 1.6, life: [0.3, 0.9], size: [2, 4], drag: 1.4 });
+    G.fx.burst(hx, hy, { n: 18, color: GC.hot, kind: 'spark', speed: [600, 1500], angle: ang, spread: 0.7, life: [0.15, 0.4], size: [1.5, 3] });
+    G.fx.kick(d * 7, -2); G.fx.shake(18);
+    let vx = d * 640, vy = Math.min(-340, -440 + (gy(b.x) - b.y) * 0.5), e = 0, ghostT = 0, z = 0.75;
+    while (true) {
+      const dt = yield;
+      e += dt;
+      vy += 1500 * dt; b.x += vx * dt; b.y += vy * dt;
+      if (b.x <= WL + 40 || b.x >= WR - 40) { b.x = clampX(b.x); vx = -vx * 0.25; } // a wall stops him dead
+      b.lie = Math.min(0.8, e * 1.6);
+      b.risen = Math.max(0, 1 - e * 2.4) * (Math.random() < 0.3 ? 0.4 : 1);
+      trail(b, dt, GC.boss); trail(b, dt, GC.hot);
+      // the view rides with him, pulling back as he goes
+      z = Math.max(0.4, z - dt * 0.9);
+      G.fx.cine.x = G.lerp(G.fx.cine.x, b.x - d * 30, Math.min(1, dt * 8)); G.fx.cine.y = G.lerp(G.fx.cine.y, b.y - 40, Math.min(1, dt * 8)); G.fx.cine.z = z;
+      ghostT -= dt;
+      if (ghostT <= 0) { ghostT = 0.045; afterimage(b, 0.32); B.ghosts[B.ghosts.length - 1].lie = b.lie; }
+      if (vy > 0 && b.y >= gy(b.x)) break;
+    }
+    // down, on his back: the ground craters under him
+    b.y = gy(b.x); b.air = false; b.lie = 1; b.pose = 'lie'; b.risen = 0;
+    const lx = b.x + d * 30;
+    G.fx.stop(0.09); G.fx.thud(lx, FLOOR, 1.7); G.audio.play('boom'); G.audio.play('stomp');
+    G.fx.shake(20); G.fx.kick(d * 3, 5); G.fx.punch(0.04);
+    G.fx.ring(lx, FLOOR - 4, { r0: 30, r1: 360, life: 0.5, width: 6, color: '230,200,160', alpha: 0.5 });
+    G.fx.ripple(lx, FLOOR - 20, 380, 0.5, 1.2);
+    G.fx.burst(lx, FLOOR - 6, { n: 20, color: '52,42,34', kind: 'chunk', speed: [200, 620], angle: -Math.PI / 2, spread: 1.3, life: [0.6, 1.2], size: [3, 9], grav: 1400 });
+    for (const dd of [-1, 1]) G.fx.dust(lx, FLOOR, 12, { dir: dd, speed: [120, 520], size: [10, 18], life: [0.7, 1.4], up: 40, a: 0.5 });
+    for (const sl of B.slabs) if (Math.abs((sl.l + sl.r) / 2 - b.x) < 300) sl.quake = Math.max(sl.quake, 0.9);
+    // a bounce, then the slide, the view settling on him
+    let v = Math.abs(vx) * 0.55, bt = 0;
+    while (bt < 0.75 || v > 6) {
+      const dt = yield;
+      bt += dt;
+      const hop = bt < 0.26 ? Math.sin(Math.PI * bt / 0.26) * 20 : 0;
+      if (bt >= 0.26 && bt - dt < 0.26) { G.audio.play('stomp', { vol: 0.6 }); G.fx.shake(6); G.fx.dust(b.x + d * 30, FLOOR, 6, { dir: d, speed: [80, 300], size: [6, 12], up: 20 }); }
+      const pit = G.arena.inPit(b.x) || G.arena.inPit(b.x + d * 60);
+      v = pit ? Math.max(v, 160) : Math.max(0, v - 520 * dt);
+      const nx = clampX(b.x + d * v * dt);
+      if (nx === b.x) v = 0;
+      b.x = nx; b.y = gy(b.x) - hop;
+      if (v > 40 && Math.random() < dt * 40) G.fx.dust(b.x + d * 30, FLOOR, 1, { dir: -d, speed: [40, 160], size: [5, 10], up: 8, a: 0.4 });
+      if (v > 120 && Math.random() < dt * 30) G.fx.spawn({ kind: 'spark', x: b.x + d * 10, y: FLOOR - 2, vx: -d * G.rand(100, 300), vy: -G.rand(40, 160), life: G.rand(0.15, 0.3), size: G.rand(1.2, 2.2), color: '255,200,140', len: 0.04 });
+      G.fx.cine.x = G.lerp(G.fx.cine.x, b.x, Math.min(1, dt * 5)); G.fx.cine.y = G.lerp(G.fx.cine.y, b.y - 30, Math.min(1, dt * 5));
+      if (bt > 3) break;
+    }
+    b.y = gy(b.x); b.fast = false;
+  }
+  function* awaken() {
+    const b = B.body, W = B.awk = { dark: 0, pillar: 0, core: 0, streak: 0, flame: 0, rocks: [] };
+    // the fall: the hero's last blow of phase II throws him (v2.9h: he used to sink to a knee and topple
+    // a second later, which read as falling over by himself)
+    yield* knockDown();
+    b.eyesShut = 1; B.eyeTrack = true;
+    yield* wait(0.5);
+    // the silence: dark falls round him, the view drops on to his face and creeps closer
+    G.audio.duck(0); G.ui.hud(false);
+    let eye = eyeAt();
+    G.fx.cineCut(eye.x, eye.y + 6, 1.1); G.fx.cineEase(1.2);
+    G.audio.play('kWhoom', { vol: 0.6 });
+    for (let i = 0; i < 26; i++) {
+      // grit hanging in the air, barely moving: time has all but stopped
+      G.fx.spawn({ kind: 'chunk', tag: 'kfloat', x: b.x + G.rand(-260, 260), y: FLOOR - G.rand(10, 200), vx: G.rand(-6, 6), vy: -G.rand(2, 10), life: G.rand(4, 6), size: G.rand(1.5, 4), color: '70,74,90', grav: 0, drag: 2, vr: G.rand(-0.4, 0.4) });
+    }
+    const beats = [0.45, 1.25];
+    let beat = 0;
+    yield* during(1.9, (k, dt, e) => {
+      W.dark = Math.min(1, e / 0.5);
+      G.fx.cine.z = 1.1 + 0.35 * E.inOutQuad(k);
+      if (beat < beats.length && e >= beats[beat]) {
+        beat++;
+        G.audio.play('kHeart', { vol: 0.8 + 0.3 * beat });
+        G.fx.ripple(b.x, b.y - 20, 120 + 60 * beat, 0.5, 0.5 + 0.3 * beat);
+        G.fx.kick(0, 0.8 * beat);
+        W.flame = 0.18 * beat;
+        for (const s of B.slabs) if (Math.abs((s.l + s.r) / 2 - b.x) < 200) s.quake = Math.max(s.quake, 0.25 * beat);
+      }
+      W.flame = Math.max(0, W.flame - dt * 0.5);
+    });
+    // the eye opens
+    b.eyesShut = 0; b.still = 1; W.flame = 0;
+    eye = eyeAt();
+    W.streak = 1;
+    G.audio.play('kGleam');
+    G.fx.glint(eye.x, eye.y, 90, WHITE_RGB, 0.7);
+    G.fx.light(eye.x, eye.y, 120, SILVER_RGB, 0.5, 0.6);
+    yield* during(0.75, (k, dt) => { W.streak = Math.max(0, W.streak - dt * 1.1); G.fx.cine.z += dt * 0.15; });
+    // the pillar: wide at once, a column of white light through the sky. He is on his feet inside it
+    G.fx.cine.to = 0; G.fx.cine.k = 0; G.fx.cineEase(2.6); G.fx.cine.z = 0.3;
+    B.eyeTrack = false; b.eyeW = null;
+    G.audio.play('kPillar'); G.audio.play('boom'); G.audio.play('kRumble', { dur: 1.6 });
+    G.fx.stop(0.08); G.fx.shake(20); G.fx.punch(0.05);
+    G.fx.flash(WHITE_RGB, 0.55, 0.5);
+    G.fx.ripple(b.x, FLOOR - 120, 620, 0.7, 1.6);
+    G.fx.ring(b.x, FLOOR - 6, { r0: 40, r1: 620, life: 0.7, width: 7, color: WHITE_RGB, alpha: 0.6 });
+    G.fx.lines(b.x, FLOOR - 140, 26, WHITE_RGB, { r0: 80, speed: [1000, 1800] });
+    for (const d of [-1, 1]) G.fx.dust(b.x + d * 40, FLOOR, 10, { dir: d, speed: [260, 700], size: [8, 16], life: [0.6, 1.2], up: 20, a: 0.5 });
+    for (const pt of G.fx.parts) if (pt.tag === 'kfloat') { pt.vy = -G.rand(30, 90); pt.vx = (G.sign(pt.x - b.x) || 1) * G.rand(20, 80); }
+    // stones torn off the ridge, rising and hanging round him
+    for (let i = 0; i < 7; i++) {
+      const d = i % 2 ? 1 : -1, x = clampX(b.x + d * G.rand(90, 300));
+      W.rocks.push({ x, y: FLOOR - 4, vy: -G.rand(260, 420), hy: FLOOR - G.rand(120, 300), r: G.rand(7, 15), rot: G.rand(0, 6), vr: G.rand(-1.5, 1.5), seed: i * 1.7, st: 'rise' });
+    }
+    for (const s of B.slabs) s.quake = 1;
+    b.lie = 0; b.pose = 'calm'; b.y = gy(b.x); b.sway = 0; b.laughing = 0;
+    const hp0 = B.hp;
+    W.pillar = 1; W.core = 1;
+    yield* during(1.35, (k, dt) => {
+      B.hp = Math.round(G.lerp(hp0, B.maxHp * RISE_HP, E.outQuad(k)));
+      W.dark = 1 - 0.15 * k;
+      W.core = 1 - 0.25 * k;
+      G.fx.shake(3 + 5 * (1 - k));
+      if (Math.random() < dt * 30) G.fx.spawn({ kind: 'spark', x: b.x + G.rand(-60, 60), y: FLOOR - G.rand(0, 400), vx: G.rand(-30, 30), vy: -G.rand(400, 900), life: G.rand(0.3, 0.6), size: G.rand(1.5, 3), color: WHITE_RGB, len: 0.06 });
+      riseRocks(dt);
+    });
+    B.hp = Math.round(B.maxHp * RISE_HP); B.unbound = true;
+    // the reveal: the light thins away from the middle out, and he is standing there, loose
+    W.flame = 1; b.surge = 1.5;
+    yield* during(0.6, (k, dt) => {
+      W.pillar = 1 - E.inQuad(k); W.core = 0.75 * (1 - E.outQuad(Math.min(1, k * 1.6)));
+      b.surge = 1.5 * (1 - k * 0.3);
+      riseRocks(dt);
+    });
+    W.pillar = 0; W.core = 0;
+    // three cuts in: his whole height, his chest, his eye
+    const cuts = [[60, 0.45], [74, 1.0], [null, 1.9]];
+    for (let i = 0; i < cuts.length; i++) {
+      const c = cuts[i], close = c[0] == null;
+      if (close) B.eyeTrack = true;
+      const at = close ? eyeAt() : { x: b.x, y: b.y - c[0] };
+      G.fx.cineCut(at.x, at.y + (close ? 4 : 0), c[1]); G.fx.cineEase(1);
+      G.audio.play('kWhoom', { vol: 0.7 + 0.2 * i });
+      G.fx.kick(0, 1.2); G.fx.punch(0.02);
+      G.fx.lines(at.x, at.y, 12, WHITE_RGB, { r0: 60 / (1 + c[1]), speed: [500, 900] });
+      // (on the eye the flame drops low, so his face reads)
+      if (close) { W.streak = 1; W.flame = 0.35; b.surge = 0; G.audio.play('kGleam'); G.fx.glint(at.x, at.y, 48, WHITE_RGB, 0.5); }
+      yield* during(close ? 0.9 : 0.42, (k, dt) => { b.surge = Math.max(0.4, b.surge - dt * 0.8); W.streak = Math.max(0, W.streak - dt * 1.2); G.fx.cine.z += dt * 0.08; riseRocks(dt); });
+    }
+    B.eyeTrack = false; b.eyeW = null; W.flame = 0.8;
+    // the proof: the hanging stones come down at him, one after another, and his body slips each one
+    G.fx.cineCut(b.x, b.y - 70, 0.5); G.fx.cineEase(1.5);
+    G.audio.play('kWhoom', { vol: 0.5 });
+    const order = W.rocks.slice().sort((p, q) => Math.abs(p.x - b.x) - Math.abs(q.x - b.x)).slice(0, 4);
+    let n = 0, slipT = 0, next = 0.15;
+    yield* during(1.7, (k, dt) => {
+      riseRocks(dt);
+      next -= dt;
+      if (n < order.length && next <= 0) {
+        const r = order[n++], tx = b.x + G.rand(-4, 4), ty = b.y - (n % 2 ? 80 : 50), d = Math.hypot(tx - r.x, ty - r.y) || 1;
+        r.st = 'fly'; r.vx = (tx - r.x) / d * 1100; r.vy = (ty - r.y) / d * 1100; r.hit = false; r.low = n % 2 === 0;
+        G.audio.play('whoosh');
+        next = 0.32;
+      }
+      for (const r of W.rocks) {
+        if (r.st !== 'fly' || r.hit) continue;
+        if (Math.hypot(r.x - b.x, r.y - (b.y - 64)) < 56) {
+          // his body moves before he does: an afterimage left where the stone was going
+          r.hit = true;
+          afterimage(b, 0.4);
+          b.pose = r.low ? 'slipB' : 'slipD'; b.fast = true; slipT = 0.22;
+          G.audio.play('kSnap', { vol: 0.5 });
+          G.fx.lines(b.x, b.y - 60, 5, WHITE_RGB, { r0: 26, speed: [200, 420] });
+        }
+      }
+      if (slipT > 0) { slipT -= dt; if (slipT <= 0) { b.pose = 'calm'; b.fast = false; } }
+    });
+    b.pose = 'calm'; b.fast = false;
+    // the settle: the flame draws in to the thin white aura, the dark lifts, the view comes back
+    G.fx.cine.to = 0; G.fx.cineEase(2.2);
+    G.audio.play('ring');
+    G.ui.hud(true);
+    const z0 = G.fx.cine.z;
+    yield* during(0.8, (k, dt) => { W.flame = 0.8 * (1 - E.outQuad(k)); W.dark = 0.85 * (1 - k); b.surge = 0.25 * (1 - k); G.fx.cine.z = G.lerp(z0, 0.3, k); riseRocks(dt); });
+    G.fx.cine.z = 0.3; G.fx.cineEase(2.6); // (the Gathered Sun, which comes next, pushes in by the usual third)
+    for (const r of W.rocks) if (r.st !== 'gone') shatter(r);
+    B.awk = null; b.surge = 0; b.still = 1; b.pose = 'idle';
+    G.audio.duck(1);
+  }
+  // the awakening's stones: rising to hang, bobbing, flying at him, breaking on the ridge
+  function riseRocks(dt) {
+    const W = B.awk;
+    if (!W) return;
+    for (const r of W.rocks) {
+      r.rot += r.vr * dt;
+      if (r.st === 'rise') {
+        r.y += r.vy * dt; r.vy = G.damp(r.vy, 0, 2.2, dt);
+        if (r.y <= r.hy || Math.abs(r.vy) < 20) r.st = 'hang';
+      } else if (r.st === 'hang') {
+        r.y += Math.sin(G.t * 1.6 + r.seed) * 6 * dt; r.x += Math.cos(G.t * 1.1 + r.seed) * 3 * dt;
+      } else if (r.st === 'fly') {
+        r.x += r.vx * dt; r.y += r.vy * dt; r.vy += 600 * dt;
+        if (r.y >= FLOOR - 4 || r.x < WL - 40 || r.x > WR + 40) shatter(r);
+      }
+    }
+  }
+  function shatter(r) {
+    r.st = 'gone';
+    G.fx.burst(r.x, Math.min(r.y, FLOOR - 4), { n: 8, color: '52,44,38', speed: [120, 380], life: [0.4, 0.8], size: [2, 5], kind: 'chunk', grav: 1300 });
+    if (r.y >= FLOOR - 30) G.fx.dust(r.x, FLOOR, 2, { speed: [40, 160], size: [5, 9], up: 30, a: 0.4 });
+    G.audio.play('kRock', { vol: 0.5 });
+  }
+  // what the awakening draws: dark round him (under him), and the pillar, the gleam and the stones (over)
+  function drawAwkGround(ctx) {
+    const W = B.awk;
+    if (!W || W.dark < 0.01) return;
+    const b = B.body, x = b.x, y = b.y - 50;
+    const g = ctx.createRadialGradient(x, y, 40, x, y, 900);
+    g.addColorStop(0, 'rgba(6,8,18,' + (0.62 * W.dark) + ')'); g.addColorStop(0.35, 'rgba(4,5,12,' + (0.88 * W.dark) + ')'); g.addColorStop(1, 'rgba(2,3,8,' + (0.94 * W.dark) + ')');
+    ctx.fillStyle = g; ctx.fillRect(-600, -600, G.W + 1200, G.H + 1200);
+  }
+  function drawAwkOver(ctx) {
+    const W = B.awk;
+    if (!W) return;
+    const b = B.body;
+    ctx.save();
+    for (const r of W.rocks) {
+      if (r.st === 'gone') continue;
+      ctx.save(); ctx.translate(r.x, r.y); ctx.rotate(r.rot);
+      ctx.fillStyle = '#2a221c';
+      ctx.beginPath();
+      for (let i = 0; i < 6; i++) { const a = i / 6 * G.TAU, rr = r.r * (0.75 + 0.25 * Math.sin(r.seed * 3 + i * 2.1)); if (i) ctx.lineTo(Math.cos(a) * rr, Math.sin(a) * rr); else ctx.moveTo(Math.cos(a) * rr, Math.sin(a) * rr); }
+      ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = 'rgba(200,220,255,' + (0.35 + 0.4 * W.flame) + ')'; ctx.lineWidth = 1.2; ctx.stroke();
+      ctx.restore();
+      if (r.st === 'fly') { ctx.strokeStyle = 'rgba(220,235,255,0.25)'; ctx.lineWidth = r.r; ctx.beginPath(); ctx.moveTo(r.x, r.y); ctx.lineTo(r.x - r.vx * 0.05, r.y - r.vy * 0.05); ctx.stroke(); }
+    }
+    ctx.globalCompositeOperation = 'lighter';
+    if (W.pillar > 0.01) {
+      const t = G.t, w = 150 * W.pillar * (1 + 0.06 * Math.sin(t * 40)), x = b.x, top = -700;
+      const g = ctx.createLinearGradient(x - w, 0, x + w, 0);
+      g.addColorStop(0, 'rgba(150,190,255,0)'); g.addColorStop(0.3, 'rgba(160,200,255,' + 0.35 * W.pillar + ')');
+      g.addColorStop(0.5, 'rgba(240,248,255,' + 0.9 * W.pillar + ')');
+      g.addColorStop(0.7, 'rgba(160,200,255,' + 0.35 * W.pillar + ')'); g.addColorStop(1, 'rgba(150,190,255,0)');
+      ctx.fillStyle = g; ctx.fillRect(x - w, top, w * 2, FLOOR - top);
+      // streaks running up it
+      ctx.strokeStyle = 'rgba(240,248,255,' + 0.5 * W.pillar + ')'; ctx.lineWidth = 2;
+      for (let i = 0; i < 10; i++) {
+        const sx = x + Math.sin(i * 2.3) * w * 0.6, ph = (t * 2.4 + i * 0.37) % 1, y0 = FLOOR - ph * (FLOOR - top), len = 60 + 80 * Math.abs(Math.sin(i));
+        ctx.beginPath(); ctx.moveTo(sx, y0); ctx.lineTo(sx, y0 - len); ctx.stroke();
+      }
+      D.glow(ctx, '200,225,255', x, FLOOR - 10, 220 * W.pillar, 0.6 * W.pillar);
+    }
+    if (W.streak > 0.01) {
+      const e = eyeAt(), L = 1100 * (0.4 + 0.6 * W.streak), a = W.streak;
+      const g = ctx.createLinearGradient(e.x - L, 0, e.x + L, 0);
+      g.addColorStop(0, 'rgba(180,210,255,0)'); g.addColorStop(0.5, 'rgba(245,250,255,' + 0.9 * a + ')'); g.addColorStop(1, 'rgba(180,210,255,0)');
+      ctx.fillStyle = g; ctx.fillRect(e.x - L, e.y - 1, L * 2, 2);
+      ctx.globalAlpha = 0.35; ctx.fillRect(e.x - L * 0.6, e.y - 5, L * 1.2, 10); ctx.globalAlpha = 1;
+      D.glow(ctx, WHITE_RGB, e.x, e.y, 26, 0.8 * a);
+    }
+    ctx.globalCompositeOperation = 'source-over';
+    if (W.core > 0.01) {
+      const x = b.x, w = 46 * W.core;
+      const g = ctx.createLinearGradient(x - w, 0, x + w, 0);
+      g.addColorStop(0, 'rgba(235,244,255,0)'); g.addColorStop(0.5, 'rgba(250,252,255,' + W.core + ')'); g.addColorStop(1, 'rgba(235,244,255,0)');
+      ctx.fillStyle = g; ctx.fillRect(x - w, -700, w * 2, FLOOR + 700);
+    }
+    ctx.restore();
+  }
   B.phaseIn = function* (n) {
     const b = B.body;
     b.air = false; b.hidden = false; b.spin = 0; b.open = 0; b.orb = 0; b.handHip = 0; b.hips = 0; b.sunK = 0;
-    if (b.y < gy(b.x) - 1) { b.pose = 'hover'; yield* tween(b, { y: gy(b.x) }, 0.3, E.inQuad); }
+    if (n === 2 && b.y < gy(b.x) - 1) { b.pose = 'hover'; yield* tween(b, { y: gy(b.x) }, 0.3, E.inQuad); }
     if (n === 2) {
       // the fight stops. He wipes his mouth and laughs once, and the view eases in on him
       b.pose = 'idle';
@@ -1555,38 +1867,7 @@
       b.surge = 0;
       b.pose = 'idle';
       yield* wait(0.35);
-    } else {
-      // he falls as if beaten; the music stops
-      G.audio.setIntensity(0);
-      b.pose = 'kneel';
-      yield* wait(0.5);
-      yield* fallDown();
-      yield* wait(1.3);
-      // and rises, his strength coming back to four tenths, the phase marks gone
-      // (v2.4c: was three quarters; the scripted clear-rate runs lost most of their Kairo fights in this phase;
-      // v2.6f: four tenths, was half, see RISE_HP)
-      b.pose = 'lie';
-      G.audio.play('kRumble', { dur: 1.8 });
-      const hp0 = B.hp;
-      let e = 0;
-      while (e < 1.6) {
-        const dt = yield;
-        e += dt;
-        const k = Math.min(1, e / 1.6);
-        b.lie = 1 - E.inOutQuad(k);
-        B.hp = Math.round(G.lerp(hp0, B.maxHp * RISE_HP, E.outQuad(k)));
-        if (k > 0.5) b.pose = 'kneel';
-      }
-      b.lie = 0; B.hp = Math.round(B.maxHp * RISE_HP); B.unbound = true;
-      b.pose = 'idle';
-      // the gold aura burns out to nothing; a beat of silence; then a thin white aura settles close
-      e = 0;
-      while (e < 0.6) { const dt = yield; e += dt; b.risen = Math.max(0, 1 - e / 0.6); if (Math.random() < dt * 30) K.aura(b.x, b.y, G.PAL[2].boss, 18, 80, 1); }
-      b.risen = 0;
-      yield* wait(0.7);
-      G.audio.play('ring');
-      yield* tween(b, { still: 1 }, 0.8, E.outQuad);
-    }
+    } else yield* awaken();
   };
   B.phaseOut = function* (n) {
     const b = B.body;
@@ -1627,7 +1908,7 @@
     // (v2.5c) each part of him on its own spring, on top of the pose (drawing only: see living)
     living(b, b.p, target, b.pose, dt, !b.air && b.y >= gy(b.x) - 3, b.fast || !!SNAP[b.pose], false);
     // hair and sash: the aura lifts them, and they keep their swing (his starts and stops fling them)
-    const lift = Math.max(b.risen, b.flareK * (B.flare > 0 ? 1 : 0), b.still * 0.4);
+    const lift = Math.max(b.risen, b.flareK * (B.flare > 0 ? 1 : 0), b.still * 0.4, B.awk ? B.awk.flame : 0);
     const ga = geo(b), ct = Math.cos(ga.tilt), st = Math.sin(ga.tilt), fs = b.face;
     const tx = ga.hx - 10 * ct + 3 * st, ty = ga.hy - 10 * st - 3 * ct; // the tie at the back of his head
     chainV(B.hair, b.x + fs * tx, b.y + ty, dt, { seg: 6, grav: G.lerp(70, -35, lift), drift: 34 + 30 * lift, face: fs, wave: 6 + 14 * lift, rate: 6 + 5 * lift });
@@ -1973,6 +2254,7 @@
     ctx.fillStyle = c.hair;
     D.poly(ctx, [-7, -7, 6, -9.5, 9.5, -5, 4, -5.5, 1, -3, -3, -5]); ctx.fill();
     ctx.fillStyle = c.belt; ctx.fillRect(-11.5, -4.5, 3, 3);
+    if (o.real && B.eyeTrack && B.wm) { const q = B.wm.inverse().multiply(ctx.getTransform()).transformPoint(new DOMPoint(6.2, -1.6)); f.eyeW = { x: q.x, y: q.y }; }
     if (f.eyesShut) { ctx.strokeStyle = '#120a08'; ctx.lineWidth = 1.2; D.line(ctx, 4, -1.5, 8, -1.2); }
     else {
       const glow = o.real ? Math.max(f.risen || 0, f.still || 0) : 0, ec = (f.still || 0) > 0.3 ? '230,240,255' : (f.risen || 0) > 0.3 ? pal.boss : rim;
@@ -2001,9 +2283,9 @@
   // the aura: gold flames (Risen, Flare Up), a thin white light (Still Sky), lightning in the gold
   // tongues of flame licking up round his body, each its own height, lean and flicker, none sharing a
   // base line (so the whole never reads as a box of light)
-  function flames(ctx, b, col, k, front) {
+  function flames(ctx, b, col, k, front, hotCol) {
     const sg = b.surge || 0; // (the transformation's eruption: taller, wider, faster)
-    const N = front ? 7 : 14, t = G.t, hot = '255,246,214';
+    const N = front ? 7 : 14, t = G.t, hot = hotCol || '255,246,214';
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
     if (!front) D.glow(ctx, col, b.x, b.y - 50 - 30 * sg, 80 * (1 + 0.7 * sg), 0.16 * k);
@@ -2033,6 +2315,7 @@
     const pal = G.pal();
     const gold = Math.max(b.risen, B.flare > 0 ? b.flareK : 0, b.flick);
     if (gold > 0.01) flames(ctx, b, B.phase >= 2 || b.risen > 0.01 ? G.PAL[2].boss : pal.boss, gold, front);
+    if (B.awk && B.awk.flame > 0.01) flames(ctx, b, SILVER_RGB, B.awk.flame, front, WHITE_RGB); // (v2.9h: the awakening)
     if (!front && b.still > 0.01) {
       ctx.save();
       ctx.globalCompositeOperation = 'lighter';
@@ -2158,6 +2441,7 @@
   B.drawGround = function (ctx) {
     drawSlabs(ctx);
     if (B.dead) return;
+    drawAwkGround(ctx);
     const b = B.body;
     if (!b.hidden) {
       const k = G.clamp(1 - (gy(b.x) - b.y) / 400, 0.2, 1);
@@ -2171,6 +2455,7 @@
     if (B.dead) return;
     const b = B.body;
     if (b.hidden) return;
+    if (B.eyeTrack) B.wm = ctx.getTransform(); // (the world's own transform, to find his eye in it)
     drawAura(ctx, b, false);
     // his hair's tail and the sash's ends, behind him
     if (b.lie < 0.3) {
@@ -2186,6 +2471,7 @@
   // and the Last Wave
   B.drawOver = function (ctx) {
     const b = B.body;
+    drawAwkOver(ctx);
     if (b && b.sunK > 0 && !b.hidden) {
       const k = b.sunK, r = sunR(k), sx = b.x + b.face * 6, sy = b.y - 150 - r;
       const g = ctx.createRadialGradient(sx, sy, r * 1.1, sx, sy, 1000);

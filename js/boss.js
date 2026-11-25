@@ -714,7 +714,7 @@
   const ABOVE_T = 1.4; // (as the other bosses, js/bosskit.js)
   function* think() {
     const low = B.phase === 3 && B.hp < B.maxHp * 0.12;
-    const gap = [0, 0.95, 0.75, 0.6][B.phase] * G.diff().pace * (low ? 0.55 : 1);
+    const gap = [0, 0.95, 0.75, hard() ? 0.6 : 0.68][B.phase] * G.diff().pace * (low ? 0.55 : 1); // (v2.9g: phase III rests longer before trial V)
     yield* wait(gap);
     let name = G.debug.forceAttack || '';
     // the last stand: once, when the Warden is nearly spent
@@ -1345,14 +1345,16 @@
     yield* during(T, (k) => { const q = E.inOutQuad(k); c.pt.x = -dir * 10 * q; c.pt.g = -0.05 * q; c.pt.sh = k > 0.7 ? 1.4 : 0; });
     c.pv.x += dir * 260; c.pv.g += 1.4;
     c.spinHint = 0;
-    let e = 0, next = 1.0, hum = 0.5;
+    // (v2.9g: before trial V the meteors come every 1.8 s, not 1.2, the first a little later)
+    const every = hard() ? 1.2 : 1.8;
+    let e = 0, next = hard() ? 1.0 : 1.4, hum = 0.5;
     while (e < total) {
       const dt = yield;
       e += dt; next -= dt; hum -= dt;
       c.pt.x = dir * 6;
       if (hum <= 0) { hum = 0.48; G.audio.play('beam'); }
       if (next <= 0 && !gentle()) {
-        next = 1.2;
+        next = every;
         H.meteor({ x: G.clamp(P.x + P.vx * 0.3, WL + 50, WR - 50), tele: 0.8 * T });
       }
     }
@@ -3041,9 +3043,10 @@
   // punish. Each rush is dodged by stepping out of its line during the draw-back, or a dash through it.
   function* atkCharge() {
     const c = B.core, P = G.player, P3 = B.phase === 3;
-    const T = G.diff().tele * (P3 ? 0.9 : 1);
+    // (v2.9g: before trial V phase III's rushes keep the full warning and come three at most, not four)
+    const T = G.diff().tele * (P3 && hard() ? 0.9 : 1);
     c.ctrl = true; c.vx = c.vy = 0;
-    const n = [0, 2, 3, 4][B.phase] + (chance(0.35, 'long') ? 1 : 0);
+    const n = [0, 2, 3, hard() ? 4 : 3][B.phase] + (chance(0.35, 'long') ? 1 : 0);
     yield* blinks(n);
     let ax = 0, ay = 1;
     for (let i = 0; i < n; i++) {

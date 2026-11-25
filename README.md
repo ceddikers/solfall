@@ -2,7 +2,7 @@
 
 A side-on boss rush for the browser: four heroes, seven three-phase bosses, played as a run of
 ever-harder trials. You pick a hero and a relic before the run and win a boon after each victory.
-Version 2.9f.
+Version 2.9h.
 
 This is an early slice of a planned boss-rush roguelite (short runs, a boon after each boss,
 bosses drawn from a pool). A run is seven trials, one for each boss, each harder than the last: the first boss
@@ -114,6 +114,118 @@ hero (`tools/feel-check.js`).
 - Settings, Reset progress erases Sunshards, upgrades, trophies and records (it has to be chosen twice).
 
 Not done: touch controls, a colour-blind alternative to red-orange warnings, gamepad rebinding.
+
+## Kairo's awakening, and a harder Standard (v2.9h)
+
+Asked: "kairo's phase 3 transition needs to be way, way more epic like zoom in, like LEGIT ultra instinct when
+goku first unlocked it". That scene works in beats: the hero is swallowed and goes quiet, a pillar of light, and
+he comes out calm in a silver aura, his body dodging on its own. Kairo's version is his own, built from those beats.
+It runs about 11 seconds, up from about 6½.
+
+| Beat | What happens |
+| --- | --- |
+| The fall | The hero's last blow of phase II throws him, shot like a finishing blow: the frame freezes on the impact with the view punched in, a flash, shockwave rings and speed lines, and his gold aura shatters into shards. He flies back in slow motion with afterimages left in the air and the view riding with him, craters the ground on his back (rock thrown up, the canyon shaking), bounces and slides to a stop. The music stops. (At first he sank to a knee and toppled a second later; the user found that "awkward", as if he fell over by himself) |
+| The silence | The HUD goes, the world goes dark round him, and the view cuts to a close-up of his face and creeps closer. Grit hangs in the air. Two heartbeats |
+| The eye | His eye opens white, with a gleam that runs across the whole screen |
+| The pillar | The view snaps out wide as a column of white light bursts up through the sky. His strength comes back to 40% inside it, and stones lift off the ridge and hang |
+| The reveal | The light thins and he is simply standing there, loose, in a tall silver-blue flame. Three cuts in: his whole height, his chest, his eye |
+| The proof | The hanging stones fly at him one after another, and his body slips each one (an afterimage left where the stone was going), feet still |
+| The settle | The flame draws in to the thin white aura he fights in, the dark lifts, the HUD and the view come back |
+
+How it's built:
+- The camera's push-in can now go further than a third. A scene can cut straight to a framing (`G.fx.cineCut`)
+  and choose how fast it eases (`G.fx.cineEase`). Both go back to the defaults once the view is all the way out,
+  so the other bosses' push-ins are unchanged.
+- Kairo's eye is found in the world while he is drawn, so the close-ups land on it whether he is lying or standing.
+- New sounds: a heartbeat, the eye's gleam, the pillar, and a whoosh for each cut.
+
+Checked by stepping through it frame by frame in the preview and through 8 bot fights. Phase III starts as before,
+with the Gathered Sun.
+
+**Standard difficulty, a notch up.** Asked: "i also think we need to bump standard difficulty up a bit".
+
+| Standard | Before | Now |
+| --- | --- | --- |
+| Boss health | ×1.0 | ×1.1 |
+| Warnings | ×1.0 | ×0.95 |
+| Rest between attacks | ×1.0 | ×0.9 |
+| Hero health, stagger length | 5, 4 s | unchanged |
+
+Gentle and Merciless are unchanged. Merciless is still well above (×1.15 health, ×0.8 warnings, ×0.7 rest, 4
+health).
+
+Measured with the bot, before and after in the same build: every boss and hero at trials I, IV and VII, with boons
+(168 fights each).
+
+| | Before | After |
+| --- | --- | --- |
+| Won | 80% | 73% |
+| Hits taken a fight | 3.1 | 3.6 |
+| Trial I / IV / VII | 89 / 82 / 70% | 79 / 77 / 63% |
+| Hardest: Warden, Kairo | 58%, 67% | 46%, 42% |
+
+Lune falls the most (67% to 55%), so she is the hero to watch.
+
+Playtest checklist:
+- Standard: harder but fair? Do the Warden and Kairo now feel like walls?
+- Does the last hit of phase II feel like it is what puts him down?
+- Does it feel like a big moment, not just a long one? Is 11 seconds too long by the third run?
+- Can you see his face and eye in the close-ups?
+- Does the pillar read as light bursting up, not a flash?
+- Do the stones he slips read as his body moving on its own?
+
+## A balance pass across bosses, boons and relics (v2.9g)
+
+Asked: "take a look for any other balance changes - deep look", then "Do 1–6" from the list of findings.
+
+**How it was looked at.** About 1,050 fights with the scripted player (`tools/clear-rates.js`):
+- every hero against every boss at trials I, III, V and VII, with boons;
+- every relic at Awakened against no relic (trial V, no boons);
+- the duos and crown sets (trial V);
+- Sol at trial VII and the Champion at trials III and V.
+
+The bot is not a human, so the gaps between things matter more than the exact percentages.
+
+**What was off, and what changed.**
+
+| Finding | Change |
+| --- | --- |
+| The Leviathan won 0 of 48 fights against the bot and landed about 1.6 hits a fight. The Assassin also won none; the Mage won 2 of 48 | Leviathan: health 2900 → 3200, rests between attacks 0.84 / 0.7 / 0.57 → 0.76 / 0.62 / 0.5, warnings ×0.9 → ×0.82. Assassin: phase III rest 0.44 → 0.4. Mage: phase III rest 0.53 → 0.48 |
+| The Warden was hardest at trial I (the bot won 50%), almost all of it in phase III, mostly the charge and the meteor wheel | Before trial V only: phase III rests 0.6 → 0.68, the charge's rushes keep their full warning and come 3 at most (not 4), the wheel's meteors fall every 1.8 s (not 1.2) |
+| Kairo was a wall at trials V and VII (the bot won 33%), mostly the Risen barrage, the Sunwell Wave and Hailfire | Risen barrage 13–16 shots every 0.15 s → 10–13 every 0.17 s. Hailfire 8–12 every 0.17 s → 7–11 every 0.18 s. The point-blank Wave after a warp waits 0.55 (was 0.45) |
+| Glass Star (+35% all damage for 1 health) beat Thorn Crown (+15% for 2) | Glass Star +35% → **+25%** |
+| The Offered Hilt did worse than no relic (46% against 57%): its echoes hit for 45% of a blow, once a fight | Echoes hit for **70%** (at least 8), **twice a fight** from the start; Awakened three times (was twice); Ascendant unchanged (every stagger) |
+| The weakest duo (Heat Lightning, 78%) and crown set (Ember, 77%), against 91–92% for the best | Embers burn for 1.5 each (was 1) and die down every 2 s (was 1.6); Pyre 16 → 20 per ember. Heat Lightning: bolts set 3 embers (was 2) and hit a burning foe 30% harder |
+
+**After the change**, the same fights again (12 per boss and trial; 64 for the Leviathan):
+
+| Boss | Won before → after | Hits taken a fight | Average win time |
+| --- | --- | --- | --- |
+| Leviathan | 100% → 98% | 1.6 → 1.6 | 72 → 82 s |
+| Assassin | 100% → 92% (trial VII 83%) | 3.0 → 2.5 | 101 → 91 s |
+| Mage | 96% → 100% | 2.7 → 2.3 | 110 → 106 s |
+| Warden | 63% → 69% (trial I 50% → 67%) | 4.1 → 3.7 | 76 → 69 s |
+| Kairo | 56% → 52% (trials V and VII 33% → 42%) | 4.5 → 3.8 | 88 → 95 s |
+
+The Offered Hilt at Awakened: 46% → 63% won (no relic: 57%), win time 130 → 120 s.
+
+With 12 fights per box, the win rates move by up to 14 points either way. The Leviathan's fights got longer, but
+the bot still takes under two hits from it, so its attacks themselves are too easy to read. Numbers alone won't fix
+that; it needs a harder move or two.
+
+**Left alone:**
+- The heroes: Eos 89%, Vesper and Aster 82%, Lune 77%. The spread is modest, and Eos changed in v2.9e.
+- Sol: the bot won 0 of 24 at trial VII, most of it lost in the Fall. She needs a human playtest first.
+- Trial scaling: the overall win rate barely drops from trial I (89%) to VII (79%).
+- Still Hourglass and Quicksilver measured no better than no relic, but both pay on perfect dodges, which the bot
+  rarely makes.
+
+Playtest checklist:
+- Does the Leviathan still feel like a free trial?
+- Is the Warden fair as a first boss, and does it still bite from trial V?
+- Kairo at trials V–VII: hard but beatable?
+- Is Glass Star still worth a health? Is the Offered Hilt worth taking now?
+- An Ember build: do the burns now add up to something you notice?
 
 ## Thorn Crown toned down (v2.9f)
 
@@ -811,7 +923,7 @@ which still replaces what is there if you take it (the card says what it replace
 
 | Duo | Sets | What it does |
 |---|---|---|
-| Heat Lightning | Ember + Storm | every bolt sets two embers; static builds twice as fast on a burning foe |
+| Heat Lightning | Ember + Storm | every bolt sets three embers and hits a burning foe 30% harder; static builds twice as fast on a burning foe (v2.9g: two embers, no extra damage) |
 | Scald | Ember + Tide | on a soaked foe, embers burn as steam for double and do not die down |
 | Black Flame | Ember + Gloam | spending the dark mark makes every ember burst for 12; they burn on |
 | Conductor | Storm + Tide | a bolt on a soaked foe strikes twice; every blow on it builds one static per layer of soak |
@@ -2580,7 +2692,7 @@ machine; clearing site data resets it. Defined in `js/meta.js`.
 | Mirror Step | Starlight | Vesper and Lune: a perfect dodge fires a free shot at the core | 1 |
 | Steady Heart | Survival | one more health | 3 |
 | Second Dawn | Survival | once per trial, a killing blow leaves you on 1 health | 1 |
-| Glass Star | Risk | all damage +35%, one less health | 1 |
+| Glass Star | Risk | all damage +25% (v2.9g: was +35%), one less health | 1 |
 
 The six gold **pairs** (v1.8a) are listed in "A run with a shape, and boons that pair" above.
 

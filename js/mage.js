@@ -35,7 +35,7 @@
     teleK: 0.9, // its warnings, against the difficulty's (v2.4d: they were easy to read)
     // its spells already reach anywhere; what it answers is a hero who will not come down out of the air
     answer: 'shards', kiting: (P) => !P.onGround && P.y < FLOOR - 150,
-    gaps: [0, 0.84, 0.66, 0.53], // (v2.4d: 0.95, 0.75, 0.6)
+    gaps: [0, 0.84, 0.66, 0.48], // (v2.9g: phase III 0.53; v2.4d: 0.95, 0.75, 0.6)
     bags: {
       1: ['shards', 'rime', 'fireball', 'bolts', 'spheres', 'comet', 'invoke', 'nova', 'serpent', 'motes', 'blink', 'glacier'],
       2: ['shards', 'rime', 'fireball', 'bolts', 'spheres', 'firewall', 'crystals', 'storm', 'comet', 'invoke', 'nova', 'serpent', 'motes', 'blink', 'glacier'],

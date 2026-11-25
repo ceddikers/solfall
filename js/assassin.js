@@ -24,7 +24,7 @@
     teleK: 0.9, // its warnings, against the difficulty's (v2.4d: they were easy to read)
     answer: 'hunt',
     antiAir: 'skyhook', // (bosskit: a hero who keeps riding over its head)
-    gaps: [0, 0.7, 0.55, 0.44], // (v2.4d: 0.8, 0.62, 0.5)
+    gaps: [0, 0.7, 0.55, 0.4], // (v2.9g: phase III 0.44; v2.4d: 0.8, 0.62, 0.5)
     bags: {
       1: ['lunge', 'flurry', 'knives', 'ambush', 'backstab', 'echo', 'stance', 'crescent', 'snare', 'dance', 'moonfall'],
       2: ['pincer', 'flurry', 'knives', 'ambush', 'backstab', 'mirror', 'rain', 'cross', 'echo', 'stance', 'crescent', 'snare', 'dance', 'moonfall'],
