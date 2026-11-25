@@ -2,7 +2,7 @@
 
 A side-on boss rush for the browser: four heroes, seven three-phase bosses, played as a run of
 ever-harder trials. You pick a hero and a relic before the run and win a boon after each victory.
-Version 2.9d.
+Version 2.9e.
 
 This is an early slice of a planned boss-rush roguelite (short runs, a boon after each boss,
 bosses drawn from a pool). A run is seven trials, one for each boss, each harder than the last: the first boss
@@ -114,6 +114,29 @@ hero (`tools/feel-check.js`).
 - Settings, Reset progress erases Sunshards, upgrades, trophies and records (it has to be chosen twice).
 
 Not done: touch controls, a colour-blind alternative to red-orange warnings, gamepad rebinding.
+
+## Eos: the finisher fills the sheath (v2.9e)
+
+Asked: "eos should only need to hit with the 3rd hit of the combo to get a gold stack for his charge".
+
+- A string now puts one in the sheath when its **finisher** (the third cut, 27) lands. The first two cuts no
+  longer have to land.
+- A string whose finisher misses still puts nothing in, however much of the rest landed.
+- Everything else is as v2.9c: two in the sheath and it is full (traced in gold), and the next press is the draw
+  for 60, which empties it. A blow turned by Still Point fills it at once.
+- The Moves page, his hero-card line and Second Sun's text say "finisher".
+
+On a target that stands still nothing changes (every cut lands). Against a moving boss the sheath fills a little
+more often, as a string that opens on the air still counts.
+
+Checked in the preview:
+- Two cuts out of reach then a finisher that lands puts one in.
+- Two cuts that land then a finisher that misses puts none in.
+- Two landed finishers fill the sheath, and the draw hits for 60 and empties it.
+
+Playtest checklist:
+- Does filling the sheath feel fair now?
+- Does it fill too fast against bosses that move a lot?
 
 ## Capes, scarves and hair that hang (v2.9d)
 

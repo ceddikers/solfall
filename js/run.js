@@ -88,9 +88,9 @@
       ],
       down: 11, special: 'guard', specialName: 'Still Point', verb: 'guard',
       blurb: 'Patient and exact. One cut, when it counts.',
-      lines: ['Sheathed blade: land two whole strings to fill the sheath, then one press draws through the foe', 'The draw blinks him through the foe; dash to get out of the way', 'Still Point: turn a blow aside and the sheath is full'],
+      lines: ['Sheathed blade: land the finisher twice to fill the sheath, then one press draws through the foe', 'The draw blinks him through the foe; dash to get out of the way', 'Still Point: turn a blow aside and the sheath is full'],
       how: {
-        attack: 'Sheathed blade: cut (11), cut (13), finisher (27). Land all three cuts twice to fill the sheath (it glows gold). Then one press is the draw: he blinks through the foe for 60.',
+        attack: 'Sheathed blade: cut (11), cut (13), finisher (27). Land the finisher twice to fill the sheath (it glows gold). Then one press is the draw: he blinks through the foe for 60.',
         aim: 'The draw goes where you aim. Down in the air strikes below and bounces.',
         dash: 'The draw is a cut, not a dodge: it does not pass through attacks.',
         special: 'Still Point: brace for two thirds of a second. A blow that lands is turned, does no harm, and fills the sheath. If nothing lands, half the Starlight comes back.',
@@ -156,7 +156,7 @@
     { id: 'splitarrow', name: 'Splitting Arrow', tag: 'Signature', max: 1, heroes: ['lune'], desc: 'The heavy arrow splits into three where it first strikes.' },
     { id: 'glide', name: 'Moonglide', tag: 'Signature', max: 1, heroes: ['lune'], desc: 'Hold the attack in the air and you fall slowly while you fire.' },
     { id: 'hanging', name: 'Hanging Cut', tag: 'Signature', max: 1, heroes: ['eos'], desc: 'The cut of a draw hangs in the air, and a second later cuts again for half.' },
-    { id: 'secondsun', name: 'Second Sun', tag: 'Signature', max: 1, heroes: ['eos'], desc: 'A draw leaves one string in the sheath, so the next needs only one more.' },
+    { id: 'secondsun', name: 'Second Sun', tag: 'Signature', max: 1, heroes: ['eos'], desc: 'A draw leaves one in the sheath, so the next needs only one more finisher.' },
   ];
   // Sets (v2.3a): four kinds of boon, each leaving its own mark on the foe. A set boon fits one of five
   // slots (Strike, Special, Dash, Mend, and since v2.6c Jump), one boon to a slot: a new one for a full slot replaces the

@@ -35,7 +35,7 @@
     AIR_REACH: 1.25,              // a draw from the air carries this much further (what flies is further away)
     ARC_DMG: 40, ARC_SPEED: 1500, // the crescent of light (Second Light throws one when a blow is turned)
     BANK_HOLD: 0.17,              // (until v2.9a: how long the button stayed down after a press before the cuts that landed lit marks)
-    SHEATH_COMBOS: 2,             // (v2.9a) full strings (all three cuts landed) to fill the sheath
+    SHEATH_COMBOS: 2,             // (v2.9a) strings to fill the sheath (v2.9e: each one whose finisher lands)
     DRAW_DODGE: false,            // (v2.9c) the draw no longer passes through attacks: a full sheath is a cut kept ready, not a dodge kept ready
     GUARD_T: 0.65,                // how long Still Point waits for a blow (v2.1b: from 0.45; half its Starlight back if none comes)
     EDGE_T: 2.5,                  // how long a turned blow keeps all three marks lit without the button held
@@ -796,7 +796,7 @@
         if (res) {
           P.gain(a.heavy ? C.GAIN_HEAVY : C.GAIN_HIT);
           G.sets.hit(a.heavy ? 'finisher' : 'light', t, c.x, c.y);
-          if (a.flick && !a.banked) { a.banked = true; P.strung = Math.min(3, (P.strung || 0) + 1); if (P.strung === 3 && a.idx === 2) sheathUp(); } // Eos: (v2.9a) a string whose three cuts all landed fills the sheath
+          if (a.flick && !a.banked) { a.banked = true; P.strung = Math.min(3, (P.strung || 0) + 1); if (a.idx === 2) sheathUp(); } // Eos: (v2.9e) a string whose finisher lands puts one in the sheath
           if (a.heavy && !a.thrust && (G.boon('pinlance') || G.boon('stars'))) finisherLanded(t, c);
           // the freeze, the shake and the kick all scale with the blow; the maul's are heavier
           G.fx.stop((a.heavy ? 0.11 : a.thrust ? 0.06 : 0.032 * H.thick) + 0.07 * (a.charge || 0) + (a.sweep ? 0.02 : 0));
@@ -1003,8 +1003,8 @@
   P.focusMark = focusMark;
   const mouthX = () => P.x + P.facing * 9, mouthY = () => P.y - 31; // where the mouth of the sheath is, for light
 
-  // (v2.9c) Eos's attack button. A press is the next cut of the string; a string whose three cuts all land
-  // puts one in the sheath. With two in it (or a blow turned by Still Point) the sheath is full: the next
+  // (v2.9c) Eos's attack button. A press is the next cut of the string; a string whose finisher lands
+  // (v2.9e: the first two need not) puts one in the sheath. With two in it (or a blow turned by Still Point) the sheath is full: the next
   // press is the full draw, at once, and empties it. Nothing is held for any more.
   function stance(dt, ctl, mx, up, down, free) {
     if (!ctl || P.stun > 0) { P.hold = null; P.focus = 0; P.edge = 0; return; }
