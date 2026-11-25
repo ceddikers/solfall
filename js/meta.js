@@ -1,12 +1,16 @@
 // Solfall - what lasts between runs: Sunshards, the Shrine's permanent upgrades, and the trophy
-// relics that the first victory over each boss adds to the relic pool. Kept in the browser's storage.
+// relics won from bosses (v2.6b: only from the boss beaten as trial VI, at its strongest). Kept in the
+// browser's storage.
 'use strict';
 (function () {
   const M = G.meta = Object.assign({ shards: 0, earned: 0, up: {}, kills: {}, runs: 0, best: {}, feats: {}, toys: {} }, G.store.load('meta', {}));
-  const save = () => G.store.save('meta', { shards: M.shards, earned: M.earned, up: M.up, kills: M.kills, runs: M.runs, best: M.best, feats: M.feats, toys: M.toys });
+  // the trophies won (boss id: true). Before v2.6b a trophy came with the first victory over its boss;
+  // a save from then keeps every trophy it had (they are copied from its victories once).
+  if (!M.trophy) { M.trophy = {}; for (const id in M.kills) if (M.kills[id]) M.trophy[id] = true; }
+  const save = () => G.store.save('meta', { shards: M.shards, earned: M.earned, up: M.up, kills: M.kills, trophy: M.trophy, runs: M.runs, best: M.best, feats: M.feats, toys: M.toys });
   // Erase everything that lasts between runs (Settings, Reset progress).
   M.reset = function () {
-    M.shards = 0; M.earned = 0; M.up = {}; M.kills = {}; M.runs = 0; M.best = {}; M.feats = {}; M.toys = {};
+    M.shards = 0; M.earned = 0; M.up = {}; M.kills = {}; M.trophy = {}; M.runs = 0; M.best = {}; M.feats = {}; M.toys = {};
     save(); G.store.save('best', {}); G.store.save('depth', {});
   };
   // Fastest first-trial win against a boss on the current difficulty, in seconds (or undefined).
@@ -51,8 +55,12 @@
   ];
   for (const t of TROPHIES) { G.RELICS.push(t); }
   G.TROPHIES = TROPHIES;
-  M.unlocked = (r) => !r.boss || !!M.kills[r.boss];
-  M.trophies = () => TROPHIES.filter((t) => M.kills[t.boss]).length;
+  M.unlocked = (r) => !r.boss || !!M.trophy[r.boss];
+  M.trophies = () => TROPHIES.filter((t) => M.trophy[t.boss]).length;
+  // (v2.6b) A boss's trophy is won by beating it as the run's last trial before the final door (trial
+  // VI, where it is at its strongest), not by beating it once anywhere: a full run wins one trophy, not
+  // all of them. Not from a corrupted portal (not a trial). The Champion's is his own: beat his duel.
+  M.trophyHere = (bossId) => bossId === 'champion' || (!G.run.corrupt && G.run.trial >= G.RUN_FIGHTS);
 
   // ------------------------------------------------------------------ Sunshards
   // Tests and god mode earn nothing (G.debug.meta = true forces it, for checking this file).
@@ -79,8 +87,11 @@
     n *= scale();
     if (!M.kills[bossId]) {
       out.first = true; n += 25;
-      out.relic = TROPHIES.find((t) => t.boss === bossId) || null;
       out.lines.push('First victory over ' + G.bosses[bossId].short + ' +25');
+    }
+    if (!M.trophy[bossId] && M.trophyHere(bossId)) {
+      const tr = TROPHIES.find((t) => t.boss === bossId);
+      if (tr) { M.trophy[bossId] = true; out.relic = tr; }
     }
     // the Champion's own gift, on top (not scaled): more the first time
     if (bossId === 'champion') { const g = out.first ? 60 : 30; n += g; out.lines.push('His gift +' + g); }

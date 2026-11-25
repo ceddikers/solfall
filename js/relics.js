@@ -18,7 +18,7 @@
 
   // What each stage adds, as the cards say it. Stages build on each other.
   RL.AWAKE = {
-    chalice: ['Mending takes a quarter less time.', 'When mending ends, a wave of light strikes a foe close by for 40.', 'Mending restores 3, and the wave crosses the whole arena for 60.'],
+    chalice: ['Mending takes a quarter less time.', 'Mending takes half the time, and a mend bursts into light around you: 40 to a foe caught in it.', 'The burst reaches further and hits for 60.'],
     shard: ['Finishers deal 75% more.', 'A finisher that lands calls a comet onto the foe a moment later, for 20.', 'Finishers deal double, and the comet strikes for 45.'],
     moons: ['Starlight fills 20% faster.', 'A second extra segment of Starlight.', 'While your Starlight is full, everything you do deals 25% more.'],
     crown: ['All damage +50%.', 'It costs only one health.', 'All damage +65%, and every 25th blow you land without being struck mends one health.'],
@@ -135,8 +135,8 @@
   RL.moonSegs = () => (G.relic('moons') ? (lv('moons') >= 2 ? 2 : 1) : 0);
   RL.airDashes = () => (lv('cloak') >= 3 ? 1 : 0) + (lv('quicksilver') >= 2 ? 1 : 0);
   RL.runK = () => (G.relic('cloak') ? by('cloak', [1.12, 1.18, 1.18, 1.18]) : 1);
-  RL.mendTimeK = () => (lv('chalice') >= 1 ? 0.75 : 1);
-  RL.mendHp = () => (G.relic('chalice') ? (lv('chalice') >= 3 ? 3 : 2) : 1);
+  RL.mendTimeK = () => (lv('chalice') >= 2 ? 0.5 : lv('chalice') >= 1 ? 0.75 : 1);
+  RL.mendHp = () => (G.relic('chalice') ? 2 : 1);
   RL.dashCdK = () => (G.relic('pelt') ? by('pelt', [0.8, 0.7, 0.7, 0.7]) : 1) * (lv('cloak') >= 2 ? 0.75 : 1);
   RL.gainK = () => (G.relic('pearl') ? by('pearl', [1.25, 1.4, 1.4, 1.4]) : 1) * (lv('moons') >= 1 ? 1.2 : 1)
     * (lv('eye') >= 3 && G.boss && G.boss.staggered ? 2 : 1);
@@ -171,10 +171,21 @@
   // the moments
   RL.mended = function () {
     if (!fighting() || lv('chalice') < 2) return;
-    const P = G.player, t = main(), far = lv('chalice') >= 3, c = RL.col('chalice');
-    F.ring(P.x, P.y - 30, { r0: 20, r1: far ? 520 : 320, life: 0.5, color: c, width: 6 });
-    if (t && (far || Math.abs(t.cx - P.x) < 320)) strike(far ? 60 : 40, c, { sound: 'flare' });
+    // (v2.6b) the mend bursts out around the hero: a medium blast, Awakened; wider and harder, Ascendant
+    const P = G.player, t = main(), big = lv('chalice') >= 3, c = RL.col('chalice');
+    const rad = big ? CHALICE_R[1] : CHALICE_R[0], x = P.x, y = P.y - 30;
+    F.ring(x, y, { r0: 20, r1: rad, life: 0.4, color: c, width: big ? 8 : 6 });
+    F.ring(x, y, { r0: 10, r1: rad * 0.6, life: 0.3, color: '255,236,220', width: 3 });
+    F.burst(x, y, { n: big ? 30 : 20, color: c, speed: [rad * 1.2, rad * 2.6], life: [0.2, 0.45], kind: 'spark', size: [2, 4] });
+    F.shake(big ? 6 : 4);
+    G.audio.play('flare');
+    if (!t) return;
+    // how far the foe's body is from the middle of the blast (its edge, not its centre)
+    const gap = t.r != null ? Math.hypot(t.cx - x, t.cy - y) - t.r
+      : Math.hypot(Math.max(0, Math.abs(t.cx - x) - (t.hw || 0)), Math.max(0, Math.abs(t.cy - y) - (t.hh || 0)));
+    if (gap <= rad) strike(big ? 60 : 40, c, { sound: 'boom' });
   };
+  const CHALICE_R = [220, 300]; // the blast's reach, Awakened and Ascendant
   // a blow landed (sets.js S.hit: 'light', 'finisher', or 'special' once a cast)
   RL.hit = function (kind) {
     if (!fighting()) return;

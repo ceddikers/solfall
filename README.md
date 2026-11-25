@@ -2,7 +2,7 @@
 
 A side-on boss rush for the browser: four heroes, seven three-phase bosses, played as a run of
 ever-harder trials. You pick a hero and a relic before the run and win a boon after each victory.
-Version 2.6a.
+Version 2.6b.
 
 This is an early slice of a planned boss-rush roguelite (short runs, a boon after each boss,
 bosses drawn from a pool). A run meets the four bosses in a shuffled order, then meets them again, harder.
@@ -114,6 +114,29 @@ hero (`tools/feel-check.js`).
 
 Not done: touch controls, a colour-blind alternative to red-orange warnings, gamepad rebinding.
 
+## The Chalice retuned, and trophies won at trial VI (v2.6b)
+
+**Trophies.** Asked: "if you complete a full run then you get all the trophies, so what im thinking is whichever
+boss you beat last before the final boss gives you their trophy as you beat them at their strongest form". A
+boss's trophy relic is now won only by beating it as trial VI (the last before the final door, where it is
+hardest), so a full run wins one trophy, not six. A first win anywhere still pays its +25 Sunshards. A corrupted
+portal never gives one (it is not a trial), and Aurel's Offered Hilt is still won from his duel. A save from
+before keeps every trophy it already had. The Shrine's trophy line and the help page say the new rule.
+Checked: wins at trials III and V gave none, trial VI gave its boss's, a corrupted rematch at VI gave none.
+
+
+Asked: "mending restores 3 might be a bit much for chalice", with a new order. Kindled: mending takes a quarter
+less time. Awakened: mending takes half the time, and a finished mend bursts into light around the hero (a
+medium blast, reaching a foe whose body is within about 240 px of the hero's middle) for 40. Ascendant: the
+burst is wider (about 320 px) and hits for 60. Mending still restores 2, as the relic always did; it no longer
+goes up to 3. Checked in a fight at every stage: mend times 0.85, 0.64, 0.43 and 0.43 s, 2 health each time,
+the burst landing up close and missing past its reach.
+
+Playtest checklist:
+- With the Chalice Awakened, mend next to the boss: a quick mend, a ring of light, 40 on the boss.
+- Does the burst feel worth standing close for, and is half-time mending too safe?
+- Win a run: the victory after trial VI names that boss's trophy; the earlier ones name none.
+
 ## Relics that awaken, and five new ones (v2.6a)
 
 Asked: expand relics and boons before the final boss. Of the ideas pitched, this build does the first two: "an
@@ -134,7 +157,7 @@ Until the final (seventh) fight exists the run ends after trial VI, so Ascendant
 
 | Relic | Kindled (after II) | Awakened (after IV) | Ascendant (after VI) |
 |---|---|---|---|
-| Ember Chalice | mending a quarter quicker | mending ends in a wave: 40 to a foe close by | restores 3; the wave crosses the arena for 60 |
+| Ember Chalice | mending a quarter quicker | mending takes half the time; a mend bursts around you (about 240 px): 40 | the burst reaches about 320 px and hits for 60 |
 | Comet Shard | finishers +75% | a landed finisher calls a comet for 20 | finishers double; comet 45 |
 | Twin Moons | Starlight fills 20% faster | a second extra segment | full Starlight: +25% to everything |
 | Thorn Crown | +50% | costs one health, not two | +65%; every 25th blow unstruck mends one |

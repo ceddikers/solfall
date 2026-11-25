@@ -228,9 +228,9 @@
       row.classList.toggle('max', cost == null);
       row.classList.toggle('poor', cost != null && M.shards < cost);
     });
-    const got = G.TROPHIES.filter((t) => M.kills[t.boss]);
+    const got = G.TROPHIES.filter((t) => M.trophy[t.boss]);
     el.shrineTrophies.textContent = 'Trophy relics ' + got.length + ' of ' + G.TROPHIES.length
-      + (got.length ? ': ' + got.map((t) => t.name).join(', ') + '.' : '. The first victory over each boss adds its relic to those you can be offered.');
+      + (got.length ? ': ' + got.map((t) => t.name).join(', ') + '.' : '. Beat a boss as your sixth trial, at its strongest, and its relic joins those you can be offered.');
   };
   U.showShrine = function () { U.fillShrine(); U.show('shrine', true); };
   // ---- the Cleansing Fountain (rest.js): one row for each corrupted boon whose bane you still carry
@@ -341,7 +341,7 @@
       ['Cleansing Fountain', 'At the crossroads. Spend Sunshards to purge a corrupted boon\u2019s drawback and keep the rest of it. Each use in a run costs twice the last.'],
       ['Grade', 'S, A, B or C for a victory. Every blow you take lowers it, and so does a fight that runs past two and a half minutes; perfect dodges raise it. A better grade pays more.'],
       ['Sunshards', 'What every fight pays, win or lose. They are kept between runs and spent at the Shrine.'],
-      ['Trophy', 'The first victory over each boss adds its relic to those the reliquary can offer.'],
+      ['Trophy', 'The boss you beat as your sixth trial, at its strongest, adds its relic to those the reliquary can offer. One a run.'],
       ['Feat', 'One of eighteen things worth doing once, each paying Sunshards. The Tally stone in the Vigil lists them.'],
     ] },
     { name: 'The Vigil', lead: 'Your camp, from left to right.', words: [
