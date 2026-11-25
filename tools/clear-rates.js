@@ -6,7 +6,7 @@
 // maxT (seconds of fight before it counts as a stalemate), boons (true: trial n starts with n - 1
 // random boons and a random relic, as a real run would have; false: bare hero), god (true: the hero
 // cannot be hurt, so the time to win measures damage alone), draws (false: Eos only taps his string,
-// never holds for a draw).
+// never holds for a draw), relic (v2.9f: the relic every fight carries, at the stage awake gives; null for none).
 // (v2.6c) build: 'duo' gives every fight a crown + duo build instead (three set boons of one set and
 // two of another, in shuffled slots, turning through all six duos and which set is the crown), a
 // random relic at stage awake (0..3, default 3; with the ordinary boons, awake sets the relic's stage too), and the bosses before it as beaten; the Champion (name him in
@@ -392,6 +392,7 @@
         R.lastOmens = [];
       }
     }
+    if (job.relic !== undefined) R.relic = job.relic || null; // (v2.9f: a relic chosen for the test, or none)
     if (job.awake != null && job.build !== 'duo') R.awake = job.awake; // (the relic's stage, if asked for)
     R.trial = job.trial; R.current = job.boss;
     // (v2.6f) the Champion as he is met: his duel is fought clean (no omens), and his doorway opens only on
@@ -473,7 +474,7 @@
       // interleaved, so a partial run already covers every cell a little
       for (let r = 0; r < runs; r++) for (const boss of bosses) for (const [hi, hero] of heroes.entries()) for (const trial of trials)
         queue.push({ boss, hero, trial, diff: o.difficulty == null ? 1 : o.difficulty, maxT: o.maxT || 420, boons: o.boons !== false, god: !!o.god, draws: o.draws !== false, champMax: !!o.champMax,
-          build: o.build, awake: o.awake, duo: r, flip: (r + hi) % 2 === 1 });
+          build: o.build, awake: o.awake, relic: o.relic, duo: r, flip: (r + hi) % 2 === 1 });
       CLEAR.total = queue.length;
       running = true; started = performance.now();
       ch.port2.postMessage(0);

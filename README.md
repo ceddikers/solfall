@@ -2,7 +2,7 @@
 
 A side-on boss rush for the browser: four heroes, seven three-phase bosses, played as a run of
 ever-harder trials. You pick a hero and a relic before the run and win a boon after each victory.
-Version 2.9e.
+Version 2.9f.
 
 This is an early slice of a planned boss-rush roguelite (short runs, a boon after each boss,
 bosses drawn from a pool). A run is seven trials, one for each boss, each harder than the last: the first boss
@@ -114,6 +114,41 @@ hero (`tools/feel-check.js`).
 - Settings, Reset progress erases Sunshards, upgrades, trophies and records (it has to be chosen twice).
 
 Not done: touch controls, a colour-blind alternative to red-orange warnings, gamepad rebinding.
+
+## Thorn Crown toned down (v2.9f)
+
+Asked: "the 40% dmg increase relic feels busted lol", then "i think start at 15 and build to 40 tbh".
+
+**Why it was.** Thorn Crown was the only relic whose bonus is always on: every other damage relic pays only in a
+moment (finishers, a staggered boss, your last health). As it awakened it also grew stronger while its cost
+shrank. It went to +50%, then cost only 1 health at Awakened, then +65% with healing at Ascendant.
+
+| Stage | Before | Now |
+| --- | --- | --- |
+| Base | +40%, 2 less health | **+15%**, 2 less health |
+| Kindled (2 wins) | +50% | **+25%** |
+| Awakened (4 wins) | costs only 1 health | **+30%** (the cost stays at 2) |
+| Ascendant (7 wins) | +65%, and every 25th blow landed without being struck mends 1 | **+40%**, and the same mend |
+
+**Measured** with the scripted player. It can now be handed a relic and its stage (a new `relic` option in
+`tools/clear-rates.js`). Trial V, no boons, Vesper and Aster against the Knight, Wolf, Warden, Kairo and Assassin,
+40 fights each. With 40 fights the win rates move by about 8 points either way, so the win time is the steadier
+number.
+
+| Relic | Won | Average win time |
+| --- | --- | --- |
+| None | 45% | 128 s |
+| Thorn Crown, base, before / now | 58% / 50% | 83 / 101 s |
+| Thorn Crown, Awakened, before / now | 78% / 60% | 81 / 96 s |
+| Thorn Crown, Ascendant, before / now | 78% / 65% | 68 / 88 s |
+| Comet Shard, Awakened | 78% | 86 s |
+| Sunstone, Awakened | 70% | 108 s |
+
+It now starts as a small edge and grows into a strong one by the end of a run, without ever losing its cost.
+
+Playtest checklist:
+- Is +15% at the start enough to make 2 less health worth it?
+- Does any other relic now feel like the one you always pick?
 
 ## Eos: the finisher fills the sheath (v2.9e)
 

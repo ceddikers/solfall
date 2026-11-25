@@ -108,7 +108,7 @@
     { id: 'chalice', name: 'Ember Chalice', desc: 'Mending restores 2 health instead of 1.' },
     { id: 'shard', name: 'Comet Shard', desc: 'Finishers deal 50% more damage.' },
     { id: 'moons', name: 'Twin Moons', desc: 'One more Starlight segment, and every trial starts with Starlight full.' },
-    { id: 'crown', name: 'Thorn Crown', desc: 'All damage +40%, but 2 less health.' },
+    { id: 'crown', name: 'Thorn Crown', desc: 'All damage +15%, but 2 less health.' },
     { id: 'ward', name: 'Wardstone', desc: 'The first hit you take in each phase of a fight is blocked.' },
     { id: 'cloak', name: 'Feather Cloak', desc: 'One more jump in the air, and you move 12% faster.' },
     { id: 'storm', name: 'Stormcaller', desc: 'Every fifth hit calls lightning onto the target for 30 damage.' },

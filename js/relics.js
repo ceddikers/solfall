@@ -21,7 +21,7 @@
     chalice: ['Mending takes a quarter less time.', 'Mending takes half the time, and a mend bursts into light around you: 40 to a foe caught in it.', 'The burst reaches further and hits for 60.'],
     shard: ['Finishers deal 75% more.', 'A finisher that lands calls a comet onto the foe a moment later, for 20.', 'Finishers deal double, and the comet strikes for 45.'],
     moons: ['Starlight fills 20% faster.', 'A second extra segment of Starlight.', 'While your Starlight is full, everything you do deals 25% more.'],
-    crown: ['All damage +50%.', 'It costs only one health.', 'All damage +65%, and every 25th blow you land without being struck mends one health.'],
+    crown: ['All damage +25%.', 'All damage +30%.', 'All damage +40%, and every 25th blow you land without being struck mends one health.'], // (v2.9f: from 40/50/50/65, and the cost stays at two)
     ward: ['A broken ward grows back after 20 seconds.', 'A ward that breaks strikes the foe for 40.', 'It grows back after 10 seconds.'],
     cloak: ['You move 18% faster.', 'Dashes recover a quarter faster.', 'One more dash in the air.'],
     storm: ['The lightning comes every fourth hit.', 'It strikes for 45 and staggers twice as hard.', 'Every third hit, and a perfect dodge calls it too.'],
@@ -130,7 +130,7 @@
   }
 
   // ------------------------------------------------------------------ asked of by the hero (player.js)
-  RL.crownCost = () => (G.relic('crown') ? (lv('crown') >= 2 ? 1 : 2) : 0);
+  RL.crownCost = () => (G.relic('crown') ? 2 : 0); // (v2.9f: it no longer drops to one when Awakened)
   RL.pearlHp = () => (G.relic('pearl') ? (lv('pearl') >= 2 ? 2 : 1) : 0);
   RL.moonSegs = () => (G.relic('moons') ? (lv('moons') >= 2 ? 2 : 1) : 0);
   RL.airDashes = () => (lv('cloak') >= 3 ? 1 : 0) + (lv('quicksilver') >= 2 ? 1 : 0);
@@ -156,7 +156,7 @@
     const P = G.player;
     if (!P) return 1;
     let k = 1;
-    if (G.relic('crown')) k *= by('crown', [1.4, 1.5, 1.5, 1.65]);
+    if (G.relic('crown')) k *= by('crown', [1.15, 1.25, 1.3, 1.4]);
     if (G.relic('shroud') && P.shroudT > 0) k *= lv('shroud') >= 2 ? 1.7 : 1.5;
     if (G.relic('oath') && P.hp > 0 && (P.hp === 1 || (lv('oath') >= 2 && P.hp === 2))) k *= by('oath', [1.5, 1.7, 1.7, 2]);
     if (G.relic('wraps') && P.wrapsHit > 0) k *= by('wraps', [1.5, 1.75, 1.75, 2]);
