@@ -706,10 +706,11 @@
   // Keep moving: a hero still on that spot is cut; one who has moved on is not.
   // The channel cannot be broken: it can be struck all the while, but no blow stops it, and a stagger
   // waits until it is done (B.steadfast). Then it is spent, and slow to rise.
-  //   II: four, and they come before the last has gone; one of them out of the air
-  //   III: two at once from either side, one out of the air, and the last is the Veil itself: the
+  //   I: five, each on the heels of the last
+  //   II: seven, two of them out of the air
+  //   III: eight: twice two at once from either side, twice out of the air, and the last is the Veil itself: the
   //        kneeling figure goes to smoke, and it is the one that comes, and stays, open
-  const ECHO_LOCK = 0.15, ECHO_FADE = 0.22, ECHO_SPEED = 1300;
+  const ECHO_LOCK = 0.15, ECHO_FADE = 0.16, ECHO_SPEED = 1550;
   function shadeSpot(P, side, used) {
     for (let i = 0; i < 10; i++) {
       const x = G.clamp(P.x + side * G.rrand(230, 380), WL + 50, WR - 50);
@@ -785,16 +786,17 @@
     appear(P.x < 640 ? WR - 110 : WL + 110, FLOOR, 'kneel');
     b.face = P.x > b.x ? 1 : -1;
     B.steadfast = true;
-    const prep = 0.5 * T, gap = [0, 0.85, 0.62, 0.58][ph] * T;
+    // (v2.5b: more of them and quicker, one on the heels of the last: I five, II seven, III eight)
+    const prep = 0.44 * T, gap = [0, 0.5, 0.4, 0.36][ph] * T;
     // what comes, and when (from the start of the channel)
     const plan = [];
-    if (ph === 1) for (let i = 0; i < 3; i++) plan.push({ at: 0.35 + i * gap, kind: 'cut' });
-    else if (ph === 2) for (let i = 0; i < 4; i++) plan.push({ at: 0.35 + i * gap, kind: i === 2 ? 'air' : 'cut' });
+    if (ph === 1) for (let i = 0; i < 5; i++) plan.push({ at: 0.3 + i * gap, kind: 'cut' });
+    else if (ph === 2) for (let i = 0; i < 7; i++) plan.push({ at: 0.3 + i * gap, kind: i === 2 || i === 5 ? 'air' : 'cut' });
     else {
-      plan.push({ at: 0.35, kind: 'cut' });
-      plan.push({ at: 0.35 + gap, kind: 'pair' });
-      plan.push({ at: 0.35 + gap * 2.2, kind: 'air' });
-      plan.push({ at: 0.35 + gap * 3.3, kind: 'real' });
+      const seq = ['cut', 'cut', 'pair', 'air', 'cut', 'pair', 'air'];
+      let at = 0.3;
+      for (const kind of seq) { plan.push({ at, kind }); at += gap * (kind === 'pair' ? 1.5 : 1); }
+      plan.push({ at: at + gap * 0.6, kind: 'real' });
     }
     const end = plan[plan.length - 1].at + prep + 0.6;
     G.audio.play('veilchannel', { dur: end });
@@ -812,7 +814,7 @@
         }
       }
       while (next < plan.length && e >= plan[next].at) {
-        const s = plan[next++], live = used.slice(-3);
+        const s = plan[next++], live = used.slice(-4);
         if (s.kind === 'cut' || s.kind === 'air') {
           const x = shadeSpot(P, side, live), y = s.kind === 'air' ? FLOOR - G.rrand(150, 210) : FLOOR;
           used.push(x); side = -side;

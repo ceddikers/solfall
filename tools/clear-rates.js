@@ -374,7 +374,7 @@
         if (G.state === 'won' || B.dead || B.dying) { won = true; break; }
         if (G.state === 'dead' || P.dead) { lost = true; break; }
       }
-    } catch (e) { errors.push(job.boss + '/' + job.hero + '/T' + job.trial + ': ' + e.message); lost = true; }
+    } catch (e) { errors.push(job.boss + '/' + job.hero + '/T' + job.trial + ': ' + e.message); CLEAR.stacks = (CLEAR.stacks || []).concat([String(e.stack).slice(0, 700)]); lost = true; }
     P.tryHit = realHit;
     const killer = lost ? Object.keys(cause).sort((a, b2) => cause[b2] - cause[a])[0] : '';
     return {

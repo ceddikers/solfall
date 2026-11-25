@@ -18,6 +18,8 @@
   const WL = G.WALL_L, WR = G.WALL_R;
   const GOLD = '214,186,128';                          // his own faded gold
   const VOID = { boss: '235,30,80', hot: '255,214,226' }; // what the seventh door keeps
+  const DAWN_GOLD = '255,190,40';                       // the Black Dawn's press window
+  const RING_IN = 34;                                   // the meeting ring the closing ring lands on
   const WPN = ['sword', 'maul', 'bow', 'blade'];
   const WHERO = { sword: 'vesper', maul: 'aster', bow: 'lune', blade: 'eos' };
   const heroOf = (w) => G.HEROES.find((h) => h.id === WHERO[w]) || G.HEROES[0];
@@ -214,6 +216,7 @@
     // moving and scenes
     dashLow: [0.5, -34, 20, 0, -28, -5, 30, -50, 0, -50, 0, 0.2],
     leap: [0.3, -50, 16, -20, -18, -12, 30, -70, 10, -70, 0, -0.9],
+    tuck: [0.5, -50, 14, -30, -8, -26, 20, -56, 8, -54, 0.2, 0.6],          // (v2.5b) knees in, through a flip
     land: [0.22, -33, 21, 0, -21, 0, 24, -46, 4, -44, 0.05, 0.6],
     kneel: [0.44, -22, 20, 0, -18, -1, 24, -8, 6, -40, 0.3, 1.45],
     sit: [0.06, -24, 22, -2, 15, 0, 15, -36, 8, -34, 0.28, 1.3],
@@ -232,7 +235,8 @@
   const SNAP = { cutDown: 1, cutUp: 1, thrust: 1, rise: 1, sweep: 1, smash: 1, drawn: 1, throwP: 1, push: 1, beam: 1, dashLow: 1 };
   function walkPose(t) {
     const s = Math.sin(t), c = Math.cos(t), w = B.body.wpn;
-    return [0.12, -41 + Math.abs(c) * 1.5, 13 + s * 15, -Math.max(0, c) * 6, -13 - s * 15, -Math.max(0, -c) * 6, 19 + c * 3, -56, 6 - c * 3, -55, 0, w === 'maul' ? -1.2 : 0.5];
+    // (the hips ride highest as the legs pass, lowest as they reach: v2.5b, it was the other way round)
+    return [0.12, -40.5 - Math.abs(c) * 1.8, 13 + s * 14, -Math.max(0, c) * 6, -13 - s * 15, -Math.max(0, -c) * 6, 19 + c * 3, -56, 6 - c * 3, -55, 0, w === 'maul' ? -1.2 : 0.5];
   }
 
   // ------------------------------------------------------------------ the standing stones
@@ -291,7 +295,12 @@
       x: b.x + f * 6, y: b.y + ay, r: o.r || 112, a0: m(o.a0), a1: m(o.a1),
       tele: o.tele, active: o.active || 0.1, fade: 0.14, owner: b, dmg: o.dmg || 1, heavy: !!o.heavy,
       tint: o.tint || (b.wpn ? tintOf(b.wpn) : { boss: GOLD, hot: '255,248,230' }),
-      follow(h) { if (!h.fired) { h.x = b.x + b.face * 6; h.y = b.y + ay; } },
+      follow(h) {
+        if (h.fired) return;
+        h.x = b.x + b.face * 6; h.y = b.y + ay;
+        // (v2.5b: the blade starts down a few frames early, so it sweeps with the drawn cut, not after it)
+        if (h.t >= h.tele - 0.05 && o.pose) { b.fast = true; b.pose = o.pose; }
+      },
       onFire() {
         b.fast = true; b.pose = o.pose;
         G.audio.play(o.heavy || b.wpn === 'maul' ? 'slash3' : 'slash');
@@ -324,16 +333,26 @@
   }
   function* hopBack(dist, hgt) {
     const b = B.body, x0 = b.x, x1 = clampX(b.x - b.face * dist), dur = 0.3 + dist / 1400;
+    // (v2.5b) a dip before he goes, and a long leap back is a back flip
+    b.pose = 'land';
+    yield* wait(0.06);
+    const flip = Math.abs(x1 - x0) >= 140 && (hgt || 46) >= 60;
     b.pose = 'leap'; b.air = true; G.audio.play('jump');
+    G.fx.dust(b.x, FLOOR, 2, { dir: b.face, speed: [40, 140], size: [4, 8], up: 18 });
     let e = 0;
-    while (e < dur) { const dt = yield; e += dt; const k = Math.min(1, e / dur); b.x = G.lerp(x0, x1, E.outQuad(k)); b.y = FLOOR - (hgt || 46) * Math.sin(Math.PI * k); }
+    while (e < dur) {
+      const dt = yield; e += dt; const k = Math.min(1, e / dur);
+      b.x = G.lerp(x0, x1, E.outQuad(k)); b.y = FLOOR - (hgt || 46) * Math.sin(Math.PI * k);
+      if (flip) { b.rot = -G.TAU * E.inOutQuad(Math.min(1, k * 1.15)); b.pose = k > 0.12 && k < 0.8 ? 'tuck' : 'leap'; if (Math.random() < dt * 30) afterimage(0.16); }
+    }
+    b.rot = 0;
     b.y = FLOOR; b.air = false; b.pose = 'land';
     G.fx.dust(b.x, FLOOR, 3, { speed: [30, 130], size: [5, 9], up: 24 });
     G.audio.play('land');
   }
   function afterimage(life, shade) {
     const b = B.body;
-    B.ghosts.push({ x: b.x, y: b.y, face: b.face, p: b.p.slice(), wpn: b.wpn, t: 0, life: life || 0.3, marks: b.marks, pull: b.pull, shade: !!shade, corruptK: b.corruptK });
+    B.ghosts.push({ x: b.x, y: b.y, face: b.face, p: b.p.slice(), wpn: b.wpn, t: 0, life: life || 0.3, marks: b.marks, pull: b.pull, shade: !!shade, corruptK: b.corruptK, rot: b.rot || 0 });
   }
   // the hero went through to his back
   const behindNow = () => (G.player.x - B.body.x) * B.body.face < -10;
@@ -357,7 +376,7 @@
     B.rackK = { sword: 0, maul: 0, bow: 0, blade: 0 }; B.rackT = { sword: 0, maul: 0, bow: 0, blade: 0 };
     B.ghosts = []; B.bolts = []; B.boltT = 0; B.shades = [];
     B.darkK = 0; B.voidK = 0; B.crackK = 0; B.reveal = 0; B.loose = null; B.guardOn = false; B.guardHit = false;
-    B.mending = false; B.mended = {}; B.strings = 0; B.feinted = false; B.feintT = 0; B.hits0 = 0; B.feintHit = false; B.cutLine = null; B.flashIn = null; b.dual = false; b.orb = 0; b.twang = 0; b.aim = 0; B.bd = null; B.vig = null; B.threads = [];
+    B.mending = false; B.mended = {}; B.strings = 0; B.feinted = false; B.feintT = 0; B.hits0 = 0; B.feintHit = false; B.cutLine = null; B.flashIn = null; b.dual = false; b.orb = 0; b.twang = 0; b.aim = 0; B.bd = null; B.vig = null; B.threads = []; B.trail = []; b.rot = 0;
     B.beaten = runBeaten();
     B.stones = G.BOSS_IDS.map((id, i) => ({ id, x: STONE_X[i % STONE_X.length], h: STONE_H[i % STONE_H.length], lit: 0, flare: 0, on: false }));
     // the bags: the duel, then the duel and a move for each boss beaten this run
@@ -381,7 +400,7 @@
   B.onInterrupt = function () {
     const P = G.player;
     if (P.grabbed) { P.grabbed = null; P.vy = -200; }
-    B.bd = null; B.guardOn = false; B.mending = false;
+    B.bd = null; B.guardOn = false; B.mending = false; B.body.rot = 0;
     for (const s of B.shades) s.dead = true;
     dark();
     G.fx.cine.to = 0;
@@ -459,7 +478,7 @@
   B.vuln = () => (B.loose ? 1.15 : 1); // disarmed, he takes a little more
   B.dying0 = function () {
     const b = B.body;
-    b.hurt = false; b.charge = 0; b.marks = 0; b.pull = 0; B.guardOn = false; B.mending = false; B.bd = null; dark();
+    b.hurt = false; b.charge = 0; b.marks = 0; b.pull = 0; b.rot = 0; B.guardOn = false; B.mending = false; B.bd = null; dark();
     for (const s of B.shades) s.dead = true;
   };
   B.choose = function () {
@@ -713,8 +732,14 @@
     facePlayer();
     b.pose = 'riseC';
     cut({ a0: 0.4, a1: -2.3, r: 190, y: -40, tele: 0.3 * T, pose: 'rise', onFire() { G.fx.lines(b.x, b.y - 120, 8, heroOf('sword').hot, { r0: 20, speed: [500, 900] }); } });
-    yield* wait(0.3 * T + 0.12);
-    yield* wait(0.28);
+    yield* wait(0.3 * T);
+    // (v2.5b) the cut carries him up off the floor with it, and he drops back down
+    b.air = true;
+    G.fx.dust(b.x, FLOOR, 3, { speed: [60, 200], size: [5, 9], up: 30 });
+    let e = 0;
+    while (e < 0.4) { const dt = yield; e += dt; const k = Math.min(1, e / 0.4); b.y = FLOOR - 74 * Math.sin(Math.PI * Math.pow(k, 0.8)); }
+    b.y = FLOOR; b.air = false; b.pose = 'land';
+    G.fx.dust(b.x, FLOOR, 3, { speed: [30, 130], size: [5, 9], up: 20 }); G.audio.play('land');
   }
   function* atkLunge() {
     const P = G.player;
@@ -1077,7 +1102,7 @@
     const win = K.hard() ? 0.1 : K.gentle() ? 0.18 : 0.14;
     for (let i = 0; i < 3 && !P.dead; i++) {
       const run = 0.8 - 0.1 * i, len = Math.abs(bd.front - bd.from);
-      bd.flash = { t: 0, run, done: false, won: false };
+      bd.flash = { t: 0, run, win, done: false, won: false };
       bd.n = i + 1;
       AU.play('chBeat', { k: 0 });
       // a full Dawnbreak meter takes the first flash by itself
@@ -1363,7 +1388,7 @@
     }
     // the pose: each part on a spring, snappier for blows
     const target = b.pose === 'walk' ? walkPose(b.walkT) : (POSES[b.pose] || POSES.idle);
-    const w0 = b.fast || SNAP[b.pose] ? 46 : 18, z = b.fast ? 0.62 : 0.8;
+    const w0 = b.fast || SNAP[b.pose] ? 46 : 18, z = b.fast ? 0.8 : 0.9; // (v2.5b: firmer, so a blow lands and holds instead of wobbling past)
     for (let i = 0; i < NP; i++) {
       b.pv[i] += ((target[i] - b.p[i]) * w0 * w0 - 2 * z * w0 * b.pv[i]) * dt;
       b.p[i] += b.pv[i] * dt;
@@ -1377,6 +1402,9 @@
       D.chainStep(B.cloak[i], sh.x - b.face * (6 + i * 4), sh.y + 2 + i * 2, dt, { seg: 9 - i, grav: b.air ? 30 : 120, drift: 24 + (b.fast ? 60 : 0), face: b.face, wave: 7, rate: 4 + i, floor: FLOOR - 2 });
     }
     b.twang = Math.max(0, (b.twang || 0) - dt * 3);
+    // (v2.5b) the weapon's trail: a ribbon from the last few frames of a fast blow
+    for (let i = B.trail.length - 1; i >= 0; i--) { B.trail[i].t += dt; if (B.trail[i].t > 0.14) B.trail.splice(i, 1); }
+    if (b.fast && b.tip && b.hilt && !b.hidden && !b.rot) B.trail.push({ tx: b.tip.x, ty: b.tip.y, hx: b.hilt.x, hy: b.hilt.y, t: 0, col: tintOf(b.wpn) });
     for (let i = B.ghosts.length - 1; i >= 0; i--) { const g = B.ghosts[i]; g.t += dt; if (g.t >= g.life) B.ghosts.splice(i, 1); }
     for (const s of B.stones) {
       s.flare = Math.max(0, s.flare - dt * 1.4);
@@ -1418,8 +1446,13 @@
   }
   function shoulderOf(f) {
     const lean = f.p[0];
-    return { x: f.x + f.face * Math.sin(lean) * 30, y: f.y + (f.bob || 0) + f.p[1] - Math.cos(lean) * 30 };
+    let lx = Math.sin(lean) * 30, ly = (f.bob || 0) + f.p[1] - STAND - Math.cos(lean) * 30;
+    // (through a flip the shoulder turns about his middle, as drawFig turns him)
+    if (f.rot) { const c = Math.cos(f.rot), s = Math.sin(f.rot), x0 = lx, y0 = ly + 44; lx = c * x0 - s * y0; ly = s * x0 + c * y0 - 44; }
+    return { x: f.x + f.face * lx, y: f.y + ly };
   }
+  // (v2.5b) he is drawn standing a little taller than his poses say: less of a crouch, a cleaner line
+  const STAND = 3;
 
   // ------------------------------------------------------------------ drawing
   // A worn traveller's kit: a hooded cloak gone grey-violet with road dust, a dark tunic, a leather
@@ -1437,64 +1470,68 @@
   function drawWeapon(ctx, w, x, y, ang, s, o) {
     o = o || {};
     const h = heroOf(w === 'sheath' ? 'blade' : w), col = o.col || h.col, hot = o.hot || h.hot;
+    // dim (0-1): on his back an unlit weapon is a dark shape, and comes up into its colours as it lights
+    const Lt = o.dim != null ? 0.16 + 0.84 * Math.min(1, o.dim) : 1;
     ctx.save();
     ctx.translate(x, y); ctx.rotate(ang); ctx.scale(s, s);
     ctx.lineCap = 'round'; ctx.lineJoin = 'round';
     if (w === 'sword') {
       if (o.glow > 0.02) D.glow(ctx, col, 22, 0, 34, 0.8 * o.glow);
       ctx.fillStyle = '#16121a'; ctx.fillRect(-9, -1.6, 9, 3.2);
-      ctx.fillStyle = G.rgba(col, 1); D.poly(ctx, [-12, 0, -9.5, -2.2, -7.5, 0, -9.5, 2.2]); ctx.fill();
-      ctx.fillStyle = G.rgba(hot, 1); D.poly(ctx, [2, -2.6, 34, -1.8, 44, 0, 34, 1.8, 2, 2.6]); ctx.fill();
-      ctx.strokeStyle = G.rgba(col, 0.9); ctx.lineWidth = 0.9; D.line(ctx, 4, 0, 34, 0);
-      ctx.fillStyle = G.rgba(col, 1); D.poly(ctx, [0, -1.6, 2.8, -1.6, 5, -7, 2.4, -6]); ctx.fill(); D.poly(ctx, [0, 1.6, 2.8, 1.6, 5, 7, 2.4, 6]); ctx.fill();
+      ctx.fillStyle = G.rgba(col, Lt * 1); D.poly(ctx, [-12, 0, -9.5, -2.2, -7.5, 0, -9.5, 2.2]); ctx.fill();
+      ctx.fillStyle = G.rgba(hot, Lt * 1); D.poly(ctx, [2, -2.6, 34, -1.8, 44, 0, 34, 1.8, 2, 2.6]); ctx.fill();
+      ctx.strokeStyle = G.rgba(col, Lt * 0.9); ctx.lineWidth = 0.9; D.line(ctx, 4, 0, 34, 0);
+      ctx.fillStyle = G.rgba(col, Lt * 1); D.poly(ctx, [0, -1.6, 2.8, -1.6, 5, -7, 2.4, -6]); ctx.fill(); D.poly(ctx, [0, 1.6, 2.8, 1.6, 5, 7, 2.4, 6]); ctx.fill();
     } else if (w === 'maul') {
       const L = 38, g = Math.max(o.glow || 0, o.charge || 0);
       ctx.strokeStyle = '#120e10'; ctx.lineWidth = 5; D.line(ctx, -16, 0, L - 6, 0);
       ctx.strokeStyle = '#4a3c30'; ctx.lineWidth = 2.8; D.line(ctx, -16, 0, L - 6, 0);
-      ctx.strokeStyle = G.rgba(col, 0.8); ctx.lineWidth = 1; for (const bx of [-9, 3, 15]) D.line(ctx, bx, -2.2, bx, 2.2);
+      ctx.strokeStyle = G.rgba(col, Lt * 0.8); ctx.lineWidth = 1; for (const bx of [-9, 3, 15]) D.line(ctx, bx, -2.2, bx, 2.2);
       if (g > 0.02) D.glow(ctx, col, L + 2, 0, 30 + 26 * (o.charge || 0), 0.9 * g);
-      ctx.fillStyle = '#2a2a30';
+      ctx.fillStyle = '#24222a';
       D.poly(ctx, [L - 8, -13, L + 9, -13, L + 11, -9, L + 11, 9, L + 9, 13, L - 8, 13, L - 10, 9, L - 10, -9]); ctx.fill();
-      ctx.strokeStyle = G.rgba(col, 1); ctx.lineWidth = 1.4; ctx.stroke();
-      ctx.fillStyle = G.rgba(hot, 0.6 + 0.4 * g); D.poly(ctx, [L + 0.5, -8, L + 4.5, 0, L + 0.5, 8, L - 3.5, 0]); ctx.fill();
+      if (g > 0.02) { ctx.strokeStyle = G.rgba(col, Lt * g); ctx.lineWidth = 1.2; ctx.stroke(); }
+      // (its striking face catches the light)
+      ctx.strokeStyle = G.rgba(hot, Lt * 0.55); ctx.lineWidth = 1.6; D.line(ctx, L + 11, -8, L + 11, 8);
+      ctx.fillStyle = G.rgba(hot, Lt * 0.6 + 0.4 * g); D.poly(ctx, [L + 0.5, -8, L + 4.5, 0, L + 0.5, 8, L - 3.5, 0]); ctx.fill();
     } else if (w === 'bow') {
       if (o.glow > 0.02) D.glow(ctx, col, 0, 0, 30, 0.8 * o.glow);
       for (const sg of [-1, 1]) {
         ctx.strokeStyle = '#1a1226'; ctx.lineWidth = 3.8;
         ctx.beginPath(); ctx.moveTo(1.6, 0); ctx.quadraticCurveTo(4, sg * 10, -1, sg * 18); ctx.quadraticCurveTo(-4, sg * 22, -8, sg * 21); ctx.stroke();
-        ctx.strokeStyle = G.rgba(col, 1); ctx.lineWidth = 1.5;
+        ctx.strokeStyle = G.rgba(col, Lt * 1); ctx.lineWidth = 1.5;
         ctx.beginPath(); ctx.moveTo(2.6, sg); ctx.quadraticCurveTo(5, sg * 10, 0, sg * 17.6); ctx.quadraticCurveTo(-3.6, sg * 22.6, -8.2, sg * 21.4); ctx.stroke();
       }
       const nx = -6 - 10 * (o.pull || 0) + (o.twang ? Math.sin(G.t * 90) * 2.4 * o.twang : 0);
-      ctx.strokeStyle = G.rgba(hot, 0.85); ctx.lineWidth = 0.9;
+      ctx.strokeStyle = G.rgba(hot, Lt * 0.85); ctx.lineWidth = 0.9;
       ctx.beginPath(); ctx.moveTo(-8, -21); ctx.lineTo(nx, 0); ctx.lineTo(-8, 21); ctx.stroke();
       if (o.pull > 0.05) {
-        ctx.strokeStyle = G.rgba(hot, 1); ctx.lineWidth = 1.8; D.line(ctx, nx, 0, nx + 30, 0);
-        ctx.fillStyle = G.rgba(hot, 1); D.poly(ctx, [nx + 29, -2.8, nx + 37, 0, nx + 29, 2.8]); ctx.fill();
+        ctx.strokeStyle = G.rgba(hot, Lt * 1); ctx.lineWidth = 1.8; D.line(ctx, nx, 0, nx + 30, 0);
+        ctx.fillStyle = G.rgba(hot, Lt * 1); D.poly(ctx, [nx + 29, -2.8, nx + 37, 0, nx + 29, 2.8]); ctx.fill();
         D.glow(ctx, col, nx + 34, 0, 14, 0.6 * o.pull);
       }
     } else if (w === 'blade') {
       // the katana, bare
       if (o.glow > 0.02) D.glow(ctx, col, 20, 0, 30, 0.8 * o.glow);
       ctx.fillStyle = '#12070b'; ctx.fillRect(-11, -1.4, 11, 2.8);
-      ctx.fillStyle = G.rgba(hot, 1);
+      ctx.fillStyle = G.rgba(hot, Lt * 1);
       ctx.beginPath(); ctx.moveTo(2, -1.7); ctx.quadraticCurveTo(24, -2.4, 42, -4); ctx.lineTo(38, 0.6); ctx.quadraticCurveTo(22, 1.6, 2, 1.7); ctx.closePath(); ctx.fill();
-      ctx.strokeStyle = G.rgba(col, 0.9); ctx.lineWidth = 0.8; ctx.beginPath(); ctx.moveTo(3.5, -0.3); ctx.quadraticCurveTo(24, -0.9, 37, -2.4); ctx.stroke();
-      ctx.fillStyle = G.rgba(col, 1); ctx.fillRect(0.2, -3.6, 1.8, 7.2);
+      ctx.strokeStyle = G.rgba(col, Lt * 0.9); ctx.lineWidth = 0.8; ctx.beginPath(); ctx.moveTo(3.5, -0.3); ctx.quadraticCurveTo(24, -0.9, 37, -2.4); ctx.stroke();
+      ctx.fillStyle = G.rgba(col, Lt * 1); ctx.fillRect(0.2, -3.6, 1.8, 7.2);
     } else if (w === 'sheath') {
       // the lacquered sheath, its hilt out, three bands that light one at a time
       const m = o.marks || 0, lit = m >= 3 ? '255,214,140' : hot;
       if (o.glow > 0.02) D.glow(ctx, col, 18, 0, 28, 0.8 * o.glow);
       ctx.fillStyle = '#1a080f';
       ctx.beginPath(); ctx.moveTo(-0.6, -2.3); ctx.quadraticCurveTo(24, -2.6, 40, -3.6); ctx.lineTo(41, -1.2); ctx.quadraticCurveTo(24, 1.9, -0.6, 2.3); ctx.closePath(); ctx.fill();
-      ctx.strokeStyle = G.rgba(col, 0.6); ctx.lineWidth = 0.8; ctx.stroke();
+      ctx.strokeStyle = G.rgba(col, Lt * 0.6); ctx.lineWidth = 0.8; ctx.stroke();
       for (let i = 0; i < 3; i++) {
         const bx = 10 + i * 8, on = m > i;
-        ctx.fillStyle = on ? G.rgba(lit, 1) : G.rgba(col, 0.18); ctx.fillRect(bx, -2.6, 2, 4.6);
+        ctx.fillStyle = on ? G.rgba(lit, Lt * 1) : G.rgba(col, Lt * 0.18); ctx.fillRect(bx, -2.6, 2, 4.6);
         if (on) D.glow(ctx, m >= 3 ? '255,214,140' : col, bx + 1, 0, 10, 0.95);
       }
       if (!o.empty) {
-        ctx.fillStyle = G.rgba(col, 1); ctx.fillRect(-2.2, -3.6, 1.8, 7.2);
+        ctx.fillStyle = G.rgba(col, Lt * 1); ctx.fillRect(-2.2, -3.6, 1.8, 7.2);
         ctx.fillStyle = '#12070b'; ctx.fillRect(-13, -1.4, 11, 2.8);
       }
     }
@@ -1513,7 +1550,7 @@
     if (alpha <= 0.01) return;
     const ck = f.corruptK || 0;
     const c = o.shade ? CSH : ck > 0.55 ? CB : CL, pal = G.pal(), rim = o.shade ? '120,60,160' : ck > 0.55 ? VOID.boss : pal.rim;
-    const p = f.p, lean = p[0], hip = p[1] + (f.bob || 0);
+    const p = f.p, lean = p[0], hip = p[1] - STAND + (f.bob || 0);
     ctx.save();
     ctx.globalAlpha *= alpha;
     ctx.lineJoin = 'round'; ctx.lineCap = 'round';
@@ -1521,6 +1558,7 @@
     if (o.real) K.recoil(ctx, f);
     const sx = o.real ? K.faceX(f, 0.25) : f.face;
     ctx.scale(sx, 1);
+    if (f.rot) { ctx.translate(0, -44); ctx.rotate(f.rot); ctx.translate(0, 44); } // (a flip, about his middle)
     if (o.real && f.flash > 0) D.glow(ctx, '255,255,255', 0, -48, 66, f.flash * 0.3);
     if (ck > 0.05 && !o.shade) D.glow(ctx, VOID.boss, 0, -46, 70, 0.22 * ck);
 
@@ -1536,7 +1574,7 @@
       if (o.real && B.loose && B.loose.w === w) continue;
       const r = RACK[w](shx, shy, hip), g = rk ? rk[w] : 0;
       const kind = w === 'blade' ? 'sheath' : w;
-      drawWeapon(ctx, kind, r[0], r[1], r[2], 0.86, o.shade ? { col: '90,50,130', hot: '140,100,190' } : { glow: g, marks: 0 });
+      drawWeapon(ctx, kind, r[0], r[1], r[2], 0.86, o.shade ? { col: '90,50,130', hot: '140,100,190', dim: 0.3 } : { glow: g, marks: 0, dim: g });
       // his twin of your weapon is wrapped in cloth until the trophies
       if (o.real && !f.unwrapped && ownW() === w) {
         ctx.save(); ctx.translate(r[0], r[1]); ctx.rotate(r[2]);
@@ -1620,10 +1658,32 @@
       const a = pose === 'bow' ? (f.aim || 0) : p[11];
       drawWeapon(ctx, 'bow', lead.ex, lead.ey, a, 1.05, { pull: f.pull, twang: f.twang });
     } else if (f.wpn) {
-      drawWeapon(ctx, f.wpn, lead.ex, lead.ey, p[11], 1.05, { charge: f.charge });
+      drawWeapon(ctx, f.wpn, lead.ex, lead.ey, p[11], f.wpn === 'maul' ? 1.25 : 1.05, { charge: f.charge });
+    }
+    // (where the weapon's end is, for its trail: see B.tick)
+    if (o.real) {
+      const drawn = f.wpn === 'sword' || f.wpn === 'maul' || (f.wpn === 'blade' && !((f.marks > 0) || pose === 'crouch' || pose === 'noto' || pose === 'guard'));
+      const len = f.wpn === 'maul' ? 58 : 46;
+      f.tip = drawn ? toWorld(lead.ex + Math.cos(p[11]) * len, lead.ey + Math.sin(p[11]) * len) : null;
+      f.hilt = drawn ? toWorld(lead.ex + Math.cos(p[11]) * len * 0.35, lead.ey + Math.sin(p[11]) * len * 0.35) : null;
     }
     if (f.offerW) drawWeapon(ctx, f.offerW === 'blade' ? 'blade' : f.offerW, lead.ex, lead.ey, p[11] + Math.PI, 1.05, { glow: 0.5 });
     if (f.dual && f.wpn !== 'bow') drawWeapon(ctx, 'blade', rear.ex, rear.ey, p[11] + 0.5, 1, { col: VOID.boss, hot: VOID.hot });
+    ctx.restore();
+  }
+  function drawTrail(ctx) {
+    const tr = B.trail;
+    if (tr.length < 2) return;
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    for (let i = 1; i < tr.length; i++) {
+      const a = tr[i - 1], c = tr[i];
+      // (a blade standing still leaves nothing: only what moves is drawn)
+      if (Math.hypot(c.tx - a.tx, c.ty - a.ty) < 3) continue;
+      const k = 1 - c.t / 0.14;
+      ctx.fillStyle = G.rgba(c.col.hot, 0.5 * k * k);
+      D.poly(ctx, [a.hx, a.hy, a.tx, a.ty, c.tx, c.ty, c.hx, c.hy]); ctx.fill();
+    }
     ctx.restore();
   }
   function drawGhost(ctx, g) {
@@ -1763,6 +1823,7 @@
       D.ribbon(ctx, B.cloak[i], 12 - i * 2, 7 - i, 3); ctx.fill();
       ctx.strokeStyle = G.rgba(b.corruptK > 0.55 ? VOID.boss : G.pal().rim, 0.18); ctx.lineWidth = 1; ctx.stroke();
     }
+    drawTrail(ctx);
     drawFig(ctx, b, 1, { real: true });
     if (b.orb > 0) {
       const t = bossTint('kairo');
@@ -1849,12 +1910,25 @@
         const q = Math.min(1, fl.t / fl.run), fx = G.lerp(bd.from, bd.front, q);
         D.glow(ctx, VOID.hot, fx, y, 46, 0.95);
         ctx.strokeStyle = G.rgba(VOID.hot, 0.9); ctx.lineWidth = 3; D.line(ctx, fx, y - hgt - 8, fx, y + hgt + 8);
-        if (!fl.done) {
+        const rr = RING_IN + 80 * (1 - q);
+        // The closing ring turns gold for exactly the press window (and holds on the meeting ring until
+        // it shuts), on every difficulty: the window itself is what narrows on Merciless.
+        const open = !fl.done && fl.t >= fl.run - fl.win;
+        if (!fl.done && !open) {
           ctx.strokeStyle = G.rgba(hc.hot, 0.35 + 0.6 * q); ctx.lineWidth = 3;
-          ctx.beginPath(); ctx.arc(bd.front, y, 20 + 80 * (1 - q), 0, G.TAU); ctx.stroke();
+          ctx.beginPath(); ctx.arc(bd.front, y, rr, 0, G.TAU); ctx.stroke();
         }
         ctx.strokeStyle = G.rgba(fl.done ? (fl.won ? hc.hot : VOID.boss) : '255,255,255', 0.9); ctx.lineWidth = 2;
-        ctx.beginPath(); ctx.arc(bd.front, y, 20, 0, G.TAU); ctx.stroke();
+        ctx.beginPath(); ctx.arc(bd.front, y, RING_IN, 0, G.TAU); ctx.stroke();
+        if (open) {
+          // drawn plainly over the glow of the meeting, with a dark edge, so it reads as gold, not white
+          ctx.globalCompositeOperation = 'source-over';
+          ctx.beginPath(); ctx.arc(bd.front, y, rr, 0, G.TAU);
+          ctx.strokeStyle = 'rgba(40,16,0,0.7)'; ctx.lineWidth = 10; ctx.stroke();
+          ctx.strokeStyle = G.rgba(DAWN_GOLD, 1); ctx.lineWidth = 6; ctx.stroke();
+          ctx.globalCompositeOperation = 'lighter';
+          D.glow(ctx, DAWN_GOLD, bd.front, y, rr + 30, 0.5);
+        }
       }
       // the key to press, over where they meet
       ctx.globalCompositeOperation = 'source-over';

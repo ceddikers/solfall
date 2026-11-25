@@ -463,12 +463,21 @@
   function punch(o, who) {
     const b = who || B.body, f = b.face, m = (a) => (f > 0 ? a : Math.PI - a);
     const ay = o.y || -74;
+    // which fist throws it: the lead for a jab, the rear for a cross or a palm
+    const rearF = o.pose === 'cross' || o.pose === 'palmShot' || o.pose === 'push';
+    const fist = () => ({ x: b.x + b.face * b.p[rearF ? 8 : 6], y: b.y + (b.bob || 0) + b.p[rearF ? 9 : 7] });
     const arc = H.arc({
       x: b.x + f * 6, y: b.y + ay, r: o.r || 100, a0: m(o.a0 != null ? o.a0 : -0.25), a1: m(o.a1 != null ? o.a1 : 0.62),
       tele: o.tele, active: 0.08, fade: 0.12, owner: b, dmg: o.dmg || 1, tint: o.tint,
-      follow(h) { if (!h.fired) { h.x = b.x + b.face * 6; h.y = b.y + ay; } },
+      follow(h) { if (!h.fired) { h.x = b.x + b.face * 6; h.y = b.y + ay; if (h.t >= h.tele - 0.04) { b.fast = true; b.pose = o.pose; } } },
+      // (v2.5b: a fist, not a blade: the glint is on the fist drawn back, and the blow is drawn from the
+      // fist out to its reach, not as a sword's crescent hanging in the air in front of him)
+      glintAt: fist,
+      drawCut: (ctx, h, e) => drawPunch(ctx, h, e, fist()),
       onFire() {
         b.fast = true; b.pose = o.pose; G.audio.play('kSnap', { vol: o.soft ? 0.45 : 1 });
+        const tc = o.tint || G.pal();
+        G.fx.burst(b.x + b.face * 44, b.y + ay + 4, { n: o.heavy ? 10 : 6, color: tc.hot, speed: [160, 420], angle: b.face > 0 ? 0.15 : Math.PI - 0.15, spread: 0.7, life: [0.08, 0.2], kind: 'spark', size: [1.4, 2.6] });
         if (who) return;
         G.fx.kick(f * (o.heavy ? 2.4 : 1.6), 0);
         // weight: the front foot drives into the ground on a cross, and the last of a string thumps
@@ -480,13 +489,40 @@
     if (B.partnerOn && !who) partnerEcho(o);
     return arc;
   }
+  // A punch's blow, drawn from the fist (fp) out to its reach: a tapering drive of air, rings thrown
+  // ahead of it, and a flash on the knuckles. The hit itself is still the arc's (hazards.js).
+  function drawPunch(ctx, h, e, fp) {
+    const life = h.active + h.fade, k = Math.min(1, e / life), f = 1 - k;
+    const P = h.tint || G.pal(), mid = (h.a0 + h.a1) / 2;
+    const ex = h.x + Math.cos(mid) * h.r, ey = h.y + Math.sin(mid) * h.r;
+    const q = G.ease.outCubic(Math.min(1, e / Math.max(0.01, h.active)));
+    const tx = G.lerp(fp.x, ex, q), ty = G.lerp(fp.y, ey, q);
+    const dx = tx - fp.x, dy = ty - fp.y, L = Math.hypot(dx, dy) || 1, nx = -dy / L, ny = dx / L;
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    for (const [col, w, al] of [[P.boss, 8, 0.45], [P.hot, 3.5, 0.95]]) {
+      ctx.fillStyle = G.rgba(col, al * f);
+      D.poly(ctx, [fp.x + nx * w, fp.y + ny * w, tx, ty, fp.x - nx * w, fp.y - ny * w]); ctx.fill();
+    }
+    const ang = Math.atan2(ey - fp.y, ex - fp.x);
+    ctx.lineWidth = 2.5;
+    for (let i = 0; i < 2; i++) {
+      const s = k * 1.5 - i * 0.3;
+      if (s <= 0 || s >= 1) continue;
+      ctx.strokeStyle = G.rgba(P.hot, 0.8 * (1 - s));
+      ctx.beginPath(); ctx.arc(G.lerp(fp.x, ex, s), G.lerp(fp.y, ey, s), 8 + 14 * s, ang - 1.1, ang + 1.1); ctx.stroke();
+    }
+    D.glow(ctx, P.hot, fp.x, fp.y, 18, 0.7 * f);
+    ctx.restore();
+  }
   // A kick: a wider sweep from his hip
   function kick(o) {
     const b = B.body, f = b.face, m = (a) => (f > 0 ? a : Math.PI - a);
     const ay = o.y || -42;
     return H.arc({
       x: b.x, y: b.y + ay, r: o.r, a0: m(o.a0), a1: m(o.a1), tele: o.tele, active: 0.12, fade: 0.16, owner: b, dmg: o.dmg || 1,
-      follow(h) { if (!h.fired) { h.x = b.x; h.y = b.y + ay; } },
+      // (v2.5b: the leg starts a few frames early, so it sweeps with the drawn arc)
+      follow(h) { if (!h.fired) { h.x = b.x; h.y = b.y + ay; if (h.t >= h.tele - 0.05) { b.fast = true; b.pose = o.pose; } } },
       onFire() { b.fast = true; b.pose = o.pose; G.audio.play('whoosh'); G.audio.play('kSnap'); G.fx.shake(5); },
     });
   }
@@ -1526,7 +1562,7 @@
     }
     // the pose: each part on a spring, snappier for blows
     const target = b.pose === 'walk' ? walkPose(b.walkT) : (POSES[b.pose] || POSES.idle);
-    const w0 = b.fast || SNAP[b.pose] ? 46 : 18, z = b.fast ? 0.62 : 0.8;
+    const w0 = b.fast || SNAP[b.pose] ? 46 : 18, z = b.fast ? 0.8 : 0.9; // (v2.5b: firmer, so a blow lands and holds instead of wobbling past)
     for (let i = 0; i < NP; i++) {
       b.pv[i] += ((target[i] - b.p[i]) * w0 * w0 - 2 * z * w0 * b.pv[i]) * dt;
       b.p[i] += b.pv[i] * dt;

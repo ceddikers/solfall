@@ -686,7 +686,12 @@
     facePlayer();
     const dir = b.face, tele = 0.8 * T, speed = K.gentle() ? 860 : 980;
     b.fast = false; b.pose = 'raise';
-    H.lane({ x: WL, y: FLOOR - 66, w: WR - WL, h: 66, dir, dur: tele });
+    // (v2.5b: the lane runs only where the sword will fly, from its edge as it leaves the Knight's hand
+    // to the wall it sticks in; it used to cover the whole floor, behind the Knight too)
+    const span = (a, c) => ({ x: Math.min(a, c), w: Math.abs(c - a) });
+    const wallAt = dir > 0 ? WR : WL;
+    const out = span(b.x + dir * (60 - 36), wallAt);
+    H.lane({ x: out.x, y: FLOOR - 66, w: out.w, h: 66, dir, dur: tele });
     G.audio.play('charge', { dur: tele });
     yield* wait(tele);
     b.fast = true; b.pose = 'cleave'; b.unarmed = true;
@@ -729,7 +734,8 @@
     yield* wait(B.phase === 3 ? 1.0 : 1.4);
     // the call: a lane the other way, then the sword tears free
     b.pose = 'grip'; facePlayer();
-    H.lane({ x: WL, y: FLOOR - 66, w: WR - WL, h: 66, dir: -dir, dur: 0.6 * T });
+    const home = span(wallAt, b.x + dir * (44 - 36));
+    H.lane({ x: home.x, y: FLOOR - 66, w: home.w, h: 66, dir: -dir, dur: 0.6 * T });
     G.audio.play('pull');
     yield* wait(0.6 * T);
     blade.state = 'back';

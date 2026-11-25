@@ -2,7 +2,7 @@
 
 A side-on boss rush for the browser: four heroes, seven three-phase bosses, played as a run of
 ever-harder trials. You pick a hero and a relic before the run and win a boon after each victory.
-Version 2.5a.
+Version 2.5b.
 
 This is an early slice of a planned boss-rush roguelite (short runs, a boon after each boss,
 bosses drawn from a pool). A run meets the four bosses in a shuffled order, then meets them again, harder.
@@ -113,6 +113,52 @@ hero (`tools/feel-check.js`).
 - Settings, Reset progress erases Sunshards, upgrades, trophies and records (it has to be chosen twice).
 
 Not done: touch controls, a colour-blind alternative to red-orange warnings, gamepad rebinding.
+
+## Cleaner blows, a quicker Echo, a truer throw (v2.5b)
+
+Asked for: a ring that turns gold when to press in the Black Dawn (then: "the gold ring can stay for every
+situation"); the two newest bosses' animations "much more clean", then a coolness and smoothness pass on Aurel's; the Veil's shadow-summoning move faster, with more of them in quick succession;
+and the Knight's sword-throw warning to cover only where the sword goes.
+
+- **The Black Dawn's ring.** On every difficulty the ring that closes on the meeting point turns **gold for
+  exactly the press window** (0.18 s either side on Gentle, 0.14 on Standard, 0.1 when fierce) and holds gold
+  on the meeting ring until it shuts.
+- **Kairo's punches come from his fist.** They used to borrow a sword's crescent, drawn 45-100 px out in front
+  of a fist that reaches about 45: the blow seemed to hang in the air ahead of him. Now a punch is a drive of
+  air from the knuckles out to its reach, with rings thrown ahead of it, and the warning glint sits on the fist
+  as it is drawn back (so you can see which hand). His fists and kicks also start moving a few frames before
+  the hit, so the limb and the drawn blow arrive together. What a punch hits is unchanged.
+- **Aurel, tidied.** The weapons on his back are dark shapes until they light (they were in full colour all
+  the time: the maul's head read as a green box); the glow is still the tell, and a feint's half glow still
+  shows half the colour. His sword now starts down with the drawn cut instead of after it. He stands a little
+  taller, and his walk's hips ride highest as the legs pass (it was the wrong way round, which bounced him).
+- **Aurel, smoother and cooler** (a second pass): his weapon leaves a **trail** through a fast blow (a short
+  ribbon in its hero's light, only while it moves); the **maul** is bigger in his hand and its head dark, with
+  only its striking face lit (it was outlined like a sign), outlined only as it charges; the **leap back
+  before the bow** starts with a dip and, when it is a long one, is a **tucked back flip** with afterimages
+  (his cloak turns with him); the **rising cut** carries him up off the floor with the blade and drops him
+  back down. Same timings, apart from the 0.06 s dip before the leap back.
+- **Both: firmer springs.** Their poses snapped into a blow on an underdamped spring that swung about 8% past
+  and back; it is firmer now (a blow lands and holds).
+- **The Veil's Echo:** five shadows in phase I (was three), seven in II (was four, two out of the air), nine in
+  III (two cuts, a pair, one from the air, a cut, a pair, one from the air, then the Veil itself), each on the
+  heels of the last (gaps 0.5/0.4/0.36 of a beat, were 0.85/0.62/0.58), a little quicker to set (0.44, was
+  0.5), quicker across (1550 px/s, was 1300) and quicker to fade. Up to three or four are out at once.
+- **The Knight's Hurl:** the floor lane now runs from the sword's edge as it leaves his hand to the wall it
+  sticks in, and on the call from the wall back to him; it used to cover the whole floor, behind him too.
+
+**Checked:** frame strips of Kairo's combo, Aurel's sword string, maul, bow, rising cut and the Knight's
+throw; Aurel again after the second pass, 96 fights at roads II-V: 78% (80% in v2.5a), no errors; the Echo in all three
+phases; the scripted player on the Veil, Kairo, the Knight and Aurel at roads III and V (128 fights): the Veil
+97%, the Knight 84%, Aurel 69%, Kairo 47%. Kairo checked again against v2.5a's own file, 64 fights each: 61%
+before, 58% after (the same, within the noise: what a punch hits did not change). One error in the first run
+(a Kairo fight, "cannot set 't' of null") did not come back in 104 more Kairo fights; the bot now keeps stack
+traces so it can be found if it does. **Not played by hand yet.**
+
+**Playtest checklist**
+- Do Kairo's punches read better as coming from his fist? Can you tell jab from cross by the glint?
+- Is Aurel's rack easier to read now the unlit weapons are dark?
+- Is the Echo too much in phase III (nine shadows)? Too little in phase I?
 
 ## The Champion Who Came Before (v2.5a)
 

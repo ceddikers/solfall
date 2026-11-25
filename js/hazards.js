@@ -503,14 +503,17 @@
         if (!this.mark && !this.glinted && this.t >= this.tele - 0.2) {
           this.glinted = true;
           const r = this.r * 0.62;
-          G.fx.glint(this.x + Math.cos(this.a0) * r, this.y + Math.sin(this.a0) * r, 18 + this.r * 0.1, this.heavy ? DANGER : pal(this).hot);
+          // (glintAt: a blow with no blade, a fist, glints where it is)
+          const gp = this.glintAt ? this.glintAt(this) : { x: this.x + Math.cos(this.a0) * r, y: this.y + Math.sin(this.a0) * r };
+          G.fx.glint(gp.x, gp.y, 18 + this.r * 0.1, this.heavy ? DANGER : pal(this).hot);
           G.audio.play('glint');
         }
         if (this.t >= this.tele && !this.fired) {
           this.fired = true;
           if (this.onFire) this.onFire(this);
           const P = pal(this), sg = this.a1 > this.a0 ? 1 : -1, big = this.r / 150;
-          for (let i = 0; i < Math.round(6 + 6 * big); i++) {
+          // (drawCut: whoever swings it draws its own cut, and its own sparks)
+          if (!this.drawCut) for (let i = 0; i < Math.round(6 + 6 * big); i++) {
             const a = G.lerp(this.a0, this.a1, Math.random()), r = this.r * G.rand(0.7, 1.02), v = G.rand(220, 640) * sg;
             G.fx.spawn({ kind: 'spark', x: this.x + Math.cos(a) * r, y: this.y + Math.sin(a) * r, vx: -Math.sin(a) * v, vy: Math.cos(a) * v, life: G.rand(0.14, 0.32), size: G.rand(1.6, 3), color: P.hot, drag: 2, grav: 400 });
           }
@@ -564,6 +567,8 @@
           this.path(ctx, Math.max(this.r0, this.r * k)); ctx.fill();
           ctx.strokeStyle = G.rgba(DANGER, 0.5 + 0.4 * k); ctx.lineWidth = 2;
           this.path(ctx, this.r); ctx.stroke();
+        } else if (this.drawCut) {
+          this.drawCut(ctx, this, this.t - this.tele);
         } else {
           // the cut itself: a bright crescent that sweeps from a0 to a1 and fades
           const e = this.t - this.tele;
