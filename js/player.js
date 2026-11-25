@@ -1836,7 +1836,11 @@
     // dash, a fall), so the first links do not fight the rest of the chain into a kink
     const d0 = TAIL_DIR[H.id] || [0.7, 0.7], F0 = heavy ? 1520 : 1100, dr = heavy ? 9 : 14;
     let wx = -f * d0[0] * F0 - G.clamp(P.vx, -1200, 1200) * dr * 0.8, wy = d0[1] * F0 - G.clamp(P.vy, -1500, 1500) * dr * 0.8;
-    const wl = Math.hypot(wx, wy) || 1; wx /= wl; wy /= wl;
+    // (v2.9d) the air sweeps it anywhere from straight down to a little above level behind, never forward or
+    // straight up (a fall lifts a scarf, it does not stand it on end): so it cannot be carried round in a loop
+    const behind = f > 0 ? Math.PI : 0, swept = ((((Math.atan2(wy, wx) - behind + Math.PI) % G.TAU) + G.TAU) % G.TAU - Math.PI) * f;
+    const baseA = behind + G.clamp(swept, -1.65, 1.0) * f;
+    wx = Math.cos(baseA); wy = Math.sin(baseA);
     const n = s.length;
     for (let i = 1; i < n; i++) {
       const a = s[i - 1], b = s[i], q = i / (n - 1);
@@ -1860,6 +1864,8 @@
       const dx = b.x - a.x, dy = b.y - a.y, d = Math.hypot(dx, dy) || 1;
       if (d > seg) { b.x = a.x + dx / d * seg; b.y = a.y + dy / d * seg; }
     }
+    // (v2.9d) it hangs along the line the air sweeps it, and cannot curl round past it into a loop
+    DR.hang(s, baseA, { root: 1.1, bend: 0.35, max: 1.9 });
   }
 
   function drawTail(ctx, h, pts) {

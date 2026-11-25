@@ -2840,7 +2840,9 @@
         v.x = v.x * keep - ix * 0.35 * q; v.y = v.y * keep - iy * 0.3 * q;
         pt.x += v.x * dt; pt.y += v.y * dt;
       }
-      D.chainStep(B.scarf, b.x + fxw * lx, b.y + b.p[1] + ly, dt, { seg: 8, grav: 30 + 40 * b.calm, drift: 46 * (1 - 0.75 * b.calm), face: b.face, wave: 14 * (1 - 0.85 * b.calm), rate: 9 });
+      const sg = 30 + 40 * b.calm, sd = 46 * (1 - 0.75 * b.calm);
+      D.chainStep(B.scarf, b.x + fxw * lx, b.y + b.p[1] + ly, dt, { seg: 8, grav: sg, drift: sd, face: b.face, wave: 14 * (1 - 0.85 * b.calm), rate: 9 });
+      D.hang(B.scarf, Math.atan2(sg, -b.face * sd), { root: 1.1, bend: 0.55, max: 2.1 }); // (v2.9d: no loops)
     }
     for (const a of [b].concat(B.clones)) a.gleam = G.damp(a.gleam || 0, a.still || a.held ? 1 : 0, 6, dt);
     for (const c of B.clones) { stepPose(c, dt); living(c, dt); }
@@ -3017,10 +3019,10 @@
     const push = (iF * 0.004 - land * 0.001 + hit * 4) / dt;
     clothRest(CAPE_W, CAPE_REST, lw, 0.55);
     for (let i = 0; i < CAPE_N; i++) CAPE_W[i] += (str + fall) * (0.5 + 0.5 * i / (CAPE_N - 1)) + Math.sin(G.t * 3.1 + i * 0.9 + L.ph) * 0.05 * calm * (1 + i);
-    o.cape = D.angleChain(L.cape, CAPE_W, dt, { w0: 20, w1: 9, z0: 0.5, z1: 0.3, follow: 0.6, push });
+    o.cape = D.angleChain(L.cape, CAPE_W, dt, { w0: 20, w1: 9, z0: 0.5, z1: 0.3, follow: 0.6, push, lo: 0.95, hi: Math.PI + 0.55 }); // (v2.9d: limits)
     clothRest(SASH_W, SASH_REST, lw, 0.3);
     for (let i = 0; i < SASH_N; i++) SASH_W[i] += (str + fall) * 0.6 + Math.sin(G.t * 3.7 + i * 1.1 + L.ph) * 0.07 * calm * (1 + i);
-    o.sash = D.angleChain(L.sash, SASH_W, dt, { w0: 16, w1: 8, z0: 0.45, z1: 0.28, follow: 0.65, push: push * 1.2 });
+    o.sash = D.angleChain(L.sash, SASH_W, dt, { w0: 16, w1: 8, z0: 0.45, z1: 0.28, follow: 0.65, push: push * 1.2, lo: 0.95, hi: Math.PI + 0.55 });
   }
 
   // ------------------------------------------------------------------ drawing

@@ -2563,22 +2563,38 @@
   }
   // The cape: a heavy cloth hung from behind the shoulders, each point carrying its own speed (so it lags
   // a start, swings past a stop and whips round a turn), pulled down and a little back, dragging on the floor.
+  // (v2.9d) Cloth hangs: each length of it may swing from straight down to a little past level behind him
+  // and only a little forward, and may bend only so far from the one above. Before this it could swing
+  // right over the top and round and round, like a chain on a pivot.
+  const CAPE_FWD = 0.35, CAPE_BACK = 1.7, CAPE_BEND = 0.55;
   function capeStep(pts, ax, ay, dt, face) {
     const a0 = pts[0];
     if (a0.px == null || Math.abs(ax - a0.x) > 160 || Math.abs(ay - a0.y) > 160) {
       for (let i = 0; i < pts.length; i++) { const q = pts[i]; q.x = q.px = ax - face * i * 3; q.y = q.py = ay + i * 12; }
     }
     a0.x = a0.px = ax; a0.y = a0.py = ay;
-    const keep = Math.max(0, 1 - 2.2 * dt), seg = 13, n = pts.length;
+    const keep = Math.max(0, 1 - 5 * dt), seg = 13, n = pts.length, cap = 22;
     for (let i = 1; i < n; i++) {
-      const q = pts[i], vx = (q.x - q.px) * keep, vy = (q.y - q.py) * keep;
+      const q = pts[i];
+      const vx = G.clamp((q.x - q.px) * keep, -cap, cap), vy = G.clamp((q.y - q.py) * keep, -cap, cap);
       q.px = q.x; q.py = q.y;
       q.x += vx - face * 140 * dt * dt; q.y += vy + 900 * dt * dt;
     }
+    const down = Math.PI / 2;
     for (let it = 0; it < 2; it++) {
+      let prev = 0;
       for (let i = 1; i < n; i++) {
         const a = pts[i - 1], q = pts[i], dx = q.x - a.x, dy = q.y - a.y, dd = Math.hypot(dx, dy) || 1;
-        if (dd > seg) { q.x = a.x + dx / dd * seg; q.y = a.y + dy / dd * seg; }
+        // how far this length swings from straight down, + behind him
+        const rel = angDiff(Math.atan2(dy, dx), down) * face;
+        let r = G.clamp(rel, -CAPE_FWD, CAPE_BACK);
+        if (i > 1) r = G.clamp(r, prev - CAPE_BEND, prev + CAPE_BEND);
+        const len = Math.min(dd, seg);
+        if (r !== rel || dd > seg) {
+          const ang = down + r * face;
+          q.x = a.x + Math.cos(ang) * len; q.y = a.y + Math.sin(ang) * len;
+        }
+        prev = r;
         // (near the shoulders it stays behind the back rather than swinging through the body)
         if (i <= 2 && (q.x - ax) * face > -1 - i) q.x = ax - face * (1 + i);
         if (q.y > FLOOR - 2) { q.y = FLOOR - 2; q.px = G.lerp(q.px, q.x, 0.5); }

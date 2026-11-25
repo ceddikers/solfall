@@ -2,7 +2,7 @@
 
 A side-on boss rush for the browser: four heroes, seven three-phase bosses, played as a run of
 ever-harder trials. You pick a hero and a relic before the run and win a boon after each victory.
-Version 2.9c.
+Version 2.9d.
 
 This is an early slice of a planned boss-rush roguelite (short runs, a boon after each boss,
 bosses drawn from a pool). A run is seven trials, one for each boss, each harder than the last: the first boss
@@ -114,6 +114,60 @@ hero (`tools/feel-check.js`).
 - Settings, Reset progress erases Sunshards, upgrades, trophies and records (it has to be chosen twice).
 
 Not done: touch controls, a colour-blind alternative to red-orange warnings, gamepad rebinding.
+
+## Capes, scarves and hair that hang (v2.9d)
+
+Asked: "the death knights cape should not be spinning around in a circle lol / make sure the animations are all
+natural with these new bone structures".
+
+**What was wrong.** The cloth and hair added in v2.5c carry their own speed, so they swing on past a stop and whip
+through a turn. Several had nothing keeping them hanging, though:
+- **The Knight's cape** was a free swinging chain: about 96% of its speed kept every frame, and only the distance
+  between points held it together. A lunge or a turn swung it over the top and round. Measured over a minute of a
+  scripted fight, a length of it pointed upward in **48% of frames**, and its tip was above his shoulders in 16%.
+- **The heroes' scarves, Lune's hair and Eos's ribbons** turned **4 to 8 full circles in 40 seconds**. Further out,
+  each link is pushed to carry on the line of the one before, so once a curl started it carried on round. Falling
+  also stood the scarf straight up, so a turn in the air carried it over.
+- **The Assassin's scarf** spun twice a minute as its anchor flicked about. **Kairo's hair** spun once.
+- **The Assassin's half-cape and sash** (spring joints) could be flung past straight up.
+
+**The fix.** A new shared rule, `D.hang` in `js/draw.js`, used by every chain with speed of its own. A chain has a
+way it naturally lies: straight down, or streamed back by the air. Under the rule:
+- Its first link may swing only so far either side of that.
+- Each link may bend only so far from the one above.
+- Nothing may swing more than about 110° to 130° from it.
+
+So cloth can billow, trail and flip as a body turns, but it cannot loop. The rule keeps each link's length and
+adds no speed of its own. An early version of it flung the last point of a scarf thousands of pixels for a frame;
+that was found by the checks below and fixed before this build.
+- **The Knight's cape** has its own version of the rule. It can stream back to a little past level and only a
+  little forward, it is damped harder, and its speed is capped.
+- **The heroes' tails:** the air can now sweep them from straight down to about 57° above level behind, never
+  forward or straight up. A fall lifts a scarf; it does not stand it on end.
+- **Kairo's hair** still rises when he powers up: its natural direction follows his drift, which is up then.
+- **The Assassin's cape and sash:** their spring joints now have stops (`lo` and `hi`, new options on
+  `D.angleChain`).
+
+**Checked.** A watcher finds every chain and spring part on a character and follows it through a scripted fight,
+counting segments pointing up, full turns in a second and a half, and links stretched past their length. Every
+boss and every hero was run; Sol, the Champion, the Mage, the Warden and the Wolf were already fine.
+
+| Part | Before | Now |
+| --- | --- | --- |
+| Knight's cape | up in 48% of frames, tip over shoulders 16% | up 0%, no turns (its intro rise from the ground aside) |
+| Heroes' scarves and hair | 4 to 8 turns in 40 s | 0 to 1 a minute |
+| Assassin's scarf | 2 turns, up 35% | 0 turns |
+| Kairo's hair | 1 turn | 0 turns |
+| Links stretched | (not measured) | none |
+
+What still counts as a "turn" for Lune and Eos is a jump where they turn round as they fall. The hair or ribbon
+flips over the head, then swings back under on landing. Each half is what real cloth would do; the counter adds
+the two together.
+
+Playtest checklist:
+- Does the Knight's cape look like heavy cloth now: trailing a lunge, swinging past a stop, never looping?
+- Do the heroes' scarves and Lune's hair feel natural in jumps, dashes and turns?
+- Anything else that moves oddly? Name it and the watcher can be pointed at it.
 
 ## Eos: a full sheath is a ready draw; shorter Moves page (v2.9c)
 

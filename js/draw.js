@@ -70,6 +70,35 @@
     for (let i = 0; i < n; i++) pts.push({ x, y: y + i * 2 });
     return pts;
   };
+  // (v2.9d) Keeps a hanging chain (cloth, hair, a scarf) hanging. base is the way it naturally lies (straight
+  // down, or streamed back by the air): the first link may swing o.root either side of it, each link after
+  // may bend o.bend from the one above, and none may swing more than o.max from it. Without this a chain
+  // with speed of its own could swing right over the top and round, like a weight on a string.
+  // (Each link keeps the length it had; a point that is moved takes its last position with it, so a chain
+  // that carries its own speed (a verlet chain's px, py) is not flung by the correction.)
+  const HANG_L = [];
+  D.hang = function (pts, base, o) {
+    o = o || {};
+    const root = o.root == null ? 1.2 : o.root, bend = o.bend == null ? 0.6 : o.bend, max = o.max == null ? 2.3 : o.max;
+    const n = pts.length;
+    for (let i = 1; i < n; i++) HANG_L[i] = Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y);
+    let prev = 0;
+    for (let i = 1; i < n; i++) {
+      const a = pts[i - 1], q = pts[i], d = HANG_L[i];
+      if (!(d > 0.01)) continue;
+      const rel = ((((Math.atan2(q.y - a.y, q.x - a.x) - base + Math.PI) % G.TAU) + G.TAU) % G.TAU) - Math.PI;
+      let r = i === 1 ? G.clamp(rel, -root, root) : G.clamp(rel, prev - bend, prev + bend);
+      r = G.clamp(r, -max, max);
+      const ang = base + r, nx = a.x + Math.cos(ang) * d, ny = a.y + Math.sin(ang) * d;
+      const mx = nx - q.x, my = ny - q.y;
+      if (mx * mx + my * my > 1e-6) {
+        q.x = nx; q.y = ny;
+        if (q.px != null) { q.px += mx; q.py += my; }
+      }
+      prev = r;
+    }
+  };
+
   // o: seg (link length), grav, drift (x speed away from the facing), face, wave, heavy
   D.chainStep = function (pts, ax, ay, dt, o) {
     pts[0].x = ax; pts[0].y = ay;
@@ -140,6 +169,9 @@
       const goal = want[i] + (i ? (st.a[i - 1] - want[i - 1]) * fol : 0);
       const c = { x: st.a[i], v: st.v[i] + push * (0.3 + 0.7 * q) * dt };
       springStep(c, goal, dt, w, z);
+      // (v2.9d) o.lo / o.hi: the joint stops there (a cape cannot swing over the top), and its speed with it
+      if (o.lo != null && c.x < o.lo) { c.x = o.lo; if (c.v < 0) c.v = 0; }
+      if (o.hi != null && c.x > o.hi) { c.x = o.hi; if (c.v > 0) c.v = 0; }
       st.a[i] = c.x; st.v[i] = c.v;
     }
     return st.a;

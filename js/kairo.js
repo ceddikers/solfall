@@ -1849,6 +1849,8 @@
       b.vx = G.clamp((b.x - ox) / dt * keep, -vm, vm); b.vy = G.clamp((b.y - oy) / dt * keep, -vm, vm);
       if (!isFinite(b.x + b.y + b.vx + b.vy)) { b.x = a.x; b.y = a.y + o.seg; b.vx = 0; b.vy = 0; }
     }
+    // (v2.9d) it hangs along its drift (up, when his hair rises with his power) and cannot loop round
+    D.hang(pts, Math.atan2((o.grav || 40) * 2.5, wind), { root: 1.15, bend: 0.55, max: 2.1 });
   }
   // The Shadow Partner's own motion: it makes each of his blows half a second after he does (as its
   // hazard does), winding up for it first, then back to its guard; and its parts on springs like his.
