@@ -53,7 +53,7 @@
     const run = R();
     if (run.corrupted.includes(id)) return 'corrupt';
     if (run.beaten.includes(id)) return 'sealed';
-    return run.runWon() ? 'sealed' : 'open';
+    return run.runWon() || run.trialsWon() >= G.TRIALS ? 'sealed' : 'open'; // (v2.9a: six trials, then only the last portal)
   }
   let portalSt = [], portalKey = '';
   function portals() {
@@ -303,8 +303,16 @@
       if (st === 'corrupt') { G.audio.play('roar'); F.shake(8); }
       G.enterPortal(s.boss, st === 'corrupt');
     } else if (s.id === 'seventh') {
+      // (v2.9a) six trials won: it opens on Sol
+      if (run.solOpen()) {
+        if (!offerTaken()) { G.audio.play('empty'); say('Take from the offering first'); return; }
+        if (G.relics.pending()) { G.audio.play('empty'); say('Your relic stirs at the fire'); return; }
+        G.audio.play('uiSelect'); G.audio.play('charge', { dur: 0.8 }); F.flash('255,250,236', 0.7, 0.8); F.shake(6);
+        G.enterPortal('sol', false);
+        return;
+      }
       G.audio.play(run.runWon() ? 'pulse' : 'uiMove', { k: 0.4 });
-      say(run.runWon() ? 'It stirs, but does not open. Not yet.' : 'Dormant');
+      say(run.runWon() ? 'Its light is yours now' : 'Dormant');
     } else if (s.id === 'home') {
       G.audio.play('uiSelect');
       G.toHub('gate');
@@ -1093,12 +1101,14 @@
   function drawSeventh(ctx, t) {
     const x = SEVENTH_X;
     if (!seen(x, 300)) return;
-    const { poly, glow, block, diamond, STONE, STONE2 } = paint, stir = R().runWon(), hw = 78, top = FLOOR - 360, cy = FLOOR - 190;
-    const pulse = stir ? 0.5 + 0.5 * Math.sin(t * 1.6) : 0;
+    const { poly, glow, block, diamond, STONE, STONE2 } = paint, open = R().solOpen(), stir = open || R().runWon(), hw = 78, top = FLOOR - 360, cy = FLOOR - 190;
+    const pulse = stir ? (open ? 0.75 + 0.25 * Math.sin(t * 3) : 0.5 + 0.5 * Math.sin(t * 1.6)) : 0;
     glow(ctx, '236,226,255', x, cy, 260, 0.06 + 0.22 * pulse);
     ctx.save();
     ctx.beginPath(); ctx.moveTo(x - hw, FLOOR - 16); ctx.lineTo(x - hw, top + hw); ctx.arc(x, top + hw, hw, Math.PI, 0); ctx.lineTo(x + hw, FLOOR - 16); ctx.closePath(); ctx.clip();
     ctx.fillStyle = '#04030a'; ctx.fillRect(x - hw, top, hw * 2, FLOOR - top);
+    // (v2.9a) open: white noon light pours out of it
+    if (open) { const g = ctx.createRadialGradient(x, cy, 10, x, cy, 220); g.addColorStop(0, 'rgba(255,252,240,' + (0.85 + 0.15 * pulse) + ')'); g.addColorStop(0.5, 'rgba(255,226,160,0.5)'); g.addColorStop(1, 'rgba(255,200,120,0.1)'); ctx.fillStyle = g; ctx.fillRect(x - hw, top, hw * 2, FLOOR - top); }
     if (stir) {
       ctx.globalCompositeOperation = 'lighter';
       ctx.drawImage(F.glow('236,226,255'), x - 90, cy - 170, 180, 340);
@@ -1175,7 +1185,7 @@
     }
     if (s.id === 'door') return ['The Doorway', 'Someone sits in the light inside, waiting. A duel: lose it, and you lose nothing.', 'step through'];
     if (s.id === 'duel') return ['The Duelling Shade', 'It dashes at you, six times at most. Strike it three times before its blade touches you and it leaves a relic.', 'duel'];
-    if (s.id === 'seventh') return ['The Last Portal', run.runWon() ? 'It stirs, but does not open. Not yet.' : 'Dormant. It waits for ' + G.roman(G.RUN_FIGHTS) + ' trials won (' + run.beaten.length + ' of ' + G.RUN_FIGHTS + ').', run.runWon() ? 'touch it' : ''];
+    if (s.id === 'seventh') return ['The Last Portal', run.solOpen() ? 'Open. Light pours out of it: she is waiting on the other side.' : run.runWon() ? 'Spent. Its light is yours.' : 'Dormant. It waits for ' + G.roman(G.TRIALS) + ' trials won (' + run.trialsWon() + ' of ' + G.TRIALS + ').', run.solOpen() ? 'step through' : run.runWon() ? 'touch it' : ''];
     if (s.id === 'portal') {
       const B = G.bosses[s.boss], st = portalState(s.boss), ready = offerTaken();
       if (st === 'corrupt') return ['Corrupted: ' + B.name, 'Optional. Far stronger, and it does not count as a trial. Win it for a second relic and triple Sunshards.', ready ? 'enter, if you dare' : 'take from the offering first'];
@@ -1220,7 +1230,8 @@
     if (REST.msgT > 0) text(ctx, REST.msg.toUpperCase(), p.x, p.y - 104, 15, paint.GOLD, Math.min(1, REST.msgT * 2));
     if (!G.ui.current) {
       text(ctx, 'THE CROSSROADS', cam + W / 2, 40, 20, '236,233,244', 0.75, '400');
-      const sub = G.relics.pending() && run.runWon() ? 'All ' + G.roman(G.RUN_FIGHTS) + ' trials won  \u00b7  your relic stirs at the fire, one last time' : run.runWon()
+      const sub = run.solOpen() && !G.relics.pending() ? 'Six trials won  \u00b7  ' + (offerTaken() ? 'the last portal is open' : 'take from the offering, then the last portal')
+        : G.relics.pending() && run.runWon() ? 'All ' + G.roman(G.RUN_FIGHTS) + ' trials won  \u00b7  your relic stirs at the fire, one last time' : run.runWon()
         ? 'All ' + G.roman(G.RUN_FIGHTS) + ' trials won' + (run.corrupted.length ? '  ·  ' + (run.corrupted.length > 1 ? 'corrupted portals wait' : 'a corrupted portal waits') + ', if you dare  ·  or the way home, behind you' : '  ·  the way home is behind you')
         : G.relics.pending() ? 'Trial ' + G.roman(run.trial) + ' won  \u00b7  your relic stirs at the fire' : (run.offerKind === 'relic' ? 'The corruption is cleansed  ·  take a relic, then choose a portal' : 'Trial ' + G.roman(run.trial) + ' of ' + G.roman(G.RUN_FIGHTS) + ' won  ·  take from the offering, then choose a portal');
       text(ctx, sub, cam + W / 2, 66, 12, '236,233,244', 0.45, '500');

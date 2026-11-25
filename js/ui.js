@@ -382,7 +382,7 @@
   // ---- (v2.8a) The Boss Journal: a page for each boss, an entry for each of its moves. A move you have not
   // met is only a blank line; once met, its name, the phases it comes in, what it does and how to read it
   // (js/journal-data.js, made from the bosses' own notes), and how often it has hit you and felled you.
-  const J_ORDER = ['warden', 'mage', 'assassin', 'knight', 'wolf', 'leviathan', 'kairo', 'champion'];
+  const J_ORDER = ['warden', 'mage', 'assassin', 'knight', 'wolf', 'leviathan', 'kairo', 'champion', 'sol'];
   const jRec = (b) => (G.meta.journal || {})[b] || {};
   U.showJournal = function () {
     Array.from(el.journalTabs.children).forEach((it, i) => {
@@ -939,7 +939,7 @@
       U.show('win');
       return;
     }
-    el.winOver.textContent = res.corrupt ? 'The corruption is cleansed' : (res.wonNow ? 'The run is won' : 'Victory') + ' \u00b7 trial ' + G.roman(res.trial) + ' of ' + G.roman(G.RUN_FIGHTS);
+    el.winOver.textContent = res.sol ? 'The sun is yours' : res.corrupt ? 'The corruption is cleansed' : (res.wonNow ? 'The run is won' : 'Victory') + ' \u00b7 trial ' + G.roman(res.trial) + ' of ' + G.roman(G.RUN_FIGHTS);
     // feats done in this fight are always named, whatever else there is to say
     const feats = res.meta.lines.filter((l) => l.indexOf('Feat: ') === 0).join(' · ');
     el.winBest.textContent = res.meta.relic ? 'Trophy won: ' + res.meta.relic.name + ' joins the relics you can be offered.' + (feats ? ' ' + feats : '')
@@ -951,7 +951,7 @@
     // trials (rest.js), not here. A portal that has just turned corrupted is named.
     const turned = res.newCorrupt && G.bosses[res.newCorrupt] ? 'A portal has turned corrupted: ' + G.bosses[res.newCorrupt].short : '';
     el.winPick.textContent = [
-      res.corrupt ? 'A second relic waits on the road' : res.done ? 'All ' + G.roman(G.RUN_FIGHTS) + ' trials won' : 'Trial ' + G.roman(res.trial + 1) + ' of ' + G.roman(G.RUN_FIGHTS) + ' lies ahead',
+      res.corrupt ? 'A second relic waits on the road' : res.sol ? 'The run is won' : res.trial === G.TRIALS ? 'Six trials won: the last portal is open' : res.done ? 'All ' + G.roman(G.RUN_FIGHTS) + ' trials won' : 'Trial ' + G.roman(res.trial + 1) + ' of ' + G.roman(G.RUN_FIGHTS) + ' lies ahead',
       turned || (res.done && waiting ? (waiting > 1 ? 'Corrupted portals still wait' : 'A corrupted portal still waits') : ''),
     ].filter(Boolean).join(' \u00b7 ');
     const goOn = !res.done || waiting > 0;

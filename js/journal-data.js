@@ -657,5 +657,159 @@ G.JOURNAL = {
    "name": "Blackdawn",
    "text": "He leaps to the far side, every weapon on his back alight, and lets the seventh door's black go in one beam. It reaches you and your light holds it. Three flashes run down it: press attack as each meets the light. Two of three and his beam breaks and so does he; fewer and it goes through you."
   }
+ },
+ "sol": {
+  "noonray": {
+   "name": "Noonray",
+   "text": "The sun drifts to one side of the sky, its crown flares, a gong, and it blazes white: the ridge burns but for the gnomon's shade. The long form (her crown flaring twice): she keeps drifting while she burns, so the shade swings across the ridge and you walk with it."
+  },
+  "palm": {
+   "name": "Palm Press",
+   "text": "A hand rises high over you and its shadow gathers under it; it slams flat. An open hand rests where it fell (strike it); a fist sends a ripple out along the ridge both ways (jump it)."
+  },
+  "clap": {
+   "name": "Meeting",
+   "text": "Her arms spread to the edges of the ridge and the sun draws its corona in; both hands come in along the floor and meet in the middle. Jump a hand or dash through it; then they are stuck together."
+  },
+  "rake": {
+   "name": "Finger Rake",
+   "text": "A hand comes down to one end of the ridge. Knuckles first, it rakes along the floor (jump); palm first, held upright, it sweeps at head height (stay down, or dash under it)."
+  },
+  "volley": {
+   "name": "Crown Volley",
+   "text": "The points of her crown light one by one; as many rays come down as points lit, the first where you stand. Count them; stand between."
+  },
+  "tears": {
+   "name": "Sun-Tears",
+   "text": "The sun swells at its lower edge; burning drops fall from it and roll along the ridge."
+  },
+  "kindhand": {
+   "name": "Kind Hand",
+   "text": "She rises to the top of the sky; the gnomon's shade shrinks to nothing. One hand comes low over you, open, and gives you shade while the ridge burns. When the burning stops, watch its fingers: still open, it lifts away; curling slowly, it is about to close on what is under it."
+  },
+  "pinch": {
+   "name": "Pinch",
+   "text": "Two fingers of a hand follow you along the ridge from above your head; they stop, and flash; then they pluck. Caught, you are lifted into her light, burned, and thrown. Dash as they flash."
+  },
+  "drum": {
+   "name": "Finger Drum",
+   "text": "A hand hangs low over one end of the ridge, fingers rippling in a rhythm you can hear; then the fingertips come down one after another all the way along the ridge. Go behind the wave, or jump each beat as it reaches you."
+  },
+  "lens": {
+   "name": "Burning Lens",
+   "text": "A hand cups near the sun and gathers her light into a point on the ridge, which hunts you, slowly, and burns where it stops. It prefers the shade: no shade is safe from it. The cupping hand hangs low and still while it works (strike it from the gnomon)."
+  },
+  "swat": {
+   "name": "Swat",
+   "text": "A hero who stays high over the ridge: a hand draws back to her shoulder, palm sideways, and swats across at that height. Come down."
+  },
+  "hammer": {
+   "name": "Hammer of Noon",
+   "text": "Both hands rise over the middle of the ridge, fingers lacing together; they come down as one. The blow shakes the whole ridge: be in the air when it lands. Then they lie there a while."
+  },
+  "meridian": {
+   "name": "Meridian",
+   "text": "How high she lifts the blade says how many cuts: level with her crown, two (a falling cut and its rise); straight up, three, the third a leaping cut that comes down on you."
+  },
+  "verdict": {
+   "name": "Verdict",
+   "text": "Two cuts that are always the same; the third is read from her body on the second: the blade over her shoulder, an overhead (dash through); low behind her, a sweep (jump); her weight on her back foot, a thrust (dodge it, perfectly if you can)."
+  },
+  "horizon": {
+   "name": "Horizon",
+   "text": "She drops her back knee and lays the blade behind her, near the floor: a wide low sweep that leaves a line of fire on the ridge. Jump it, and do not land in the fire."
+  },
+  "crossing": {
+   "name": "Crossing",
+   "text": "From one knee, her crown flaring, she crosses the whole ridge in one cut and leaves it burning behind her. At the far side: if her head turns back, she comes back the same way."
+  },
+  "fallingsky": {
+   "name": "Falling Sky",
+   "text": "She lifts her blade to the broken sky and pieces of it fall, each one's shadow growing where it will land. How she holds the blade says how they fall: straight up, scattered over the ridge; pointed at you, a line that walks to you; circled over her head, a ring round you, then one on you."
+  },
+  "glare": {
+   "name": "Glare",
+   "text": "She stands utterly still, her blade held flat, her eyes shut: she is never still otherwise. A blade struck against her is answered at once. Her own light turned on her (a special) breaks it."
+  },
+  "zenith": {
+   "name": "Zenith Fall",
+   "text": "She crouches and looks straight up, then leaps out of sight; her shadow grows on the ridge where you stand (it follows you, then stops). She comes down blade first, and it sticks."
+  },
+  "dayrise": {
+   "name": "Dayrise",
+   "text": "A deep crouch, the blade pointing down by her heel: a rising cut that throws you up. Step back from it; she lands open."
+  },
+  "sunhold": {
+   "name": "Sunhold",
+   "text": "She reaches out with her free hand, palm glowing, leaning in: a grab. Caught, you burn in her hand and she throws you. Dash through her as she comes; a perfect dodge leaves her wide open."
+  },
+  "solstice": {
+   "name": "Solstice",
+   "text": "The blade tucked behind her back, her hips wound round: she comes forward spinning, the blade all the way round her, three times. Back away, or go over her."
+  },
+  "afterglow": {
+   "name": "Afterglow",
+   "text": "She dashes through you; the shape she leaves at the start of it brightens, and a beat later it cuts along the whole of her path. Two dodges: one for her, one for her echo."
+  },
+  "returning": {
+   "name": "Returning Noon",
+   "text": "A backhand grip, the arm drawn back: she throws the blade. It flies out low along the ridge (jump it) to the wall and comes back high (stay down). While it is gone, she is open."
+  },
+  "hours": {
+   "name": "Hours",
+   "text": "Her blade slung on her back, a deep coil: she leaps to a wall and crosses the ridge from wall to wall, three times. Where she clings to the wall says how high she will cross: high, stay down; low, jump. Stay in the middle and count."
+  },
+  "gnomons": {
+   "name": "Gnomons",
+   "text": "She drives her blade into the ridge and pillars of light burst up out of it in a row. Her hand pushing down on the pommel, they march outward from her; pulling it back, they march in from the walls towards her."
+  },
+  "pursuit": {
+   "name": "Pursuit",
+   "text": "She leaps up after you and cuts you down out of the air."
+  },
+  "flashover": {
+   "name": "Flashover",
+   "text": "Her hair and crown flare white and she will not be stopped: five cuts coming forward, faster each time; then she falls to one knee, spent. Live through it."
+  },
+  "umbra": {
+   "name": "Umbra Step",
+   "text": "Her rim goes out entirely; then embers glow on the ridge, one after another, walking to you. Where the last one glows she steps out of the dark, cutting. Dodge into the last ember."
+  },
+  "corona": {
+   "name": "Corona Ring",
+   "text": "Her crown spins faster and brightens; she throws it. It flies out across the ridge and comes back to her: jump it going and jump it coming."
+  },
+  "blacknoon": {
+   "name": "Black Noon",
+   "text": "She flares, and the light she throws off lies in pools on the ridge; then the dark burns in earnest, everywhere but in the pools and close to her. Get into the light."
+  },
+  "snapshot": {
+   "name": "Snapshot",
+   "text": "A flare lights the ridge for an instant and shows you how she stands; then the dark, and she does what you saw: crouched low, she sweeps the floor (jump); blade high, she falls on you from above (move)."
+  },
+  "falsesuns": {
+   "name": "False Suns",
+   "text": "She splits into three in the dark. The real one's rim flickers like a flame breathing; the false ones burn steady. Strike a false one and it bursts into light (and Starlight for you); then all three cut at once. (The false ones' cuts are only light: they do not hurt.)"
+  },
+  "whip": {
+   "name": "Corona Whip",
+   "text": "The rim peels off her as a lash of fire, the only lit thing on the ridge: lashed low along the floor (jump), or high across (stay down)."
+  },
+  "drain": {
+   "name": "Drain",
+   "text": "She breathes in and her light draws in with it: the lit ground round her shrinks, and the Starlight runs out of you towards her. She cannot move while she drinks it: strike her."
+  },
+  "total": {
+   "name": "Total Eclipse",
+   "text": "Even your own light goes out. For two heartbeats there is only her rim, drawing in to a closed ring of fire round her; when it closes it bursts. Dash as it closes."
+  },
+  "sunspots": {
+   "name": "Sunspots",
+   "text": "Dark motes hang in the air round the ridge; they show only in light (near her, or near you). After a moment they fall."
+  },
+  "lastlight": {
+   "name": "Last Light",
+   "text": "She rises into the sky as a black sun and draws in every light left. What is left of her own light falls out of her as steps of light, one above another. Climb them while the dark rains; at the top your Dawnbreak is full: strike the black sun. Take too long and she lets the Duskbreak go, and the steps fall and rise again."
+  }
  }
 };

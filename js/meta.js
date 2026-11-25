@@ -71,7 +71,7 @@
   // (v2.6b) A boss's trophy is won by beating it as the run's last trial before the final door (trial
   // VI, where it is at its strongest), not by beating it once anywhere: a full run wins one trophy, not
   // all of them. Not from a corrupted portal (not a trial). The Champion's is his own: beat his duel.
-  M.trophyHere = (bossId) => bossId === 'champion' || (!G.run.corrupt && G.run.trial >= G.RUN_FIGHTS);
+  M.trophyHere = (bossId) => bossId === 'champion' || (bossId !== 'sol' && !G.run.corrupt && G.run.trial >= G.TRIALS); // (v2.9a: the sixth, before Sol)
 
   // ------------------------------------------------------------------ Sunshards
   // Tests and god mode earn nothing (G.debug.meta = true forces it, for checking this file).

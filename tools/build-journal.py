@@ -8,8 +8,8 @@ import json, os, re
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FILES = {'warden': 'boss.js', 'mage': 'mage.js', 'assassin': 'assassin.js', 'knight': 'knight.js', 'wolf': 'wolf.js',
-         'leviathan': 'leviathan.js', 'kairo': 'kairo.js', 'champion': 'champion.js'}
-SKIP = {'reckoning'}  # (a boss's Reckoning is its own moment, named on the screen when it comes)
+         'leviathan': 'leviathan.js', 'kairo': 'kairo.js', 'champion': 'champion.js', 'sol': 'sol.js'}
+SKIP = {'reckoning', 'answer', 'antiair'}  # (a boss's Reckoning is its own moment, named on the screen when it comes)
 
 
 def attacks_table(src):

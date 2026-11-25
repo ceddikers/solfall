@@ -2,7 +2,7 @@
 
 A side-on boss rush for the browser: four heroes, seven three-phase bosses, played as a run of
 ever-harder trials. You pick a hero and a relic before the run and win a boon after each victory.
-Version 2.8a.
+Version 2.9a.
 
 This is an early slice of a planned boss-rush roguelite (short runs, a boon after each boss,
 bosses drawn from a pool). A run is seven trials, one for each boss, each harder than the last: the first boss
@@ -114,6 +114,225 @@ hero (`tools/feel-check.js`).
 - Settings, Reset progress erases Sunshards, upgrades, trophies and records (it has to be chosen twice).
 
 Not done: touch controls, a colour-blind alternative to red-orange warnings, gamepad rebinding.
+
+## Sol, the Falling Sun: the final boss (v2.9a)
+
+Asked: "Looks good, make sure she has a LOT of unique moves (do research) and the fight and transitions feel epic
+especially when she comes to fight head on in phase 2", on the brief "Solfall boss brief: Sol, the Falling Sun"
+(Claude Doc). Built in `js/sol.js` (about 2,600 lines), with 38 moves. Before building I researched how acclaimed
+final bosses are made. The main lessons were:
+- One tell always gives the same result.
+- Each phase tests a different skill.
+- Motifs carry from form to form.
+- Transitions happen in the arena.
+- The last moment is a single act.
+
+**The run.** A run is now six trials (six of the seven bosses, one left out again), then the seventh portal at the
+end of the road opens, pouring white light, and Sol is behind it. Beating her wins the run ("The sun is yours") and
+gives 2 more mastery. A boss's trophy is now won at the sixth trial. Falling to her ends the run, except once: the
+first time, you **rise again** at the start of the form she felled you in, with everything you carry.
+
+**Noon (12 moves).** She is too big to fit: the sun itself, with no face, in a crown of blades of light, and two
+black clawed hands on arms of light that come out of it. Her light burns, and the gnomon's real shadow is safe.
+It is worked out from where the sun is, so it swings and stretches as she drifts, and jumping high leaves it. You strike her hands. Breaking both drops
+her face to the ridge (strike it for double), and she rises with a ring of light to dash through.
+
+| Move | How it works |
+| --- | --- |
+| Noonray | Short, or a long drift you walk with |
+| Palm Press | An open hand rests; a fist ripples both ways |
+| The Meeting | A clap along the floor |
+| Finger Rake | Low (jump) or high (stay down) |
+| Crown Volley | Count the lit points |
+| Sun-Tears | Rolling drops |
+| The Kind Hand | Shade under her hand; when the fingers curl, it grabs |
+| Pinch | A grab that locks with a flash |
+| Finger Drum | Taps across the whole ridge |
+| Burning Lens | A hot spot that hunts the shade |
+| Swat | Answers a hero who stays in the air |
+| Hammer of Noon | Be airborne when it lands |
+
+**The Fall.** Her face cracks, her hands break into light, the sky splits, and she falls as a comet. Then a
+white impact and silence. She kneels in the crater at your size. There is a long standoff, she opens her eyes,
+and she **pulls the gnomon out of the ridge, and it burns into her blade**: the shade that kept you safe
+becomes her sword. Now a shadow on the ridge means something is landing there. She has 16 moves, read from how
+she holds the blade:
+
+| Move | How it works |
+| --- | --- |
+| Meridian | Two or three cuts, by how high the blade is lifted |
+| The Verdict | The third cut is read from her pose on the second |
+| Horizon | Leaves fire on the floor |
+| The Crossing | Comes back if her head turns |
+| Falling Sky | Scatter, line or ring, by her blade |
+| Glare | A counter stance; your special breaks it |
+| Zenith Fall | Her blade sticks: punish it |
+| Dayrise | A rising cut |
+| Sunhold | A grab |
+| Solstice | An advancing spin |
+| Afterglow | Her echo cuts a beat later |
+| The Returning Noon | A thrown blade: out low, back high |
+| The Hours | Wall to wall three times; where she clings is the height |
+| Gnomons | Pillars marching out or in |
+| Pursuit | Anti-air |
+| Flashover | Once, past half: unstoppable, then spent |
+
+The last cut of a string leaves a trail of light hanging that burns for a moment. Her stagger is a knee.
+
+**Eclipse.** She drives the blade into her own crown, and the light drains out of the world over a held note
+and a heartbeat. Here **the dark burns**: stay in her light (near her) or in the pools her flares leave. This is
+the opposite of Noon, and of the Champion's dark, where your own light was what mattered. Hitting her during a
+flare blinds her (her stagger). She has 10 new moves, plus six carried from the Fall that read the same in the
+dark:
+
+| Move | How it works |
+| --- | --- |
+| Umbra Step | Embers walk to where she steps out |
+| Corona Ring | Jump it out, jump it back |
+| Black Noon | Get into a pool of light |
+| Snapshot | Do what the flare showed |
+| False Suns | The real rim breathes; false ones burst into light and Starlight |
+| Corona Whip | Low or high |
+| Drain | Strike her while she drinks |
+| Total Eclipse | Dash as the ring closes |
+| Sunspots | Seen only in light |
+| The Last Light | Her finale, below |
+
+**The Last Light** (below 12%): she rises as a black sun and steps of light come up out of the ridge. Climb
+them while the dark rains. At the top your Dawnbreak fills: strike the black sun. If you take too long, her
+Duskbreak hits and the steps fall and rise again. When she ends, she kneels, says "Then carry it", breaks into
+light that pours into the hero, and dawn comes up for the first time.
+
+She has her own music: one theme that is slow bells at noon, fast drums in the Fall, and near-silence in the
+dark, which comes back loud for the last light. She is in the Boss Journal (38 entries).
+
+**Changed from the brief:**
+- **The Eclipse.** It burns in the dark around you rather than shrinking your own light circle, because the
+  Champion already did that.
+- **The finale.** It is a climb, not a beam struggle, because the Champion and Kairo already have those.
+- **The retry.** It starts from the form you fell in, as the research warned against replaying a whole finale.
+
+**Checked** in the preview:
+- All 38 moves run without errors, and so do every scene, the rise again, the finale, the ending and "The sun
+  is yours".
+- The road opens the last portal after six wins.
+- Screenshots of Noon, the Fall, the Eclipse and the dawn after her.
+- The scripted player (`tools/clear-rates.js`, which now knows her shade, her sweeping hands and the climb) won
+  4 of 40 fights at trial VII. Half reached the Eclipse. Win times were 78 to 94 seconds of fight.
+- She was tuned on those numbers:
+  - Health 3,900.
+  - Her hands lower.
+  - One burn takes one health.
+  - Trails only on the last cut of a string.
+  - She takes more damage in the dark.
+
+**Art pass** (asked first "sol definitely needs better art work it looks so weird now / it doesnt need a face",
+then "She definitely needs to look better": the art style felt too different from the game, and the fallen
+form should be "anime celestial"). She is now drawn the way the rest of the game is: flat muted shapes, a thin
+line of light at the edges, and glow only at the points that matter.
+- **Noon:** the sun has no face (redrawn again after "the sun could look better"). It is a wheel of flat light:
+  - Bands from a deep gold edge to a pale heart, a thin dark ring inside the rim (the eclipse to come), and her
+    glyph (a ring of twelve hour points and a turning four-pointed star).
+  - An hour ring round it, like a sundial's.
+  - A double crown of blades of light turning against each other, with slow shafts of light falling from it
+    across the sky.
+  - When it blazes for Noonray, the disc burns white from the heart out and the crown reaches out. Her hands are black silhouettes with a gold rim and a glyph on the back,
+  in the Warden's manner, on thin arms of light. When both hands break, the sun sinks to the ridge: strike it.
+- **The Fall:** a celestial knight at the hero's size:
+  - Ivory plate (breastplate, shoulders, vambraces, greaves) over a dark bodysuit, edged in gold.
+  - A long armoured skirt split at the front, with a sash of light at the waist.
+  - Very long dark hair in three strands that stream and wave behind her.
+  - Glowing eyes.
+  - Her halo is a small copy of the noon sun's wheel: a crown of short blades, an hour ring turning the
+    other way, and four points of light.
+  - **Wings** of blades of light, the sun's crown made hers (added after "now step up the other form
+    models"). At rest they hang folded down her back like a cloak of gold blades. They open into a swept fan
+    when she gathers light (the Crossing, Flashover, Corona Ring, Black Noon, Corona Whip) and in the air, so an
+    open wing is a tell too.
+  - The blade of noon is a dark curved blade with a hot edge.
+- **The Eclipse:** all of it turns black with a burning ember rim. A black sun fills her halo, and her wings
+  are black blades edged in ember.
+- **The Last Light:** the black sun she becomes is the noon sun's dark twin: a crown of black blades edged
+  in ember over ember spikes, a black disc with the hours and her star drawn on it in ember.
+- **A fix found while checking it:** a move cut short by a stagger or a new phase could leave her stuck. She
+  could keep blocking every blow in her Glare stance, stay unstoppable after Flashover, stay hidden, or stay
+  without her blade. All of that now clears.
+
+**Not played by hand.** Not done: the sun crown on the echo of a hero who has beaten her (the win is recorded
+under `solfall.sol` for it); choosing her in practice; and weapon forms (next, with their own brief).
+
+Playtest checklist:
+- Win six trials: does the open last portal feel like a moment?
+- Noon: can you find and keep the gnomon's shade, and is breaking her hands worth chasing?
+- The Fall: does her landing and the gnomon becoming her blade feel as big as you wanted? Is the duel fair?
+- Eclipse: is "stay in her light" readable? Too punishing?
+- The Last Light: is the climb a good last act? Does the ending land?
+- Is she too hard? The scripted player won 10%, against about 40% for Kairo.
+- Does she look like she belongs in the game now: the black hands at Noon, the ivory knight with the halo in
+  the Fall?
+
+## Eos's draw: two whole strings to open the sheath (v2.9a)
+
+Asked: "eos might be too strong with the damage block ... my friend is just charging and blocking all the
+damage basically", then "you need to do two full left click combos to enable even doing the charge".
+
+**The problem.** Holding the charge never blocked anything. Letting go did: every draw, even the smallest,
+carried him through attacks untouched, and a draw was always close. One cut that landed plus a 0.17 s hold
+was enough. A draw through a blow was a perfect dodge, which also gave the dash back. So the attack button was a
+second dodge that chained with the first. And his string filled all three marks, so a full 100 draw followed
+every string almost at once.
+
+**Now:**
+- **The sheath opens after two whole strings.** A string counts when all three of its cuts land; one that
+  misses a cut does not.
+  - Until the sheath is open, holding the button does nothing: no Focus, no slowing down, no draw.
+  - Once it is open, holding gathers Focus from nothing as before (0.3, 0.65 and 1.05 s for one, two and
+    three marks), and the draw is worth 18, 46 or 100.
+  - Any draw empties the sheath again.
+  - Being hit loses the Focus in the stance, but not the strings already landed.
+- **The string no longer lights marks.** That old head start ("hit, hit and hold starts at two") is gone.
+- **Every draw still passes through attacks**, but it is the dash's dodge: it puts the dash on its cooldown,
+  and a perfect dodge made by a draw no longer gives the dash back. So the two do not chain.
+- **You can see it.** Two small lights at the mouth of the sheath fill with each whole string, with a soft
+  chime. When both are lit, a brighter chime and flash, and the sheath is traced in breathing gold until the
+  draw.
+- **Unchanged:** Still Point, whose turned blow still lights all three marks for a free full draw that does not
+  need the sheath or empty it. (It was toned down for a turn by mistake, then put back.)
+- **Second Sun** (Eos's boon) still pays off a full draw: hold again within 3 s and the sheath is open at
+  once, at two marks.
+- A bug found while checking: the sheath's count carried over from one fight to the next. It now starts empty
+  every fight.
+
+**Measured:**
+- **Damage a second on a boss that does not fight back** (20 s):
+
+| Hero and style | Before | Now |
+| --- | --- | --- |
+| Eos, string then hold, repeat | 84 | 57 (a full draw about every 4.8 s) |
+| Eos, tapping only | 48 | 48 |
+| Vesper, tapping | 45 | 45 |
+| Aster, tapping | 50 | 50 |
+
+- **The scripted player** (trial III, no boons, Knight, Wolf, Warden, Kairo and Assassin, 50 fights each). It
+  now plays whole strings until the sheath is open:
+
+| Hero | Won | Hits taken a fight | Average win time |
+| --- | --- | --- | --- |
+| Eos before | 78% | 3.5 | 79 s |
+| Eos now | 62% | 5.2 | 109 s |
+| Vesper (unchanged, three runs) | 54% to 70% | 4.6 to 5.1 | 101 to 104 s |
+
+- **Checked by hand in the preview:**
+  - Holding on a fresh fight gathers nothing.
+  - Each whole string lights one more; two open it.
+  - Then holding reaches three marks and the draw empties it.
+  - A string with a missed first cut does not count.
+
+**Playtest checklist:**
+- Is two whole strings the right price, or does it feel slow? Lowering `SHEATH_COMBOS` in `js/player.js` to
+  1 is the gentler setting.
+- Can you see when the sheath is open in the middle of a fight?
+- Can your friend still turtle?
 
 ## A Boss Journal, a daily trial, and costumes (v2.8a)
 

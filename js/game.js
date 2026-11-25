@@ -196,7 +196,14 @@
     R.champFight = true; R.champMet = true;
     G.startFight();
   };
-  G.nextTrial = function () { const left = G.run.left(); G.enterPortal(G.pick(left.length ? left : G.BOSS_IDS), false); };
+  // (v2.9a) once a run, felled by Sol: up again, with all you carry, at the start of the form she felled you in
+  G.riseAgain = function () {
+    G.solFrom = G.solRise; G.solRise = null;
+    G.startFight();
+    G.solFrom = null;
+    G.ui.callout('RISE AGAIN');
+  };
+  G.nextTrial = function () { if (G.run.solOpen()) { G.enterPortal('sol', false); return; } const left = G.run.left(); G.enterPortal(G.pick(left.length ? left : G.BOSS_IDS), false); };
   G.rerollBoons = function () { if (G.run.reroll()) { G.audio.play('uiSelect'); G.ui.fillBoons(); } else G.audio.play('empty'); };
   G.takeBoon = function (i) { G.run.take(i); G.nextTrial(); };
 
@@ -253,6 +260,8 @@
   G.onPlayerDeath = function () {
     G.state = 'dead'; G.deadT = 0;
     if (G.player.lastHit && G.player.lastHit.attack) G.meta.jot(G.boss.id, G.player.lastHit.attack, 'fell'); // (v2.8a: the Boss Journal)
+    // (v2.9a) felled by Sol: once a run, you rise again, at the start of the form she felled you in
+    if (!G.practice && G.boss.id === 'sol' && !G.run.solRetried && !G.debug.boss) { G.run.solRetried = true; G.solRise = G.boss.phase; G.ui.letterbox(false); G.ui.mood('dead'); G.audio.duck(0.35); return; }
     // beaten by the Champion: nothing lost but pride (the road waits, see step)
     if (G.run.champFight && !G.practice) { G.champLost = true; G.lastShards = 0; G.ui.letterbox(false); G.ui.mood('dead'); G.audio.duck(0.35); return; }
     G.lastShards = G.meta.onDefeat();
@@ -305,11 +314,12 @@
     if (wonNow) { const wins = G.store.load('wins', {}); wins[d] = (wins[d] || 0) + 1; G.store.save('wins', wins); }
     const newCorrupt = !G.practice && !corrupt ? R.rollCorruption(id) : null;
     const meta = G.meta.onVictory(grade, id);
-    const costume = G.practice ? null : G.mastery.gain(R.hero, 1 + (wonNow ? 3 : 0)); // (v2.8a: mastery, costumes.js)
+    const costume = G.practice ? null : G.mastery.gain(R.hero, 1 + (wonNow ? 3 : 0) + (id === 'sol' ? 2 : 0)); // (v2.8a: mastery, costumes.js; v2.9a: Sol gives 2 more)
+    if (id === 'sol' && !G.practice) { const sw = G.store.load('sol', {}); sw[R.hero] = (sw[R.hero] || 0) + 1; G.store.save('sol', sw); } // (v2.9a: who has beaten her: the sun crown in the Hall)
     if (R.daily && !G.practice) G.dailyRecord(); // (v2.8a)
-    const offer = corrupt ? R.rollRelicReward() : R.rollOffer();
+    const offer = corrupt ? R.rollRelicReward() : id === 'sol' ? (R.offer = []) : R.rollOffer();
     R.current = null;
-    return { grade, title, newBest, best: best[d], trial, newDepth, done, wonNow, corrupt, newCorrupt, offer, meta, costume };
+    return { grade, title, newBest, best: best[d], trial, newDepth, done, wonNow, corrupt, newCorrupt, offer, meta, costume, sol: id === 'sol' };
   }
 
   // The Champion beaten (champion.js): his trophy and gift (meta.js), and his hilt for the rest of the run.
@@ -341,7 +351,7 @@
     if (a === 'pause') G.pause();
     if (a === 'moves') G.showMoves();
     // no need to wait for the defeat screen: R restarts at once
-    if (a === 'retry' && G.state === 'dead' && !G.champLost) G.newRun();
+    if (a === 'retry' && G.state === 'dead' && !G.champLost && !G.solRise) G.newRun();
   }
 
   // ------------------------------------------------------------------ simulation
@@ -399,6 +409,7 @@
     if (G.state === 'dead') {
       G.deadT += dt;
       if (G.champLost) { if (G.deadT > 2.4 && !G.endShown) { G.endShown = true; G.audio.setIntensity(0); G.toRest(); } }
+      else if (G.solRise) { if (G.deadT > 2.6 && !G.endShown) { G.endShown = true; G.riseAgain(); } }
       else if (G.deadT > 1.7 && !G.endShown) { G.endShown = true; G.audio.setIntensity(0); G.ui.showDead(); }
     }
     if (G.state === 'won') {

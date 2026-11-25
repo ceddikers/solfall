@@ -50,6 +50,10 @@
         case 'blast': if (h.y > FLOOR - 200) out.push([h.x, h.r + 18, h.tele - h.t]); break;
         case 'pool': if (h.t < h.tele + h.active && P.y > FLOOR - 60) out.push([h.x, h.w / 2 + 14, h.tele - h.t]); break;
         case 'mark': out.push([h.x, h.w / 2 + 20, 0.3]); break;
+        // (v2.9a) Sol's: her rays and lens, the sky's falling pieces, her pillars
+        case 'ray': if (h.t < h.tele + 0.2) out.push([h.x, h.w / 2 + 18, h.tele - h.t]); break;
+        case 'fragment': out.push([h.x, h.w / 2 + 18, h.delay - h.t]); break;
+        case 'pillar': out.push([h.x, 44, h.tele - h.t]); break;
         case 'cloud': if (h.mark) out.push([h.mark.x, 34 + 18, h.mark.tele - h.mark.t]); else out.push([h.x, 20, 2]); break;
         case 'arc': if (h.t < h.tele + h.active && Math.abs(h.y - py) < h.r + 40) out.push([h.x, h.r + 30, h.tele - h.t]); break;
         case 'whirl': if (P.y > FLOOR - 110) out.push([B.body.x, h.r + 44, 0.2]); break;
@@ -120,6 +124,14 @@
       if (h.kind === 'wave') {
         const dx = P.x - h.x;
         if (dx * h.dir > 0 && Math.abs(dx) < 105) jump = true;
+      } else if (h.kind === 'box' && h.dir && h.q) {
+        // (Sol's hands sweeping along the ridge: over a low one, under a high one)
+        const dx = P.x - h.q.cx;
+        if (dx * h.dir > -h.q.hw && Math.abs(dx) < h.q.hw + 150) { if (h.low) { jump = true; high = true; } else stayDown = true; }
+      } else if (h.kind === 'tear' && h.rolling) {
+        // (Sol's tears, rolling along the ridge)
+        const dx = P.x - h.x;
+        if (dx * h.dir > 0 && Math.abs(dx) < 100) jump = true;
       } else if (h.kind === 'rime') {
         for (const c of h.cells) if (Math.abs(c.x - P.x) < h.cw / 2 + 26 && c.at - h.t < 0.17 && c.at + h.active - h.t > 0) jump = true;
       } else if (h.kind === 'lane') {
@@ -192,6 +204,25 @@
       }
     }
 
+    // (v2.9a) Sol's light burns: into the shade (at noon) or into the light (in the eclipse), and wait there
+    // (v2.9a) her last light: climb the steps of light, one above another, to the top
+    if (B.id === 'sol' && B.lastLightOn) {
+      const steps = (G.arena.platforms || []).filter((p) => !p.gone && p.rise > 0.9 && p.top < P.y - 20).sort((p, q) => Math.abs(p.x + p.w / 2 - P.x) + (p.top - q.top) * 0 - Math.abs(q.x + q.w / 2 - P.x) || q.top - p.top);
+      const next = steps.sort((p, q) => q.top - p.top)[0];
+      if (next) {
+        const cx = next.x + next.w / 2, d = cx - P.x;
+        hold(d < -20, d > 20);
+        if (Math.abs(d) < next.w / 2 + 60 && P.onGround) press('jump');
+        else if (!P.onGround && P.vy > 0 && P.y > next.top - 10) press('jump');
+        else lift('jump');
+      } else hold(false, false);
+      if (P.ult >= 100) press('ult');
+      return;
+    }
+    if (B.id === 'sol' && G.sol && G.sol.safeX) {
+      const sx = G.sol.safeX();
+      if (sx != null) { const d = sx - P.x; hold(d < -12, d > 12); return; }
+    }
     // ---- what to go for
     const tg = B.active && !B.invuln ? pickTarget(B) : (B.toppled ? pickTarget(B) : null);
     const bow = H.weapon === 'bow';
@@ -305,7 +336,7 @@
     I.pressed.crown = !!(tg && edge < 300);
   }
 
-  // Eos: a short string up close (each cut that lands banks a mark), then hold for the stance, aimed at
+  // Eos: whole strings up close until the sheath is full (v2.9a), then hold for the stance, aimed at
   // the boss, and let go at three marks once the boss is within the draw's carry. With something about to
   // land, any lit mark is let go at once: the draw passes through attacks. Returns false to leave the
   // attack button to the plain rules (out of reach, nothing to do).
@@ -328,8 +359,16 @@
       } else I.down.attack = true;
       return true;
     }
+    // (v2.9a) the stance is closed until two full strings have filled the sheath: until then, whole strings
+    const open = (P.sheath || 0) >= C.SHEATH_COMBOS || P.edge > 0 || P.sun > 0;
+    if (!open) {
+      if (!inReach) return false;
+      if (st.tap) lift('attack'); else press('attack');
+      st.tap = !st.tap;
+      return true;
+    }
     // the string: two cuts while in reach, then into the stance on the next press
-    if (inReach && (st.taps || 0) < 2) {
+    if (inReach && (st.taps || 0) < 2 && P.sun <= 0) {
       if (st.tap) lift('attack'); else { press('attack'); st.taps = (st.taps || 0) + 1; }
       st.tap = !st.tap;
       return true;

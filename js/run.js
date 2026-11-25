@@ -88,11 +88,11 @@
       ],
       down: 11, special: 'guard', specialName: 'Still Point', verb: 'guard',
       blurb: 'Patient and exact. One cut, when it counts.',
-      lines: ['Sheathed blade: a string of three cuts, each that lands a mark on the sheath; hold the attack to gather Focus, let go to draw through the foe', 'The draw passes through attacks; its cut lands when the blade is home. Focus gathers in the air too', 'Still Point: turn a blow aside and the next press is a full draw'],
+      lines: ['Sheathed blade: a string of three cuts; land two whole strings and the sheath is open: hold the attack to gather Focus, let go to draw through the foe', 'The draw passes through attacks; its cut lands when the blade is home. Focus gathers in the air too', 'Still Point: turn a blow aside and the next press is a full draw'],
       how: {
-        attack: 'His blade stays in its sheath. Press for a string: a rising cut out of the sheath (11), a falling cut back across (13), then a wide finisher that steps in (27). Keep the button held after any of them and he sets his feet: Focus gathers, one mark on the sheath at a time, up to three (0.3, 0.65 and 1.05 seconds). Every cut of the string that landed is a mark already: hit, hit and hold starts at two; all three and hold is the third mark at once. Let go to draw: he crosses the ground in a blink and cuts whatever he passes through, for 18, 46 or 100. The cut lands a moment later, when the blade clicks home.',
+        attack: 'His blade stays in its sheath. Press for a string: a rising cut out of the sheath (11), a falling cut back across (13), then a wide finisher that steps in (27). Land all three cuts of a string twice and the sheath is open: two lights at its mouth fill one string at a time, and it is traced in gold when it is open. Then keep the button held and he sets his feet: Focus gathers, one mark on the sheath at a time, up to three (0.3, 0.65 and 1.05 seconds). Before the sheath is open, holding does nothing. Let go to draw: he crosses the ground in a blink and cuts whatever he passes through, for 18, 46 or 100. The cut lands a moment later, when the blade clicks home. Any draw empties the sheath.',
         aim: 'The draw goes where you aim it: at the mouse, or the way you hold, straight up included. A press with down held in the air strikes below and bounces off what it hits.',
-        dash: 'A dash or a jump keeps the Focus you have; being hit loses it, and he walks slowly while he holds it. In the air he can hold the stance too, for about a second a jump, drifting down while Focus gathers a little slower: draw up at what flies. The draw passes through attacks as a dash does, so a draw through a blow is a perfect dodge, and the cut that follows is its Riposte.',
+        dash: 'A dash or a jump keeps the Focus you have; being hit loses it, and he walks slowly while he holds it. In the air he can hold the stance too, for about a second a jump, drifting down while Focus gathers a little slower: draw up at what flies. The draw passes through attacks as a dash does, so a draw through a blow is a perfect dodge, and the cut that follows is its Riposte. It shares the dodge with the dash: it puts the dash on its cooldown.',
         special: 'Still Point: he sets the sheath across his body and waits, for about two thirds of a second. A blow that lands in that time is turned: it does no harm, the swing is stopped, and all three marks light at once, so your next press is a full draw (100). They stay lit for two and a half seconds without the button held. If nothing lands, half the Starlight comes back.',
         ult: 'Horizon: one cut from one side of the arena to the other, for 250. It lands when the blade is home.',
       },
@@ -156,7 +156,7 @@
     { id: 'splitarrow', name: 'Splitting Arrow', tag: 'Signature', max: 1, heroes: ['lune'], desc: 'The heavy arrow splits into three where it first strikes.' },
     { id: 'glide', name: 'Moonglide', tag: 'Signature', max: 1, heroes: ['lune'], desc: 'Hold the attack in the air and you fall slowly while you fire.' },
     { id: 'hanging', name: 'Hanging Cut', tag: 'Signature', max: 1, heroes: ['eos'], desc: 'The cut of a full draw hangs in the air, and a second later cuts again for half.' },
-    { id: 'secondsun', name: 'Second Sun', tag: 'Signature', max: 1, heroes: ['eos'], desc: 'After a full draw, holding again starts at two marks.' },
+    { id: 'secondsun', name: 'Second Sun', tag: 'Signature', max: 1, heroes: ['eos'], desc: 'After a full draw, hold again within 3 seconds and the sheath is open at once, at two marks.' },
   ];
   // Sets (v2.3a): four kinds of boon, each leaving its own mark on the foe. A set boon fits one of five
   // slots (Strike, Special, Dash, Mend, and since v2.6c Jump), one boon to a slot: a new one for a full slot replaces the
@@ -357,12 +357,17 @@
   // its portal. Each boss is fought once. A beaten boss's portal may turn corrupted: an optional,
   // far harder fight for a second relic (see G.diff and rollCorruption).
   G.RUN_FIGHTS = 7;
-  R.left = () => G.BOSS_IDS.filter((id) => !R.beaten.includes(id));
+  // (v2.9a) Six of the seven bosses, then the last portal opens on Sol (sol.js): she is the seventh fight,
+  // and the run is won when she is beaten. One boss is left out of every run again.
+  G.TRIALS = 6;
+  R.trialsWon = () => R.beaten.filter((id) => id !== 'sol').length;
+  R.solOpen = () => R.trialsWon() >= G.TRIALS && !R.beaten.includes('sol');
+  R.left = () => (R.trialsWon() >= G.TRIALS ? [] : G.BOSS_IDS.filter((id) => !R.beaten.includes(id)));
   R.foe = function () {
-    if (!R.current) { const left = R.left(); R.current = G.pick(left.length ? left : G.BOSS_IDS); }
+    if (!R.current) { const left = R.left(); R.current = R.solOpen() ? 'sol' : G.pick(left.length ? left : G.BOSS_IDS); }
     return R.current;
   };
-  R.runWon = () => R.beaten.length >= G.RUN_FIGHTS;
+  R.runWon = () => R.beaten.includes('sol');
   // After a normal victory, now and then a portal already beaten turns corrupted (never the one just
   // beaten, at most two waiting at once, each boss once per run). Returns the boss id, or null.
   R.CORRUPT_CHANCE = 0.3;
