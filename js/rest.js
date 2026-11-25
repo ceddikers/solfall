@@ -313,6 +313,24 @@
     }
   }
 
+  // (v2.6e) Banish (once the Shrine's Banishment is bought): the flourish key at a plinth strikes its
+  // boon from the run and draws another there.
+  function banish(s) {
+    const run = R();
+    if (turning(s.i)) { startTurn(); return; }
+    if (mineI(s.i) || closed()) { G.audio.play('uiMove'); return; }
+    if (run.offerKind !== 'boon') { G.audio.play('empty'); say('Spoils cannot be banished'); return; }
+    if (run.banishes <= 0) { G.audio.play('empty'); say('No banish left this run'); return; }
+    const old = run.offer[s.i], cy = FLOOR - 104, wasCursed = !!old.cursed;
+    const nb = run.banish(s.i);
+    G.audio.play('shatter'); G.audio.play('whoosh'); F.shake(5);
+    F.shatter(s.x, cy, '90,84,110', 14, { r: 220, r0: 20 });
+    F.burst(s.x, cy, { n: 16, color: '20,16,30', speed: [60, 260], life: [0.5, 1], size: [4, 8], grav: -60 });
+    if (wasCursed || (REST.turn && REST.turn.i === s.i)) initTurn();
+    cardFor = null;
+    say(old.name + ' banished' + (nb ? '' : ''));
+  }
+
   // ------------------------------------------------------------------ who you meet on the road (v2.2a)
   // On a little over half the roads someone waits between the fountain and the portals: a
   // fortune-teller with three face-down cards, a wandering smith, an altar that takes a pledge, or a
@@ -404,7 +422,7 @@
     ev.done = true; ev.pick = c.i;
     for (const k of ev.cards) k.flip = k === c ? 0.001 : -0.25 - 0.15 * Math.abs(k.i - c.i); // (the others turn a moment later)
     let got = '', col = EV_COL.fortune;
-    if (c.what === 'boon') { const was = run.crownSet(), b = run.freeBoon(); if (b) { got = b.name; col = colOf(b); crowned(was); } else c.what = 'shards'; }
+    if (c.what === 'boon') { const was = run.crownSet(), dw = run.duo(), b = run.freeBoon(); if (b) { got = b.name; col = colOf(b); crowned(was); duoed(dw); } else c.what = 'shards'; }
     if (c.what === 'curse') { const b = run.freeCurse(); if (b) { got = b.name; col = BLOOD; } else c.what = 'shards'; }
     if (c.what === 'shards') { G.meta.shards += 40; G.meta.earned += 40; G.meta.save(); got = '+40 Sunshards'; col = paint.GOLD; }
     retake();
@@ -736,6 +754,7 @@
     updateTurn(dt);
     updateEvent(dt);
     if (best && G.playerControl() && !p.ulting && (I.pressed.heal || I.pressed.confirm)) use(best);
+    else if (best && best.id === 'boon' && G.up('banish') > 0 && G.playerControl() && !p.ulting && I.pressed.taunt) { I.pressed.taunt = false; banish(best); } // (not a flourish: player.js reads it after)
     showCard(best && !G.ui.current && ((best.id === 'boon' && !(turning(best.i) && REST.turn.t < TURN_SNAP)) || (best.id === 'fire' && G.relics.held().length)) ? best : null);
     updateAwake(dt);
 
@@ -770,7 +789,7 @@
   function showCard(s) {
     const el = document.getElementById('restCard');
     if (!el) return;
-    const key = !s ? null : s.id === 'fire' ? 'fire:' + G.run.awake + ':' + G.relics.pending() : s.i + ':' + G.run.offer[s.i].id + ':' + REST.taken + ':' + REST.taken2 + ':' + REST.extra;
+    const key = !s ? null : s.id === 'fire' ? 'fire:' + G.run.awake + ':' + G.relics.pending() : s.i + ':' + G.run.offer[s.i].id + ':' + REST.taken + ':' + REST.taken2 + ':' + REST.extra + ':' + G.run.banishes;
     if (key === cardFor) return;
     cardFor = key;
     if (!s) { el.classList.remove('show'); return; }
@@ -782,8 +801,9 @@
     el.querySelector('.cname').textContent = b.name;
     el.querySelector('.cdesc').innerHTML = G.ui.esc(b.desc) + (own && !mine ? ' You hold ' + own + '.' : '') + (mine || b.relicReward ? '' : G.ui.pairNote(b) + G.ui.setNote(b))
       + (b.cursed ? '<span class="bane">' + G.ui.esc(b.bane) + '</span>' : '');
+    const pad = G.input.device === 'gamepad', canBan = !b.relicReward && G.run.banishes > 0;
     el.querySelector('.cuse').textContent = mine ? 'Yours for the run' : closed() ? 'You have taken one'
-      : (G.input.device === 'gamepad' ? 'LB' : G.input.label('heal')) + '  take it';
+      : (pad ? 'LB' : G.input.label('heal')) + '  take it' + (canBan ? '   \u00b7   ' + (pad ? 'Back' : G.input.label('taunt')) + '  banish (' + G.run.banishes + ' left)' : '');
   }
   // the relic's card at the fire: what it does at each stage it has woken to, and the next one
   function relicCard(el) {
@@ -814,7 +834,7 @@
     ctx.beginPath();
     for (let px = Math.floor(x0 / 70) * 70; px < x1; px += 70) { const o = (px * 37) % 23; ctx.moveTo(px + o, FLOOR + 8 + (o % 7)); ctx.lineTo(px + o + 26, FLOOR + 8 + (o % 7)); }
     ctx.stroke();
-    // the road's two ends: rocks behind you, a cliff past the seventh portal
+    // the road's two ends: rocks behind you, a cliff past the last portal
     if (seen(0, 400)) poly(ctx, [-300, FLOOR, -300, FLOOR - 460, 40, FLOOR - 420, 80, FLOOR - 330, 112, FLOOR - 120, 96, FLOOR], paint.STONE);
     if (seen(RW, 400)) poly(ctx, [RW - 90, FLOOR, RW - 104, FLOOR - 280, RW - 50, FLOOR - 410, RW + 300, FLOOR - 500, RW + 300, FLOOR], paint.STONE);
     drawArch(ctx, t);
@@ -926,7 +946,7 @@
 
   // the standing stone that redraws the offering (the Shrine's Second Thoughts)
   function drawStone(ctx, t) {
-    if (!seen(STONE_X, 300) || G.up('reroll') <= 0) return;
+    if (!seen(STONE_X, 300)) return;
     const { poly, glow, RIM, STONE } = paint, x = STONE_X, live = G.run.rerolls > 0 && REST.taken < 0 && G.run.offerKind === 'boon', on = REST.near && REST.near.id === 'stone';
     if (live) glow(ctx, '236,233,244', x, FLOOR - 90, on ? 110 : 80, on ? 0.35 : 0.2);
     poly(ctx, [x - 30, FLOOR, x - 34, FLOOR - 120, x - 10, FLOOR - 160, x + 22, FLOOR - 150, x + 32, FLOOR], STONE);
@@ -1117,7 +1137,7 @@
     const run = R(), next = G.roman(run.trial + 1), of = G.roman(G.RUN_FIGHTS);
     if (s.id === 'fire' && G.relics.pending()) return ['The Fire', 'Your relic stirs in the flames. Hold it to the fire.', 'awaken it'];
     if (s.id === 'fire') return ['The Fire', run.runWon() ? 'All ' + G.roman(G.RUN_FIGHTS) + ' trials won. Rest a while.' : 'Trial ' + G.roman(run.trial) + ' won. Rest a while; nothing here can hurt you.', 'warm your hands'];
-    if (s.id === 'stone') return ['Second Thoughts', 'Redraw the offering (' + run.rerolls + ' left this run)', 'redraw'];
+    if (s.id === 'stone') return ['Second Thoughts', 'Redraw the whole offering (' + run.rerolls + ' left this run)', 'redraw'];
     if (s.id === 'home') return ['The Way Home', 'The run is won. Back to the camp.', 'go home'];
     if (s.id === 'fountain') {
       const n = run.banes().length, cost = run.cleanseCost();
@@ -1138,7 +1158,7 @@
     }
     if (s.id === 'door') return ['The Doorway', 'Someone sits in the light inside, waiting. A duel: lose it, and you lose nothing.', 'step through'];
     if (s.id === 'duel') return ['The Duelling Shade', 'It dashes at you, six times at most. Strike it three times before its blade touches you and it leaves a relic.', 'duel'];
-    if (s.id === 'seventh') return ['The Seventh Portal', run.runWon() ? 'It stirs, but does not open. Not yet.' : 'Dormant. It waits for ' + G.roman(G.RUN_FIGHTS) + ' trials won (' + run.beaten.length + ' of ' + G.RUN_FIGHTS + ').', run.runWon() ? 'touch it' : ''];
+    if (s.id === 'seventh') return ['The Last Portal', run.runWon() ? 'It stirs, but does not open. Not yet.' : 'Dormant. It waits for ' + G.roman(G.RUN_FIGHTS) + ' trials won (' + run.beaten.length + ' of ' + G.RUN_FIGHTS + ').', run.runWon() ? 'touch it' : ''];
     if (s.id === 'portal') {
       const B = G.bosses[s.boss], st = portalState(s.boss), ready = offerTaken();
       if (st === 'corrupt') return ['Corrupted: ' + B.name, 'Optional. Far stronger, and it does not count as a trial. Win it for a second relic and triple Sunshards.', ready ? 'enter, if you dare' : 'take from the offering first'];
@@ -1151,7 +1171,7 @@
     if (s.id === 'boon') return shownDef(s.i).name;
     if (s.id === 'card') return s.i === 1 ? 'The Fortune-Teller' : '';
     if (s.id === 'portal') { const B = G.bosses[s.boss]; return B ? (portalState(s.boss) === 'corrupt' ? 'Corrupted' : B.short) : ''; }
-    return { fire: 'The Fire', stone: 'Second Thoughts', seventh: 'The Seventh', home: 'The Way Home', fountain: 'The Fountain', smith: 'The Smith', pledge: 'The Omen Altar', duel: 'The Shade', door: 'The Doorway' }[s.id];
+    return { fire: 'The Fire', stone: 'Second Thoughts', seventh: 'The Last Portal', home: 'The Way Home', fountain: 'The Fountain', smith: 'The Smith', pledge: 'The Omen Altar', duel: 'The Shade', door: 'The Doorway' }[s.id];
   }
 
   // names over each place, what the nearest one does; in front of everything

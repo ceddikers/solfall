@@ -38,6 +38,44 @@
       kind: 'crush', x, dmg: dmg || 1,
       update() { if (this.t > 0.07) this.dead = true; },
       hits(P) { return G.rectsOverlap(P.box(), { cx: x, cy, hw, hh }); },
+      // (v2.6f) the shock of the landing, over what it hits for the few frames it hits: only sparks and dust
+      // used to show there, so the edge of a landing hit from empty air
+      draw(ctx) {
+        const c = (this.tint || G.pal()).boss, f = 1 - Math.min(1, this.t / 0.1);
+        const g = ctx.createRadialGradient(x, cy, 0, x, cy, Math.hypot(hw, hh) + 6);
+        g.addColorStop(0, G.rgba(c, 0.42 * f)); g.addColorStop(0.8, G.rgba(c, 0.28 * f)); g.addColorStop(1, G.rgba(c, 0.1 * f));
+        ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = g;
+        ctx.beginPath(); ctx.roundRect(x - hw - 4, cy - hh - 4, hw * 2 + 8, hh * 2 + 8, Math.min(hw, hh) * 0.6); ctx.fill(); ctx.restore();
+      },
+    });
+  };
+
+  // (v2.6f) Gentle only: a soft lane along the floor where a body is about to come through (a dash, a
+  // thrust, a flying knee), shown for dur seconds, in the boss's light. It hurts nothing: the body does.
+  // Standard and Merciless read the body alone, so this does nothing there.
+  K.gentleLane = function (x0, x1, dur, o) {
+    if (!K.gentle() || dur <= 0) return null;
+    o = o || {};
+    const l = Math.min(x0, x1), r = Math.max(x0, x1), h = o.h || 80, dir = G.sign(x1 - x0) || 1;
+    return H.add({
+      kind: 'gentle', layer: 'under', x: (l + r) / 2, tint: o.tint,
+      update() { if (this.t > dur) this.dead = true; },
+      draw(ctx) {
+        const c = (this.tint || G.pal()).hot, k = Math.min(1, this.t / dur), y = FLOOR - h;
+        ctx.save();
+        ctx.fillStyle = G.rgba(c, 0.05 + 0.08 * k); ctx.fillRect(l, y, r - l, h);
+        ctx.strokeStyle = G.rgba(c, 0.2 + 0.3 * k); ctx.lineWidth = 1.5; ctx.setLineDash([8, 6]);
+        ctx.beginPath(); ctx.moveTo(l, y); ctx.lineTo(r, y); ctx.moveTo(l, FLOOR - 1); ctx.lineTo(r, FLOOR - 1); ctx.stroke();
+        ctx.setLineDash([]);
+        // chevrons along it, the way it will come
+        ctx.strokeStyle = G.rgba(c, 0.15 + 0.3 * k); ctx.lineWidth = 3;
+        const cy = y + h / 2, s = Math.min(16, h * 0.25), gap = 70, off = (this.t * 160) % gap;
+        for (let px = l + off; px < r; px += gap) {
+          const cx = dir > 0 ? px : r - (px - l);
+          ctx.beginPath(); ctx.moveTo(cx - dir * s * 0.6, cy - s); ctx.lineTo(cx + dir * s * 0.4, cy); ctx.lineTo(cx - dir * s * 0.6, cy + s); ctx.stroke();
+        }
+        ctx.restore();
+      },
     });
   };
 

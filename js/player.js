@@ -79,6 +79,7 @@
       flT: 0, flCd: 0, flBrazen: false, lifts: 0,
       cast: null, // a special's body motion: Vesper's throw, Lune's release, Aster's slam (see castPose)
       recov: null, // how the weapon comes back to rest after the last attack (see recoverPose)
+      fidget: null, idleT: 0, idleNext: 4, // (v2.6f) standing still: what the hero does with their hands (fidgetPose)
       // Eos: the stance she is holding, the Focus gathered in it, the draw carrying her, and the cuts made but not yet landed
       hold: null, focus: 0, strung: 0, sun: 0, hangs: [], pin: null, stars: null, faults: [], drawT: 0, drawV: null, owed: [], arc2: null, hush: null,
       pad: 0, grazeCd: 0, streakN: 0, streakT: 0, fallT: 0, edge: 0, fadeT: 0, castN: 0,
@@ -491,6 +492,16 @@
         if (r.t >= r.dur) P.recov = null;
       }
     }
+    // (v2.6f) idle: after a few seconds standing still, the hero does something of their own with their
+    // weapon (fidgetPose), then again every so often. Anything they do cuts it short.
+    const still = P.onGround && Math.abs(P.vx) < 12 && !P.atk && !P.cast && !P.recov && P.dashT <= 0 && P.healT <= 0
+      && P.stun <= 0 && P.flT <= 0 && !P.hold && !P.plunge && P.drawT <= 0;
+    if (!still) { P.idleT = 0; P.fidget = null; }
+    else if (P.fidget) {
+      const f = P.fidget;
+      f.t += dt; fidgetCues(f);
+      if (f.t >= f.dur) { P.fidget = null; P.idleT = 0; P.idleNext = G.rand(5, 9); }
+    } else if ((P.idleT += dt) >= P.idleNext) P.fidget = { t: 0, dur: FIDGET_DUR[H.id] || 1.6, cues: {} };
 
     // --- Dawnbreak: the ultimate, when its meter is full
     if (ctl && I.pressed.ult && free && P.stun <= 0 && G.flow.tryUlt()) return;
@@ -1717,7 +1728,13 @@
   // what a shot strikes with. A crescent wave is drawn as an arc standing across its flight, ahead of
   // its centre and as tall as a hero and a half: it strikes with all of that (v2.1b; it used to strike
   // with a small square behind the arc). Anything else: a square on its head.
+  // (v2.6f) The Star Lance strikes along the bright part of its streak too, up to 72 px back from its
+  // head: its box was only the head, and the streak drawn behind it passed through a foe and did nothing.
   function shotBox(s, half) {
+    if (s.lance && !s.wave) {
+      const L = Math.hypot(s.vx, s.vy) || 1, ux = s.vx / L, uy = s.vy / L, back = Math.min(72, L * Math.min(0.05, s.t + 0.012));
+      return { cx: s.x - ux * back / 2, cy: s.y - uy * back / 2, hw: half + Math.abs(ux) * back / 2, hh: half + Math.abs(uy) * back / 2 };
+    }
     if (!s.wave) return { cx: s.x, cy: s.y, hw: half, hh: half };
     const L = Math.hypot(s.vx, s.vy) || 1, ux = s.vx / L, uy = s.vy / L, b = s.big || 1;
     const along = 14 * b, across = 36 * b;
@@ -1981,7 +1998,10 @@
     }
     if (a.kind === 'shot') return { kind: a.heavy ? 'spin' : 'drop', t: 0, dur: a.heavy ? 0.4 : 0.22, at: 0.05, dx: a.dx, dy: a.dy };
     if (a.thrust) return { kind: 'thrust', t: 0, dur: 0.24, at: 2 };
-    if (a.kind !== 'side') return null;
+    // (v2.6f) an up or down cut (or one from the air) used to have no way back: the weapon jumped to rest
+    // in a tenth of a second. Now it is carried back from where the cut ended.
+    if (a.kind !== 'side') return a.kind !== 'shot' && (H.weapon === 'sword' || H.weapon === 'maul')
+      ? { kind: 'settle', t: 0, dur: H.weapon === 'maul' ? 0.42 : 0.32, at: 2, from: swingAngle(Object.assign({}, a, { t: a.a1 })) } : null;
     if (H.weapon === 'maul') return a.heavy ? { kind: 'smash', t: 0, dur: 0.5, at: 0.3 } : { kind: 'sweep', t: 0, dur: 0.34, at: 0.8 };
     if (a.heavy) return { kind: 'fin', t: 0, dur: 0.4, at: 0.2 };
     return a.idx === 1 ? { kind: 'cut2', t: 0, dur: 0.28, at: 2 } : { kind: 'cut1', t: 0, dur: 0.24, at: 2 };
@@ -2015,14 +2035,16 @@
       let ang, len = 36;
       if (r.kind === 'cut1') ang = u < 0.25 ? G.lerp(1.3, 0.95, sm(u / 0.25)) : toRest(0.95, sm((u - 0.25) / 0.75));
       else if (r.kind === 'cut2') ang = u < 0.22 ? G.lerp(-1.6, -1.95, sm(u / 0.22)) : toRest(-1.95, sm((u - 0.22) / 0.78));
-      else if (r.kind === 'fin') { ang = u < 0.2 ? G.lerp(1.5, 0.62, sm(u / 0.2)) : u < 0.5 ? 0.62 : toRest(0.62, sm((u - 0.5) / 0.5)); len = G.lerp(40, 36, u); }
+      // (v2.6f) the flick runs a little past where it holds and settles back, so it does not stop dead
+      else if (r.kind === 'settle') ang = toRest(r.from, sm(u / 0.8));
+      else if (r.kind === 'fin') { ang = u < 0.16 ? G.lerp(1.5, 0.5, sm(u / 0.16)) : u < 0.34 ? G.lerp(0.5, 0.62, sm((u - 0.16) / 0.18)) : u < 0.5 ? 0.62 : toRest(0.62, sm((u - 0.5) / 0.5)); len = G.lerp(40, 36, u); }
       else ang = u < 0.3 ? -0.05 : toRest(-0.05, sm((u - 0.3) / 0.7));
       const fx = G.lerp(1 + Math.cos(ang) * 11, rest.fx, home), fy = G.lerp(SH + Math.sin(ang) * 11, rest.fy, home);
       return { fx, fy, bx: G.lerp(-4, rest.bx, home), by: G.lerp(-27, rest.by, home), ang, len };
     }
     if (h.weapon === 'maul') {
       // over the top: down in front, up, and back onto the shoulder, running a little past it and settling
-      const start = r.kind === 'smash' ? 1.5 : 1.3, hold = r.kind === 'smash' ? 0.3 : 0.08;
+      const start = r.kind === 'settle' ? r.from : r.kind === 'smash' ? 1.5 : 1.3, hold = r.kind === 'smash' ? 0.3 : r.kind === 'settle' ? 0 : 0.08;
       let ang = start;
       if (u > hold) {
         const q = (u - hold) / (1 - hold);
@@ -2089,7 +2111,12 @@
   }
 
   // Where the hands and weapon are: front hand (fx, fy), back hand (bx, by), weapon angle and length.
+  // (v2.6f) the pose at rest, with the hero's idle move on top while one is running
   function weaponPose(h, s, breath) {
+    const W = weaponPose0(h, s, breath);
+    return s.fidget && !s.atk && !s.recov && !s.cast && s.onGround ? fidgetPose(h, s.fidget, W) : W;
+  }
+  function weaponPose0(h, s, breath) {
     const a = s.atk, air = !s.onGround, run = !air && Math.abs(s.vx) > 40;
     const sw = Math.sin(s.runT + Math.PI);
     const SH = -35; // shoulder height
@@ -2117,7 +2144,7 @@
       return { fx: 6.5, fy: -26 + q, bx: 3, by: -28.5 + q, ang: G.lerp(0.16, 1.25, k), pull: 0, len: 0 };
     }
     if (s.recov && !a && !s.dash && !s.plunge) {
-      const rest = weaponPose(h, Object.assign({}, s, { recov: null }), breath);
+      const rest = weaponPose0(h, Object.assign({}, s, { recov: null }), breath);
       return recoverPose(h, s.recov, SH, rest);
     }
     if (h.weapon === 'sword') {
@@ -2149,6 +2176,45 @@
     return { fx: 12.5 + (run ? sw * 2 : 0), fy: -27.5 + breath * 0.3, bx: -3.5 + (run ? -sw * 3 : 0), by: -25.5, ang: 0.16, pull: 0, len: 0 };
   }
 
+
+  // ---- (v2.6f) Idle moves, one each, over FIDGET_DUR seconds: in from the rest pose and back to it
+  // (the weapon at rest is eased in drawBody, so it never jumps). Vesper lifts the blade to look along it
+  // and turns it over; Aster lets the maul over the top to stand on its head and leans on it, then heaves
+  // it back onto her shoulder; Lune raises the bow and tests the string; Eos thumbs the guard out of the
+  // sheath and clicks it home.
+  const FIDGET_DUR = { vesper: 1.8, aster: 2.2, lune: 1.6, eos: 1.6 };
+  const fidgetIn = (u, a, b) => smooth(G.clamp(u / a, 0, 1)) * (1 - smooth(G.clamp((u - (1 - b)) / b, 0, 1)));
+  function fidgetPose(h, f, W) {
+    const u = G.clamp(f.t / f.dur, 0, 1), SH = -35;
+    if (h.weapon === 'sword') {
+      const e = fidgetIn(u, 0.24, 0.26), turn = Math.sin(G.clamp((u - 0.3) / 0.4, 0, 1) * Math.PI * 2) * 0.3;
+      return Object.assign({}, W, { fx: G.lerp(W.fx, 10, e), fy: G.lerp(W.fy, -31, e), bx: G.lerp(W.bx, 3, e), by: G.lerp(W.by, -29, e), ang: G.lerp(W.ang, -0.3 + turn, e) });
+    }
+    if (h.weapon === 'maul') {
+      const k = smooth(G.clamp(u / 0.3, 0, 1)) * (1 - smooth(G.clamp((u - 0.72) / 0.28, 0, 1)));
+      const ang = -2.42 + 3.57 * k + Math.sin(u * 11) * 0.03 * k, fx = G.lerp(W.fx, 7, k), fy = G.lerp(W.fy, -27, k), grip = 7.5 - 4.5 * k;
+      return { fx, fy, bx: fx - Math.cos(ang) * grip, by: fy - Math.sin(ang) * grip, ang, len: 34, behind: ang < -1.7 };
+    }
+    if (h.weapon === 'bow') {
+      const e = fidgetIn(u, 0.2, 0.25), let0 = 0.62;
+      const pull = u < let0 ? 0.4 * smooth(G.clamp((u - 0.25) / 0.3, 0, 1)) : 0, twang = u >= let0 ? Math.max(0, 1 - (u - let0) / 0.16) : 0;
+      const aim = -0.12, c = Math.cos(aim), sn = Math.sin(aim), fx1 = 0.5 + c * 12.5, fy1 = SH + 4 + sn * 12.5;
+      return { fx: G.lerp(W.fx, fx1, e), fy: G.lerp(W.fy, fy1, e), bx: G.lerp(W.bx, fx1 - c * (5 + 8 * pull), e), by: G.lerp(W.by, fy1 - sn * (5 + 8 * pull), e),
+        ang: G.lerp(W.ang, aim, e), pull: pull * e, len: 0, twang: twang * e };
+    }
+    // Eos
+    const e = fidgetIn(u, 0.2, 0.25), out = u < 0.62 ? 4 * smooth(G.clamp((u - 0.2) / 0.15, 0, 1)) : 0;
+    if (e < 0.05) return W;
+    return sheathed(MOUTH[0] + 2 * e, MOUTH[1] + 0.5 * e, G.lerp(SANG, 3.04, 0.5 * e), { out: out * e });
+  }
+  // the sounds of an idle move, each once
+  function fidgetCues(f) {
+    const cue = (k, at, fn) => { if (!f.cues[k] && f.t >= at * f.dur) { f.cues[k] = true; fn(); } };
+    if (H.id === 'aster') { cue('down', 0.3, () => { G.audio.play('stepHeavy'); P.squash = Math.min(P.squash, -0.05); }); cue('up', 0.74, () => G.audio.play('heave')); }
+    else if (H.id === 'lune') { cue('pull', 0.3, () => G.audio.play('draw')); cue('let', 0.62, () => G.audio.play('tink')); }
+    else if (H.id === 'eos') { cue('out', 0.25, () => G.audio.play('tink')); cue('click', 0.62, () => G.audio.play('sheath', { soft: true })); }
+    else if (H.id === 'vesper') cue('turn', 0.45, () => G.audio.play('glint'));
+  }
 
   // ---- Eos: the sheath at her hip and the blade in it. Her pose carries more than the others':
   // the sheath (its mouth sx, sy and the way it points, sang), the sword's own place (hx, hy: where
@@ -2753,8 +2819,9 @@
     }
     else if (h.draw && s.recov && s.recov.kind === 'noto' && !s.dash) leanT = s.recov.t < s.recov.dur * s.recov.at ? 0.32 : 0.08;
     else if (h.draw && s.hold && s.focus > 0.12 && s.onGround && !s.dash) leanT = 0.2;
+    else if (s.fidget) leanT = lean0 + (h.weapon === 'maul' ? 0.1 : 0.035) * fidgetIn(G.clamp(s.fidget.t / s.fidget.dur, 0, 1), 0.3, 0.28);
     const drawing = !!(a && a.kind === 'draw');
-    const leanNow = ease('lean', leanT, c || drawing ? 45 : a ? 38 : 30);
+    const leanNow = ease('lean', leanT, c || drawing ? 45 : a ? 38 : s.recov ? 14 : 22); // (v2.6f: back from a blow over more frames, was 30)
     ctx.rotate(leanNow);
     // Eos sinks into her stance, lower with each mark, and lowest of all in the lunge after a draw
     let crouchT = 0;
@@ -2782,6 +2849,8 @@
     const soft = (v, lo, hi) => (v > 0 ? hi * Math.tanh(v / hi) : lo * Math.tanh(v / lo));
     const sink = soft(spr('sink', Math.max(0, -squash) * 20, 20, 0.42), -2.5, 9);
     kick('sink', land * 0.03 + hit * 60);
+    // (v2.6f) a blow finished on the ground, the weight settles back into the stance: a small dip
+    if (R && rdt > 0) { const was = R.pAtk; R.pAtk = !!a; if (was && !a && !air) { kick('sink', h.heavy ? 30 : 18); kick('ch', h.heavy ? 20 : 11); } }
     const bob = run ? Math.abs(Math.sin(s.runT)) * 1.3 : 0;
     const hip = Math.min(-13, -24 + bob + crouch + sink + ws * ws * 0.35);
     // -- the chest rides the hips a beat late; the spine bows and stretches about the hips
@@ -2882,7 +2951,7 @@
         if (W.sx != null) { R.wsx = W.sx; R.wsy = W.sy; R.wsa = W.sang; }
       } else {
         // back to rest after a swing, or from one carry to another: quick, but not in one frame
-        const kk = 1 - Math.exp(-22 * rdt);
+        const kk = 1 - Math.exp(-15 * rdt); // (v2.6f: a little softer, was 22)
         R.wfx += (W.fx - R.wfx) * kk; R.wfy += (W.fy - R.wfy) * kk; R.wbx += (W.bx - R.wbx) * kk; R.wby += (W.by - R.wby) * kk;
         R.wang += G.angDiff(R.wang, W.ang) * kk;
         W = Object.assign({}, W, { fx: R.wfx, fy: R.wfy, bx: R.wbx, by: R.wby, ang: R.wang });

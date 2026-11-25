@@ -2,10 +2,11 @@
 
 A side-on boss rush for the browser: four heroes, seven three-phase bosses, played as a run of
 ever-harder trials. You pick a hero and a relic before the run and win a boon after each victory.
-Version 2.6d.
+Version 2.6f.
 
 This is an early slice of a planned boss-rush roguelite (short runs, a boon after each boss,
-bosses drawn from a pool). A run meets the four bosses in a shuffled order, then meets them again, harder.
+bosses drawn from a pool). A run is seven trials, one for each boss, each harder than the last: the first boss
+at random, then whichever portal you walk into. A final eighth fight, behind the Last Portal, is still to come.
 
 ## Play
 
@@ -113,6 +114,119 @@ hero (`tools/feel-check.js`).
 - Settings, Reset progress erases Sunshards, upgrades, trophies and records (it has to be chosen twice).
 
 Not done: touch controls, a colour-blind alternative to red-orange warnings, gamepad rebinding.
+
+## Fixes from an audit, idle moves, and Gentle's warnings (v2.6f)
+
+Asked: "find a list of things that can be fixed", then "do it all"; and partway through: "id liek there to be
+idle animations for the player chars, as well as like animations going from an attack back to base standing so
+it feels natural".
+
+**Hits that came from empty air** (`tools/hitbox-check.js`: how far from anything drawn a hero can stand and
+still be hit). What hits is unchanged except where said; what changed is what is drawn.
+- *The Leviathan's Gyre*: its ring of spouts was drawn so faint (to keep a whole shore of them from lighting
+  the screen) that it hardly counted as drawn: 261 px. The columns now keep nine tenths of their light and only
+  their spray and shake are dimmed: 12 px.
+- *Pools* (Kairo's Scorched Wave, Aurel's, the Wolf's and others) burned on their first frame, before any
+  flame was drawn. They now start at four tenths of their height, and what burns rises with them. Kairo's: 145 px
+  to 8.
+- *Sword swings and kicks* cut near the hilt and back to where they started (v2.1b, so nobody can hug a boss)
+  but drew only the crescent. The cut now leaves a smear of light over all the slice it cuts, and Kairo's
+  punches a cone of air over theirs. The Knight's swings (46-68 px), the Wolf's rake (74) and Kairo's punches and
+  kicks (about 40) are all under 15 now.
+- *Landings and slams* (`K.crush`) hurt in a box round the impact with only sparks and dust drawn there. A
+  brief shock of light now fills it: Kairo's Meteor Heel 48 px to 25, the Knight's slams 22-27 to 16-18.
+- *The Star Lance* struck with a square on its head while a streak up to 85 px long trailed behind it. It
+  now strikes along the bright part of the streak too, up to 72 px back (hits each foe once, as before).
+- Left as they are: the Magus's lightning cuts the whole column its warning marked (v2.1b); the Knight's
+  charge and whirl (about 30 px) and the Wolf's Blaze front (35).
+
+**Smaller fixes.** A boon from the fortune-teller's cards that wakes a duo now says so, as one from the
+offering does. The final door is now **the Last Portal** (with seven boss portals beside it, the Seventh
+was the eighth), on the road and in Aurel's phase III card. The README's opening describes a seven-trial run.
+A `.gitignore` keeps `shots/` and loose screenshots out of commits.
+
+**Kairo, a little easier in phase III.** At trials V and VII the scripted player beat him a third of the time,
+against 80-100% for every other boss, and lost two of every three of those fights in phase III. He now rises
+into it with four tenths of his health (was half), and his openings after a move there are 0.6 of phase I's
+(was 0.5). The scripted player, 64 fights a trial: trial III 48%, V 50% (33% before), VII 42% (38%). Still the
+hardest boss by a distance.
+
+**Aurel, measured as he is met.** The scripted player fought him with omens and at trial VII's health, which
+his duel never has (it is fought clean, and his doorway opens only on the roads after trials II to V). Fought as
+met, at trials III-V: 83% over 96 fights; Lune 63% and Vesper 78% over 60 each, and his thrust beats both
+most often. That is no Lune problem, so he is unchanged. `CLEAR.start({ champMax: true })` fights him the old
+way.
+
+**Looked into, left alone.** `tools/boss-tests.js` loses 23 over its non-Kairo runs, up from 10 at v2.1b: most
+of it is the Veil's Echo (made quicker and denser in v2.5b, as asked) and the Magus's bolts (quicker in v2.4d).
+The Magus's blink strike flickers on purpose (a lightning flicker that shows where it will drop).
+
+**The scripted player plays to its set a little**: with Gloam it saves its special for the dark mark and
+spends it at once when the mark is up; with a jump boon it jumps beside the foe now and then (for Nightglide,
+only while the mark is up).
+
+**Gentle's extra warnings** (the plan agreed after v2.5b: Standard and Merciless keep today's warnings, Gentle
+adds more). On Gentle only:
+- every sword swing, kick and punch that is read from the body draws a soft dashed outline of where it will cut
+  during its wind-up, in the light of whoever swings it (not the old red slice), filling as the wind-up runs;
+- a soft lane with chevrons along the floor where a body is about to come through: Kairo's Closing Knee, and
+  Aurel's thrust and draw (`K.gentleLane`).
+Not done yet: the other moves with no area of their own (grabs, other dashes, the Veil's shadows).
+
+**Idle moves.** After about four seconds standing still, and every five to nine after that, each hero does
+something of their own, and anything they do cuts it short:
+- Vesper lifts her blade to look along it and turns it over;
+- Aster lets the maul over the top to stand on its head in front of her and leans on it, then heaves it back
+  onto her shoulder;
+- Lune raises the bow and tests the string, which twangs as she lets it go;
+- Eos thumbs the guard so a hand's width of the blade shows, and clicks it home.
+
+**Back to standing after a blow.** Up and down cuts, and cuts from the air, had no way back: the weapon jumped
+to rest in a tenth of a second. Vesper's and Aster's are now carried back from where the cut ended (a third of
+a second; the maul heaves over onto the shoulder). The weapon eases to rest a little more softly after any move,
+the body comes upright from a blow over more frames, and the weight settles through the knees as a blow
+finishes. Vesper's finisher flick runs a touch past where it holds and settles back, instead of stopping dead.
+
+**Checked:** `tools/dodge-tests.js` passes all 136; `tools/boss-tests.js` loses 170 over 496 runs, as before;
+the hitbox check on every boss these touched; `tools/motion-check.js` on the heroes (Vesper's finisher and
+Lune's shot recovery no longer stop dead; Aster's maul stopping as it meets the floor is meant); stills of the
+four idle moves, a Gentle outline and a swing's smear. **Not played by hand.**
+
+**Not built: trading a boon in.** Approved in the plan after v2.5e, but where it happens, how often and what it
+costs are open (see the playtest checklist).
+
+Playtest checklist:
+- Stand still for a few seconds with each hero. Do the idle moves look natural, and is the timing right?
+- Do up cuts, down cuts and air cuts flow back to standing now?
+- Do sword swings read better with the smear behind the crescent, or is it too much light?
+- Play a fight on Gentle: do the dashed outlines and lanes help without cluttering?
+- Kairo at trial V or later: still the hardest, but fair?
+- Boon trading: should it trade a boon you hold for a second pick from the offering, once a run, unlocked
+  at the Shrine like Banishment? Or something else?
+
+## A redraw and a banish every run (v2.6e)
+
+Asked, after boon rarities were pitched: "i dont think we need rarities but a limited amount of rerolls/banish
+could be good. i think base values are a good balance for them". So no rarities: boons keep their numbers.
+Every run now has:
+- **One redraw** of the whole offering, at the standing stone (Second Thoughts) between the offering and the
+  fountain. It used to exist only with the Shrine's upgrade; the stone now always stands, and the Shrine's
+  Second Thoughts adds one or two more redraws on top (2 or 3 a run).
+- **A banish, once unlocked.** Then: "i think banish should be an unlock to unlock it entirely and not start with
+  it". Runs start with none; the Shrine's new **Banishment** (80 Sunshards, then 150 for a second) gives one
+  banish a run (two at rank 2). With it, at a plinth, the flourish key (T, Back on a gamepad) strikes that boon
+  from the run: it is never offered again, not by the fortune-teller either, and the plinth draws another in its place (a set boon
+  for a set boon where one is left). The card shows the key and how many banishes are left. A relic from a
+  corrupted portal cannot be banished.
+
+Checked on the road: the card read "E take it · T banish (1 left)"; banishing Nightblade put another Gloam
+boon on its plinth and no flourish; a second banish was refused; the banished boon came up in none of 200 later
+offerings; the stone redrew the offering and spent the run's redraw.
+
+Playtest checklist:
+- Buy Banishment at the Shrine, then on a road stand at a plinth and press T: the plinth shatters grey and a new
+  boon stands there. Without it, T at a plinth is only a flourish.
+- Is one redraw a run, and 80 Sunshards for the banish, the right amount?
 
 ## Kairo's floor crumbles before it falls (v2.6d)
 
@@ -705,7 +819,7 @@ so each run leaves one boss out; the portals were spaced closer to fit (`js/rest
 |---|---|---|
 | I · Sparring | Punch combos, the Sunwell Wave (a blue beam from both hands), Hailfire (8-12 energy balls from the air), the spin throw. Keep away and he flies at you knee first; ride over his head and he drives a palm straight up | Every combo opens the same way; the **third punch** shows the ending. Hips turning with a sharp breath: kicks (the last rises over your head; dash through to his back). A hand dropped glowing to his hip with a hum: a short beam. Nothing: he hops back, open. A leap with **open hands** is the throw: a dash does not save you, a jump over him does |
 | II · Risen | A gold aura with lightning in it, everything faster. The Wave can **warp** behind you; combos can fire a one-hand beam; Flare Up (six seconds of blinks and a quarter more damage taken, then a gasp), Meteor Smash, Twin Comets. His heavy blows crack the ridge | Warp: the charge hum cuts off with a crack. Meteor Smash: a shadow grows where he will land (he is off screen, so the mark is fair) |
-| III · Still Sky | He falls as if beaten and rises with half his health back, the phase marks gone from his bar, in a thin white aura. The **Gathered Sun** opens it. Standing still between attacks he slips blows to his front and answers with a palm. Empty Hand, the Sweeping Wave, Meteor Heel. Below 12%, once: the **Last Wave** | Empty Hand: eyes shut, nothing moving; strike him and he is behind you. Sweeping Wave: which hand is on top as he draws back says which way it sweeps (the lead hand: up) |
+| III · Still Sky | He falls as if beaten and rises with four tenths of his health back (half before v2.6f), the phase marks gone from his bar, in a thin white aura. The **Gathered Sun** opens it. Standing still between attacks he slips blows to his front and answers with a palm. Empty Hand, the Sweeping Wave, Meteor Heel. Below 12%, once: the **Last Wave** | Empty Hand: eyes shut, nothing moving; strike him and he is behind you. Sweeping Wave: which hand is on top as he draws back says which way it sweeps (the lead hand: up) |
 
 **The punch combos** (v2.4b) come out of wind-ups you can see: each punch starts with the fist drawn back,
 the opener is measured, the middle ones quick, and the punch that shows the ending is held a beat longer. The

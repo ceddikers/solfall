@@ -545,6 +545,36 @@
         }
         return false;
       },
+      // (v2.6f) The smear of the blow's passing, over all the slice it cuts (a sword's, or the cone of air
+      // in front of a fist): the cut reaches in near the hilt (v2.1b, so nobody can hug a boss) and right
+      // back to where it started, and that was drawn as nothing, so a hit came from empty air beside it.
+      smear(ctx, P) {
+        const e = this.t - this.tele;
+        if (e >= this.active + this.fade * 0.5) return;
+        const k = Math.min(1, e / Math.max(0.01, this.active)), f = e < this.active ? 1 : Math.max(0, 1 - (e - this.active) / this.fade);
+        const rin = this.mark ? this.r0 : Math.max(this.r0, this.r * 0.3);
+        const sa = this.a0, sb = G.lerp(this.a0, this.a1, Math.max(0.04, G.ease.outCubic(k) - 0.08 * (1 - k)));
+        const gr = ctx.createRadialGradient(this.x, this.y, Math.max(0, rin - 6), this.x, this.y, this.r + 6);
+        gr.addColorStop(0, G.rgba(P.boss, 0.22 * f)); gr.addColorStop(0.35, G.rgba(P.boss, 0.26 * f)); gr.addColorStop(1, G.rgba(P.boss, 0.3 * f));
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.fillStyle = gr;
+        ctx.beginPath(); ctx.arc(this.x, this.y, this.r + 6, sa, sb, sb < sa); ctx.arc(this.x, this.y, Math.max(1, rin - 6), sb, sa, sb >= sa); ctx.closePath(); ctx.fill();
+        ctx.restore();
+      },
+      // (v2.6f) Gentle only: a soft outline of where the blow will cut, in the light of whoever swings it
+      // (not the old red slice), filling as the wind-up runs. Standard and Merciless read the body alone.
+      soft(ctx, P) {
+        const k = G.clamp(this.t / this.tele, 0, 1), rin = Math.max(this.r0, this.r * 0.3);
+        const lo = Math.min(this.a0, this.a1), hi = Math.max(this.a0, this.a1);
+        const shape = (r) => { ctx.beginPath(); ctx.arc(this.x, this.y, r, lo, hi); ctx.arc(this.x, this.y, rin, hi, lo, true); ctx.closePath(); };
+        ctx.fillStyle = G.rgba(P.hot, 0.04 + 0.08 * k);
+        shape(this.r); ctx.fill();
+        ctx.fillStyle = G.rgba(P.hot, 0.07 + 0.05 * k);
+        shape(G.lerp(rin, this.r, k)); ctx.fill();
+        ctx.strokeStyle = G.rgba(P.hot, 0.18 + 0.3 * k); ctx.lineWidth = 1.5; ctx.setLineDash([6, 6]);
+        shape(this.r); ctx.stroke(); ctx.setLineDash([]);
+      },
       path(ctx, r) {
         const lo = Math.min(this.a0, this.a1), hi = Math.max(this.a0, this.a1);
         ctx.beginPath();
@@ -558,7 +588,7 @@
         ctx.save();
         ctx.beginPath(); ctx.rect(-80, -400, G.W + 160, G.FLOOR + 400); ctx.clip();
         if (this.t < this.tele) {
-          if (!this.mark) { ctx.restore(); return; }
+          if (!this.mark) { if (G.settings.difficulty === 0) this.soft(ctx, P); ctx.restore(); return; }
           const k = this.t / this.tele;
           const late = k > 0.75 ? 0.5 + 0.5 * Math.sin(this.t * 55) : 0;
           ctx.fillStyle = G.rgba(DANGER, 0.07 + 0.07 * k + 0.1 * late);
@@ -568,6 +598,7 @@
           ctx.strokeStyle = G.rgba(DANGER, 0.5 + 0.4 * k); ctx.lineWidth = 2;
           this.path(ctx, this.r); ctx.stroke();
         } else if (this.drawCut) {
+          this.smear(ctx, P);
           this.drawCut(ctx, this, this.t - this.tele);
         } else {
           // the cut itself: a bright crescent that sweeps from a0 to a1 and fades
@@ -576,6 +607,7 @@
           const f = e < this.active ? 1 : Math.max(0, 1 - (e - this.active) / this.fade);
           const N = 18, a0 = this.a0, a1 = G.lerp(this.a0, this.a1, G.ease.outCubic(k));
           const rm = (this.r + Math.max(this.r0, this.r * 0.45)) / 2, w = this.r - Math.max(this.r0, this.r * 0.45);
+          this.smear(ctx, P);
           ctx.globalCompositeOperation = 'lighter';
           for (const [col, ws, al] of [[P.boss, 1, 0.55], [P.hot, 0.5, 0.95]]) {
             ctx.fillStyle = G.rgba(col, al * f);
@@ -603,6 +635,9 @@
     return H.add(Object.assign({
       kind: 'pool', w: 150, hgt: 26, tele: 0.8, active: 5, fade: 0.4, layer: 'under',
       get firing() { return this.t >= this.tele && this.t < this.tele + this.active; },
+      // (v2.6f) how far its flames have risen: they start at 0.4 of their height, not at nothing (it used to
+      // burn on a frame where nothing was drawn yet), and stand full after 0.15 s
+      grown() { return Math.min(1, 0.4 + 0.6 * (this.t - this.tele) / 0.15); },
       update() {
         this.srcX = this.x;
         if (this.firing && Math.random() < 0.35) {
@@ -620,7 +655,7 @@
         // the flames stand tallest in the middle and are low at the edges: as high as they are drawn
         // (v2.1b; it used to burn its full height right out to the edge)
         const edge = Math.sin(Math.PI * (dx + this.w / 2) / this.w);
-        return P.y > G.FLOOR - Math.max(8, this.hgt * 0.8 * edge);
+        return P.y > G.FLOOR - Math.max(8, this.hgt * 0.8 * edge * this.grown());
       },
       draw(ctx) {
         const P = pal(this), x = this.x, w = this.w, F = G.FLOOR;
@@ -635,7 +670,7 @@
           return;
         }
         const left = this.tele + this.active - this.t;
-        const f = left > 0 ? Math.min(1, (this.t - this.tele) / 0.15) : Math.max(0, 1 + left / this.fade);
+        const f = left > 0 ? this.grown() : Math.max(0, 1 + left / this.fade);
         const warn = left > 0 && left < 0.8 ? 0.6 + 0.4 * Math.sin(this.t * 30) : 1; // flickers before it goes out
         ctx.globalCompositeOperation = 'lighter';
         ctx.fillStyle = G.rgba(DANGER, 0.5 * f * warn);

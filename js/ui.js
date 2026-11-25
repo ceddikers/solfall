@@ -337,6 +337,7 @@
       ['Relic', 'One power chosen at the reliquary before the gate. It lasts the whole run, and stays with you if you fall and go again; it is given up only by going back to the camp.'],
       ['Boon', 'A smaller power chosen after each victory. They add up through the run.'],
       ['Pair', 'A gold boon offered only once you hold both of the two boons it joins. A card that would open one says so.'],
+      ['Redraw, banish', 'Each run has one redraw of the offering, at the standing stone (the Shrine sells more), and, once the Shrine sells you Banishment, a banish: at a plinth, the flourish key strikes that boon from the run and draws another in its place.'],
       ['Sets and duos', 'Ember, Storm, Tide and Gloam boons each fill a slot: Strike, Special, Dash, Mend or Jump. Three of one set open its crown; two each of two sets wake their duo, which works for as long as both sets stay slotted.'],
       ['Corrupted boon', 'A crimson boon, far stronger than the rest, with a drawback written under it. Once a boss has fallen, one sometimes takes a card\u2019s place.'],
       ['Cleansing Fountain', 'At the crossroads. Spend Sunshards to purge a corrupted boon\u2019s drawback and keep the rest of it. Each use in a run costs twice the last.'],

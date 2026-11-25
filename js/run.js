@@ -270,7 +270,11 @@
   R.reset = function () {
     R.trial = 1; R.boons = {}; R.order = []; R.offer = []; R.relic = null; R.relicOffer = []; R.phoenixUsed = false; R.phoenixN = 0;
     R.awake = 0; R.sun = 0; // the relics' awakening (0 to 3) and the Rising Sun's measure: relics.js
-    R.omens = []; R.lastOmens = []; R.ult = 0; R.rerolls = G.up('reroll');
+    R.omens = []; R.lastOmens = []; R.ult = 0;
+    // (v2.6e) every run has one redraw of the offering (the standing stone; the Shrine's Second Thoughts
+    // adds more); banishes (a boon struck from the run, its plinth drawn again) come only from the
+    // Shrine's Banishment, which unlocks them
+    R.rerolls = 1 + G.up('reroll'); R.banishes = G.up('banish'); R.banned = [];
     R.hero = heroById[G.settings.hero] ? G.settings.hero : 'vesper';
     R.foes = [];
     // the portals (rest.js): bosses beaten this run, the one being fought, whether it is corrupted,
@@ -326,8 +330,11 @@
     return R.relicOffer;
   };
   // Three boons to choose from after a victory.
+  // what may be offered: not held to its limit, the hero's own, not banished this run
+  const offerable = (b) => G.boon(b.id) < b.max && (!b.heroes || b.heroes.includes(R.hero))
+    && (b.id !== 'glass' || baseHp() - G.boon('glass') >= 3) && !(R.banned || []).includes(b.id);
   R.rollOffer = function (avoid) {
-    let pool = G.BOONS.filter((b) => G.boon(b.id) < b.max
+    let pool = G.BOONS.filter((b) => offerable(b) && G.boon(b.id) < b.max
       && (!b.heroes || b.heroes.includes(R.hero))
       && (b.id !== 'glass' || baseHp() - G.boon('glass') >= 3));
     const n = 3 + G.up('choice');
@@ -358,10 +365,10 @@
     R.offer = G.shuffle(R.offer);
     R.offerKind = 'boon';
     // a pair you have earned takes one card's place, on half the offers
-    const open = openPairs().filter((p) => !avoid || !avoid.includes(p));
+    const open = openPairs().filter((p) => (!avoid || !avoid.includes(p)) && !(R.banned || []).includes(p.id));
     if (open.length && Math.random() < 0.5) R.offer[Math.min(R.offer.length, n - 1)] = G.pick(open);
     // and once a boss has fallen, a corrupted boon takes the first card's place on two offers in five
-    const cursed = G.CURSED.filter((b) => !G.boon(b.id) && (!avoid || !avoid.includes(b)));
+    const cursed = G.CURSED.filter((b) => !G.boon(b.id) && (!avoid || !avoid.includes(b)) && !(R.banned || []).includes(b.id));
     if (R.beaten.length && cursed.length && Math.random() < R.CURSED_CHANCE) R.offer[0] = G.pick(cursed);
     return R.offer;
   };
@@ -391,7 +398,7 @@
   // The fortune-teller's cards (rest.js): a boon not on the offering, or a corrupted one not held.
   R.freeBoon = function () {
     const ids = (R.offer || []).map((b) => b.id);
-    const pool = G.BOONS.filter((b) => G.boon(b.id) < b.max && !ids.includes(b.id) && (!b.heroes || b.heroes.includes(R.hero)) && b.id !== 'glass');
+    const pool = G.BOONS.filter((b) => G.boon(b.id) < b.max && !ids.includes(b.id) && (!b.heroes || b.heroes.includes(R.hero)) && b.id !== 'glass' && !(R.banned || []).includes(b.id));
     if (!pool.length) return null;
     const b = G.pick(pool);
     R.grant(b);
@@ -411,6 +418,20 @@
     R.rerolls--;
     R.rollOffer(R.offer);
     return true;
+  };
+  // (v2.6e) Banish the boon on plinth i: it is never offered again this run, and the plinth draws
+  // another in its place (of the same kind where it can: a set boon for a set boon, else anything).
+  // Returns the new boon, or null.
+  R.banish = function (i) {
+    const b = R.offer[i];
+    if (!b || R.banishes <= 0 || R.offerKind !== 'boon') return null;
+    R.banishes--; R.banned.push(b.id);
+    const shown = R.offer.map((o) => o.id);
+    const pool = G.BOONS.filter((o) => offerable(o) && !shown.includes(o.id));
+    const like = pool.filter((o) => !!o.set === !!b.set);
+    const nb = (like.length ? G.pick(like) : pool.length ? G.pick(pool) : null);
+    if (nb) R.offer[i] = nb; else R.offer.splice(i, 1);
+    return nb;
   };
   R.take = function (i) {
     const b = R.offer[i];
@@ -464,6 +485,6 @@
       stagger: b.stagger - (bulwark ? 0.8 : 0),
     });
   };
-  // From the fifth trial (with six bosses, the last two met) they also use their Merciless patterns.
+  // From the fifth trial (of seven, the last three met) they also use their Merciless patterns.
   G.fierce = () => G.settings.difficulty === 2 || R.trial >= 5 || (G.corrupt && G.corrupt.on());
 })();

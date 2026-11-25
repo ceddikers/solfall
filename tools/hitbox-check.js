@@ -426,7 +426,7 @@
     // 3. shots: each kind's box against its drawing, wherever it flies
     const kinds = [
       ['arrow', { arrow: true, dmg: 1 }], ['heavy arrow', { arrow: true, heavy: true, dmg: 1 }],
-      ['lance', { dmg: 1 }], ['crescent wave', { wave: true, life: 0.42, dmg: 1 }], ['big lance', { big: 1.6, dmg: 1 }],
+      ['lance', { lance: true, vx: 1700, dmg: 1 }], ['crescent wave', { wave: true, life: 0.42, dmg: 1 }], ['big lance', { lance: true, vx: 1700, big: 1.6, dmg: 1 }],
     ];
     for (const [label, o] of kinds) {
       const s = Object.assign({ x: 640, y: 300, vx: 900, vy: 0, t: 0.05, life: 2, hit: new Set(), ox: 640, oy: 300 }, o);

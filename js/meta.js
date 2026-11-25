@@ -26,7 +26,8 @@
     { id: 'tempo', name: 'Momentum', costs: [30, 55, 90], text: (n) => 'Dawnbreak charges ' + n * 12 + '% faster' },
     { id: 'relics', name: 'Fourth Relic', costs: [90], text: () => 'Choose from four relics, not three' },
     { id: 'choice', name: 'Fourth Boon', costs: [120], text: () => 'Choose from four boons, not three' },
-    { id: 'reroll', name: 'Second Thoughts', costs: [50, 110], text: (n) => 'Redraw the boons on offer ' + (n > 1 ? 'twice' : 'once') + ' per run' },
+    { id: 'reroll', name: 'Second Thoughts', costs: [50, 110], text: (n) => (n + 1) + ' redraws of the offering a run, not 1' },
+    { id: 'banish', name: 'Banishment', costs: [80, 150], text: (n) => n + (n > 1 ? ' banishes' : ' banish') + ' a run: strike a boon from the run at its plinth' }, // (v2.6e)
     { id: 'fortune', name: 'Prospector', costs: [30, 60, 100], text: (n) => '+' + n * 10 + '% Sunshards' },
   ];
   const upById = {};

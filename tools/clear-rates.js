@@ -11,6 +11,8 @@
 // two of another, in shuffled slots, turning through all six duos and which set is the crown), a
 // random relic at stage awake (0..3, default 3; with the ordinary boons, awake sets the relic's stage too), and the bosses before it as beaten; the Champion (name him in
 // bosses) is then met with every boss beaten, his full seven-stone second phase.
+// (v2.6f) The Champion is fought as he is met: no omens, and at trial V at most (his doorway opens only on
+// the roads after trials II to V). champMax: true fights him at the trial asked, with omens, as v2.6c did.
 //
 // The fights run in small slices on a message loop, so the page stays usable and a hidden pane keeps
 // going. Everything the fights write to localStorage is put back when they finish (CLEAR.restore()).
@@ -22,6 +24,8 @@
 // It also knows three answers the plain rules miss: up onto a platform for the Warden's tide, a
 // double jump on Kairo's crouch for his spin throw, and behind him for his sweeping wave. Eos plays his
 // own way: a short string, then the stance and a draw at three marks (or sooner, as a way out).
+// (v2.6f) It plays to its set a little: with Gloam it saves the special for the dark mark, and with a
+// jump boon it jumps beside the foe now and then (for Nightglide, only while the mark is up).
 // Held in a struggle (Kairo's Last Wave), it mashes the attack at about eight presses a second.
 // It is a steady, mediocre player: read its clear rates as a comparison between bosses, heroes and
 // trials, not as what a person will see.
@@ -247,6 +251,15 @@
 
     // a target overhead and close: jump up to it
     if (tg && !danger && !healing && P.onGround && edge < reach && tg.cy < P.y - 120 && vgap > 30) jump = true;
+    // (v2.6f) play to the set, as a person building one would: a jump boon pays on a jump beside the foe
+    // (the landing for Cinderfall and Splashdown, a jump in the air over it for Skybreak, a blow from the
+    // air while the dark mark is up for Nightglide)
+    const jb = ['emjump', 'tdjump', 'stjump', 'gljump'].find((id) => G.boon(id)), sst = G.sets.state() || {};
+    st.setJumpCd = (st.setJumpCd || 0) - D;
+    if (jb && tg && !danger && !healing && !charging && !stayDown && !perch && P.onGround && edge < reach * 0.9 && vgap < 60 && st.setJumpCd <= 0 && soonest > 0.6
+      && (jb !== 'gljump' || sst.mark)) {
+      jump = true; st.setJumpCd = jb === 'gljump' ? 0.8 : 1.6; if (jb === 'stjump') high = true;
+    }
 
     if (stayDown) jump = false;
     // (a fresh press every time: one held over from the last jump would not count)
@@ -281,7 +294,9 @@
 
     // ---- special, Dawnbreak, crown
     I.pressed.flare = false;
-    if (tg && !danger && segs >= (P.hp < P.maxHp ? 2 : 1) && H.special !== 'guard') {
+    // (v2.6f) with Gloam, the special waits for the dark mark (it deals double), and goes at once when it is up
+    const gl = G.run.setCount && G.run.setCount('gloam') > 0, markUp = gl && !!sst.mark;
+    if (tg && !danger && segs >= (markUp ? 1 : P.hp < P.maxHp || gl ? 2 : 1) && H.special !== 'guard') {
       const ok = H.special === 'lance' ? vgap < 200 : H.special === 'starfall' ? edge < 60 && vgap < 60 : edge < 140 && vgap < 120;
       if (ok && (st.flareCd || 0) <= 0) { aimAt(tg.cx, tg.cy); I.aim.flare = true; I.pressed.flare = true; st.flareCd = 0.8; }
     }
@@ -357,6 +372,10 @@
     }
     if (job.awake != null && job.build !== 'duo') R.awake = job.awake; // (the relic's stage, if asked for)
     R.trial = job.trial; R.current = job.boss;
+    // (v2.6f) the Champion as he is met: his duel is fought clean (no omens), and his doorway opens only on
+    // the roads after trials II to V, so his health and pace are never past trial V's. champMax: true
+    // fights him at the trial asked, with omens (the v2.6c test of him after seven trials).
+    if (job.boss === 'champion' && !job.champMax) { R.champFight = true; R.trial = Math.min(job.trial, 5); }
     G.startFight();
     const B = G.boss, st = { draws: job.draws };
     let t = 0, hits = 0, cause = {};
@@ -431,7 +450,7 @@
       queue = []; results = []; errors.length = 0;
       // interleaved, so a partial run already covers every cell a little
       for (let r = 0; r < runs; r++) for (const boss of bosses) for (const [hi, hero] of heroes.entries()) for (const trial of trials)
-        queue.push({ boss, hero, trial, diff: o.difficulty == null ? 1 : o.difficulty, maxT: o.maxT || 420, boons: o.boons !== false, god: !!o.god, draws: o.draws !== false,
+        queue.push({ boss, hero, trial, diff: o.difficulty == null ? 1 : o.difficulty, maxT: o.maxT || 420, boons: o.boons !== false, god: !!o.god, draws: o.draws !== false, champMax: !!o.champMax,
           build: o.build, awake: o.awake, duo: r, flip: (r + hi) % 2 === 1 });
       CLEAR.total = queue.length;
       running = true; started = performance.now();

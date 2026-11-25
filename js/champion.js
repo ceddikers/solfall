@@ -165,7 +165,7 @@
     answer: 'lunge', antiAir: 'rise', finale: 'blackdawn',
     gaps: [0, 0.95, 0.75, 0.58],
     bags: { 1: [], 2: [], 3: [] }, // (filled in setup: phase II and III carry a move for each boss beaten this run)
-    cards: { 2: ['THE TROPHIES', 'Then you have earned them'], 3: ['THE OTHER SIDE', 'What the seventh door keeps'] },
+    cards: { 2: ['THE TROPHIES', 'Then you have earned them'], 3: ['THE OTHER SIDE', 'What the last door keeps'] },
     first: { 1: 'string', 2: '', 3: 'fourfold' },
     bpm: [72, 96, 112, 132],
     staggerWord: 'OPEN', staggerMult: 1.5,
@@ -553,6 +553,10 @@
     yield* wait(0.12 * T);
     G.fx.glint(b.x + b.face * 30, b.y - 54, 30, heroOf('sword').hot, 0.25); G.audio.play('glint');
     b.pose = 'thrustP'; // (v2.5c) with the glint the point goes right back: the coil before the spring
+    { // (v2.6f, Gentle only) where the thrust will carry him, as it stands at the glint
+      const gp = Math.abs(P.x - b.x), lx = clampX(b.x + b.face * (far ? Math.min(900, gp + 140) : Math.min(B.phase === 1 ? 380 : 430, gp + (B.phase === 1 ? 70 : 110))));
+      K.gentleLane(b.x, lx, (far ? 0.4 : 0.36) * T + 0.1, { h: 90, tint: heroOf('sword') });
+    }
     yield* wait((far ? 0.4 : 0.36) * T);
     b.set = 0;
     const dir = b.face, gap = Math.abs(P.x - b.x);
@@ -673,6 +677,7 @@
     // the hand closes on the hilt: a glint at the sheath's mouth, and then it comes
     b.set = n; G.audio.play('glint');
     G.fx.glint(b.x + b.face * 4, b.y - 36, 26, '255,248,230', 0.2);
+    K.gentleLane(b.x, clampX(b.x + b.face * ([0, 210, 330, 500][n] || 210)), (B.phase === 1 ? 0.36 : 0.3) * T + 0.1, { h: 90, tint: heroOf('blade') }); // (v2.6f, Gentle only)
     yield* wait((B.phase === 1 ? 0.36 : 0.3) * T);
     b.set = 0;
     yield* drawThrough(n);

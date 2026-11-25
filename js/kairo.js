@@ -197,7 +197,11 @@
     bpm: [84, 108, 124, 138], // his own music's tempos (see B.music)
   };
   // how long each punish window lasts, by phase: about two thirds in II, half in III
-  const PW = () => [0, 1, 0.67, 0.5][B.phase];
+  // (v2.6f) phase III's openings after a move 0.6 of phase I's, was 0.5; and he rises into phase III with
+  // four tenths of his health, was half. At trials V and VII the scripted player beat him a third of the
+  // time against 80-100% for every other boss, and lost two in three of those fights in phase III.
+  const PW = () => [0, 1, 0.67, 0.6][B.phase];
+  const RISE_HP = 0.4;
   // how long his close blows take to come, by phase: slowest in the sparring phase
   const SP = () => [0, 1.25, 1.02, 0.9][B.phase];
 
@@ -1033,6 +1037,7 @@
     G.audio.play('kCrack'); b.flick = 1;
     K.aura(b.x, b.y, G.pal().boss, 20, 90, 6);
     const tx = clampX(P.x + (G.sign(P.x - b.x) || 1) * 60);
+    K.gentleLane(b.x, tx, 0.14 + Math.max(0.15, Math.abs(tx - b.x) / 1500), { h: 70 }); // (Gentle only)
     yield* wait(0.14);
     yield* flyLow(tx);
     b.exposed = true; yield* wait(0.8 * PW()); b.exposed = false;
@@ -1557,8 +1562,9 @@
       yield* wait(0.5);
       yield* fallDown();
       yield* wait(1.3);
-      // and rises, his strength coming back to half, the phase marks gone
-      // (v2.4c: was three quarters; the scripted clear-rate runs lost most of their Kairo fights in this phase)
+      // and rises, his strength coming back to four tenths, the phase marks gone
+      // (v2.4c: was three quarters; the scripted clear-rate runs lost most of their Kairo fights in this phase;
+      // v2.6f: four tenths, was half, see RISE_HP)
       b.pose = 'lie';
       G.audio.play('kRumble', { dur: 1.8 });
       const hp0 = B.hp;
@@ -1568,10 +1574,10 @@
         e += dt;
         const k = Math.min(1, e / 1.6);
         b.lie = 1 - E.inOutQuad(k);
-        B.hp = Math.round(G.lerp(hp0, B.maxHp * 0.5, E.outQuad(k)));
+        B.hp = Math.round(G.lerp(hp0, B.maxHp * RISE_HP, E.outQuad(k)));
         if (k > 0.5) b.pose = 'kneel';
       }
-      b.lie = 0; B.hp = Math.round(B.maxHp * 0.5); B.unbound = true;
+      b.lie = 0; B.hp = Math.round(B.maxHp * RISE_HP); B.unbound = true;
       b.pose = 'idle';
       // the gold aura burns out to nothing; a beat of silence; then a thin white aura settles close
       e = 0;

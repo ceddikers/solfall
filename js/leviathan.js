@@ -558,8 +558,11 @@
     const topY = e < active ? G.lerp(F, -60, E.outCubic(up)) : G.lerp(-60, F, E.inQuad(Math.min(1, (e - active) / 0.45)));
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
+    // (v2.6f) the column itself is never dimmed much (only its spray and shake are): the gyre's spouts
+    // were drawn so faint that their hits came from what looked like empty sky
+    const fc = f0 * Math.max(dim || 1, 0.9);
     const g = ctx.createLinearGradient(x - cw / 2, 0, x + cw / 2, 0);
-    g.addColorStop(0, G.rgba(WATER, 0)); g.addColorStop(0.25, G.rgba(WATER, 0.2 * f)); g.addColorStop(0.5, G.rgba(P.hot, 0.24 * f)); g.addColorStop(0.75, G.rgba(WATER, 0.2 * f)); g.addColorStop(1, G.rgba(WATER, 0));
+    g.addColorStop(0, G.rgba(WATER, 0)); g.addColorStop(0.25, G.rgba(WATER, 0.2 * fc)); g.addColorStop(0.5, G.rgba(P.hot, 0.24 * fc)); g.addColorStop(0.75, G.rgba(WATER, 0.2 * fc)); g.addColorStop(1, G.rgba(WATER, 0));
     ctx.fillStyle = g;
     ctx.beginPath(); ctx.moveTo(x - cw / 2, F);
     for (let y = F; y > topY; y -= 24) ctx.lineTo(x - cw / 2 + Math.sin(y * 0.05 + t * 18) * 4, y);
