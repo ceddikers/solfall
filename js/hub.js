@@ -281,12 +281,7 @@
 
   // The reliquary: one plinth for each relic on offer this visit (three, or four with the Shrine's
   // Fourth Relic). The plinths are places too, rebuilt only when the offer changes.
-  const RELIC_COL = {
-    chalice: '255,150,120', shard: '150,225,255', moons: '214,170,255', crown: '255,96,56', ward: '255,226,170', cloak: '140,245,185',
-    storm: '255,250,160', phoenix: '255,170,90', sunstone: '255,214,140', eye: '255,186,92', prism: '150,170,255', shroud: '190,135,255', oath: '130,195,255',
-    pelt: '255,130,60', pearl: '120,230,220',
-  };
-  const relicCol = (r) => RELIC_COL[r.id] || GOLD;
+  const relicCol = (r) => G.relics.col(r.id); // (each relic's light: relics.js)
   let relicKey = '', relicSt = [];
   function relicStations() {
     const offer = G.run.relicOffer || [], key = offer.map((r) => r.id).join(',');
@@ -318,7 +313,7 @@
     }
     if (s.id === 'relic') {
       const r = G.run.relicOffer[s.i];
-      return [r.name, r.desc, G.run.relic === r.id ? 'this is your relic for the run' : 'take it for the run'];
+      return [r.name, r.desc + ' It awakens three times in a run.', G.run.relic === r.id ? 'this is your relic for the run' : 'take it for the run'];
     }
     if (s.id === 'gate') {
       const deep = G.store.load('depth', {})[G.settings.difficulty], r = G.relicDef(G.run.relic);
@@ -1105,8 +1100,8 @@
     if (!G.ui.current) {
       text(ctx, 'THE VIGIL', cam + W / 2, 40, 20, '236,233,244', 0.75, '400');
       text(ctx, pad ? 'Stick move  ·  A jump  ·  X attack  ·  B dash  ·  LB use  ·  Back flourish  ·  Start menu'
-        : [G.input.label('left') + ' / ' + G.input.label('right') + ' move', G.input.label('jump') + ' jump', G.input.label('attack') + ' or click attack', G.input.label('dash') + ' dash',
-          G.input.label('flare') + ' special', G.input.label('heal') + ' use', G.input.label('taunt') + ' flourish', 'hold Tab moves', 'Esc menu'].join('  \u00b7  '),
+        : [G.input.label('left') + ' / ' + G.input.label('right') + ' move', G.input.label('jump') + ' jump', G.input.label('attack') + (G.input.mouse ? ' attack' : ' or click attack'), G.input.label('dash') + ' dash',
+          G.input.label('flare') + (G.input.mouse ? ' special' : ' or right click special'), G.input.label('heal') + ' use', 'hold Tab moves'].join('  \u00b7  '),
         cam + W / 2, 66, 12, '236,233,244', 0.45, '500');
       text(ctx, '\u25c6 ' + G.meta.shards + ' Sunshards', cam + W - 112, 66, 12, GOLD, 0.8);
       // which way the gate lies, until it is in view

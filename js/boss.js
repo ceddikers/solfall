@@ -307,12 +307,12 @@
     }
     amount = G.sets.amp(amount, info); // (the Gloam mark: sets.js)
     let mult = t.kind === 'core' ? 1.5 : 1;
-    if (B.staggered) mult *= G.relic('eye') ? 1.82 : 1.4;
+    if (B.staggered) mult *= 1.4 * G.relics.staggerK();
     if (B.hands.some((h) => h.alive && h.broken > 0)) mult *= 1.25; // exposed while a hand lies broken
     const dmg = Math.round(amount * mult);
     const floorHp = B.phase === 1 ? Math.floor(B.maxHp * 2 / 3) : B.phase === 2 ? Math.floor(B.maxHp / 3) : 0;
     B.hp = Math.max(floorHp, B.hp - dmg);
-    G.player.stats.dmg += dmg; G.flow.dealt(dmg); G.sets.dealt(amount, info);
+    G.player.stats.dmg += dmg; G.flow.dealt(dmg); G.sets.dealt(amount, info); G.relics.dealt(amount, info);
     // (an ember burning, info.tick, hurts without a flinch, a number or any stagger)
     if (!info.tick) {
       if (t.kind === 'core') B.core.flash = 1; else t.ref.flash = 1;
@@ -329,7 +329,7 @@
       if (!B.staggered) {
         // heroes differ in how hard they stagger (info.poise); the Sunstone relic speeds it for everyone
         B.poise += (amount * (t.kind === 'hand' ? 1.5 : (B.phase === 3 ? 1.35 : 0.9)) * (info.poise || 1) + (info.lance ? 60 : 0))
-          * (G.relic('sunstone') ? 1.4 : 1);
+          * G.relics.poiseK();
       }
     }
     if (B.hp <= 0) die();
@@ -406,6 +406,7 @@
     G.fx.shatter(B.core.x, B.core.y, G.pal().boss, 20, { hot: G.pal().hot, r: 340, jitter: 30, r0: 60 });
     G.fx.punch(0.022);
     G.ui.callout('STAGGERED', 'Strike the core');
+    G.relics.onStagger(); // (the Offered Hilt's echoes, the Sunstone: relics.js)
     B.script = staggerScript();
   }
   // thrown down from outside the fight (the Dying Light pair)
@@ -414,7 +415,7 @@
   };
 
   function* staggerScript() {
-    const c = B.core, dur = G.diff().stagger + (G.relic('sunstone') ? 1.5 : 0);
+    const c = B.core, dur = G.diff().stagger + G.relics.staggerAdd();
     c.ctrl = true;
     const drops = [tween(c, { y: FLOOR - 112, open: 0.06 }, 0.42, E.inCubic)];
     for (const h of B.hands) {

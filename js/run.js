@@ -103,6 +103,7 @@
   G.hero = () => heroById[R.hero] || G.HEROES[0];
 
   // ------------------------------------------------------------------ relics (one, chosen before the first trial)
+  // Each one awakens on the road after trials II, IV and VI (relics.js, which also holds what they do).
   G.RELICS = [
     { id: 'chalice', name: 'Ember Chalice', desc: 'Mending restores 2 health instead of 1.' },
     { id: 'shard', name: 'Comet Shard', desc: 'Finishers deal 50% more damage.' },
@@ -113,6 +114,12 @@
     { id: 'storm', name: 'Stormcaller', desc: 'Every fifth hit calls lightning onto the target for 30 damage.' },
     { id: 'phoenix', name: 'Phoenix Feather', desc: 'Once per run, a killing blow leaves you on 3 health instead.' },
     { id: 'sunstone', name: 'Sunstone', desc: 'The stagger bar fills 40% faster, and each stagger lasts 1.5 seconds longer.' },
+    // (v2.6a) relics that change how a fight is played rather than how hard you hit
+    { id: 'hourglass', name: 'Still Hourglass', desc: 'A perfect dodge slows the foe, and all it has thrown, to half speed for 0.6 seconds.' },
+    { id: 'anvil', name: 'Anvil Heart', desc: 'Blows no longer knock you back or break the attack you are making.' },
+    { id: 'sun', name: 'Rising Sun', desc: 'Every blow you land adds 1% to everything you do, up to 30% a fight. Being struck loses it all.' },
+    { id: 'quicksilver', name: 'Quicksilver', desc: 'Dashes recover twice as fast, each paid for with an eighth of a segment of Starlight (with none, as before).' },
+    { id: 'lantern', name: 'Lantern of Hours', desc: 'In a fight, Starlight fills by itself: a segment every 10 seconds.' },
   ];
   const relicById = {};
   for (const r of G.RELICS) relicById[r.id] = r;
@@ -229,10 +236,9 @@
   // a corrupted boon's drawback, while it is held and has not been cleansed
   G.bane = (id) => !!R.boons[id] && !(R.purged || []).includes(id);
   // Boons and relics, the Shrine's Whetstone, the Flow rank, and the two trophies that depend on the moment.
-  G.dmgMult = () => (1 + 0.35 * G.boon('glass')) * (G.relic('crown') ? 1.4 : 1) * (G.boon('whisper') ? 1.3 : 1)
+  G.dmgMult = () => (1 + 0.35 * G.boon('glass')) * (G.boon('whisper') ? 1.3 : 1)
     * (1 + 0.04 * G.up('edge')) * (1 + 0.03 * G.flow.rank)
-    * (G.relic('shroud') && G.player.shroudT > 0 ? 1.5 : 1) * (G.relic('oath') && G.player.hp === 1 ? 1.5 : 1)
-    * (G.relic('wraps') && G.player.wrapsHit > 0 ? 1.5 : 1); // Sparring Wraps (Kairo's trophy)
+    * G.relics.dmgK(); // every relic's share (Thorn Crown, the Shroud, the Oath, the Wraps...): relics.js
 
   G.roman = function (n) {
     const t = [[10, 'X'], [9, 'IX'], [5, 'V'], [4, 'IV'], [1, 'I']];
@@ -242,7 +248,8 @@
   };
 
   R.reset = function () {
-    R.trial = 1; R.boons = {}; R.order = []; R.offer = []; R.relic = null; R.relicOffer = []; R.phoenixUsed = false;
+    R.trial = 1; R.boons = {}; R.order = []; R.offer = []; R.relic = null; R.relicOffer = []; R.phoenixUsed = false; R.phoenixN = 0;
+    R.awake = 0; R.sun = 0; // the relics' awakening (0 to 3) and the Rising Sun's measure: relics.js
     R.omens = []; R.lastOmens = []; R.ult = 0; R.rerolls = G.up('reroll');
     R.hero = heroById[G.settings.hero] ? G.settings.hero : 'vesper';
     R.foes = [];
@@ -289,7 +296,7 @@
   };
 
   // Health before boons, for deciding whether a health-costing pick may be offered.
-  const baseHp = () => (G.DIFFS[G.settings.difficulty] || G.DIFFS[1]).hp + G.hero().hp + G.boon('heart') + G.up('vigor') - (G.relic('crown') ? 2 : 0);
+  const baseHp = () => (G.DIFFS[G.settings.difficulty] || G.DIFFS[1]).hp + G.hero().hp + G.boon('heart') + G.up('vigor') - G.relics.crownCost();
 
   // Three relics to choose from before the first trial.
   R.rollRelics = function () {

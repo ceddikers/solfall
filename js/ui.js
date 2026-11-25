@@ -210,7 +210,7 @@
       c.style.display = r ? '' : 'none';
       if (!r) return;
       c.querySelector('.cname').textContent = r.name;
-      c.querySelector('.cdesc').textContent = r.desc;
+      c.querySelector('.cdesc').textContent = r.desc + ' It awakens three times in a run.';
     });
     U.show('relic', true);
   };
@@ -381,10 +381,10 @@
     const rows = [
       ['Move', k('left') + ' ' + k('right'), 'Run. ' + (h.heavy ? 'She is heavy: slower to start, slower to stop.' : h.id === 'lune' ? 'The fastest of them.' : h.draw ? 'He slows to a walk while he holds his stance.' : 'Quick on her feet.')],
       ['Jump', k('jump'), 'Jump; press again in the air (' + jumps + ' jumps in all). Hold for height. Down and jump drops through a platform.'],
-      ['Attack', k('attack') + ' or left click', h.how.attack],
+      ['Attack', '<kbd>Left click</kbd> or ' + k('attack'), h.how.attack],
       ['Aim', k('up') + ' ' + k('down'), h.how.aim],
       ['Dash', k('dash'), 'A burst of speed that passes straight through any attack. Dash through one at the last moment for a perfect dodge: time slows, Starlight fills, and your next hit is a Riposte for double. ' + h.how.dash],
-      ['Special', k('flare') + ' or right click', h.how.special + ' Costs one segment of Starlight.'],
+      ['Special', '<kbd>Right click</kbd> or ' + k('flare'), h.how.special + ' Costs one segment of Starlight.'],
       ['Mend', 'hold ' + k('heal'), 'Stand still and hold to turn one segment of Starlight into one health. Jumping or dashing cancels it.'],
       ['Dawnbreak', k('ult') + ' or middle click', h.how.ult + ' The bar fills as you deal damage; nothing can hurt you while it plays.'],
       ...(G.run.crownSet() ? [['Crown', k('crown'), G.SETS[G.run.crownSet()].crown + ': ' + G.SETS[G.run.crownSet()].crownDesc + ' The bar fills as your ' + G.SETS[G.run.crownSet()].name + ' set does its work.']] : []),
@@ -468,8 +468,8 @@
     const omens = G.run.omens.map((id) => '<p><b>Omen: ' + G.omenDef(id).name + '</b> ' + G.omenDef(id).desc + '</p>').join('');
     el.pauseBoons.innerHTML = (held.length || relic || omens)
       ? '<h3>' + G.hero().name + '\u2019s run</h3>' + omens
-        + (relic ? '<p><b>' + relic.name + '</b> ' + relic.desc + '</p>' : '')
-        + (G.run.extraRelics || []).map((id) => G.relicDef(id)).filter(Boolean).map((r) => '<p><b>' + r.name + '</b> ' + r.desc + ' <i>(' + (r.id === 'hilt' ? 'his gift, for this run' : 'from a corrupted portal') + ')</i></p>').join('')
+        + (relic ? '<p><b>' + esc(G.relics.title(relic.id)) + '</b> ' + G.relics.html(relic.id, { next: true }) + '</p>' : '')
+        + (G.run.extraRelics || []).map((id) => G.relicDef(id)).filter(Boolean).map((r) => '<p><b>' + esc(G.relics.title(r.id)) + '</b> ' + G.relics.html(r.id) + ' <i>(' + (r.id === 'hilt' ? 'his gift, for this run' : 'from a corrupted portal') + ')</i></p>').join('')
         + (G.run.crownSet() ? '<p class="crownline" style="--tagc:' + G.SETS[G.run.crownSet()].css + '"><b>Crown · ' + G.SETS[G.run.crownSet()].crown + '</b> ' + esc(G.SETS[G.run.crownSet()].crownDesc) + '</p>' : '')
         + held.map((h) => '<p' + (h.def.cursed ? ' class="cursed"' : '') + '><b>' + h.def.name + (h.n > 1 ? ' \u00d7' + h.n : '') + '</b> ' + (h.def.set ? '<i>' + G.SETS[h.def.set].name + ' · ' + G.SLOT_NAMES[h.def.slot] + '.</i> ' : '') + esc(h.def.desc) + U.pairNote(h.def)
           + (h.def.cursed ? (G.bane(h.def.id) ? '<span class="bane">' + esc(h.def.bane) + '</span>' : ' <i>(cleansed)</i>') : '') + '</p>').join('')
@@ -509,8 +509,8 @@
     el.heroName.textContent = hero.name.toUpperCase();
     // the health pips and Starlight take the hero's own colour
     el.stage.style.setProperty('--star', hero.css);
-    el.boons.innerHTML = (relic ? '<span class="t-relic">' + relic.name + '</span>' : '')
-      + (R.extraRelics || []).map((id) => G.relicDef(id)).filter(Boolean).map((r) => '<span class="t-relic">' + r.name + '</span>').join('')
+    el.boons.innerHTML = (relic ? '<span class="t-relic">' + esc(G.relics.title(relic.id)) + '</span>' : '')
+      + (R.extraRelics || []).map((id) => G.relicDef(id)).filter(Boolean).map((r) => '<span class="t-relic">' + esc(G.relics.title(r.id)) + '</span>').join('')
       + R.held().map((h) => '<span class="t-' + h.def.tag.toLowerCase() + (h.def.cursed && !G.bane(h.def.id) ? ' clean' : '') + '">' + h.def.name + (h.n > 1 ? ' \u00d7' + h.n : '') + '</span>').join('');
     const label = el.ember.querySelector('.elabel');
     el.ember.querySelectorAll('.seg').forEach((s) => s.remove());
@@ -558,7 +558,7 @@
     if (U.fights > 0) return;
     el.hint.innerHTML = G.input.device === 'gamepad'
       ? 'Stick move &middot; <b>A</b> jump &middot; <b>X</b> attack &middot; <b>B</b> dash &middot; <b>Y</b> special &middot; hold <b>LB</b> mend &middot; <b>RT</b> Dawnbreak'
-      : (() => { const k = (a) => '<kbd>' + G.input.label(a) + '</kbd>'; return k('left') + k('right') + ' move &middot; ' + k('jump') + ' jump &middot; ' + k('attack') + ' or click attack &middot; ' + k('dash') + ' dash &middot; ' + k('flare') + ' or right click special &middot; hold ' + k('heal') + ' mend &middot; ' + k('ult') + ' Dawnbreak'; })();
+      : (() => { const k = (a) => '<kbd>' + G.input.label(a) + '</kbd>'; return k('left') + k('right') + ' move &middot; ' + k('jump') + ' jump &middot; ' + k('attack') + (G.input.mouse ? '' : ' or click') + ' attack &middot; ' + k('dash') + ' dash &middot; ' + k('flare') + (G.input.mouse ? '' : ' or right click') + ' special &middot; hold ' + k('heal') + ' mend &middot; ' + k('ult') + ' Dawnbreak'; })();
     el.hint.classList.add('show', 'calm');
     H.hintT = 7;
   };
@@ -619,13 +619,13 @@
     if (P.emberFlash < 0) { P.emberFlash = 0; retrigger(el.ember, 'deny'); }
     // prompt for what a full segment can buy
     const ready = !P.dead && P.ember >= G.PLAYER.SEG;
-    const mend = !ready ? '' : (P.hp < P.maxHp ? 'both' : 'lance') + G.input.device;
+    const mend = !ready ? '' : (P.hp < P.maxHp ? 'both' : 'lance') + G.input.device + G.input.mouse;
     if (mend !== H.mend) {
       H.mend = mend;
       el.mend.classList.toggle('on', ready);
       if (ready) {
         const pad = G.input.device === 'gamepad';
-        el.mend.innerHTML = (pad ? '<kbd>Y</kbd>' : '<kbd>' + G.input.label('flare') + '</kbd> or right click') + ' ' + G.hero().verb
+        el.mend.innerHTML = (pad ? '<kbd>Y</kbd>' : '<kbd>' + G.input.label('flare') + '</kbd>' + (G.input.mouse ? '' : ' or right click')) + ' ' + G.hero().verb
           + (P.hp < P.maxHp ? ' &middot; hold ' + (pad ? '<kbd>LB</kbd>' : '<kbd>E</kbd>') + ' to mend' : '');
       }
     }

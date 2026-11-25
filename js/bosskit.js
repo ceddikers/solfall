@@ -200,13 +200,13 @@
         return true;
       }
       amount = G.sets.amp(amount, info); // (the Gloam mark: sets.js)
-      let mult = B.staggered ? (B.staggerMult || 1.4) * (G.relic('eye') ? 1.3 : 1) : 1;
+      let mult = B.staggered ? (B.staggerMult || 1.4) * G.relics.staggerK() : 1;
       if (b.exposed) mult *= 1.3;
       if (B.vuln) mult *= B.vuln(t, info);
       const dmg = Math.round(amount * mult);
       const floorHp = B.phase === 1 ? Math.floor(B.maxHp * 2 / 3) : B.phase === 2 ? Math.floor(B.maxHp / 3) : 0;
       B.hp = Math.max(floorHp, B.hp - dmg);
-      G.player.stats.dmg += dmg; G.flow.dealt(dmg); G.sets.dealt(amount, info);
+      G.player.stats.dmg += dmg; G.flow.dealt(dmg); G.sets.dealt(amount, info); G.relics.dealt(amount, info);
       // (an ember burning, info.tick, hurts without a flinch, a number or any stagger)
       if (!info.tick) {
         b.flash = 1;
@@ -222,7 +222,7 @@
           });
         }
         if (!B.staggered) {
-          B.poise += (amount * (B.poiseK || 1.15) * (info.poise || 1) + (info.lance ? 60 : 0)) * (G.relic('sunstone') ? 1.4 : 1);
+          B.poise += (amount * (B.poiseK || 1.15) * (info.poise || 1) + (info.lance ? 60 : 0)) * G.relics.poiseK();
         }
       }
       if (B.onHit && !info.tick) B.onHit(dmg, info);
@@ -267,8 +267,7 @@
       G.fx.shatter(b.x, cy, G.pal().boss, 18, { hot: G.pal().hot, r: 300, jitter: B.w * 0.4 });
       G.fx.punch(0.022);
       G.ui.callout(B.staggerWord || 'STAGGERED');
-      // the Offered Hilt (the Champion's trophy): six seconds of echoes, once a fight
-      if (G.relic('hilt') && !G.player.hiltUsed) { G.player.hiltUsed = true; G.player.hiltT = 6; G.audio.play('segment'); }
+      G.relics.onStagger(); // (the Offered Hilt's echoes, the Sunstone: relics.js)
       G.feats.bump('stagger');
       B.script = staggerScript();
     }
@@ -280,7 +279,7 @@
     // it gets up), staggerMult (damage taken while down, 1.4 unless given) and staggerDur (a scale on
     // how long it lasts). The Knight is disarmed, the Veil is thrown into a wall, the Magus is grounded.
     function* staggerScript() {
-      const b = B.body, dur = G.diff().stagger * (B.staggerDur || 1) + (G.relic('sunstone') ? 1.5 : 0);
+      const b = B.body, dur = G.diff().stagger * (B.staggerDur || 1) + G.relics.staggerAdd();
       b.ctrl = true; b.hidden = false;
       if (B.onStagger) B.onStagger();
       b.x = G.clamp(b.x, G.WALL_L + 90, G.WALL_R - 90);

@@ -137,6 +137,7 @@
     if (kind === 'special') {
       if (token == null || token === st.lastToken) return; // (once a cast; a free shot, with no cast, is not the special)
       st.lastToken = token;
+      G.relics.hit('special', t, x, y); // (the Magus's Prism, awakened: relics.js)
       if (has('emspecial')) S.ember(3);
       if (has('stspecial')) st.cloud = { n: K.CLOUD_N, t: 0.3 };
       if (has('tdspecial')) { S.soak(2); wash(G.player.x, G.player.y - 30, K.WASH_R); G.fx.ring(G.player.x, G.player.y - 30, { r0: 30, r1: K.WASH_R, life: 0.4, color: col('tide'), width: 4 }); }
@@ -144,6 +145,7 @@
       return;
     }
     const fin = kind === 'finisher';
+    G.relics.hit(kind, t, x, y); // (the Comet Shard, awakened: relics.js)
     if (st.pyreT > 0) S.ember(fin ? 2 : 1);
     if (fin && has('emstrike')) S.ember(2);
     if (has('ststrike')) S.zap(fin ? 2 : 1);

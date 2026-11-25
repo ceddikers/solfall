@@ -56,7 +56,7 @@
   FL.perfect = function () {
     if (!P.ulting) P.ult = Math.min(100, P.ult + 6);
     FL.add(10); // on top of what the Starlight it earns already gives
-    if (G.relic('shroud')) P.shroudT = 3;
+    G.relics.shroud(); // (the Silent Shroud's surge: relics.js)
   };
 
   FL.update = function (dt) {

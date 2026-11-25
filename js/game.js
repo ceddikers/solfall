@@ -145,7 +145,7 @@
     G.cam.x = 0; G.cam.y = 0; // the camp scrolls; an arena does not
     G.run.rollOmens(); // before the boss works out its health
     G.arena.reset(); G.hazards.clear(); F.reset();
-    G.player.reset(); G.flow.reset(); G.boss.reset(); G.moments.reset(); G.sets.reset(); G.feats.reset(); G.hexes.reset(); G.boss.intro();
+    G.player.reset(); G.flow.reset(); G.boss.reset(); G.moments.reset(); G.sets.reset(); G.relics.reset(); G.feats.reset(); G.hexes.reset(); G.boss.intro();
     G.state = 'fight'; G.paused = false;
     G.time = 0; G.hitstop = 0; G.slowT = 0; G.deadT = 0; G.wonT = 0; G.endShown = false;
     G.ui.close(); G.ui.resetHud(); G.ui.buildHp(G.player.maxHp); G.ui.buildRun(); G.ui.bossIntro(); G.ui.hud(true); G.ui.keysHint();
@@ -291,7 +291,7 @@
     G.input.endStep();
     // while a Dawnbreak plays, the boss and everything it has thrown all but stand still
     // (and a soaked boss runs slower: sets.js)
-    const bdt = (G.player.ulting ? sdt * G.flow.SLOW : sdt) * G.sets.bossK();
+    const bdt = (G.player.ulting ? sdt * G.flow.SLOW : sdt) * G.sets.bossK() * G.relics.bossK(); // (the Still Hourglass: relics.js)
     G.boss.update(bdt);
     G.hazards.update(bdt);
     G.corrupt.update(bdt);
@@ -305,6 +305,7 @@
     }
     G.moments.update(sdt);
     G.sets.update(sdt);
+    G.relics.update(sdt);
     G.updateShots(sdt);
     F.update(sdt);
     // the view leans a little towards the hero
@@ -373,6 +374,7 @@
     if (G.boss.kit) drawBoss();
     G.moments.draw(ctx);
     G.sets.draw(ctx);
+    G.relics.draw(ctx);
     if (G.boss.drawOver) G.boss.drawOver(ctx); // e.g. the Veil's darkness: over the arena and the boss, under the hero
     G.drawShots(ctx);
     G.player.draw(ctx);

@@ -517,6 +517,11 @@ ul.tips b { color: var(--ink); font-weight: 600; }
 .item.card.t-corrupted { background: linear-gradient(180deg, rgba(235, 30, 80, 0.16), rgba(10, 0, 6, 0.5)); border-color: rgba(255, 74, 114, 0.55); }
 .bane { display: block; margin-top: 0.45em; color: #ff8aa4; font-style: italic; }
 .bane::before { content: 'But: '; font-style: normal; font-weight: 700; color: #ff4a72; }
+/* (v2.6a) a relic's awakened stages, on its cards (relics.js) */
+.awake { display: block; margin-top: 0.4em; color: #ffe2a8; }
+.awake b { color: #ffc861; font-weight: 700; margin-right: 0.3em; }
+.awake.next { color: var(--dim); opacity: 0.75; font-style: italic; }
+.awake.next b { color: var(--dim); }
 .boonlist p.cursed b { color: #ff6e8c; }
 #boons .t-corrupted.clean { --tagc: #aadcff; }
 .panel.fountain .item.up .uname { color: #ff8aa4; }

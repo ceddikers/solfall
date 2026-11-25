@@ -8,7 +8,7 @@
     down: ['KeyS', 'ArrowDown'],
     jump: ['Space', 'KeyZ'],
     attack: ['KeyJ', 'KeyX'],
-    dash: ['KeyK', 'KeyC', 'ShiftLeft', 'ShiftRight'],
+    dash: ['ShiftLeft', 'KeyK', 'KeyC', 'ShiftRight'],
     flare: ['KeyL', 'KeyV'],
     heal: ['KeyE', 'KeyF'],
     ult: ['KeyQ', 'KeyI'],
@@ -99,8 +99,15 @@
     ArrowLeft: '\u2190', ArrowRight: '\u2192', ArrowUp: '\u2191', ArrowDown: '\u2193', Tab: 'Tab', Backspace: 'Bksp', CapsLock: 'Caps',
     Comma: ',', Period: '.', Slash: '/', Semicolon: ';', Quote: '\'', BracketLeft: '[', BracketRight: ']', Backslash: '\\', Minus: '-', Equal: '=', Backquote: '`' };
   I.keyName = (code) => NAMES[code] || (code || '?').replace(/^Key/, '').replace(/^Digit/, '').replace(/^Numpad/, 'Num ');
-  // The first key bound to an action, for prompts.
-  I.label = (action) => (MAP[action] && MAP[action].length ? I.keyName(MAP[action][0]) : '?');
+  // The key to show for an action in prompts: its first binding. (v2.6a) The game is played with the
+  // mouse, so attack and special are shown as the mouse buttons (their keys still work), and Shift
+  // is dash's first key.
+  I.label = function (action) {
+    if (action === 'attack') return 'Left click';
+    if (action === 'flare') return 'Right click';
+    return MAP[action] && MAP[action].length ? I.keyName(MAP[action][0]) : '?';
+  };
+  I.mouse = true;
   I.keys = (action) => (MAP[action] || []).map(I.keyName);
 
   // Mouse: left click slashes, right click fires the lance, both aimed at the cursor.

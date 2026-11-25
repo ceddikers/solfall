@@ -167,7 +167,7 @@
 
   REST.enter = function () {
     REST.t = 0; REST.taken = -1; REST.near = null; REST.msgT = 0;
-    REST.taken2 = -1; REST.extra = false;
+    REST.taken2 = -1; REST.extra = false; REST.awakeT = -1;
     REST.ev = rollEvent();
     initTurn();
     if (!REST.flies.length) {
@@ -200,6 +200,45 @@
   }
   REST.crowned = crowned;
 
+  // ------------------------------------------------------------------ the relic awakens (v2.6a)
+  // On the road after trials II, IV and VI the run's relic stirs in the fire: it turns in the flames,
+  // and the portals wait until it is held to them. Then it rises out of the fire to the hero and
+  // wakes a stage (Kindled, Awakened, Ascendant: relics.js). Every relic held wakes with it.
+  const AWAKE_T = 1.7, RISE_T = 0.7;
+  function awaken() {
+    const p = P(), s = G.relics.awaken(), id = G.relics.held()[0], c = G.relics.col(id);
+    REST.awakeT = 0; REST.awakeCol = c;
+    retake();
+    G.audio.play('crownTaken'); G.audio.play('segment');
+    F.shake(5); F.stop(0.06);
+    F.ring(FIRE_X, FLOOR - 80, { r0: 10, r1: 220, life: 0.6, color: c, width: 6 });
+    F.burst(FIRE_X, FLOOR - 40, { n: 30, color: c, speed: [80, 320], angle: -Math.PI / 2, spread: 1.4, life: [0.5, 1.1], size: [2, 4], grav: -140 });
+    say(G.relicDef(id).name + ': ' + G.relics.STAGES[s]);
+    cardFor = null;
+  }
+  function updateAwake(dt) {
+    if (REST.awakeT < 0) return;
+    const before = REST.awakeT, p = P(), c = REST.awakeCol;
+    REST.awakeT += dt;
+    // it reaches the hero: a ring closes on them, and the stage is named over their head
+    if (before < RISE_T && REST.awakeT >= RISE_T) {
+      G.audio.play('heal');
+      F.ring(p.x, p.y - 40, { r0: 150, r1: 16, life: 0.4, color: c, width: 5 });
+      F.burst(p.x, p.y - 40, { n: 22, color: c, speed: [40, 240], life: [0.6, 1.3], size: [2, 4.5], grav: -160, wob: 120, jitter: 20 });
+      F.text(p.x, p.y - 120, G.relics.STAGES[G.run.awake].toUpperCase(), { color: c, size: 22, life: 1.4 });
+    }
+    if (REST.awakeT >= AWAKE_T) REST.awakeT = -1;
+  }
+  // where the relic is drawn: turning in the flames while it waits, then rising to the hero
+  function relicAt(t) {
+    const bob = Math.sin(t * 2.2) * 5, fx = FIRE_X, fy = FLOOR - 92 + bob;
+    if (REST.awakeT >= 0 && REST.awakeT < RISE_T) {
+      const k = REST.awakeT / RISE_T, e = k * k * (3 - 2 * k), p = P();
+      return { x: fx + (p.x - fx) * e, y: fy + (p.y - 60 - fy) * e - Math.sin(Math.PI * k) * 90, k };
+    }
+    return G.relics.pending() ? { x: fx, y: fy, k: 0 } : null;
+  }
+
   function use(s) {
     const p = P(), run = R();
     if (s.id === 'boon') {
@@ -227,6 +266,7 @@
       const st = portalState(s.boss);
       if (st === 'sealed') { G.audio.play('uiMove'); say(run.beaten.includes(s.boss) ? 'Sealed: beaten this run' : 'Sealed'); return; }
       if (!offerTaken()) { G.audio.play('empty'); say('Take from the offering first'); return; }
+      if (G.relics.pending()) { G.audio.play('empty'); say('Your relic stirs at the fire'); return; }
       G.audio.play('uiSelect');
       if (st === 'corrupt') { G.audio.play('roar'); F.shake(8); }
       G.enterPortal(s.boss, st === 'corrupt');
@@ -250,6 +290,7 @@
       F.flash('255,226,186', 0.5, 0.5);
       G.enterChampion();
     }
+    else if (s.id === 'fire' && G.relics.pending()) awaken();
     else if (s.id === 'fire') {
       G.audio.play('whoosh');
       F.burst(FIRE_X, FLOOR - 30, { n: 24, color: '255,170,90', speed: [60, 260], angle: -Math.PI / 2, spread: 1.2, life: [0.4, 1], size: [1.6, 3.4], grav: -120 });
@@ -680,7 +721,8 @@
     updateTurn(dt);
     updateEvent(dt);
     if (best && G.playerControl() && !p.ulting && (I.pressed.heal || I.pressed.confirm)) use(best);
-    showCard(best && best.id === 'boon' && !G.ui.current && !(turning(best.i) && REST.turn.t < TURN_SNAP) ? best : null);
+    showCard(best && !G.ui.current && ((best.id === 'boon' && !(turning(best.i) && REST.turn.t < TURN_SNAP)) || (best.id === 'fire' && G.relics.held().length)) ? best : null);
+    updateAwake(dt);
 
     if (Math.random() < dt * 16) F.spawn({ x: FIRE_X + rnd(-10, 10), y: FLOOR - 22, vx: rnd(-16, 16), vy: -rnd(50, 150), life: rnd(0.5, 1.2), size: rnd(1.4, 2.8), color: '255,170,90', wob: 70, rot: rnd(0, 6) });
     // open portals drink light in; corrupted ones bleed black and red
@@ -713,10 +755,11 @@
   function showCard(s) {
     const el = document.getElementById('restCard');
     if (!el) return;
-    const key = s ? s.i + ':' + G.run.offer[s.i].id + ':' + REST.taken + ':' + REST.taken2 + ':' + REST.extra : null;
+    const key = !s ? null : s.id === 'fire' ? 'fire:' + G.run.awake + ':' + G.relics.pending() : s.i + ':' + G.run.offer[s.i].id + ':' + REST.taken + ':' + REST.taken2 + ':' + REST.extra;
     if (key === cardFor) return;
     cardFor = key;
     if (!s) { el.classList.remove('show'); return; }
+    if (s.id === 'fire') { relicCard(el); return; }
     const b = G.run.offer[s.i], own = b.relicReward ? 0 : G.boon(b.id), mine = mineI(s.i);
     el.className = 'item card focus show t-' + b.tag.toLowerCase();
     document.body.classList.toggle('pad', G.input.device === 'gamepad');
@@ -726,6 +769,16 @@
       + (b.cursed ? '<span class="bane">' + G.ui.esc(b.bane) + '</span>' : '');
     el.querySelector('.cuse').textContent = mine ? 'Yours for the run' : closed() ? 'You have taken one'
       : (G.input.device === 'gamepad' ? 'LB' : G.input.label('heal')) + '  take it';
+  }
+  // the relic's card at the fire: what it does at each stage it has woken to, and the next one
+  function relicCard(el) {
+    const run = R(), ids = G.relics.held(), id = ids[0], s = run.awake || 0, due = G.relics.pending();
+    el.className = 'item card focus show t-relic';
+    el.querySelector('.ctag').textContent = 'Your relic' + (s ? ' \u00b7 ' + G.relics.STAGES[s] : '') + (ids.length > 1 ? ' \u00b7 and ' + (ids.length - 1) + ' more' : '');
+    el.querySelector('.cname').textContent = G.relicDef(id).name;
+    el.querySelector('.cdesc').innerHTML = G.relics.html(id, { next: true });
+    el.querySelector('.cuse').textContent = due ? (G.input.device === 'gamepad' ? 'LB' : G.input.label('heal')) + '  awaken it: ' + G.relics.STAGES[G.relics.due()]
+      : s >= 3 ? 'Ascendant' : 'It stirs again after trial ' + G.roman(G.relics.AT[s]);
   }
   REST.leave = function () { cardFor = null; const el = document.getElementById('restCard'); if (el) el.classList.remove('show'); };
 
@@ -785,6 +838,16 @@
     ctx.beginPath(); ctx.moveTo(x - 24, FLOOR - 4); ctx.lineTo(x + 20, FLOOR - 16); ctx.moveTo(x + 24, FLOOR - 4); ctx.lineTo(x - 20, FLOOR - 16); ctx.stroke(); ctx.lineCap = 'butt';
     flame(ctx, x, FLOOR - 10, 34, 54, WARM, t, 0);
     pool(ctx, WARM, x, 260, 0.6);
+    // (the relic, when it stirs: v2.6a)
+    const at = relicAt(t), ids = G.relics.held();
+    if (at && ids.length) {
+      const c = G.relics.col(ids[0]), w = 11 * (0.35 + 0.65 * Math.abs(Math.cos(t * 1.6))), h = 19;
+      glow(ctx, c, at.x, at.y, 70 + 30 * Math.sin(t * 3), 0.45);
+      ctx.globalCompositeOperation = 'lighter';
+      paint.diamond(ctx, at.x, at.y, w + 2, h, G.rgba(c, 0.95));
+      paint.diamond(ctx, at.x, at.y, w * 0.45 + 1, h * 0.6, 'rgba(255,255,255,0.9)');
+      ctx.globalCompositeOperation = 'source-over';
+    }
   }
 
   // the offering: a plinth for each boon (or, after a corrupted portal, each relic), turning in the
@@ -1037,6 +1100,7 @@
 
   function label(s) {
     const run = R(), next = G.roman(run.trial + 1), of = G.roman(G.RUN_FIGHTS);
+    if (s.id === 'fire' && G.relics.pending()) return ['The Fire', 'Your relic stirs in the flames. Hold it to the fire.', 'awaken it'];
     if (s.id === 'fire') return ['The Fire', run.runWon() ? 'All six trials won. Rest a while.' : 'Trial ' + G.roman(run.trial) + ' won. Rest a while; nothing here can hurt you.', 'warm your hands'];
     if (s.id === 'stone') return ['Second Thoughts', 'Redraw the offering (' + run.rerolls + ' left this run)', 'redraw'];
     if (s.id === 'home') return ['The Way Home', 'The run is won. Back to the camp.', 'go home'];
@@ -1064,7 +1128,7 @@
       const B = G.bosses[s.boss], st = portalState(s.boss), ready = offerTaken();
       if (st === 'corrupt') return ['Corrupted: ' + B.name, 'Optional. Far stronger, and it does not count as a trial. Win it for a second relic and triple Sunshards.', ready ? 'enter, if you dare' : 'take from the offering first'];
       if (st === 'sealed') return [B.name, run.beaten.includes(s.boss) ? (run.cleansed.includes(s.boss) ? 'Beaten, and its corruption cleansed' : 'Beaten this run') : 'Sealed', ''];
-      return [B.name, 'Trial ' + next + ' of ' + of, ready ? 'enter' : 'take from the offering first'];
+      return [B.name, 'Trial ' + next + ' of ' + of, !ready ? 'take from the offering first' : G.relics.pending() ? 'awaken your relic at the fire first' : 'enter'];
     }
     return ['', '', ''];
   }
@@ -1104,9 +1168,9 @@
     if (REST.msgT > 0) text(ctx, REST.msg.toUpperCase(), p.x, p.y - 104, 15, paint.GOLD, Math.min(1, REST.msgT * 2));
     if (!G.ui.current) {
       text(ctx, 'THE CROSSROADS', cam + W / 2, 40, 20, '236,233,244', 0.75, '400');
-      const sub = run.runWon()
+      const sub = G.relics.pending() && run.runWon() ? 'All ' + G.roman(G.RUN_FIGHTS) + ' trials won  \u00b7  your relic stirs at the fire, one last time' : run.runWon()
         ? 'All ' + G.roman(G.RUN_FIGHTS) + ' trials won' + (run.corrupted.length ? '  ·  ' + (run.corrupted.length > 1 ? 'corrupted portals wait' : 'a corrupted portal waits') + ', if you dare  ·  or the way home, behind you' : '  ·  the way home is behind you')
-        : (run.offerKind === 'relic' ? 'The corruption is cleansed  ·  take a relic, then choose a portal' : 'Trial ' + G.roman(run.trial) + ' of ' + G.roman(G.RUN_FIGHTS) + ' won  ·  take from the offering, then choose a portal');
+        : G.relics.pending() ? 'Trial ' + G.roman(run.trial) + ' won  \u00b7  your relic stirs at the fire' : (run.offerKind === 'relic' ? 'The corruption is cleansed  ·  take a relic, then choose a portal' : 'Trial ' + G.roman(run.trial) + ' of ' + G.roman(G.RUN_FIGHTS) + ' won  ·  take from the offering, then choose a portal');
       text(ctx, sub, cam + W / 2, 66, 12, '236,233,244', 0.45, '500');
       if (PORTAL_X > cam + W + 40 && offerTaken()) text(ctx, 'THE PORTALS  ›', cam + W - 96, 40, 12, paint.GOLD, 0.5 + 0.2 * Math.sin(REST.t * 3));
     }

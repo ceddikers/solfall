@@ -2,7 +2,7 @@
 
 A side-on boss rush for the browser: four heroes, seven three-phase bosses, played as a run of
 ever-harder trials. You pick a hero and a relic before the run and win a boon after each victory.
-Version 2.5c.
+Version 2.6a.
 
 This is an early slice of a planned boss-rush roguelite (short runs, a boon after each boss,
 bosses drawn from a pool). A run meets the four bosses in a shuffled order, then meets them again, harder.
@@ -113,6 +113,78 @@ hero (`tools/feel-check.js`).
 - Settings, Reset progress erases Sunshards, upgrades, trophies and records (it has to be chosen twice).
 
 Not done: touch controls, a colour-blind alternative to red-orange warnings, gamepad rebinding.
+
+## Relics that awaken, and five new ones (v2.6a)
+
+Asked: expand relics and boons before the final boss. Of the ideas pitched, this build does the first two: "an
+evo at trial 2 completion -> trial 4 completion and a final awakening at the trial before the final boss", and
+new relics that change the rules (the "echo of the boss's move" one was left out: "could be strong/difficult to
+build"). Duo boons with a fifth slot, boon rarities and pick control (reroll, banish, trade) come next.
+
+**Relic or boon.** A relic is chosen once, at the camp's reliquary, and kept for the whole run (retries
+included); first wins over bosses add trophy relics to what the reliquary can offer. A boon is taken on the road
+after every victory and lasts only the run. Relics are now the part of a build that grows with the run.
+
+**Awakening.** On the road after trial II, after trial IV and after trial VI, the relic stirs in the fire: it
+turns over the flames, the subtitle says so, and the portals wait until it is held to the fire (E at the fire).
+It rises out of the flames to the hero and wakes a stage: **Kindled**, **Awakened**, **Ascendant**. Stages build
+on each other; every relic held wakes with the run (a second one from a corrupted portal, the Offered Hilt). The
+fire's card shows what it does now and the next stage. The pause menu and the run panel name the stage.
+Until the final (seventh) fight exists the run ends after trial VI, so Ascendant only shows on the last road.
+
+| Relic | Kindled (after II) | Awakened (after IV) | Ascendant (after VI) |
+|---|---|---|---|
+| Ember Chalice | mending a quarter quicker | mending ends in a wave: 40 to a foe close by | restores 3; the wave crosses the arena for 60 |
+| Comet Shard | finishers +75% | a landed finisher calls a comet for 20 | finishers double; comet 45 |
+| Twin Moons | Starlight fills 20% faster | a second extra segment | full Starlight: +25% to everything |
+| Thorn Crown | +50% | costs one health, not two | +65%; every 25th blow unstruck mends one |
+| Wardstone | grows back 20 s after breaking | breaking strikes the foe for 40 | grows back after 10 s |
+| Feather Cloak | 18% faster | dashes recover a quarter faster | one more dash in the air |
+| Stormcaller | every fourth hit | 45 damage, staggers twice as hard | every third hit; a perfect dodge calls it |
+| Phoenix Feather | saving you throws the boss down | twice a run | back on full health, +50% for 8 s |
+| Sunstone | stagger fills 55% faster | staggers 2.5 s longer | a break fills a segment and a fifth of Dawnbreak |
+| Eclipse Eye | +45% on a staggered boss | +60%, staggers 1 s longer | +80%, Starlight twice as fast on it |
+| Magus's Prism | specials +55% | a landed special gives back a quarter segment | +75%, and it strikes again for 30 |
+| Silent Shroud | 4 seconds | +70% | the first blow in it is turned aside |
+| Unburied Oath | +70% on last health | holds on the last two | double |
+| Cinder Pelt | dashes recover 30% faster | dashing through scorches for 18 | twice the Starlight; scorch 36 |
+| Drowned Pearl | Starlight +40% | one more health | once a fight, left on last health: mends two |
+| Sparring Wraps | the blink's blow +75% | 3 s window, staggers twice as hard | double; the blink gives half a segment |
+| The Offered Hilt | echoes last 8 s | twice a fight | every break |
+
+**Five new relics** (in the reliquary from the start), each changing how a fight is played:
+
+| Relic | Base | Kindled | Awakened | Ascendant |
+|---|---|---|---|---|
+| Still Hourglass | a perfect dodge slows the foe and its attacks to half for 0.6 s | 0.9 s | blows in the slow +40% | 1.2 s; dashes and air jumps back |
+| Anvil Heart | blows no longer knock you back or break your attack | a blow taken fills a quarter segment | +40% for 3 s after a blow | a two-health blow takes one |
+| Rising Sun | each blow landed +1% to everything, up to 30% a fight; a hit loses it all (an arc at your feet shows it) | up to 45% | a hit costs only half | up to 60%, and it carries between fights |
+| Quicksilver | dashes recover twice as fast, each paid with an eighth of a segment (with none, as before) | a perfect dodge gives a quarter segment | one more dash in the air | dashing through the foe cuts for 30 |
+| Lantern of Hours | Starlight fills by itself in a fight, a segment every 10 s | every 7 s | every 5 s | full Starlight overflows into Dawnbreak |
+
+Built in `js/relics.js` (everything a relic does, base and awakened, is asked of it by the hero, the bosses and
+the road); `js/rest.js` holds the fire's part. Checked: every relic at its base and Ascendant stage through 44
+scripted fights with no errors; the on-hit relics (Anvil Heart, Rising Sun, the Pearl, the Phoenix, the
+Wardstone, the Shroud, the Oath, the Crown) tested blow by blow; the road walked through at trials II and VI.
+Not measured: how much the awakenings move clear rates (the scripted player carries no relic).
+
+**Also in this build.** "The controls at the top of the screen should reflect the mouse/keyboard setting like shift
+for dash, left click for attack", then "just make those the first bindings, full keyboard gameplay is
+ridiculous": every prompt now shows Left click for attack, Right click for special and Shift for dash (Shift is
+dash's first key; J, K, L and the rest still work). The camp's line drops flourish and Esc (both on the Moves
+page) so it clears the Starlight panel. And "aster turns the wrong way when charging": while she holds the smash
+her facing was locked, so walking or aiming the other way left it coming out behind her. Now she turns with it
+while she holds: to the cursor if the smash was clicked, or the way she walks.
+
+Playtest checklist:
+- Hold Aster's smash, then move the cursor (or walk) to the other side: she turns, and it lands that way.
+- The camp's top line reads Left click attack, Shift dash, Right click special.
+- Win trial II: the subtitle says the relic stirs, it turns over the fire, the portals refuse you until you press
+  E at the fire, then it rises to you and "KINDLED" shows. The fire's card lists the stage and the next one.
+- Pause: the relic shows its stage and what each awakened stage adds.
+- Try each new relic once: the Hourglass slow after a perfect dodge, Anvil Heart taking a blow without being
+  thrown, the Rising Sun arc filling and emptying, Quicksilver's quick dashes eating Starlight, the Lantern filling.
+- Does an awakening feel like a moment, and are any stages too strong or not worth noticing?
 
 ## Quick turns and a calmer crest (v2.5e)
 

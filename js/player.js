@@ -54,18 +54,18 @@
   P.reset = function () {
     H = G.hero(); STAR = H.col; HOT = H.hot;
     // the hero, the relic and the boons taken this run set these
-    const hp = Math.max(1, G.diff().hp + H.hp + G.boon('heart') + G.up('vigor') - G.boon('glass') - (G.relic('crown') ? 2 : 0) + (G.relic('pearl') ? 1 : 0) + (G.boon('hollow') ? 3 : 0));
-    const maxAir = H.air + G.boon('wind') + (G.relic('cloak') ? 1 : 0), maxDash = 1 + G.boon('twin');
-    const segs = C.SEGS + G.boon('fourth') + (G.relic('moons') ? 1 : 0);
+    const hp = Math.max(1, G.diff().hp + H.hp + G.boon('heart') + G.up('vigor') - G.boon('glass') - G.relics.crownCost() + G.relics.pearlHp() + (G.boon('hollow') ? 3 : 0));
+    const maxAir = H.air + G.boon('wind') + (G.relic('cloak') ? 1 : 0), maxDash = 1 + G.boon('twin') + G.relics.airDashes();
+    const segs = C.SEGS + G.boon('fourth') + G.relics.moonSegs();
     Object.assign(P, {
       hero: H,
       x: 300, y: FLOOR, vx: 0, vy: 0, facing: 1,
-      run: H.run * (G.relic('cloak') ? 1.12 : 1),
+      run: H.run * G.relics.runK(),
       onGround: true, plat: null, coyote: 0, dropT: 0, jumpHeld: false,
       maxAir, maxDash, airJumps: maxAir, airDashes: maxDash,
       segs,
-      healTime: C.HEAL_T * (G.boon('swift') ? 0.5 : 1) * G.sets.healTime(),
-      dashCdMax: C.DASH_CD * (G.boon('twin') ? 0.7 : 1) * (G.relic('pelt') ? 0.8 : 1) * (G.boon('voidstep') ? 0.5 : 1),
+      healTime: C.HEAL_T * (G.boon('swift') ? 0.5 : 1) * G.sets.healTime() * G.relics.mendTimeK(),
+      dashCdMax: C.DASH_CD * (G.boon('twin') ? 0.7 : 1) * G.relics.dashCdK() * (G.boon('voidstep') ? 0.5 : 1),
       dashHit: new Set(), dawnUsed: false, borrowUsed: false,
       ward: G.relic('ward'), hitCount: 0, plunge: false, afterT: 0, afterScale: 1,
       jumpBuf: 0, atkBuf: 0, dashBuf: 0, flareBuf: 0, wardT: 0,
@@ -99,7 +99,7 @@
 
   P.gain = function (n) {
     const before = Math.floor(P.ember / C.SEG);
-    P.ember = Math.min(C.SEG * P.segs, P.ember + n * (1 + 0.4 * G.boon('vein')) * (G.relic('pearl') ? 1.25 : 1) * (G.boon('starving') ? 2 : 1));
+    P.ember = Math.min(C.SEG * P.segs, P.ember + n * (1 + 0.4 * G.boon('vein')) * G.relics.gainK() * (G.boon('starving') ? 2 : 1));
     if (Math.floor(P.ember / C.SEG) > before) { G.audio.play('segment'); P.emberFlash = 1; }
     G.flow.hit(n); // whatever earns Starlight also builds Flow
   };
@@ -253,7 +253,7 @@
       }
       if (P.jumpBuf > 0 || P.dashBuf > 0) { P.healT = 0; P.healLock = true; }
       else if (P.healT >= P.healTime) {
-        P.hp = Math.min(P.maxHp, P.hp + (G.relic('chalice') ? 2 : 1));
+        P.hp = Math.min(P.maxHp, P.hp + G.relics.mendHp());
         P.ember -= C.SEG; P.healT = 0; P.healLock = true; P.stats.heals++;
         G.audio.play('heal');
         G.fx.ring(P.x, P.y - 24, { r0: 10, r1: 90, life: 0.45, color: STAR, width: 6 });
@@ -266,6 +266,7 @@
           G.fx.ring(P.x, P.y - 22, { r0: 70, r1: 30, life: 0.4, color: HOT, width: 4 });
         }
         G.sets.mended(); // (the Mend slot's set boon: sets.js)
+        G.relics.mended(); // (the Ember Chalice, awakened: relics.js)
       }
     } else {
       if (ctl && I.pressed.heal && P.hp < P.maxHp && (P.ember < C.SEG || G.bane('hollow'))) { G.audio.play('empty'); P.emberFlash = -1; }
@@ -278,7 +279,7 @@
       P.dashT = C.DASH_T; P.dashDir = mx || P.facing; P.facing = P.dashDir;
       P.iframes = C.IFRAME; P.pdDone = false;
       if (!P.onGround) P.airDashes--;
-      if (G.relic('pelt') && G.state === 'fight') P.gain(C.GAIN_HIT); // Cinder Pelt (the wolf's trophy)
+      G.relics.dashed(); // (Cinder Pelt, Quicksilver: relics.js)
       if (G.bane('voidstep') && G.state === 'fight') G.hexes.scar(P.x); // Void Step's bane (hexes.js)
       if (P.cast && !P.cast.thrown && P.cast.kind === 'lance') throwLance(P.cast);
       if (P.cast && !P.cast.thrown && P.cast.kind === 'arc') throwArc(P.cast);
@@ -326,9 +327,9 @@
         }
         if (P.onGround) G.fx.dust(P.x - P.dashDir * 10, P.y, 1, { dir: -P.dashDir, speed: [30, 110], size: [4, 8], a: 0.3 });
       }
-      if (G.boon('comet') || G.boon('voidstep')) cometStep();
+      if (G.boon('comet') || G.boon('voidstep') || G.relics.dashCut()) cometStep();
       if (P.dashT <= 0) {
-        P.vx = P.dashDir * P.run * (mx === P.dashDir ? 1 : 0.6); P.dashCd = P.dashFree ? 0 : P.dashCdMax; P.dashFree = false; P.sinceDash = 0;
+        P.vx = P.dashDir * P.run * (mx === P.dashDir ? 1 : 0.6); P.dashCd = P.dashFree ? 0 : P.dashCdMax * G.relics.dashEndK(); P.dashFree = false; P.sinceDash = 0;
         if (P.onGround) G.fx.dust(P.x + P.dashDir * 10, P.y, 3, { dir: P.dashDir, speed: [50, 190], size: [5, 9], up: 26 });
       }
     } else if (P.stun > 0) {
@@ -467,6 +468,10 @@
       // Aster's smash: with the button still down when the wind-up ends, the blow is held back and charges
       if (a.canCharge && !a.swung && a.t + dt >= a.a0 && ctl && I.down.attack && a.hold < C.CHARGE_T) {
         a.t = a.a0 - 0.0001;
+        // (v2.6a) while she holds it she turns to where it is aimed, so it never comes out behind her:
+        // the cursor if the smash was clicked, or the way she walks
+        const ax = I.mx + G.cam.x - P.x, want = I.aim.attack ? (Math.abs(ax) > 12 ? G.sign(ax) : 0) : mx;
+        if (want && want !== a.dir) { a.dir = want; P.facing = want; }
         charge(a, dt);
       } else a.t += dt;
       if (!a.swung && a.t >= a.a0) { a.swung = true; if (a.kind === 'shot') loose(a); else swing(a); }
@@ -529,11 +534,11 @@
     P.combo = idx; P.comboT = idx === n - 1 ? 0 : 0.62 + (H.heavy ? 0.3 : 0);
     return idx;
   }
-  const weaponMult = (heavy) => (1 + 0.25 * G.boon('keen')) * G.dmgMult() * (heavy && G.relic('shard') ? 1.5 : 1)
+  const weaponMult = (heavy) => (1 + 0.25 * G.boon('keen')) * G.dmgMult() * (heavy ? G.relics.finisherK() : 1)
     * (heavy && G.boon('dayedge') ? 1.6 : 1) // Edge of Day (a pair)
     * (G.boon('bloodedge') ? 1.6 : 1); // Bloodied Edge (corrupted)
   const haste = () => (1 - 0.18 * G.boon('quick')) * (G.boon('feral') ? 0.74 : 1);
-  const spec = () => (G.relic('prism') ? 1.4 : 1) * G.sets.specMult(); // the Magus's Prism strengthens every special (and Shadow Star)
+  const spec = () => G.relics.specK() * G.sets.specMult(); // the Magus's Prism strengthens every special (and Shadow Star)
 
   // ---------------------------------------------------------------- melee (sword, maul)
   function startSwing(mx, up, down) {
@@ -710,8 +715,8 @@
   // Stormcaller: every fifth weapon hit calls lightning onto what it struck.
   function struck(t, x, y) {
     P.hitCount++;
-    if (!G.relic('storm') || P.hitCount % 5 !== 0) return;
-    if (G.boss.damage(Math.round(30 * G.dmgMult()), t, { x, y, heavy: true })) {
+    if (!G.relic('storm') || P.hitCount % G.relics.stormEvery() !== 0) return;
+    if (G.boss.damage(Math.round(G.relics.stormDmg() * G.dmgMult()), t, { x, y, heavy: true, poise: G.relics.stormPoise() })) {
       const pts = [];
       for (let i = 0; i <= 7; i++) pts.push([x + (i === 7 ? 0 : G.rand(-26, 26)), -20 + (y + 20) * i / 7]);
       P.bolts.push({ pts, life: 0.22 });
@@ -809,7 +814,7 @@
     for (const t of G.boss.targets()) {
       if (P.dashHit.has(t.id) || !touch(P.box(), t)) continue;
       P.dashHit.add(t.id);
-      const dmg = Math.round((24 * G.boon('comet') * (G.boon('shooting') ? 2 : 1) + 40 * G.boon('voidstep')) * G.dmgMult());
+      const dmg = Math.round((24 * G.boon('comet') * (G.boon('shooting') ? 2 : 1) + 40 * G.boon('voidstep') + G.relics.dashCut()) * G.dmgMult());
       if (G.boss.damage(dmg, t, { x: P.x, y: P.y - 22, heavy: true, dir: P.dashDir })) {
         P.gain(C.GAIN_HIT);
         if (G.boon('shooting')) { P.dashFree = true; P.airDashes = P.maxDash; } // Shooting Star (a pair): no wait after this dash
@@ -1511,7 +1516,8 @@
     }
     if (H.draw) hush();
     G.sets.perfect(); // (the Dash slot's set boon: sets.js)
-    if (G.relic('wraps')) P.wraps = 2; // Sparring Wraps: the next attack within two seconds blinks
+    G.relics.perfect(); // (Stormcaller, the Still Hourglass, Quicksilver, awakened: relics.js)
+    if (G.relic('wraps')) P.wraps = G.relics.wrapsWin(); // Sparring Wraps: the next attack within two seconds blinks
   }
 
   // Sparring Wraps (Kairo's trophy): after a perfect dodge, the next attack starts with a blink to the
@@ -1528,6 +1534,7 @@
     P.ghosts.push({ x: P.x, y: P.y, f: P.facing, life: 0.3 });
     P.x = x; P.vx = 0; P.facing = G.sign(bx - x) || P.facing;
     P.wrapsHit = 0.45;
+    G.relics.blinked();
     G.audio.play('blink');
     G.fx.ring(P.x, P.y - 22, { r0: 44, r1: 8, life: 0.2, color: HOT, width: 3 });
   }
@@ -1562,16 +1569,19 @@
       G.fx.ring(P.x, P.y - 22, { r0: 26, r1: 130, life: 0.45, color: HOT, width: 8 });
       G.fx.shatter(P.x, P.y - 22, HOT, 10, { r: 180 });
       G.fx.text(P.x, P.y - 78, 'WARDED', { color: HOT, size: 18, life: 1 });
+      G.relics.warded(); // (the Wardstone, awakened: relics.js)
       return false;
     }
+    dmg = G.relics.blowDmg(dmg); // (Anvil Heart, Ascendant)
     if (G.bane('bloodedge')) dmg += 1; // Bloodied Edge's bane
     P.hp -= dmg; P.stats.hits++;
+    G.relics.hurt(); // (relics.js: Thorn Crown, Rising Sun, Anvil Heart, the Pearl)
     if (G.bane('feral')) P.ember = 0; // Feral Rhythm's bane
     if (G.bane('ravenous')) G.hexes.feed(); // Ravenous Light's bane
     if (P.cast && !P.cast.thrown) P.ember += C.SEG; // caught mid wind-up: the lance never left, the Starlight comes back
     P.cast = null;
     P.lastHit = { kind: src && src.kind, attack: G.boss.attackName || '' }; // for the defeat screen
-    const braced = !!(P.atk && P.atk.canCharge && !P.atk.swung && P.atk.hold > 0.12) && P.hp > 0;
+    const braced = (!!(P.atk && P.atk.canCharge && !P.atk.swung && P.atk.hold > 0.12) || G.relics.anvil()) && P.hp > 0; // (Anvil Heart: never moved)
     const dir = G.sign(P.x - srcX) || -P.facing;
     P.inv = C.HURT_INV; P.dashT = 0; P.healT = 0; P.hurtFlash = 1; P.plunge = false;
     P.drawT = 0; if (!braced) { P.hold = null; P.focus = 0; P.edge = 0; P.strung = 0; P.sun = 0; } // and whatever Focus Eos had gathered is gone
@@ -1604,9 +1614,9 @@
       revived('BORROWED TIME');
       if (G.boss.forceStagger) G.boss.forceStagger();
     }
-    if (P.hp <= 0 && G.relic('phoenix') && !G.run.phoenixUsed) {
-      // Phoenix Feather: once per run
-      G.run.phoenixUsed = true; P.hp = Math.min(P.maxHp, 3); P.inv = 3;
+    if (P.hp <= 0 && G.relics.phoenixReady()) {
+      // Phoenix Feather: once per run (twice, Awakened)
+      G.relics.phoenix();
       revived('REBORN');
     }
     if (P.hp <= 0) { P.hp = 0; die(); } else G.moments.hurt();
