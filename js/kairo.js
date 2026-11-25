@@ -407,6 +407,8 @@
   const faceNow = () => { const b = B.body; b.tqf = b.face; b.tqP = 1; }; // (out of a blink he is already turned)
 
   // ------------------------------------------------------------------ state
+  // (v2.9j) corrupted, he is drawn in a box round him (corrupt.js): the Gathered Sun rises far above it
+  B.silTop = () => (B.body && B.body.sunK > 0 ? 600 : 0);
   B.setup = function () {
     const b = B.body;
     Object.assign(b, {

@@ -810,6 +810,7 @@
     return { i, side, x: r.x, y: r.y, tx: r.x, ty: r.y, vx: 0, vy: 0, rot: 0.15 * side, trot: 0.15 * side, open: 0.7, curl: 0.3, tcurl: 0.3, topen: 0.7,
       crack: 0, dmg: 0, broken: false, glow: 0, flash: 0, shade: false, gone: 0, alpha: 1, busy: false, low: false, stuck: 0, shadowK: 1 };
   }
+  B.silFull = true; // (v2.9j, corrupt.js: her forms fill the sky)
   B.setup = function () {
     const b = B.body;
     Object.assign(b, {
@@ -2705,6 +2706,7 @@
 
   // ------------------------------------------------------------------ the frame
   const setup0 = B.setup;
+  B.silFull = true; // (v2.9j, corrupt.js: her forms fill the sky)
   B.setup = function () {
     setup0();
     B.form = 'noon'; B.flashed = false; B.lastLightOn = false; B.glaring = false; B.glareHit = false; B.armor = false;

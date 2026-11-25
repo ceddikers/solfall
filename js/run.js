@@ -290,6 +290,9 @@
     // and the fight in hand (game.js starts it afresh)
     R.stats = { dealt: {}, taken: {} }; R.fight = { dealt: {}, taken: {} };
     R.daily = null; R.dn = {}; // (v2.8a) the day of a daily trial, and how often each of its picks has been drawn
+    // (v2.9k) Motes, the run's own currency, the two consumables held, the road merchant's stock, and
+    // what was bought from it (motes.js)
+    R.motes = 0; R.motesEarned = 0; R.items = [null, null]; R.merch = null; R.mendsBought = 0; R.bonusHp = 0;
     if (typeof document !== 'undefined') document.documentElement.style.setProperty('--herocol', G.hero().css); // (a hero's own boons wear the hero's colour)
   };
 
@@ -440,25 +443,24 @@
     return R.offer;
   };
   R.CURSED_CHANCE = 0.4;
-  // The Cleansing Fountain (rest.js): purge a corrupted boon's bane for Sunshards. The price doubles
-  // with each use in a run.
-  R.cleanseCost = () => 40 * Math.pow(2, R.cleanses);
+  // The Cleansing Fountain (rest.js): purge a corrupted boon's bane for Motes (v2.9k: was Sunshards).
+  // The price doubles with each use in a run.
+  R.cleanseCost = () => 50 * Math.pow(2, R.cleanses);
   R.banes = () => R.order.filter((id) => boonById[id] && boonById[id].cursed && G.bane(id));
   R.cleanse = function (id) {
     const cost = R.cleanseCost();
-    if (!G.bane(id) || G.meta.shards < cost) return false;
-    G.meta.shards -= cost; G.meta.save();
+    if (!G.bane(id) || !G.motes.spend(cost)) return false;
     R.purged.push(id); R.cleanses++;
     return true;
   };
   // The wandering smith (rest.js): one more of a boon you hold, even past its limit (one past at most),
-  // for Sunshards. Only boons that grow with each one held can be tempered. The price doubles each time.
-  R.temperCost = () => 50 * Math.pow(2, R.tempers || 0);
+  // for Motes (v2.9k: was Sunshards). Only boons that grow with each one held can be tempered. The price
+  // doubles each time.
+  R.temperCost = () => 60 * Math.pow(2, R.tempers || 0);
   R.temperable = () => R.held().filter((h) => h.def.max >= 2 && !h.def.cursed && !h.def.pair && h.n < h.def.max + 1).map((h) => h.def);
   R.temper = function (id) {
     const cost = R.temperCost(), b = boonById[id];
-    if (!b || !R.temperable().includes(b) || G.meta.shards < cost) return false;
-    G.meta.shards -= cost; G.meta.save();
+    if (!b || !R.temperable().includes(b) || !G.motes.spend(cost)) return false;
     R.boons[id] = G.boon(id) + 1; R.order.push(id); R.tempers = (R.tempers || 0) + 1;
     return true;
   };

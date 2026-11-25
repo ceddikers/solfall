@@ -380,6 +380,7 @@
   }
 
   // ------------------------------------------------------------------ state
+  B.silWide = true; // (v2.9j, corrupt.js: if ever corrupted, his weapons and echoes reach far)
   B.setup = function () {
     const b = B.body;
     Object.assign(b, {

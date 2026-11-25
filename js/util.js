@@ -3,7 +3,7 @@
 
 const G = window.G = {};
 
-G.VERSION = '2.9h';
+G.VERSION = '2.9l';
 G.bgK = 1; // how many pixels per unit the painted backdrops are kept at (set in game.js, resize)
 G.W = 1280;          // logical view size
 G.H = 720;
@@ -157,9 +157,11 @@ G.settings = Object.assign(
 G.saveSettings = () => G.store.save('settings', G.settings);
 
 // Difficulty tuning: tele scales telegraph time, pace scales the gaps between attacks.
+// G.POISE scales every boss's stagger bar (v2.9l: 2, was 1); Kairo's Gathered Sun bar is its own.
+G.POISE = 2;
 G.DIFFS = [
-  { name: 'Gentle', hp: 7, bossHp: 0.85, tele: 1.3, pace: 1.3, stagger: 4.8 },
-  { name: 'Standard', hp: 5, bossHp: 1.1, tele: 0.95, pace: 0.9, stagger: 4.0 }, // (v2.9h: bossHp 1.0, tele 1.0, pace 1.0)
-  { name: 'Merciless', hp: 4, bossHp: 1.15, tele: 0.8, pace: 0.7, stagger: 3.2 },
+  { name: 'Gentle', hp: 7, bossHp: 1.425, tele: 1.1, pace: 1.0, stagger: 4.8 }, // (v2.9l: bossHp 0.95; v2.9j: bossHp 0.85; v2.9i: tele 1.3, pace 1.3)
+  { name: 'Standard', hp: 5, bossHp: 1.8, tele: 0.9, pace: 0.8, stagger: 4.0 }, // (v2.9l: bossHp 1.2; v2.9j: bossHp 1.1; v2.9i: tele 0.95, pace 0.9; v2.9h: bossHp 1.0, tele 1.0, pace 1.0)
+  { name: 'Merciless', hp: 4, bossHp: 1.875, tele: 0.8, pace: 0.7, stagger: 3.2 }, // (v2.9l: bossHp 1.25; v2.9j: bossHp 1.15)
 ];
 G.diff = () => G.DIFFS[G.settings.difficulty] || G.DIFFS[1];

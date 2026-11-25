@@ -56,7 +56,7 @@
   P.reset = function () {
     H = G.hero(); STAR = H.col; HOT = H.hot;
     // the hero, the relic and the boons taken this run set these
-    const hp = Math.max(1, G.diff().hp + H.hp + G.boon('heart') + G.up('vigor') - G.boon('glass') - G.relics.crownCost() + G.relics.pearlHp() + (G.boon('hollow') ? 3 : 0));
+    const hp = Math.max(1, G.diff().hp + H.hp + G.boon('heart') + G.up('vigor') - G.boon('glass') - G.relics.crownCost() + G.relics.pearlHp() + (G.boon('hollow') ? 3 : 0) + (G.run.bonusHp || 0)); // (v2.9k: the merchant's mending)
     const maxAir = H.air + G.boon('wind') + (G.relic('cloak') ? 1 : 0), maxDash = 1 + G.boon('twin') + G.relics.airDashes();
     const segs = C.SEGS + G.boon('fourth') + G.relics.moonSegs();
     Object.assign(P, {
@@ -72,6 +72,7 @@
       ward: G.relic('ward'), hitCount: 0, plunge: false, afterT: 0, afterScale: 1,
       jumpBuf: 0, atkBuf: 0, dashBuf: 0, flareBuf: 0, wardT: 0,
       dashT: 0, dashCd: 0, dashDir: 1, iframes: 0, pdDone: false, ghostT: 0, drawIfr: 0,
+      charm: false, // (v2.9k: a Ward Charm used: motes.js)
       sheath: 0, strung: 0, // (v2.9a: Eos's full strings toward an open stance, and the cuts of this string that landed)
       inv: 0, stun: 0, hp, maxHp: hp,
       ember: G.relic('moons') ? C.SEG * segs : 40 * G.up('spark'), healT: 0, healLock: false,
@@ -512,6 +513,8 @@
     if (ctl && I.pressed.ult && free && P.stun <= 0 && G.flow.tryUlt()) return;
     // --- the crown: a set's own move, once three of its boons are held (sets.js)
     if (ctl && I.pressed.crown && free && P.stun <= 0 && P.dashT <= 0) G.sets.tryCrown();
+    // --- (v2.9k) the two consumables, on 1 and 2 (motes.js); not mid-dash or reeling
+    if (ctl && P.stun <= 0 && P.dashT <= 0) { if (I.pressed.item1) G.motes.use(0); if (I.pressed.item2) G.motes.use(1); }
 
     // --- special: costs one segment of Starlight
     if (P.flareBuf > 0 && free && P.dashT <= 0 && P.stun <= 0 && P.healT === 0) {
@@ -1552,6 +1555,16 @@
       G.relics.warded(); // (the Wardstone, awakened: relics.js)
       return false;
     }
+    if (G.motes.ward()) {
+      // (v2.9k) a Ward Charm: the blow is turned aside, as the Wardstone turns one
+      P.inv = 0.9;
+      G.audio.play('tink'); G.audio.play('perfect');
+      G.fx.shake(6);
+      G.fx.ring(P.x, P.y - 22, { r0: 26, r1: 130, life: 0.45, color: '170,220,255', width: 8 });
+      G.fx.shatter(P.x, P.y - 22, '170,220,255', 10, { r: 180 });
+      G.fx.text(P.x, P.y - 78, 'WARDED', { color: '170,220,255', size: 18, life: 1 });
+      return false;
+    }
     dmg = G.relics.blowDmg(dmg); // (Anvil Heart, Ascendant)
     if (G.bane('bloodedge')) dmg += 1; // Bloodied Edge's bane
     P.hp -= dmg; P.stats.hits++; G.run.hurtBy(dmg); // (v2.7a: for the recap)
@@ -1599,6 +1612,11 @@
       // Phoenix Feather: once per run (twice, Awakened)
       G.relics.phoenix();
       revived('REBORN');
+    }
+    if (P.hp <= 0 && G.motes.ash()) {
+      // (v2.9k) Phoenix Ash, held: it burns away and the hero stands on 2 health
+      P.hp = Math.min(2, P.maxHp); P.inv = 2.6;
+      revived('ASHES');
     }
     if (P.hp <= 0) { P.hp = 0; die(); } else G.moments.hurt();
     return true;

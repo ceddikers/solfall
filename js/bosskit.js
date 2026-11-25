@@ -194,7 +194,7 @@
     B.reset = function () {
       B.maxHp = Math.round(B.BASE_HP * G.diff().bossHp);
       B.hp = B.maxHp;
-      B.phase = 1; B.poise = 0; B.poiseMax = B.poise0; B.staggered = false;
+      B.phase = 1; B.poise = 0; B.poiseMax = B.poise0 * G.POISE; B.staggered = false;
       B.invuln = true; B.active = false; B.dead = false; B.dying = false; B.toppled = false; B.down = false;
       B.script = null; B.attackName = ''; B.bag = []; B.lastAtk = ''; B.forceNext = G.corrupt.opener(B, 1) || (B.first && B.first[1]) || '';
       B.t = 0; B.lastStand = false; B.kite = 0; B.above = 0;
@@ -306,6 +306,7 @@
       G.fx.punch(0.022);
       G.ui.callout(B.staggerWord || 'STAGGERED');
       G.relics.onStagger(); // (the Offered Hilt's echoes, the Sunstone: relics.js)
+      G.motes.onStagger(); // (v2.9k: a few Motes shaken loose)
       G.feats.bump('stagger');
       B.script = staggerScript();
     }
@@ -333,7 +334,7 @@
         B.poise = B.poiseMax * (1 - e / dur);
       }
       B.staggered = false; B.poise = 0;
-      B.poiseMax = Math.min(900, B.poiseMax * 1.25);
+      B.poiseMax = Math.min(900 * G.POISE, B.poiseMax * 1.25);
       G.fx.ring(b.x, b.y - B.h / 2, { r0: 40, r1: 280, life: 0.45, color: G.pal().boss, width: 8 });
       G.audio.play('ring'); G.fx.shake(8);
       for (const d of [-1, 1]) G.fx.dust(b.x + d * 30, FLOOR, 5, { dir: d, speed: [120, 420], size: [7, 13], up: 40 });
@@ -368,7 +369,7 @@
       G.ui.card('', B.cards[n][0], '');
       if (B.phaseOut) yield* B.phaseOut(n);
       G.ui.letterbox(false);
-      B.poiseMax = B.poise0 + 60 * (n - 1); B.invuln = false; B.kite = 0; B.above = 0;
+      B.poiseMax = (B.poise0 + 60 * (n - 1)) * G.POISE; B.invuln = false; B.kite = 0; B.above = 0;
       release();
     }
 

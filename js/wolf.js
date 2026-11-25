@@ -512,6 +512,8 @@
   }
 
   // ------------------------------------------------------------------ state
+  B.silWide = () => B.attackName === 'pack' || B.attackName === 'wallrun'; // (v2.9j, corrupt.js: the pack and the wall-run reach across)
+  B.silTop = () => 120; // (its leaps)
   B.setup = function () {
     const b = B.body;
     b.x = 900; b.y = FLOOR; b.face = -1; b.lf = -1; b.tf = 1; b.tfRate = 9;

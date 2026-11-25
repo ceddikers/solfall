@@ -26,6 +26,7 @@
       <div id="ult"><div class="ubar"><i id="ultFill"></i></div><span class="elabel">DAWNBREAK</span><span id="ultKey"></span></div>
       <div id="crown" class="off"><div class="ubar"><i id="crownFill"></i></div><span class="elabel" id="crownName">CROWN</span><span id="crownKey"></span></div>
       <div id="mend"></div>
+      <div id="items"><span class="slot" id="item0"><kbd>1</kbd><b></b></span><span class="slot" id="item1"><kbd>2</kbd><b></b></span><span id="motes"><i></i><b id="moteCount">0</b></span></div>
       <div id="boons"></div>
     </div>
     <div id="timer">0:00.0</div>
@@ -98,7 +99,7 @@
 
     <section id="s-fountain" class="screen panelscreen">
       <div class="panel shrine fountain">
-        <p class="over">Sunshards</p>
+        <p class="over">Motes</p>
         <h2>The Cleansing Fountain</h2>
         <p class="lead" id="fountainLead"></p>
         <nav id="fountainList">
@@ -117,7 +118,7 @@
 
     <section id="s-smith" class="screen panelscreen">
       <div class="panel shrine smith">
-        <p class="over">Sunshards</p>
+        <p class="over">Motes</p>
         <h2>The Wandering Smith</h2>
         <p class="lead" id="smithLead"></p>
         <nav id="smithList">
@@ -129,6 +130,22 @@
           <div class="item up" data-act="temper5"><b class="uname"></b><span class="udesc"></span><span class="ucost"></span></div>
           <div class="item up" data-act="temper6"><b class="uname"></b><span class="udesc"></span><span class="ucost"></span></div>
           <div class="item up" data-act="temper7"><b class="uname"></b><span class="udesc"></span><span class="ucost"></span></div>
+        </nav>
+        <nav class="row"><div class="item" data-act="back">Leave</div></nav>
+      </div>
+    </section>
+
+    <section id="s-merchant" class="screen panelscreen">
+      <div class="panel shrine merchant">
+        <p class="over">Motes</p>
+        <h2>The Road Merchant</h2>
+        <p class="lead" id="merchLead"></p>
+        <nav id="merchList">
+          <div class="item up" data-act="merch0"><b class="uname"></b><span class="udesc"></span><span class="ucost"></span></div>
+          <div class="item up" data-act="merch1"><b class="uname"></b><span class="udesc"></span><span class="ucost"></span></div>
+          <div class="item up" data-act="merch2"><b class="uname"></b><span class="udesc"></span><span class="ucost"></span></div>
+          <div class="item up" data-act="merch3"><b class="uname"></b><span class="udesc"></span><span class="ucost"></span></div>
+          <div class="item up" data-act="merch4"><b class="uname"></b><span class="udesc"></span><span class="ucost"></span></div>
         </nav>
         <nav class="row"><div class="item" data-act="back">Leave</div></nav>
       </div>
@@ -230,6 +247,8 @@
           <div class="item kv" data-act="key-heal"><span class="k"></span><span class="v"></span></div>
           <div class="item kv" data-act="key-ult"><span class="k"></span><span class="v"></span></div>
           <div class="item kv" data-act="key-crown"><span class="k"></span><span class="v"></span></div>
+          <div class="item kv" data-act="key-item1"><span class="k"></span><span class="v"></span></div>
+          <div class="item kv" data-act="key-item2"><span class="k"></span><span class="v"></span></div>
           <div class="item kv" data-act="key-taunt"><span class="k"></span><span class="v"></span></div>
           <div class="item" data-act="keyreset">Restore defaults</div>
           <div class="item" data-act="back">Back</div>
@@ -404,6 +423,7 @@
 <script src="js/moments.js"></script>
 <script src="js/sets.js"></script>
 <script src="js/relics.js"></script>
+<script src="js/motes.js"></script>
 <script src="js/hub.js"></script>
 <script src="js/rest.js"></script>
 <script src="js/corrupt.js"></script>

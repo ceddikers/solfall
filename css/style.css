@@ -3,6 +3,7 @@
   --star: #96e1ff;
   --star-hot: #ebfaff;
   --gold: #ffba5c;
+  --mote: #a0e2ff; /* (v2.9k) Motes, the run's own currency */
   --danger: #ff6038;
   --ink: #ece9f4;
   --dim: rgba(236, 233, 244, 0.6);
@@ -87,6 +88,17 @@ kbd {
 .elabel { margin-left: 9px; font-size: 10px; letter-spacing: 0.3em; color: var(--dim); }
 #mend { margin-top: 9px; font-size: 12px; letter-spacing: 0.08em; color: var(--star); opacity: 0; transition: opacity 0.3s; }
 #mend.on { opacity: 0.95; }
+/* (v2.9k) the two items held (keys 1 and 2) and the Motes carried (motes.js) */
+#items { display: flex; align-items: center; gap: 8px; margin-top: 9px; font-size: 11px; letter-spacing: 0.06em; }
+#items .slot { display: flex; align-items: center; gap: 5px; min-width: 92px; padding: 3px 8px 3px 4px; border: 1px solid rgba(255,255,255,0.14); border-radius: 3px; background: rgba(8,6,16,0.45); color: var(--icol, var(--dim)); }
+#items .slot b { font-weight: 400; white-space: nowrap; }
+#items .slot.empty { opacity: 0.35; }
+#items .slot.empty b::after { content: "—"; color: var(--dim); }
+#items .slot.passive kbd { opacity: 0.35; }
+#items kbd { font-size: 10px; }
+#motes { display: flex; align-items: center; gap: 5px; margin-left: 4px; color: var(--mote); font-size: 13px; }
+#motes i { width: 7px; height: 7px; border-radius: 50%; background: var(--mote); box-shadow: 0 0 8px var(--mote); }
+#hud.camp:not(.rest) #items { display: none; }
 
 #timer {
   position: absolute; right: 58px; top: 24px;
@@ -457,6 +469,7 @@ ul.tips b { color: var(--ink); font-weight: 600; }
 .item.up.bought { animation: bought 0.4s ease-out; }
 @keyframes bought { 0% { background: rgba(255, 214, 140, 0.3); } 100% { background: transparent; } }
 .stats .n.gold { color: var(--gold); }
+.stats .n.mote { color: var(--mote); }
 #winCards .card { min-width: 0; }
 
 /* ---------------------------------------------------------------- v1.0a: camp HUD, controls, tighter How to play */
@@ -537,6 +550,11 @@ ul.tips b { color: var(--ink); font-weight: 600; }
 .panel.fountain nav .item.up { grid-template-columns: 190px 1fr 84px; }
 .panel.smith .item.up .uname { color: #ffba5c; }
 .panel.smith nav .item.up { grid-template-columns: 190px 1fr 84px; }
+.panel.merchant .item.up .uname { color: var(--mote); }
+.panel.merchant nav .item.up { grid-template-columns: 210px 1fr 84px; }
+.panel.merchant .item.up .ucost { color: var(--mote); }
+.panel.merchant .item.up.poor .ucost { color: var(--faint); }
+.panel.merchant .item.up.max .ucost, .panel.merchant .item.up.max .uname { color: var(--faint); }
 
 /* ---------------------------------------------------------------- v2.7a: quality of life */
 /* the run's chips say what they do when the pointer rests on one (in a fight too: the pointer is the aim,

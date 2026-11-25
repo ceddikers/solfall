@@ -138,26 +138,56 @@
   // the black shape, its edge and its eyes (parts of a boss drawn elsewhere, like the Leviathan's coils
   // far out in the sea, drawn by its drawGround).
   C.drawing = false;
+  // (v2.9j) Where on the screen the work is done. Every layer used to be the whole screen, about
+  // sixteen full-screen passes a frame, which is what made corrupted fights lag. A boss drawn round
+  // its core (the duelling bosses) is now worked in a box round it: wide enough for its reach, from
+  // the floor up past its head, plus B.silTop() for anything it raises higher (Kairo's Sun). A boss
+  // that draws across the arena (the Assassin's clones and threads, the Mage's crystals, the Wolf's
+  // pack: B.silWide) keeps the whole width but not the whole height. The Warden (its hands), the
+  // Leviathan's far coils and Sol (B.silFull) still use it all. Checked by drawing every corrupted
+  // duelling boss through whole bot fights and looking for any of it on the box's edge.
+  const val = (v) => (typeof v === 'function' ? v() : v);
+  function region(m, W, H, torn) {
+    const B = G.boss, c = B && B.core;
+    if (!torn || !B || !B.kit || val(B.silFull) || !c) return { x: 0, y: 0, w: W, h: H };
+    const padX = Math.max(330, (B.w || 80) * 1.6 + 220) + Math.abs(C.tear || 0);
+    const top = c.y - (B.h || 100) - 330 - (B.silTop ? B.silTop() : 0), bot = G.FLOOR + 150;
+    const k = m.a || 1, edge = 14 * k; // (room for the soft edge and the torn shadows)
+    const wide = val(B.silWide);
+    const x0 = wide ? 0 : Math.max(0, Math.floor(m.a * (c.x - padX) + m.e - edge)), x1 = wide ? W : Math.min(W, Math.ceil(m.a * (c.x + padX) + m.e + edge));
+    const y0 = Math.max(0, Math.floor(m.d * top + m.f - edge)), y1 = Math.min(H, Math.ceil(m.d * bot + m.f + edge));
+    if (x1 - x0 < 8 || y1 - y0 < 8) return { x: 0, y: 0, w: W, h: H };
+    return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
+  }
+  C.region = region; // (for the console and tests)
   C.silhouette = function (ctx, draw, torn) {
     const t = C.t, W = ctx.canvas.width, H = ctx.canvas.height;
-    // the boss as itself, off screen, in the same place it would be drawn
-    const m = ctx.getTransform(), A = layer('a', W, H);
-    A.x.setTransform(m); if (torn) A.x.translate(C.tear, 0);
+    // the boss as itself, off screen, in the same place it would be drawn (within its box)
+    const m = ctx.getTransform(), bx = region(m, W, H, torn), w = bx.w, h = bx.h;
+    const A = layer('a', w, h);
+    A.x.setTransform(m.a, m.b, m.c, m.d, m.e - bx.x, m.f - bx.y); if (torn) A.x.translate(C.tear, 0);
     C.drawing = true;
     try { draw(A.x); } finally { C.drawing = false; }
-    const S = layer('s', W, H); tint(S, A, '#020003');
-    const R = layer('r', W, H); tint(R, A, 'rgb(235,30,80)');
-    // its brightest parts: grey, then pushed hard so only what was near white is left, then crimson
-    const Hl = layer('h', W, H);
-    Hl.x.filter = 'grayscale(1) brightness(0.85) contrast(7)'; Hl.x.drawImage(A, 0, 0); Hl.x.filter = 'none';
-    Hl.x.globalCompositeOperation = 'multiply'; Hl.x.fillStyle = 'rgb(255,64,104)'; Hl.x.fillRect(0, 0, W, H);
-    Hl.x.globalCompositeOperation = 'destination-in'; Hl.x.drawImage(A, 0, 0);
+    if (C.check) C.check(A, bx, W, H);
+    const S = layer('s', w, h); tint(S, A, '#020003');
+    const R = layer('r', w, h); tint(R, A, 'rgb(235,30,80)');
+    // its brightest parts: grey, then pushed hard so only what was near white is left, then crimson.
+    // (v2.9j: at half size, drawn back up; they are glows, and the filter was the dearest pass)
+    const hw = Math.ceil(w / 2), hh = Math.ceil(h / 2), Hl = layer('h', hw, hh);
+    Hl.x.filter = 'grayscale(1) brightness(0.85) contrast(7)'; Hl.x.drawImage(A, 0, 0, hw, hh); Hl.x.filter = 'none';
+    Hl.x.globalCompositeOperation = 'multiply'; Hl.x.fillStyle = 'rgb(255,64,104)'; Hl.x.fillRect(0, 0, hw, hh);
+    Hl.x.globalCompositeOperation = 'destination-in'; Hl.x.drawImage(A, 0, 0, hw, hh);
+    // (v2.9j) the soft edge: the crimson shape at a quarter size, stretched back up, which blurs it
+    // without a blur filter (the other dear pass)
+    const qw = Math.ceil(w / 4), qh = Math.ceil(h / 4), Q = layer('q', qw, qh);
+    Q.x.drawImage(R, 0, 0, qw, qh);
 
     ctx.save();
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.setTransform(1, 0, 0, 1, bx.x, bx.y);
+    ctx.imageSmoothingEnabled = true;
     const k = m.a || 1, flick = 0.75 + 0.25 * Math.sin(t * 31) * Math.sin(t * 17);
     // a soft crimson edge round the black, so the shape still reads against a dark arena
-    ctx.globalAlpha = 0.32 * flick; ctx.filter = 'blur(' + Math.round(5 * k) + 'px)'; ctx.drawImage(R, 0, 0); ctx.filter = 'none';
+    ctx.globalAlpha = 0.32 * flick; ctx.drawImage(Q, 0, 0, w, h);
     ctx.globalAlpha = 0.7;
     for (const [dx, dy] of [[-1.6, 0], [1.6, 0], [0, -1.6], [0, 1.6]]) ctx.drawImage(R, dx * k, dy * k);
     if (torn) {
@@ -169,7 +199,7 @@
     // the shape itself, pitch black, and what burns through it
     ctx.globalAlpha = 1; ctx.drawImage(S, 0, 0);
     ctx.globalCompositeOperation = 'lighter';
-    ctx.globalAlpha = 0.95; ctx.drawImage(Hl, 0, 0);
+    ctx.globalAlpha = 0.95; ctx.drawImage(Hl, 0, 0, w, h);
     ctx.restore();
   };
 

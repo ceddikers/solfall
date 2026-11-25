@@ -141,7 +141,7 @@
   // The Vigil: the camp between runs, where the hero walks about (see hub.js).
   // where: 'fire' (coming from the title) or 'gate' (coming back from a run).
   G.toHub = function (where) {
-    if (where === 'gate') G.clearRun(); // (back from a run: it is over)
+    if (where === 'gate') { G.clearRun(); if (!G.practice && G.run.motes) G.motes.convert(); } // (back from a run: it is over, and its Motes are Sunshards now)
     G.rest.leave();
     G.practice = null;
     G.run.reset();
@@ -218,7 +218,7 @@
     G.cam.x = 0; G.cam.y = 0; // the camp scrolls; an arena does not
     G.run.seeded('omens', () => G.run.rollOmens()); // before the boss works out its health (from the day, in a daily trial)
     G.arena.reset(); G.hazards.clear(); F.reset();
-    G.player.reset(); G.flow.reset(); G.boss.reset(); G.moments.reset(); G.sets.reset(); G.relics.reset(); G.feats.reset(); G.hexes.reset(); G.boss.intro();
+    G.player.reset(); G.flow.reset(); G.boss.reset(); G.moments.reset(); G.sets.reset(); G.relics.reset(); G.feats.reset(); G.hexes.reset(); G.motes.reset(); G.boss.intro();
     G.state = 'fight'; G.paused = false;
     G.time = 0; G.hitstop = 0; G.slowT = 0; G.deadT = 0; G.wonT = 0; G.endShown = false;
     G.ui.close(); G.ui.resetHud(); G.ui.buildHp(G.player.maxHp); G.ui.buildRun(); G.ui.bossIntro(); G.ui.hud(true); G.ui.keysHint();
@@ -282,6 +282,9 @@
     // beaten by the Champion: nothing lost but pride (the road waits, see step)
     if (G.run.champFight && !G.practice) { G.champLost = true; G.lastShards = 0; G.ui.letterbox(false); G.ui.mood('dead'); G.audio.duck(0.35); return; }
     G.lastShards = G.meta.onDefeat();
+    // (v2.9k) the run is over: its Motes become Sunshards, one for every five
+    G.lastMotes = G.practice ? null : G.motes.convert();
+    if (G.lastMotes) G.lastShards += G.lastMotes.shards;
     if (!G.practice) { if (G.run.daily) G.dailyRecord(); G.clearRun(); } // (the run is over)
     G.ui.againHint(); // (R starts again at once: v2.7a says so)
     G.ui.letterbox(false); G.ui.mood('dead');
@@ -331,12 +334,13 @@
     if (wonNow) { const wins = G.store.load('wins', {}); wins[d] = (wins[d] || 0) + 1; G.store.save('wins', wins); }
     const newCorrupt = !G.practice && !corrupt ? R.rollCorruption(id) : null;
     const meta = G.meta.onVictory(grade, id);
+    const motes = G.motes.onVictory(grade, id); // (v2.9k)
     const costume = G.practice ? null : G.mastery.gain(R.hero, 1 + (wonNow ? 3 : 0) + (id === 'sol' ? 2 : 0)); // (v2.8a: mastery, costumes.js; v2.9a: Sol gives 2 more)
     if (id === 'sol' && !G.practice) { const sw = G.store.load('sol', {}); sw[R.hero] = (sw[R.hero] || 0) + 1; G.store.save('sol', sw); } // (v2.9a: who has beaten her: the sun crown in the Hall)
     if (R.daily && !G.practice) G.dailyRecord(); // (v2.8a)
     const offer = corrupt ? R.rollRelicReward() : id === 'sol' ? (R.offer = []) : R.rollOffer();
     R.current = null;
-    return { grade, title, newBest, best: best[d], trial, newDepth, done, wonNow, corrupt, newCorrupt, offer, meta, costume, sol: id === 'sol' };
+    return { grade, title, newBest, best: best[d], trial, newDepth, done, wonNow, corrupt, newCorrupt, offer, meta, costume, motes, sol: id === 'sol' };
   }
 
   // The Champion beaten (champion.js): his trophy and gift (meta.js), and his hilt for the rest of the run.
@@ -390,7 +394,7 @@
     G.input.endStep();
     // while a Dawnbreak plays, the boss and everything it has thrown all but stand still
     // (and a soaked boss runs slower: sets.js)
-    const bdt = (G.player.ulting ? sdt * G.flow.SLOW : sdt) * G.sets.bossK() * G.relics.bossK(); // (the Still Hourglass: relics.js)
+    const bdt = (G.player.ulting ? sdt * G.flow.SLOW : sdt) * G.sets.bossK() * G.relics.bossK() * G.motes.bossK(); // (the Still Hourglass: relics.js; Slowsand: motes.js)
     G.boss.update(bdt);
     G.hazards.update(bdt);
     G.corrupt.update(bdt);
@@ -405,6 +409,7 @@
     G.moments.update(sdt);
     G.sets.update(sdt);
     G.relics.update(sdt);
+    G.motes.update(sdt);
     G.updateShots(sdt);
     F.update(sdt);
     // the view leans a little towards the hero
@@ -478,6 +483,7 @@
     G.moments.draw(ctx);
     G.sets.draw(ctx);
     G.relics.draw(ctx);
+    G.motes.draw(ctx);
     if (G.boss.drawOver) G.boss.drawOver(ctx); // e.g. the Veil's darkness: over the arena and the boss, under the hero
     G.drawShots(ctx);
     G.player.draw(ctx);

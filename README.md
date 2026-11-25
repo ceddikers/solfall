@@ -2,7 +2,7 @@
 
 A side-on boss rush for the browser: four heroes, seven three-phase bosses, played as a run of
 ever-harder trials. You pick a hero and a relic before the run and win a boon after each victory.
-Version 2.9h.
+Version 2.9l.
 
 This is an early slice of a planned boss-rush roguelite (short runs, a boon after each boss,
 bosses drawn from a pool). A run is seven trials, one for each boss, each harder than the last: the first boss
@@ -33,7 +33,8 @@ then open http://localhost:8321. There is no build step and no dependency.
 | Mend one health (costs one segment) | hold E or F while standing | LB |
 | Dawnbreak (when its bar is full) | Q or I, or middle click | RT |
 | Crown (once three boons of one set are held, when its bar is full) | U | LT |
-| Flourish (a salute that leaves you open) | T or G | Back, or press the right stick |
+| Flourish (a salute that leaves you open) | T or G | Back |
+| Use item 1 / item 2 (bought from the road merchant) | 1 / 2 | press the left / right stick |
 | Drop through a platform | S + Space | down + A |
 | Your hero's moves (the fight waits while it is up) | hold Tab, or Moves in the pause menu | |
 | Help: how a fight works and what every word means | Help on the title screen or in the pause menu | |
@@ -114,6 +115,176 @@ hero (`tools/feel-check.js`).
 - Settings, Reset progress erases Sunshards, upgrades, trophies and records (it has to be chosen twice).
 
 Not done: touch controls, a colour-blind alternative to red-orange warnings, gamepad rebinding.
+
+## Longer stagger bars, much more boss health (v2.9l)
+
+Asked: "i think stagger bars need to be maybe 2x their current amount and maybe bosses get 1.5x hp".
+
+- **Stagger bars are twice as long** for every boss (`G.POISE = 2`, util.js), including how long they can grow
+  after each stagger (the cap went from 900 to 1800). Kairo's Gathered Sun bar is a separate thing and is unchanged.
+- **Boss health ×1.5** on every difficulty:
+
+| | Gentle | Standard | Merciless |
+| --- | --- | --- | --- |
+| Boss health | ×0.95 → **×1.425** | ×1.2 → **×1.8** | ×1.25 → **×1.875** |
+
+- A stagger now gives 10 Motes instead of 5, since there are about half as many.
+- Fixed a rare crash: if Eos's swing was cleared during her full-sheath draw, the game stopped.
+
+**What the bot saw on Standard** (every boss and hero at trials I, IV and VII, with boons, 168 fights):
+
+| | v2.9j | v2.9l |
+| --- | --- | --- |
+| Won | 74% | **51%** |
+| Hits taken a fight | 3.9 | 6.2 |
+| Average win | 104 s | 150 s |
+
+By boss: Leviathan 92%, Mage 88%, Assassin 71%, Knight 42%, Wolf 29%, Warden 25%, Kairo 13%. The Mage's wins
+now take 195 s on average.
+
+Playtest checklist:
+- Do fights feel weighty, or do they drag? Is two and a half minutes a boss too long?
+- Does a stagger feel earned now, and is the window worth the wait?
+- Kairo, the Warden and the Wolf: still beatable on Standard?
+
+## Motes, the road merchant and items (v2.9k)
+
+Asked: "i also think we need the run unique currency added if it isnt already?". It wasn't: everything was bought
+with Sunshards, which you keep between runs. Now there is a currency that lives and dies with one run.
+
+**Motes** (`js/motes.js`). Shown at the top left beside your two item slots.
+
+| How you earn them | Motes |
+| --- | --- |
+| Win a trial | 20 + 4 for each trial past the first, ×1.5 for an S, ×1.25 for an A, ×1.1 for a B |
+| Win a corrupted trial | twice that |
+| Beat the Champion | +25 more |
+| Stagger a boss | +10 (you see them fly to you; 5 before v2.9l) |
+| The fortune-teller's Motes card | +30 (was 40 Sunshards) |
+| The duel's consolation | +40 (was 60 Sunshards) |
+
+No Motes in practice or for beating Sol. When the run ends, by death or by leaving through the gate, what you hold
+becomes Sunshards, **one for every five Motes**. The defeat screen says what they became.
+
+**The Road Merchant** sits between the fire and the altars on every road (not after the run is won). His stock is
+rolled once a road:
+
+| Row | Price | |
+| --- | --- | --- |
+| Mending | 60, then 90 | One more health for the rest of the run. Twice a run. |
+| Two boons | 75 each | From the boons you could be offered (no Glass Star, corrupted or duo boons). |
+| Two items | 35 to 70 | Drawn from the five below. |
+
+Mending was going to heal you, but health refills before every fight, so that would buy nothing. It raises your
+maximum instead.
+
+**Items.** Two slots, keys **1** and **2** (rebindable; gamepad: press the left or right stick). You can't buy with
+both hands full. A Sun Flask is kept if you're already at full health.
+
+| Item | Price | |
+| --- | --- | --- |
+| Sun Flask | 45 | Mends 2 health at once. |
+| Star Bomb | 40 | A falling star strikes the foe for 80 (more with your damage boons). |
+| Slowsand | 35 | The boss and everything it throws move at half speed for 3 s. |
+| Ward Charm | 40 | The next blow that would hit you is turned aside. |
+| Phoenix Ash | 70 | Held, not used: a killing blow leaves you on 2 health instead. |
+
+**The Fountain and the Smith now take Motes:** cleansing 50, then 100, 200…; tempering 60, then 120, 240….
+The Shrine's upgrades are still bought with Sunshards.
+
+Checked in the preview: each item does what it says; buying takes the Motes and marks the row Sold; a full pair of
+hands, being too poor and the second mending are refused; Mending raised maximum health from 5 to 7 after two; the
+Smith takes Motes and doubles; 47 Motes became 9 Sunshards. A short bot run (Eos against the Knight, the Wolf
+and Kairo) gave no errors. The bot doesn't shop, so the numbers above are a first guess.
+
+Playtest checklist:
+- Do you have enough Motes to want the merchant each road, or too many? Is a boon worth 75?
+- Are the items worth a slot? Is the Star Bomb too weak late or the Phoenix Ash too strong?
+- Do keys 1 / 2 feel right, or should items sit on another button?
+- Does the merchant look right beside the fire? Is his screen easy to read?
+
+## More boss health, and corrupted fights that run lighter (v2.9j)
+
+Asked: "I think bosses overall could use a bit more hp - and i heard corrupted fights are laggy".
+
+**Boss health, +10% on every difficulty** (`G.DIFFS`, util.js):
+
+| | Gentle | Standard | Merciless |
+| --- | --- | --- | --- |
+| Boss health | ×0.85 → **×0.95** | ×1.1 → **×1.2** | ×1.15 → **×1.25** |
+
+Every boss, including the Champion and Sol, takes its health from this. The bot on Standard (every boss and hero
+at trials I, IV and VII, with boons, 168 fights) went from 79% won to 74%, 3.7 → 3.9 hits taken a fight, and an
+average win of 96 → 104 s. **Kairo is now the outlier: the bot won 17% of its fights against him on Standard**
+(the Warden is next at 54%).
+
+**Why corrupted fights lagged.** A corrupted boss is drawn as a black shape with a crimson rim, a soft crimson glow
+and its eyes burning through (corrupt.js). To do that, every frame it was drawn onto four hidden canvases the size
+of the whole screen. Those got recoloured, run through a full-screen colour filter and a full-screen blur, and laid
+back over the screen eight more times. That is about sixteen full-screen passes a frame, and more on a big or
+high-resolution screen.
+
+What changed:
+- **A box round the boss.** The duelling bosses are worked only in a box round them: wide enough for their reach,
+  from below the floor to well above their head, plus extra headroom when Kairo raises the Gathered Sun. Bosses
+  that draw across the arena keep the full width but not the full height: the Assassin (clones, echoes, threads),
+  the Mage (crystals) and the Wolf's pack and wall-run. The Warden, the Leviathan's far coils and Sol still use
+  the whole screen.
+- **The glow at half size.** The "brightest parts" pass (eyes, rune glows, hit flashes) is worked at half size and
+  drawn back up.
+- **The soft rim without a blur filter.** It's the crimson shape at a quarter size, stretched back up, which blurs
+  it for almost nothing.
+
+How it was checked:
+- **Nothing cut off.** Bot fights against every corrupted duelling boss were drawn frame by frame (about 14,000
+  frames), looking for any of the boss on the edge of its box. The Knight, Kairo and the Leviathan never touched
+  it. The Assassin, the Mage and the Wolf's pack and wall-run did, which is why they get the full width; rechecked
+  after.
+- **Same look.** Side-by-side screenshots of the corrupted Knight look the same: rim, glow, eye and runes.
+- **Speed.** Measured on a 2560-wide screen with the browser drawing in software (the slow case): the corrupted
+  drawing went from 164 ms a frame to 59 ms. With the GPU doing the work the numbers were too noisy to compare
+  here, but every pass now covers less of the screen, so it should help there too.
+
+Playtest checklist:
+- Corrupted fights: smoother? Anything of a boss cut off at the edges (a sword tip, a leap, a clone)?
+- Are bosses' longer health bars fun, or a slog? Kairo especially.
+
+## Warnings and rest retuned on Gentle and Standard (v2.9i)
+
+Asked: "warnings .9 and gentle 1.1 / rest .8 standard 1.0 gentle".
+
+| | Gentle | Standard | Merciless |
+| --- | --- | --- | --- |
+| Your health | 7 | 5 | 4 |
+| Boss health | ×0.85 | ×1.1 | ×1.15 |
+| Warnings | **×1.1** (was ×1.3) | **×0.9** (was ×0.95) | ×0.8 |
+| Rest between attacks | **×1.0** (was ×1.3) | **×0.8** (was ×0.9) | ×0.7 |
+| Stagger length | 4.8 s | 4.0 s | 3.2 s |
+
+Merciless is unchanged. Standard now sits one step below it on warnings and rest, and Gentle has normal rest and
+slightly longer warnings.
+
+Measured with the bot: every boss and hero at trials I, IV and VII, with boons, 168 fights each.
+
+| | Won | Hits taken a fight | Average win time |
+| --- | --- | --- | --- |
+| Standard, v2.9g (×1.0 health, warnings and rest) | 80% | 3.1 | 87 s |
+| Standard, v2.9h (×0.95 warnings, ×0.9 rest) | 73% | 3.6 | 94 s |
+| Standard, now (×0.9, ×0.8) | 79% | 3.7 | 96 s |
+| Gentle, before (×1.3, ×1.3) | 89% | 2.3 | 74 s |
+| Gentle, now (×1.1, ×1.0) | 90% | 2.5 | 78 s |
+
+The bot reacts to a warning the instant it appears, so shorter warnings and less rest barely move its win rate.
+They show up only as slightly more hits taken. For a person they will matter much more, so judge these by playing.
+Win rates also drift by about ±4 points from run to run at this size.
+
+Found on the way: on Gentle the bot loses to Kairo two fights in three, mostly to the full Gathered Sun that opens
+phase III, the blow that kills outright. It often waits 400–700 px away while the Sun grows and never breaks its
+bar. That is the bot not knowing to rush the Sun, not something Gentle does. Nothing was changed for it.
+
+Playtest checklist:
+- Gentle: still gentle with normal rest?
+- Standard: does it feel a clear step up from Gentle and a clear step below Merciless?
 
 ## Kairo's awakening, and a harder Standard (v2.9h)
 

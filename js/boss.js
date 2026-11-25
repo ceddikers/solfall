@@ -231,7 +231,7 @@
   B.reset = function () {
     B.maxHp = Math.round(B.BASE_HP * G.diff().bossHp);
     B.hp = B.maxHp;
-    B.phase = 1; B.poise = 0; B.poiseMax = 440; B.staggered = false;
+    B.phase = 1; B.poise = 0; B.poiseMax = 440 * G.POISE; B.staggered = false;
     B.invuln = true; B.active = false; B.dead = false; B.dying = false; B.toppled = false; B.down = false;
     B.script = null; B.attackName = ''; B.bag = []; B.lastAtk = ''; B.forceNext = G.corrupt.opener(B, 1) || 'slam';
     B.t = 0; B.spread = 318; B.rays = []; B.shardR = 900; B.shardsOut = false; B.hasShards = false;
@@ -407,6 +407,7 @@
     G.fx.punch(0.022);
     G.ui.callout('STAGGERED', 'Strike the core');
     G.relics.onStagger(); // (the Offered Hilt's echoes, the Sunstone: relics.js)
+    G.motes.onStagger(); // (v2.9k: a few Motes shaken loose)
     B.script = staggerScript();
   }
   // thrown down from outside the fight (the Dying Light pair)
@@ -433,7 +434,7 @@
       B.poise = B.poiseMax * (1 - e / dur);
     }
     B.staggered = false; B.poise = 0;
-    B.poiseMax = Math.min(900, B.poiseMax * 1.25);
+    B.poiseMax = Math.min(900 * G.POISE, B.poiseMax * 1.25);
     G.fx.ring(c.x, c.y, { r0: 40, r1: 300, life: 0.45, color: G.pal().boss, width: 8 });
     G.audio.play('ring'); G.fx.shake(8);
     pushPlayer(480);
@@ -502,7 +503,7 @@
     );
     G.fx.ring(c.x, c.y, { r0: c.r, r1: 760, life: 0.9, color: G.PAL[2].boss, width: 12, alpha: 0.7 });
     G.ui.letterbox(false);
-    B.poiseMax = 500; B.invuln = false;
+    B.poiseMax = 500 * G.POISE; B.invuln = false;
     release();
   }
 
@@ -553,7 +554,7 @@
       }
     }
     G.ui.letterbox(false);
-    B.poiseMax = 540; B.invuln = false;
+    B.poiseMax = 540 * G.POISE; B.invuln = false;
     release();
   }
 

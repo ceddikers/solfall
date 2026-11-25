@@ -10,7 +10,7 @@
 (function () {
   const FLOOR = G.FLOOR, F = G.fx, rnd = G.rand, W = G.W, TAU = G.TAU;
   const RW = 3820, WALL_L = 120, WALL_R = RW - 110, PAD = 48;
-  const ARCH_X = 210, FIRE_X = 600, ALTAR_X = 1090, STONE_X = 1400, FOUNT_X = 1610, EVENT_X = 1900, PORTAL_X = 2160, PORTAL_GAP = 192, SEVENTH_X = 3560;
+  const ARCH_X = 210, FIRE_X = 600, MERCH_X = 850, ALTAR_X = 1090, STONE_X = 1400, FOUNT_X = 1610, EVENT_X = 1900, PORTAL_X = 2160, PORTAL_GAP = 192, SEVENTH_X = 3560;
   const TAG_COL = { movement: '127,227,176', weapon: '255,186,92', starlight: '150,225,255', survival: '255,154,166', risk: '255,96,56', pair: '255,210,122', relic: '255,224,138', corrupted: '235,30,80', duo: '255,170,220' };
   // (a hero's own boons are in the hero's colour)
   const colOf = (b) => (b.tag === 'Signature' ? G.hero().col : b.set ? G.SETS[b.set].col : TAG_COL[b.tag.toLowerCase()] || '255,214,140');
@@ -70,6 +70,7 @@
   }
   function places() {
     const out = [{ id: 'fire', x: FIRE_X, reach: 90, top: 150 }].concat(altars());
+    if (!R().runWon()) out.push({ id: 'merchant', x: MERCH_X, reach: 60, top: 196 }); // (v2.9k: motes.js)
     if (G.run.rerolls > 0 && REST.taken < 0 && G.run.offerKind === 'boon' && G.run.offer.length) out.push({ id: 'stone', x: STONE_X, reach: 60, top: 190 });
     out.push({ id: 'fountain', x: FOUNT_X, reach: 70, top: 200 });
     out.push(...evPlaces());
@@ -169,6 +170,9 @@
     REST.t = 0; REST.taken = -1; REST.near = null; REST.msgT = 0;
     REST.taken2 = -1; REST.extra = false; REST.awakeT = -1;
     REST.ev = G.run.seeded('event', rollEvent); // (v2.8a: from the day, in a daily trial)
+    // (v2.9k) the merchant's stock, once for each road (a run continued keeps the road's own)
+    const run = G.run;
+    if (!run.runWon() && (!run.merch || run.merch.trial !== run.trial)) { run.seeded('merch', () => G.motes.rollStock()); run.merch.trial = run.trial; }
     initTurn();
     if (!REST.flies.length) {
       for (let i = 0; i < 40; i++) REST.flies.push({ x: WALL_L + Math.random() * (WALL_R - WALL_L), y: FLOOR - 16 - Math.random() * 160, s: 0.5 + Math.random() * 0.9, ph: Math.random() * 6.28, dx: (Math.random() - 0.5) * 14 });
@@ -317,11 +321,12 @@
       G.audio.play('uiSelect');
       G.toHub('gate');
     } else if (s.id === 'fountain') {
-      // the Cleansing Fountain: purge a corrupted boon's bane, for Sunshards (ui.js shows the choice)
+      // the Cleansing Fountain: purge a corrupted boon's bane, for Motes (ui.js shows the choice)
       if (!run.banes().length) { G.audio.play('uiMove'); say(run.order.some((id) => G.boonDef(id).cursed) ? 'Nothing left to cleanse' : 'Nothing here needs cleansing'); return; }
       G.audio.play('uiSelect');
       G.ui.showFountain();
-    } else if (s.id === 'card') turnCard(s);
+    } else if (s.id === 'merchant') { G.audio.play('uiSelect'); G.ui.showMerchant(); }
+    else if (s.id === 'card') turnCard(s);
     else if (s.id === 'smith') smith();
     else if (s.id === 'pledge') pledge(s);
     else if (s.id === 'duel') startDuel();
@@ -439,7 +444,7 @@
     return [];
   }
 
-  // -- the fortune-teller: three cards face down; one is a boon, one Sunshards, one a corrupted boon
+  // -- the fortune-teller: three cards face down; one is a boon, one Motes (v2.9k: was Sunshards), one a corrupted boon
   const CARD_GAP = 74;
   function turnCard(s) {
     const ev = REST.ev, run = R(), c = ev.cards[s.i];
@@ -449,7 +454,7 @@
     let got = '', col = EV_COL.fortune;
     if (c.what === 'boon') { const was = run.crownSet(), dw = run.duo(), b = run.freeBoon(); if (b) { got = b.name; col = colOf(b); crowned(was); duoed(dw); } else c.what = 'shards'; }
     if (c.what === 'curse') { const b = run.freeCurse(); if (b) { got = b.name; col = BLOOD; } else c.what = 'shards'; }
-    if (c.what === 'shards') { G.meta.shards += 40; G.meta.earned += 40; G.meta.save(); got = '+40 Sunshards'; col = paint.GOLD; }
+    if (c.what === 'shards') { G.motes.add(30); got = '+30 Motes'; col = G.motes.COL; }
     retake();
     G.audio.play('cardflip'); G.audio.play(c.what === 'curse' ? 'shatter' : 'segment');
     F.shake(c.what === 'curse' ? 6 : 3);
@@ -459,12 +464,22 @@
     say(got);
   }
 
-  // -- the wandering smith: Sunshards for one more of a boon you hold (ui.js shows the choice)
+  // -- the wandering smith: Motes (v2.9k: was Sunshards) for one more of a boon you hold (ui.js shows the choice)
   function smith() {
     if (!R().temperable().length) { G.audio.play('uiMove'); say('Nothing you hold can be tempered'); return; }
     G.audio.play('uiSelect');
     G.ui.showSmith();
   }
+  // (v2.9k) something bought from the merchant (ui.js): a boon is worked like one from the offering
+  REST.bought = function (row, crownWas, duoWas) {
+    const p = P(), c = row.kind === 'boon' ? colOf(G.boonDef(row.id)) : row.kind === 'item' ? G.motes.item(row.id).col : G.hero().col;
+    retake();
+    G.audio.play('segment');
+    F.burst(p.x, p.y - 10, { n: 16, color: c, speed: [20, 130], life: [0.6, 1.2], size: [2, 4], grav: -220, wob: 130, jitter: 22 });
+    F.burst(MERCH_X, FLOOR - 70, { n: 10, color: G.motes.COL, speed: [40, 160], life: [0.4, 0.9], size: [1.5, 3], grav: -120 });
+    if (row.kind === 'boon') { crowned(crownWas); duoed(duoWas); }
+    say(row.kind === 'mend' ? 'One more health, for the run' : row.name);
+  };
   REST.tempered = function () {
     const x = EVENT_X;
     G.audio.play('anvil', { k: 1.4 }); G.audio.play('segment');
@@ -516,7 +531,7 @@
     F.ring(sh.x, sh.y - 40, { r0: 10, r1: 160, life: 0.5, color: paint.GOLD, width: 6 });
     F.burst(P().x, P().y - 10, { n: 16, color: paint.GOLD, speed: [20, 130], life: [0.6, 1.2], size: [2, 4], grav: -220, wob: 130, jitter: 22 });
     if (pool.length) { const r = G.pick(pool); run.extraRelics.push(r.id); retake(); say(r.name); }
-    else { G.meta.shards += 60; G.meta.earned += 60; G.meta.save(); say('+60 Sunshards'); }
+    else { G.motes.add(40); say('+40 Motes'); } // (v2.9k: was 60 Sunshards)
   }
   function shadeSpot() {
     const ev = REST.ev, p = P();
@@ -864,6 +879,7 @@
     if (seen(RW, 400)) poly(ctx, [RW - 90, FLOOR, RW - 104, FLOOR - 280, RW - 50, FLOOR - 410, RW + 300, FLOOR - 500, RW + 300, FLOOR], paint.STONE);
     drawArch(ctx, t);
     drawFire(ctx, t);
+    drawMerchant(ctx, t);
     drawAltars(ctx, t);
     drawStone(ctx, t);
     drawFountain(ctx, t);
@@ -908,6 +924,59 @@
       paint.diamond(ctx, at.x, at.y, w * 0.45 + 1, h * 0.6, 'rgba(255,255,255,0.9)');
       ctx.globalCompositeOperation = 'source-over';
     }
+  }
+
+  // (v2.9k) the road merchant: hooded, sitting on a crate beside a tall pack hung with glass jars of
+  // Motes, a lantern on a pole over him. He nods now and then; the jars glow and dim.
+  function drawMerchant(ctx, t) {
+    if (R().runWon() || !seen(MERCH_X, 200)) return;
+    const { poly, glow, pool, STONE2, DARK, RIM } = paint, x = MERCH_X, C = G.motes.COL, on = REST.near && REST.near.id === 'merchant';
+    const nod = Math.pow(Math.max(0, Math.sin(t * 0.7)), 12) * 4;
+    // the lantern on its pole
+    ctx.strokeStyle = '#1a1424'; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(x + 44, FLOOR); ctx.lineTo(x + 44, FLOOR - 150); ctx.lineTo(x + 24, FLOOR - 158); ctx.stroke();
+    glow(ctx, '255,200,130', x + 24, FLOOR - 142, 90, 0.3 + 0.04 * Math.sin(t * 9));
+    poly(ctx, [x + 18, FLOOR - 152, x + 30, FLOOR - 152, x + 32, FLOOR - 134, x + 16, FLOOR - 134], '#2a2036');
+    ctx.fillStyle = 'rgba(255,214,150,0.9)'; ctx.fillRect(x + 20, FLOOR - 149, 8, 12);
+    // the pack: a tall frame of cloth, a bedroll tied across its top, a crossbar the jars hang from
+    poly(ctx, [x - 56, FLOOR, x - 60, FLOOR - 104, x - 50, FLOOR - 114, x - 26, FLOOR - 118, x - 18, FLOOR - 108, x - 14, FLOOR], '#231b34');
+    ctx.fillStyle = '#2c2240'; ctx.beginPath(); ctx.ellipse(x - 38, FLOOR - 122, 26, 9, -0.08, 0, TAU); ctx.fill();
+    ctx.strokeStyle = G.rgba(RIM, 0.45); ctx.lineWidth = 1.5; ctx.beginPath(); ctx.ellipse(x - 38, FLOOR - 122, 26, 9, -0.08, Math.PI * 1.1, Math.PI * 1.9); ctx.stroke();
+    ctx.strokeStyle = '#120e1c'; ctx.lineWidth = 2;
+    for (const yy of [FLOOR - 84, FLOOR - 46]) { ctx.beginPath(); ctx.moveTo(x - 59, yy); ctx.lineTo(x - 15, yy - 5); ctx.stroke(); }
+    ctx.strokeStyle = '#3a2e4e'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(x - 72, FLOOR - 98); ctx.lineTo(x - 6, FLOOR - 104); ctx.stroke();
+    // jars of Motes hung from the crossbar on cords, swaying a little, each glowing in its own time
+    for (let i = 0; i < 5; i++) {
+      const ax = x - 68 + i * 14, ay = FLOOR - 99 - i * 1.1, len = 14 + (i % 2) * 12, sw = Math.sin(t * 1.3 + i * 1.7) * 2;
+      const jx = ax + sw, jy = ay + len, k = 0.55 + 0.45 * Math.sin(t * 1.7 + i * 1.9);
+      ctx.strokeStyle = 'rgba(20,14,30,0.9)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(jx, jy - 5); ctx.stroke();
+      ctx.globalCompositeOperation = 'lighter';
+      glow(ctx, C, jx, jy, 16, 0.35 * k);
+      ctx.fillStyle = G.rgba(C, 0.4 + 0.5 * k); ctx.beginPath(); ctx.ellipse(jx, jy, 4, 5.5, 0, 0, TAU); ctx.fill();
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.fillStyle = '#2a2036'; ctx.fillRect(jx - 2.5, jy - 7, 5, 2);
+    }
+    // the crate he sits on
+    poly(ctx, [x - 10, FLOOR, x - 10, FLOOR - 32, x + 32, FLOOR - 32, x + 32, FLOOR], STONE2);
+    ctx.fillStyle = G.rgba(RIM, 0.4); ctx.fillRect(x - 10, FLOOR - 33, 42, 2);
+    ctx.strokeStyle = 'rgba(0,0,0,0.3)'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(x - 8, FLOOR - 16); ctx.lineTo(x + 30, FLOOR - 16); ctx.stroke();
+    // the merchant: a long hooded cloak, hunched over his knees, its hood drawn to a point; one hand
+    // held out with a small jar in it
+    const sy = FLOOR - 32, hx = x + 12, hy = sy - 66 + nod;
+    poly(ctx, [x - 4, sy + 2, x - 10, sy - 34, x - 4, sy - 56 + nod, hx - 12, hy - 4, hx - 6, hy - 16, hx + 10, hy - 6, hx + 16, hy + 8, x + 30, sy - 36, x + 38, sy - 4, x + 30, sy + 2], '#191327');
+    ctx.strokeStyle = G.rgba(RIM, 0.4); ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(hx - 6, hy - 16); ctx.lineTo(hx + 10, hy - 6); ctx.lineTo(hx + 16, hy + 8); ctx.stroke();
+    ctx.fillStyle = DARK; ctx.beginPath(); ctx.ellipse(hx + 6, hy + 4, 6.5, 8, 0.15, 0, TAU); ctx.fill();
+    // the arm, out over his knee, and the jar in his hand
+    poly(ctx, [x + 18, sy - 34, x + 46, sy - 26, x + 48, sy - 18, x + 16, sy - 22], '#191327');
+    const jk = 0.6 + 0.4 * Math.sin(t * 2.1);
+    ctx.globalCompositeOperation = 'lighter';
+    glow(ctx, C, x + 52, sy - 26, on ? 34 : 22, (on ? 0.55 : 0.35) * jk);
+    ctx.fillStyle = G.rgba(C, 0.6 + 0.4 * jk); ctx.beginPath(); ctx.ellipse(x + 52, sy - 26, 4.5, 6, 0, 0, TAU); ctx.fill();
+    // two small lights under the hood, brighter when you stand at his crate
+    ctx.fillStyle = G.rgba(C, on ? 0.95 : 0.6);
+    ctx.fillRect(hx + 5, hy + 2, 2, 2); ctx.fillRect(hx + 9, hy + 3, 2, 2);
+    ctx.globalCompositeOperation = 'source-over';
+    pool(ctx, C, x - 10, 130, on ? 0.3 : 0.18);
   }
 
   // the offering: a plinth for each boon (or, after a corrupted portal, each relic), turning in the
@@ -1168,16 +1237,19 @@
     if (s.id === 'home') return ['The Way Home', 'The run is won. Back to the camp.', 'go home'];
     if (s.id === 'fountain') {
       const n = run.banes().length, cost = run.cleanseCost();
-      return ['The Cleansing Fountain', n ? 'Purge a corrupted boon\u2019s drawback: ' + cost + ' Sunshards (you hold ' + G.meta.shards + ')'
+      return ['The Cleansing Fountain', n ? 'Purge a corrupted boon\u2019s drawback: ' + cost + ' Motes (you hold ' + G.motes.held() + ')'
         : 'Its water purges the drawback of a corrupted boon. You carry none.', n ? 'cleanse' : ''];
     }
     if (s.id === 'card') {
       const done = REST.ev.done;
-      return ['A Face-Down Card', done ? 'Turned. The fortune-teller has nothing more for you.' : 'Turn one of the three: a boon, Sunshards, or a corrupted boon. You will not know which.', done ? '' : 'turn it'];
+      return ['A Face-Down Card', done ? 'Turned. The fortune-teller has nothing more for you.' : 'Turn one of the three: a boon, Motes, or a corrupted boon. You will not know which.', done ? '' : 'turn it'];
     }
     if (s.id === 'smith') {
       const n = run.temperable().length, cost = run.temperCost();
-      return ['The Wandering Smith', n ? 'Temper a boon you hold: one more of it, even past its limit. ' + cost + ' Sunshards (you hold ' + G.meta.shards + ')' : 'Nothing you hold can be tempered.', n ? 'temper' : ''];
+      return ['The Wandering Smith', n ? 'Temper a boon you hold: one more of it, even past its limit. ' + cost + ' Motes (you hold ' + G.motes.held() + ')' : 'Nothing you hold can be tempered.', n ? 'temper' : ''];
+    }
+    if (s.id === 'merchant') {
+      return ['The Road Merchant', 'Health for the run, boons, and things for the fight. You hold ' + G.motes.held() + ' Motes.', 'trade'];
     }
     if (s.id === 'pledge') {
       const done = REST.ev.done;
@@ -1198,7 +1270,7 @@
     if (s.id === 'boon') return shownDef(s.i).name;
     if (s.id === 'card') return s.i === 1 ? 'The Fortune-Teller' : '';
     if (s.id === 'portal') { const B = G.bosses[s.boss]; return B ? (portalState(s.boss) === 'corrupt' ? 'Corrupted' : B.short) : ''; }
-    return { fire: 'The Fire', stone: 'Second Thoughts', seventh: 'The Last Portal', home: 'The Way Home', fountain: 'The Fountain', smith: 'The Smith', pledge: 'The Omen Altar', duel: 'The Shade', door: 'The Doorway' }[s.id];
+    return { fire: 'The Fire', merchant: 'The Merchant', stone: 'Second Thoughts', seventh: 'The Last Portal', home: 'The Way Home', fountain: 'The Fountain', smith: 'The Smith', pledge: 'The Omen Altar', duel: 'The Shade', door: 'The Doorway' }[s.id];
   }
 
   // names over each place, what the nearest one does; in front of everything

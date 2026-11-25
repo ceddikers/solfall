@@ -42,7 +42,7 @@
       'hint', 'lowhp', 'lbTop', 'lbBot', 'diffNote', 'bestLine', 'ver', 'deadLead', 'deadFill', 'deadStats',
       'pauseBoons', 'boons', 'trial', 'winOver', 'winPick', 'winCards', 'heroName', 'heroCards', 'relicCards', 'relicOver',
       'deadTip', 'winStats', 'winBest', 'gradeLetter', 'gradeTitle', 'gradeSub', 'stage',
-      'practiceOver', 'keyList', 'resetItem', 'movesOver', 'movesTitle', 'movesBody', 'movesFoot', 'ult', 'ultFill', 'ultKey', 'crown', 'crownFill', 'crownName', 'crownKey', 'flow', 'flowRank', 'flowFill', 'omen', 'shardCount', 'shrineLead', 'shrineList', 'shrineTrophies', 'rerollItem', 'featsLead', 'featsBody', 'helpBody', 'helpTabs', 'fountainLead', 'fountainList', 'smithLead', 'smithList', 'continueItem', 'quickItem', 'deadRecap', 'winRecap', 'dailyItem', 'journalTabs', 'journalBody']) el[id] = $(id);
+      'practiceOver', 'keyList', 'resetItem', 'movesOver', 'movesTitle', 'movesBody', 'movesFoot', 'ult', 'ultFill', 'ultKey', 'crown', 'crownFill', 'crownName', 'crownKey', 'flow', 'flowRank', 'flowFill', 'omen', 'shardCount', 'shrineLead', 'shrineList', 'shrineTrophies', 'rerollItem', 'featsLead', 'featsBody', 'helpBody', 'helpTabs', 'fountainLead', 'fountainList', 'smithLead', 'smithList', 'merchLead', 'merchList', 'items', 'item0', 'item1', 'motes', 'moteCount', 'continueItem', 'quickItem', 'deadRecap', 'winRecap', 'dailyItem', 'journalTabs', 'journalBody']) el[id] = $(id);
     el.segs = Array.from(document.querySelectorAll('#ember .seg'));
     el.bbar = document.querySelector('.bbar');
     el.bname = document.getElementById('bname');
@@ -160,6 +160,7 @@
     else if (/^shrine\d$/.test(name)) buy(Number(name.slice(6)));
     else if (/^cleanse\d$/.test(name)) cleanse(Number(name.slice(7)));
     else if (/^temper\d$/.test(name)) temper(Number(name.slice(6)));
+    else if (/^merch\d$/.test(name)) merchBuy(Number(name.slice(5)));
     else if (name === 'how') U.show('how', true);
     else if (name === 'help') U.showHelp();
     else if (/^help\d$/.test(name)) U.fillHelp(Number(name.slice(4)));
@@ -256,15 +257,15 @@
   // ---- the Cleansing Fountain (rest.js): one row for each corrupted boon whose bane you still carry
   U.fillFountain = function () {
     const R = G.run, banes = R.banes(), cost = R.cleanseCost();
-    el.fountainLead.innerHTML = 'You hold <b style="color:var(--gold)">' + G.meta.shards + '</b> Sunshards. Each cleansing this run costs twice the last.';
+    el.fountainLead.innerHTML = 'You hold <b style="color:var(--mote)">' + G.motes.held() + '</b> Motes. Each cleansing this run costs twice the last.';
     Array.from(el.fountainList.children).forEach((row, i) => {
       const id = banes[i], b = id && G.boonDef(id);
       row.style.display = b ? '' : 'none';
       if (!b) return;
       row.querySelector('.uname').textContent = b.name;
       row.querySelector('.udesc').textContent = 'Purge: ' + b.bane;
-      row.querySelector('.ucost').textContent = cost + ' \u25c6';
-      row.classList.toggle('poor', G.meta.shards < cost);
+      row.querySelector('.ucost').textContent = cost + ' \u25c7';
+      row.classList.toggle('poor', G.motes.held() < cost);
     });
   };
   U.showFountain = function () { U.fillFountain(); U.show('fountain', true); };
@@ -282,7 +283,7 @@
   // ---- the Wandering Smith (rest.js): one row for each boon that can be tempered
   U.fillSmith = function () {
     const R = G.run, list = R.temperable(), cost = R.temperCost();
-    el.smithLead.innerHTML = 'You hold <b style="color:var(--gold)">' + G.meta.shards + '</b> Sunshards. One more of a boon you hold, even past its limit. Each tempering this run costs twice the last.';
+    el.smithLead.innerHTML = 'You hold <b style="color:var(--mote)">' + G.motes.held() + '</b> Motes. One more of a boon you hold, even past its limit. Each tempering this run costs twice the last.';
     Array.from(el.smithList.children).forEach((row, i) => {
       const b = list[i];
       row.style.display = b ? '' : 'none';
@@ -290,8 +291,8 @@
       const n = G.boon(b.id);
       row.querySelector('.uname').textContent = b.name + ' \u00d7' + n + ' \u2192 ' + (n + 1);
       row.querySelector('.udesc').textContent = b.desc;
-      row.querySelector('.ucost').textContent = cost + ' \u25c6';
-      row.classList.toggle('poor', G.meta.shards < cost);
+      row.querySelector('.ucost').textContent = cost + ' \u25c7';
+      row.classList.toggle('poor', G.motes.held() < cost);
     });
   };
   U.showSmith = function () { U.fillSmith(); U.show('smith', true); };
@@ -300,6 +301,30 @@
     if (!b || !G.run.temper(b.id)) { G.audio.play('empty'); return; }
     G.rest.tempered();
     if (!G.run.temperable().length) { U.close(); G.input.endStep(); } else { U.fillSmith(); U.refresh(); U.setFocus(0); }
+  }
+  // ---- (v2.9k) the road merchant (rest.js, motes.js): mending, two boons, two consumables
+  U.fillMerchant = function () {
+    const rows = G.motes.rows(), held = G.motes.held(), it = G.motes.items();
+    const hands = it.map((id) => (id ? G.motes.item(id).name : 'empty')).join(', ');
+    el.merchLead.innerHTML = 'You hold <b style="color:var(--mote)">' + held + '</b> Motes. In your hands: ' + U.esc(hands) + '.';
+    Array.from(el.merchList.children).forEach((row, i) => {
+      const r = rows[i];
+      row.style.display = r ? '' : 'none';
+      if (!r) return;
+      row.querySelector('.uname').textContent = r.name + (r.kind === 'item' ? ' \u00b7 item' : r.kind === 'boon' ? ' \u00b7 boon' : '');
+      row.querySelector('.udesc').textContent = r.why && !r.sold ? r.why + '. ' + r.desc : r.desc;
+      row.querySelector('.ucost').textContent = r.sold ? 'Sold' : r.price + ' \u25c7';
+      row.classList.toggle('poor', !r.sold && !r.why && held < r.price);
+      row.classList.toggle('max', !!(r.sold || r.why));
+    });
+  };
+  U.showMerchant = function () { U.fillMerchant(); U.show('merchant', true); };
+  function merchBuy(i) {
+    const R = G.run, crownWas = R.crownSet(), duoWas = R.duo();
+    const row = G.motes.buy(i);
+    if (!row) { G.audio.play('empty'); return; }
+    G.rest.bought(row, crownWas, duoWas);
+    U.fillMerchant(); U.refresh();
   }
   // ---- Help: how a fight goes, and every word the game uses, by subject
   // steps: a numbered account. words: [the word, what it means].
@@ -453,6 +478,7 @@
       ['Dawnbreak', k('ult') + ' or middle click', h.how.ult + ' Fills as you deal damage. Nothing can hurt you while it plays.'],
       ...(G.run.crownSet() ? [['Crown', k('crown'), G.SETS[G.run.crownSet()].crown + ': ' + G.SETS[G.run.crownSet()].crownDesc + '']] : []),
       ['Flourish', k('taunt'), 'A short salute that raises Flow and Dawnbreak, three times as much during a boss attack. Getting hit ends it.'],
+      ['Items', k('item1') + ' ' + k('item2'), 'Use what you hold. Bought from the road merchant with Motes.'],
     ];
     el.movesOver.textContent = h.title; el.movesOver.style.color = h.css;
     el.movesTitle.textContent = h.name + '\u2019s moves';
@@ -467,7 +493,7 @@
     U.show('practice', true);
   };
   // ---- Settings, Controls: choose a row, then press the key it should use
-  const ACTIONS = { left: 'Move left', right: 'Move right', up: 'Aim up', down: 'Aim down, drop', jump: 'Jump', attack: 'Attack', dash: 'Dash', flare: 'Special', heal: 'Mend, use', ult: 'Dawnbreak', crown: 'Crown', taunt: 'Flourish' };
+  const ACTIONS = { left: 'Move left', right: 'Move right', up: 'Aim up', down: 'Aim down, drop', jump: 'Jump', attack: 'Attack', dash: 'Dash', flare: 'Special', heal: 'Mend, use', ult: 'Dawnbreak', crown: 'Crown', taunt: 'Flourish', item1: 'Item 1', item2: 'Item 2' };
   U.fillKeys = function () {
     Array.from(el.keyList.children).forEach((row) => {
       const a = (row.dataset.act || '').slice(4);
@@ -503,6 +529,7 @@
     const pad = G.input.device === 'gamepad';
     if (el.ultKey) el.ultKey.innerHTML = pad ? '<kbd>RT</kbd>' : '<kbd>' + G.input.label('ult') + '</kbd>';
     if (el.crownKey) el.crownKey.innerHTML = pad ? '<kbd>LT</kbd>' : '<kbd>' + G.input.label('crown') + '</kbd>';
+    if (el.item0) { el.item0.querySelector('kbd').textContent = pad ? 'L3' : G.input.label('item1'); el.item1.querySelector('kbd').textContent = pad ? 'R3' : G.input.label('item2'); } // (v2.9k)
   };
   function buy(i) {
     if (G.meta.buy(i)) {
@@ -681,6 +708,20 @@
     if (H.hintT > 0) { H.hintT -= dt; if (H.hintT <= 0) el.hint.classList.remove('show'); }
     if (el.hud.classList.contains('off')) return;
 
+    // (v2.9k) Motes and the two items
+    const mo = G.motes.held();
+    if (mo !== H.motes) { H.motes = mo; el.moteCount.textContent = mo; }
+    const its = G.motes.items(), ik = its.join(',') + (P.charm ? '+c' : '');
+    if (ik !== H.items) {
+      H.items = ik;
+      its.forEach((id, i) => {
+        const slot = el['item' + i], def = id && G.motes.item(id);
+        slot.classList.toggle('empty', !def);
+        slot.classList.toggle('passive', !!(def && def.passive));
+        slot.querySelector('b').textContent = def ? def.name : '';
+        slot.style.setProperty('--icol', def ? 'rgb(' + def.col + ')' : '');
+      });
+    }
     // health
     if (P.hp !== H.hp) {
       const pips = el.hp.children;
@@ -834,8 +875,10 @@
   U.showDead = function () {
     const P = G.player, B = G.boss;
     const pct = Math.max(1, Math.ceil(B.hp / B.maxHp * 100));
+    const lm = G.lastMotes;
     el.deadLead.textContent = [G.practice ? 'Practice.' : 'You fell in trial ' + G.roman(G.run.trial) + '.', felledBy(P, B),
-      B.short + ' endured with ' + pct + '% of its strength, in phase ' + ROMAN[B.phase] + '.'].filter(Boolean).join(' ');
+      B.short + ' endured with ' + pct + '% of its strength, in phase ' + ROMAN[B.phase] + '.',
+      lm && lm.motes ? 'Your ' + lm.motes + ' Motes became ' + lm.shards + ' Sunshards.' : ''].filter(Boolean).join(' ');
     el.deadFill.style.transition = 'none';
     el.deadFill.style.width = '100%';
     void el.deadFill.offsetWidth;
@@ -924,8 +967,9 @@
       [P.stats.hits, 'Hits taken'],
       [P.stats.perfect, 'Perfect dodges'],
       ['+' + res.meta.shards, 'Sunshards'],
+      ...(res.motes ? [['+' + res.motes, 'Motes']] : []),
     ]);
-    el.winStats.lastElementChild.firstElementChild.classList.add('gold');
+    Array.from(el.winStats.children).forEach((d) => { const l = d.lastElementChild.textContent; if (l === 'Sunshards') d.firstElementChild.classList.add('gold'); if (l === 'Motes') d.firstElementChild.classList.add('mote'); });
     el.winRecap.innerHTML = recapHtml(!!res.done && !res.champ && !res.corrupt);
     const R = G.run, waiting = R.corrupted.length;
     if (res.champ) {

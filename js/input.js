@@ -13,6 +13,8 @@
     heal: ['KeyE', 'KeyF'],
     ult: ['KeyQ', 'KeyI'],
     crown: ['KeyU'], // a set's crown (v2.3a)
+    item1: ['Digit1', 'Numpad1'], // (v2.9k) the two consumables (motes.js)
+    item2: ['Digit2', 'Numpad2'],
     taunt: ['KeyT', 'KeyG'],
     pause: ['Escape', 'KeyP'],
     moves: ['Tab'],
@@ -80,7 +82,7 @@
   window.addEventListener('blur', releaseAll);
 
   // ---- rebinding (Settings, Controls)
-  I.REBIND = ['left', 'right', 'up', 'down', 'jump', 'attack', 'dash', 'flare', 'heal', 'ult', 'crown'];
+  I.REBIND = ['left', 'right', 'up', 'down', 'jump', 'attack', 'dash', 'flare', 'heal', 'ult', 'crown', 'item1', 'item2'];
   const FIXED = ['Escape', 'Enter', 'NumpadEnter'];
   // Make `code` the first key for an action. A key does one thing, so it is taken from whatever had it.
   I.bind = function (action, code) {
@@ -149,7 +151,9 @@
     attack: (g) => btn(g, 2),
     dash: (g) => btn(g, 1) || btn(g, 5),
     ult: (g) => btn(g, 7),
-    taunt: (g) => btn(g, 8) || btn(g, 11),
+    taunt: (g) => btn(g, 8),
+    item1: (g) => btn(g, 10), // (v2.9k) the stick clicks: L3 and R3 (R3 was a second flourish)
+    item2: (g) => btn(g, 11),
     flare: (g) => btn(g, 3),
     heal: (g) => btn(g, 4),
     crown: (g) => btn(g, 6), // LT (mend keeps LB)

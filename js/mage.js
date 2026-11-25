@@ -49,6 +49,7 @@
   };
 
   // ------------------------------------------------------------------ state
+  B.silWide = true; // (v2.9j, corrupt.js: its crystals and blinks reach across the arena)
   B.setup = function () {
     const b = B.body;
     b.x = 900; b.y = GY; b.homeY = GY; b.alpha = 0; b.cast = 0; b.want = 0; b.elem = null; b.spent = false; b.charge = 0;

@@ -294,6 +294,7 @@
   }
 
   // ------------------------------------------------------------------ state
+  B.silWide = true; // (v2.9j, corrupt.js: its clones, echoes and threads reach across the arena)
   B.setup = function () {
     const b = B.body;
     b.x = 900; b.y = -120; b.pose = 'dive'; b.hurt = false; b.p = POSES.dive.slice(); b.runT = 0;
