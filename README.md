@@ -114,6 +114,20 @@ hero (`tools/feel-check.js`).
 
 Not done: touch controls, a colour-blind alternative to red-orange warnings, gamepad rebinding.
 
+## Softer landings (v2.5d)
+
+Asked: "are the animations like natural? do they feel weird now?" Checked with `tools/motion-check.js` against
+v2.5b: no boss got worse (Warden 12 to 10 flags, Veil 1 to 0, Knight 4 to 2, Leviathan 5 to 3; Magus 22, Kairo 5
+and the Wolf 0 unchanged, the Magus ones being its own blink-in). One thing had got worse: a hero landing dropped
+the whole figure about 10 px in one frame and held there (the new hip spring hit a hard limit). Now the drawn
+squash eases into a landing over a few frames, as the knees bend, and the hip and chest springs round off at
+their limits instead of stopping dead. Drawing only: nothing in the game's timing or hit areas changed.
+
+Playtest checklist:
+- Jump and land with each hero, from a short hop and from a full double jump: the body sinks into the knees and
+  comes back up, with no one-frame drop.
+- Aster's plunge and a heavy blow landing on a hero still read as a hard hit.
+
 ## Every character, more frames and a bone for every part; the Hall by the gate (v2.5c)
 
 Asked for: the hero choice nearer the gate, and "the boss animations to be filled with a few more frames and

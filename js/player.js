@@ -2755,7 +2755,10 @@
     const crouch = h.draw ? ease('crouch', crouchT, drawing ? 60 : 22) : 0;
     // (v2.5c) a squash that presses the hero down is taken mostly in the knees (see sink), not by
     // squeezing the whole figure; a stretch (a jump) still stretches it
-    const squash = s.squash || 0, sq = squash < 0 ? squash * 0.4 : squash;
+    // (v2.5d) the drawn squash eases into a landing over a few frames, as knees bend, instead of the
+    // whole figure dropping in one frame; it still lets go as fast as the game's squash does
+    const rawSq = s.squash || 0, squash = K && rawSq < 0 ? spr('sq', rawSq, 46, 0.8) : (K ? (K.set('sq', rawSq), rawSq) : rawSq);
+    const sq = squash < 0 ? squash * 0.4 : squash;
     ctx.scale(1 - sq * 0.55, 1 + sq);
     ctx.lineCap = 'round'; ctx.lineJoin = 'round';
 
@@ -2763,12 +2766,14 @@
     // rest the weight drifts from one foot to the other
     const restK = R ? ease('restK', idle && !s.hold ? 1 : 0, 5) : (idle && !s.hold ? 1 : 0);
     const ws = Math.sin(G.t * 0.75 + ph) * restK, hipX = ws * 1.1;
-    const sink = G.clamp(spr('sink', Math.max(0, -squash) * 20, 20, 0.42), -2.5, 8);
+    // (soft limits, so a hard landing rounds off at the bottom rather than hitting a wall and holding)
+    const soft = (v, lo, hi) => (v > 0 ? hi * Math.tanh(v / hi) : lo * Math.tanh(v / lo));
+    const sink = soft(spr('sink', Math.max(0, -squash) * 20, 20, 0.42), -2.5, 9);
     kick('sink', land * 0.03 + hit * 60);
     const bob = run ? Math.abs(Math.sin(s.runT)) * 1.3 : 0;
     const hip = Math.min(-13, -24 + bob + crouch + sink + ws * ws * 0.35);
     // -- the chest rides the hips a beat late; the spine bows and stretches about the hips
-    const chest = G.clamp(spr('ch', 0, 16, 0.36), -2.5, 4);
+    const chest = soft(spr('ch', 0, 16, 0.36), -2.5, 4);
     kick('ch', land * 0.022 + hit * 45 - dvy * 0.01 + (foot ? (h.heavy ? 9 : 4) : 0));
     const spine = G.clamp(spr('sp', run ? 0.03 : 0, 10, 0.45), -0.16, 0.16) - ws * 0.02 + breath * 0.008;
     kick('sp', -dvx * 0.0013 + land * 0.0005 + hit * 0.6);
