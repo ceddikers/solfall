@@ -2,7 +2,7 @@
 
 A side-on boss rush for the browser: four heroes, seven three-phase bosses, played as a run of
 ever-harder trials. You pick a hero and a relic before the run and win a boon after each victory.
-Version 2.6c.
+Version 2.6d.
 
 This is an early slice of a planned boss-rush roguelite (short runs, a boon after each boss,
 bosses drawn from a pool). A run meets the four bosses in a shuffled order, then meets them again, harder.
@@ -113,6 +113,25 @@ hero (`tools/feel-check.js`).
 - Settings, Reset progress erases Sunshards, upgrades, trophies and records (it has to be chosen twice).
 
 Not done: touch controls, a colour-blind alternative to red-orange warnings, gamepad rebinding.
+
+## Kairo's floor crumbles before it falls (v2.6d)
+
+Asked: "can we make it so kairo doesnt break the floor immediately cause it could catch people offguard a bit
+more often than it should - make it slowly fall". A slab of the ridge that has taken its third crack used to drop
+the instant the hero was off it. Now it crumbles first, for 1.5 seconds, while it still holds: it shakes harder
+and harder, its edges split from the floor beside it, it sags between them, its cracks glow and grit pours out of
+them, with a rumble as it starts. Then it falls, more slowly than before (1.3 s, was 0.9). The slab under a phase
+change crumbles for 1.1 s (the hero is still put off it first) and the Gathered Sun's crater for 1.2 s. It still
+never gives way under the hero: if they are standing on it when it is done, it waits until they step off. A
+crumbling slab counts towards the two-holes limit and the no-two-side-by-side rule.
+
+Checked: due slab to hole 1.51 s; held for 3 s with the hero standing on it, gone the moment they left; stills of
+the crumble and the fall. The scripted player against Kairo at trials III and V (120 fights each way): pit falls
+26 to 21, wins 58% to 61% (it reads holes at once, so the warning matters more to a person than to it).
+
+Playtest checklist:
+- In Kairo's phase II, watch a slab with three cracks: it shakes, splits at the edges and sags for a moment before
+  it drops. Is that long enough to see, and not so long that it loses its threat?
 
 ## A Jump slot, and duos (v2.6c)
 

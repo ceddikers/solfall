@@ -283,7 +283,12 @@
   // falls away and leaves a hole (arena.js keeps it as a pit). Never under the hero's feet, never two
   // side by side, never more than two at once, never the two at the walls. In phase III his blows
   // waste nothing: only the Gathered Sun leaves a crater.
+  // (v2.6d) A slab does not drop the moment it is due: it crumbles first, for about a second and a
+  // half (shaking, sagging at its edges, grit pouring from its cracks, a rising rumble) while it still
+  // holds, and only then falls, more slowly than before. The user found the instant hole caught people
+  // off guard. It still never gives way under the hero: if they stand on it as it finishes, it waits.
   const NS = 8, SW = (WR - WL) / NS;
+  const CRUMBLE_T = 1.5, CRUMBLE_PHASE = 1.1, CRUMBLE_SUN = 1.2, DROP_T = 1.3;
   function makeSlabs() {
     B.slabs = [];
     for (let i = 0; i < NS; i++) {
@@ -294,14 +299,23 @@
         for (let j = 0; j < 4; j++) { px += (q() - 0.5) * 34; py += 4 + q() * 7; pts.push([px, py]); }
         cracks.push(pts);
       }
-      B.slabs.push({ i, l: WL + i * SW, r: WL + (i + 1) * SW, dmg: 0, crack: 0, open: false, drop: 0, quake: 0, due: false, cracks });
+      B.slabs.push({ i, l: WL + i * SW, r: WL + (i + 1) * SW, dmg: 0, crack: 0, open: false, drop: 0, quake: 0, due: false, crumble: 0, cr0: 1, cracks });
     }
   }
   function mulberry(a) { return () => { a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
   const slabAt = (x) => B.slabs[G.clamp(Math.floor((x - WL) / SW), 0, NS - 1)];
-  const holes = () => B.slabs.filter((s) => s.open).length;
+  const going = (s) => !!s && (s.open || s.crumble > 0); // (open, or crumbling and about to be)
+  const holes = () => B.slabs.filter(going).length;
   const edgeSlab = (s) => s.i === 0 || s.i === NS - 1;
-  const canOpen = (s) => !s.open && !edgeSlab(s) && holes() < 2 && !(B.slabs[s.i - 1] || {}).open && !(B.slabs[s.i + 1] || {}).open;
+  const canOpen = (s) => !going(s) && !edgeSlab(s) && holes() < 2 && !going(B.slabs[s.i - 1]) && !going(B.slabs[s.i + 1]);
+  // the slab starts to give: it holds for `t` seconds more, then falls (updateSlabs)
+  function crumble(s, t) {
+    s.due = false; s.crumble = t; s.cr0 = t; s.quake = 0.5;
+    G.audio.play('kRock', { vol: 0.7 });
+    const cx = (s.l + s.r) / 2;
+    G.fx.burst(cx, FLOOR - 2, { n: 10, color: '30,22,18', speed: [60, 220], angle: -Math.PI / 2, spread: 2, life: [0.4, 0.8], size: [3, 6], kind: 'chunk', grav: 1400, jitter: SW * 0.35 });
+    G.fx.dust(cx, FLOOR, 4, { speed: [20, 120], size: [6, 12], up: 30, a: 0.3 });
+  }
   function heroOn(s) {
     const P = G.player;
     return !P.dead && P.x > s.l - 16 && P.x < s.r + 16 && P.y > FLOOR - 170;
@@ -322,7 +336,7 @@
     if (s.crack >= 3) s.due = true;
   }
   function openSlab(s) {
-    s.open = true; s.due = false; s.drop = 0; s.quake = 0;
+    s.open = true; s.due = false; s.crumble = 0; s.drop = 0; s.quake = 0;
     G.arena.pits.push({ l: s.l, r: s.r });
     G.audio.play('kRock', { vol: 1.3 }); G.audio.play('boom');
     G.fx.shake(14);
@@ -335,7 +349,7 @@
   function breakUnder(x) {
     let s = slabAt(x);
     if (edgeSlab(s)) s = B.slabs[s.i === 0 ? 1 : NS - 2];
-    if (s.open) return;
+    if (going(s)) return;
     const P = G.player;
     if (heroOn(s)) {
       const side = P.x < (s.l + s.r) / 2 ? -1 : 1;
@@ -345,22 +359,31 @@
       G.fx.dust(P.x, FLOOR, 4, { speed: [40, 160], size: [6, 11], up: 40 });
     }
     s.dmg = 3; s.crack = 3;
-    openSlab(s);
+    crumble(s, CRUMBLE_PHASE);
   }
   // the Gathered Sun's crater (phase III only)
   function craterAt(x) {
     const s = slabAt(x);
-    if (canOpen(s) && !heroOn(s)) { s.dmg = 3; s.crack = 3; openSlab(s); }
-    else if (!s.open) { s.dmg = Math.max(s.dmg, 2.99); s.crack = 2; s.quake = 1; }
+    if (canOpen(s) && !heroOn(s)) { s.dmg = 3; s.crack = 3; crumble(s, CRUMBLE_SUN); }
+    else if (!going(s)) { s.dmg = Math.max(s.dmg, 2.99); s.crack = 2; s.quake = 1; }
   }
   function updateSlabs(dt) {
     if (!B.slabs) return;
     for (const s of B.slabs) {
       s.quake = Math.max(s.due ? 0.35 : 0, s.quake - dt * 2.5);
-      if (s.open && s.drop < 1) s.drop = Math.min(1, s.drop + dt / 0.9);
-      if (s.due && !s.open) {
+      if (s.open && s.drop < 1) s.drop = Math.min(1, s.drop + dt / DROP_T);
+      if (s.due && !going(s)) {
         if (!canOpen(s)) { s.due = false; s.dmg = 2.99; s.crack = 2; }
-        else if (!heroOn(s)) openSlab(s);
+        else if (!heroOn(s)) crumble(s, CRUMBLE_T);
+      }
+      if (s.crumble > 0) {
+        // it shakes harder and pours grit as it goes; it waits while the hero is on it
+        const k = 1 - s.crumble / s.cr0;
+        s.quake = Math.max(s.quake, 0.45 + 0.75 * k);
+        if (Math.random() < dt * (10 + 30 * k)) G.fx.spawn({ kind: 'chunk', x: G.rand(s.l + 8, s.r - 8), y: FLOOR + 2, vx: G.rand(-20, 20), vy: G.rand(40, 160), life: G.rand(0.4, 0.8), size: G.rand(2, 4.5), color: '30,22,18', grav: 1400 });
+        if (Math.random() < dt * (3 + 8 * k)) G.fx.dust(G.rand(s.l + 10, s.r - 10), FLOOR, 1, { speed: [10, 60], size: [5, 10], up: 20, a: 0.22 });
+        if (s.crumble > dt || !heroOn(s)) s.crumble -= dt;
+        if (s.crumble <= 0) openSlab(s);
       }
     }
   }
@@ -2104,6 +2127,14 @@
       if (s.crack <= 0) continue;
       ctx.save();
       if (s.quake) ctx.translate(G.rand(-1.5, 1.5) * s.quake, 0);
+      if (s.crumble > 0) {
+        // (v2.6d) crumbling: its edges split from the floor beside it, and it sags between them
+        const k = 1 - s.crumble / s.cr0, w = 2 + 5 * k, sag = 5 * k;
+        ctx.fillStyle = 'rgba(0,0,0,0.85)';
+        for (const ex of [s.l, s.r]) { ctx.beginPath(); ctx.moveTo(ex - w / 2, FLOOR - 1); ctx.lineTo(ex + w / 2, FLOOR - 1); ctx.lineTo(ex + w * 0.2, FLOOR + 16 + 10 * k); ctx.lineTo(ex - w * 0.2, FLOOR + 16 + 10 * k); ctx.closePath(); ctx.fill(); }
+        ctx.fillStyle = 'rgba(0,0,0,' + (0.35 * k).toFixed(3) + ')'; ctx.fillRect(s.l + w / 2, FLOOR - 1, s.r - s.l - w, sag);
+        ctx.translate(0, sag);
+      }
       const hot = s.crack >= 3;
       for (let k = 0; k < Math.min(4, s.crack + (s.crack >= 2 ? 1 : 0)); k++) {
         const pts = s.cracks[k];
