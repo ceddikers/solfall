@@ -730,7 +730,7 @@
     x = G.clamp(x, WL + w * 0.3, WR - w * 0.3);
     const live = H.list.filter((h) => h.kind === 'blaze' && !h.ending);
     if (live.length >= 3) live[0].end();
-    const life = K.gentle() ? 3.4 : 4.4;
+    const life = (K.gentle() ? 3.4 : 4.4) * (G.twist() ? 1.5 : 1); // (v3.0c: Ascension +3, its own way: G.twist()) its fire burns half again as long
     return H.add({
       kind: 'blaze', layer: 'under', x, w, cw: w * 0.25, ign: 0.42, life, popVy: -600, ending: false, endT: 0, lit: false, sc: 0,
       end() { if (!this.ending) { this.ending = true; this.endT = this.t; } },

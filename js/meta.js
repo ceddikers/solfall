@@ -86,7 +86,8 @@
   M.earning = earning;
   const GRADE = { S: 1.5, A: 1.25, B: 1.1, C: 1 }, DIFF = [0.75, 1, 1.4];
   const base = () => 12 + 5 * (G.run.trial - 1);
-  const scale = () => (DIFF[G.settings.difficulty] || 1) * (1 + 0.1 * G.up('fortune')) * (1 + 0.25 * G.run.omens.length)
+  const scale = () => (DIFF[Math.min(2, G.settings.difficulty)] || 1) * (1 + 0.1 * G.ascLevel()) * // (v3.0c: Ascension pays a tenth more a step)
+    (1 + 0.1 * G.up('fortune')) * (1 + 0.25 * G.run.omens.length)
     * (G.run.corrupt ? 3 : 1); // a corrupted boss pays three times over
 
   // A boss fell. Returns what was earned, for the victory screen.

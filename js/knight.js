@@ -963,7 +963,7 @@
     // unarmed: nothing to swing, and every blow counts for more
     while (blade.state === 'out') yield;
     b.fast = false; b.pose = 'idle'; b.exposed = true;
-    yield* wait(B.phase === 3 ? 1.0 : 1.4);
+    yield* wait((B.phase === 3 ? 1.0 : 1.4) * (G.twist() ? 0.5 : 1)); // (v3.0c: Ascension +3, its own way: G.twist()) his thrown sword comes back sooner
     // the call: a lane the other way, then the sword tears free
     b.pose = 'grip'; facePlayer();
     const home = span(wallAt, b.x + dir * (44 - 36));

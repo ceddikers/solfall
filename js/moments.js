@@ -40,7 +40,7 @@
   M.gather = function* (B, pos) {
     const P = G.player, pal = G.pal();
     const dur = 6.5 * Math.max(0.8, G.diff().tele);
-    const hp = Math.round((DPS[P.hero.id] || 45) * 3.3 * Math.min(1.6, 1 + 0.08 * (G.run.trial - 1)) * [0.8, 1, 1.15][G.settings.difficulty]);
+    const hp = Math.round((DPS[P.hero.id] || 45) * 3.3 * Math.min(1.6, 1 + 0.08 * (G.run.trial - 1)) * [0.8, 1, 1.15][Math.min(2, G.settings.difficulty)]);
     const p0 = pos();
     B.ward = { hp, max: hp, t: 0, dur, x: p0.x, y: p0.y, r: p0.r, flash: 0 };
     G.ui.callout(B.reckonName || 'RECKONING', 'Break the ward before the ring closes');

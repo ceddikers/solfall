@@ -3,7 +3,7 @@
 
 const G = window.G = {};
 
-G.VERSION = '3.0b';
+G.VERSION = '3.0c';
 G.bgK = 1; // how many pixels per unit the painted backdrops are kept at (set in game.js, resize)
 G.W = 1280;          // logical view size
 G.H = 720;
@@ -165,3 +165,37 @@ G.DIFFS = [
   { name: 'Merciless', hp: 4, bossHp: 1.875, tele: 0.8, pace: 0.7, stagger: 3.2 }, // (v2.9l: bossHp 1.25; v2.9j: bossHp 1.15)
 ];
 G.diff = () => G.DIFFS[G.settings.difficulty] || G.DIFFS[1];
+// (v3.0c) Ascension: five steps above Merciless, a ladder for each hero, opened by beating Sol on Merciless
+// and climbed by beating her on the step below. Difficulty 3..7 is Ascension +1..+5, and each step keeps
+// everything below it:
+//   +1 Quickened      warnings 15% shorter, 10% less rest between attacks
+//   +2 Hardened       bosses 15% more health, a stagger bar 25% longer, staggers 20% shorter
+//   +3 Their own way  each boss fights one way of its own harder (G.twist(), in each boss's file)
+//   +4 Lean road      two boons offered instead of three, 25% fewer Motes, the merchant 25% dearer
+//   +5 Ill omens      an omen on every trial, two from trial IV
+G.ASC = [null,
+  { name: 'Quickened', note: 'Merciless, with shorter warnings and less rest' },
+  { name: 'Hardened', note: 'bosses have more health and a longer stagger bar' },
+  { name: 'Their own way', note: 'each boss fights one of its own ways harder' },
+  { name: 'Lean road', note: 'two boons offered, fewer Motes, a dearer merchant' },
+  { name: 'Ill omens', note: 'an omen every trial, two from trial IV' }];
+for (let n = 1; n <= 5; n++) {
+  const m = G.DIFFS[2];
+  G.DIFFS[2 + n] = Object.assign({}, m, {
+    name: 'Ascension +' + n, asc: n,
+    tele: m.tele * 0.85, pace: m.pace * 0.9,
+    bossHp: m.bossHp * (n >= 2 ? 1.15 : 1), poise: n >= 2 ? 1.25 : 1, stagger: m.stagger * (n >= 2 ? 0.8 : 1),
+    motes: n >= 4 ? 0.75 : 1, shop: n >= 4 ? 1.25 : 1, lean: n >= 4, omens: n >= 5,
+  });
+}
+G.ascLevel = (d) => (G.DIFFS[d == null ? G.settings.difficulty : d] || {}).asc || 0;
+G.twist = () => G.ascLevel() >= 3;
+// each hero's ladder: { open: the highest step open (0: none yet), best: the highest step beaten }
+G.ascOf = (hero) => G.store.load('asc', {})[hero || G.settings.hero] || { open: 0, best: 0 };
+// the difficulties this hero can choose (the Brazier steps through them)
+G.diffChoices = (hero) => { const out = [0, 1, 2], o = G.ascOf(hero).open; for (let n = 1; n <= o; n++) out.push(2 + n); return out; };
+// a hero without that step open drops to the highest they have
+G.fitDiff = function () {
+  const c = G.diffChoices();
+  if (!c.includes(G.settings.difficulty)) { G.settings.difficulty = Math.min(G.settings.difficulty, c[c.length - 1]); G.saveSettings(); }
+};

@@ -6,7 +6,7 @@
   const el = {};
 
   const OPTS = {
-    difficulty: { values: [0, 1, 2], label: (v) => G.DIFFS[v].name },
+    difficulty: { get values() { return G.diffChoices(); }, label: (v) => G.DIFFS[v].name }, // (v3.0c: and the hero's Ascension steps)
     shake: { values: [0, 0.5, 1], label: (v) => (v === 0 ? 'Off' : v === 0.5 ? 'Half' : 'Full') },
     flash: { values: [0, 0.4, 1], label: (v) => (v === 0 ? 'Off' : v === 0.4 ? 'Reduced' : 'Full') },
     numbers: { values: [false, true], label: (v) => (v ? 'On' : 'Off') },
@@ -613,7 +613,8 @@
       : 'No victory on ' + G.diff().name + ' yet';
     const held = G.run.held(), relic = G.relicDef(G.run.relic);
     el.resetItem.textContent = 'Reset progress';
-    const omens = G.run.omens.map((id) => '<p><b>Omen: ' + G.omenDef(id).name + '</b> ' + G.omenDef(id).desc + '</p>').join('');
+    const omens = G.run.omens.map((id) => '<p><b>Omen: ' + G.omenDef(id).name + '</b> ' + G.omenDef(id).desc + '</p>').join('')
+      + (G.twist() && G.state === 'fight' && TWIST[G.boss.id] ? '<p><b>Ascension: its own way</b> ' + TWIST[G.boss.id] + '</p>' : ''); // (v3.0c)
     el.pauseBoons.innerHTML = (held.length || relic || omens)
       ? '<h3>' + G.hero().name + '\u2019s run \u00b7 ' + G.diff().name + '</h3>' + omens
         + (relic ? '<p><b>' + esc(G.relics.title(relic.id)) + '</b> ' + G.relics.html(relic.id, { next: true }) + '</p>' : '')
@@ -1074,6 +1075,15 @@
   };
   // (v3.0a) The end of a run won, after the dawn (epilogue.js): what the run came to, the bosses in the
   // order they fell (a corrupted one cleansed is marked), the build, and what the win unlocked.
+  // (v3.0c) what each boss does harder from Ascension +3 (G.twist(): the boss files)
+  const TWIST = {
+    warden: 'Its broken hands come back twice as fast.', wolf: 'Its fire burns half again as long.',
+    knight: 'His thrown sword comes back to him sooner.', kairo: 'His Gathered Sun bar is a quarter longer.',
+    champion: 'He feints from the start, and more often.', sol: 'The cold of the eclipse sets in faster.',
+    mage: 'It fires one more ice shard.', assassin: 'Its mirror attack sends one more image.',
+    leviathan: 'It bites once more before it sticks fast.',
+  };
+  U.TWIST = TWIST;
   U.showEnd = function (res) {
     const R = G.run, s = R.sum || { t: G.time, hits: 0, perfect: 0, shards: 0 }, H = G.hero();
     const fromMotes = Math.floor((R.motes || 0) / (G.motes.PER_SHARD || 10));
@@ -1100,6 +1110,8 @@
     const un = [];
     if (res.solFirst) un.push('Dawn at the Vigil: the camp wakes up to morning.');
     if (res.solHeroFirst) un.push('A sun crown over ' + H.name + ' in the Hall of Echoes.');
+    if (res.ascBeat) un.push('Ascension +' + res.ascBeat + ' beaten with ' + H.name + '.');
+    if (res.ascOpened) un.push('Ascension +' + res.ascOpened + ' for ' + H.name + ': choose it at the Brazier.');
     if (res.costume) un.push('The ' + res.costume.name + ' costume (the Wardrobe, in the Hall of Echoes).');
     if (res.meta.relic) un.push('Trophy: ' + res.meta.relic.name + ' joins the relics you can be offered.');
     for (const l of res.meta.lines) if (l.indexOf('Feat: ') === 0) un.push(l.replace(/\s*\+\d+$/, ''));

@@ -274,7 +274,7 @@
     const tell = (o.quick ? 0.2 : [0, 0.42, 0.34, 0.28][B.phase]) * T;
     // a feint: a second weapon lights dimmer with it
     let feint = null;
-    if (!o.noFeint && B.phase >= 2 && K.chance(B.phase === 3 ? 0.4 : 0.28, 'feint')) {
+    if (!o.noFeint && B.phase >= (G.twist() ? 1 : 2) && K.chance((B.phase === 3 ? 0.4 : 0.28) * (G.twist() ? 1.5 : 1), 'feint')) { // (v3.0c: Ascension +3, its own way: G.twist()) he feints from the start, and more often
       feint = G.pick(WPN.filter((x) => x !== w));
       B.feinted = true; B.feintT = 1.6; B.hits0 = G.player.stats.hits;
     }

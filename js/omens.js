@@ -26,7 +26,8 @@
     else if (G.practice || R.champFight) { R.omens = []; } // (the Champion's duel is fought clean)
     else {
       // a corrupted boss always brings two; a pledge at the omen altar (rest.js) one more
-      const n = (R.corrupt || R.trial >= 6 ? 2 : R.trial >= 2 ? 1 : 0) + (R.pledge ? 1 : 0);
+      const ill = (G.DIFFS[G.settings.difficulty] || {}).omens; // (v3.0c: Ascension +5, an omen every trial, two from trial IV)
+      const n = (R.corrupt || R.trial >= (ill ? 4 : 6) ? 2 : R.trial >= 2 || ill ? 1 : 0) + (R.pledge ? 1 : 0);
       R.pledge = false;
       // never the same omen two trials running
       const pool = G.shuffle(G.OMENS.map((o) => o.id).filter((id) => !(R.lastOmens || []).includes(id)));

@@ -231,7 +231,7 @@
   B.reset = function () {
     B.maxHp = Math.round(B.BASE_HP * G.diff().bossHp);
     B.hp = B.maxHp;
-    B.phase = 1; B.poise = 0; B.poiseMax = 440 * G.POISE; B.staggered = false;
+    B.phase = 1; B.poise = 0; B.poiseMax = 440 * G.POISE * (G.diff().poise || 1); B.staggered = false;
     B.invuln = true; B.active = false; B.dead = false; B.dying = false; B.toppled = false; B.down = false;
     B.script = null; B.attackName = ''; B.bag = []; B.lastAtk = ''; B.forceNext = G.corrupt.opener(B, 1) || 'slam';
     B.t = 0; B.spread = 318; B.rays = []; B.shardR = 900; B.shardsOut = false; B.hasShards = false;
@@ -376,7 +376,7 @@
   // A hand's health ran out: it drops, the Warden loses the attacks that need it, and takes more damage.
   function breakHand(h) {
     const busy = h.ctrl;
-    h.broken = hard() ? 9 : 12; h.hp = 0;
+    h.broken = h.brokenMax = (hard() ? 9 : 12) * (G.twist() ? 0.5 : 1); h.hp = 0; // (v3.0c: Ascension +3, its own way: G.twist()) the hands come back twice as fast
     h.hurt = false; h.hot = 0; h.stuck = false; h.ctrl = false;
     B.poise = Math.min(B.poiseMax - 1, B.poise + B.poiseMax * 0.3);
     G.player.gain(40);
@@ -463,7 +463,7 @@
       B.poise = B.poiseMax * (1 - e / dur);
     }
     B.staggered = false; B.poise = 0;
-    B.poiseMax = Math.min(900 * G.POISE, B.poiseMax * 1.25);
+    B.poiseMax = Math.min(900 * G.POISE * (G.diff().poise || 1), B.poiseMax * 1.25);
     G.fx.ring(c.x, c.y, { r0: 40, r1: 300, life: 0.45, color: G.pal().boss, width: 8 });
     G.audio.play('ring'); G.fx.shake(8);
     pushPlayer(480);
@@ -532,7 +532,7 @@
     );
     G.fx.ring(c.x, c.y, { r0: c.r, r1: 760, life: 0.9, color: G.PAL[2].boss, width: 12, alpha: 0.7 });
     G.ui.letterbox(false);
-    B.poiseMax = 500 * G.POISE; B.invuln = false;
+    B.poiseMax = 500 * G.POISE * (G.diff().poise || 1); B.invuln = false;
     release();
   }
 
@@ -583,7 +583,7 @@
       }
     }
     G.ui.letterbox(false);
-    B.poiseMax = 540 * G.POISE; B.invuln = false;
+    B.poiseMax = 540 * G.POISE * (G.diff().poise || 1); B.invuln = false;
     release();
   }
 
@@ -3860,7 +3860,7 @@
     ctx.globalCompositeOperation = 'source-over';
     // how much more the hand can take, as an arc round its sigil (and the time left once it is broken)
     if (h.broken > 0 || h.hp < h.maxHp) {
-      const k = h.broken > 0 ? 1 - h.broken / 12 : h.hp / h.maxHp;
+      const k = h.broken > 0 ? 1 - h.broken / (h.brokenMax || 12) : h.hp / h.maxHp;
       ctx.globalCompositeOperation = 'lighter';
       ctx.strokeStyle = h.broken > 0 ? G.rgba(G.COL.starHot, 0.5) : G.rgba(P.hot, 0.9); ctx.lineWidth = 3;
       ctx.beginPath(); ctx.arc(0, 12, 29, -Math.PI / 2, -Math.PI / 2 + G.TAU * G.clamp(k, 0, 1)); ctx.stroke();

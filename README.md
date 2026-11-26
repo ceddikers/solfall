@@ -2,7 +2,7 @@
 
 A side-on boss rush for the browser: four heroes, seven three-phase bosses, played as a run of
 ever-harder trials. You pick a hero and a relic before the run and win a boon after each victory.
-Version 3.0b.
+Version 3.0c.
 
 This is an early slice of a planned boss-rush roguelite (short runs, a boon after each boss,
 bosses drawn from a pool). A run is seven trials, one for each boss, each harder than the last: the first boss
@@ -116,6 +116,61 @@ hero (`tools/feel-check.js`).
 - Settings, Reset progress erases Sunshards, upgrades, trophies and records (it has to be chosen twice).
 
 Not done: touch controls, a colour-blind alternative to red-orange warnings, gamepad rebinding.
+
+## Ascension: five steps above Merciless, one ladder per hero (v3.0c)
+
+Asked: "an ascension mode like sts, +1 to +5, each making the bosses harder in their own way (stacking the
+difficulties)", based off Merciless, per hero. This is part 2 of the plan. What each step unlocks (costume, hero
+relic, third item slot, hero boon, golden aura) is part 3 and comes next.
+
+**How it opens.**
+- Beat Sol on Merciless with a hero: Ascension +1 opens for that hero.
+- Beat Sol on +1: +2 opens, and so on up to +5.
+- Each hero has their own ladder.
+
+**How to choose it.** The Brazier now steps Gentle, Standard, Merciless, then each Ascension step your hero has
+open, then back to Gentle. It burns violet on Ascension, with a lit mark on the plinth for each step. Switching to
+a hero who hasn't reached that step drops you back to the highest one they have.
+
+**The steps.** Each step keeps everything below it:
+
+| Step | Name | What it adds |
+|---|---|---|
+| +1 | Quickened | warnings 15% shorter, 10% less rest between attacks |
+| +2 | Hardened | bosses 15% more health, stagger bar 25% longer, staggers 20% shorter |
+| +3 | Their own way | each boss does one thing harder (below) |
+| +4 | Lean road | 2 boons offered instead of 3, 25% fewer Motes, the merchant 25% dearer |
+| +5 | Ill omens | an omen on every trial, two from trial IV |
+
+The +3 twists, one per boss (the pause menu shows the current boss's):
+- **Warden:** broken hands come back twice as fast.
+- **Wolf:** its fire burns half again as long.
+- **Knight:** his thrown sword comes back sooner.
+- **Kairo:** the Gathered Sun bar is a quarter longer.
+- **Aurel:** feints from the start, and more often.
+- **Sol:** the eclipse's cold sets in faster.
+- **Magus:** one more ice shard.
+- **Veil:** one more mirror image.
+- **Leviathan:** one more bite before it sticks fast.
+
+**Other details.**
+- Every Ascension step keeps its own records (fastest first trial, deepest trial, runs won), and the HUD and
+  pause menu say "Ascension +3".
+- Sunshards pay a tenth more per step.
+- The end screen says when you beat a step and which step just opened.
+- In the Hall of Echoes, small violet marks under a hero's sun crown show the highest step they have beaten.
+
+Checked in the preview:
+- The ladder, the Brazier order and the drop back when switching heroes.
+- At +5: health, warnings, rest, stagger, Motes, prices, 2 boons, and the omen counts at trials I and IV.
+- Every boss, Aurel included, fights on +5 under the bot with no errors.
+
+Bot win rates, one fight at trial IV, all heroes, 56 fights each: Merciless 36%, +3 21%, +5 18% (wins take 168 s, 194 s and 222 s on average). The bot cannot test +4 and +5 properly, because their boon and omen changes act over a whole run.
+
+Playtest checklist:
+- Does each step feel harder than the last? Is +5 too much?
+- Do the +3 twists feel like each boss's own, and are any unfair?
+- Is it clear at the Brazier which step you are on and what it adds?
 
 ## Sol: the sun cracks like glass (v3.0b)
 

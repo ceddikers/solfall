@@ -433,7 +433,7 @@
   function* atkShards() {
     yield* reposition();
     const b = B.body, P = G.player, T = K.T();
-    const n = (B.phase === 3 ? 5 : B.phase === 2 ? 4 : 3) + (K.hard() ? 1 : 0);
+    const n = (B.phase === 3 ? 5 : B.phase === 2 ? 4 : 3) + (K.hard() ? 1 : 0) + (G.twist() ? 1 : 0); // (v3.0c: Ascension +3, its own way: G.twist()) one more ice shard
     setElem(ICE); b.want = 1;
     G.audio.play('charge', { dur: 0.75 * T });
     for (let i = 0; i < n; i++) {

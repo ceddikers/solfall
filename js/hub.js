@@ -12,7 +12,10 @@
   const STONE = '#120f26', STONE2 = '#1c1736', DARK = '#0b0919';
   const HW = 3820, WALL_L = 150, WALL_R = HW - 110, PAD = 48;
   const NOTES = ['7 health. Warnings last longer, attacks come slower', '5 health. The fight as intended', '4 health. Shorter warnings, less rest, extra attacks'];
-  const FLAME = ['150,215,255', '255,170,90', '255,70,60'];
+  const FLAME = ['150,215,255', '255,170,90', '255,70,60', '236,190,255', '226,170,255', '214,150,255', '204,130,255', '255,236,255'];
+  // (v3.0c) how big the brazier burns: up to Merciless by difficulty, a little more for Ascension
+  const heat = (d) => Math.min(2, d) + (d > 2 ? 0.35 + 0.08 * (d - 3) : 0);
+  const note = (d) => d < 3 ? NOTES[d] : d === 3 ? G.ASC[1].note : 'All of the steps below, and ' + G.ASC[d - 2].note;
   // where things stand
   // The Hall of Echoes has one bay for each hero, between piers that stand BAY apart
   const NH = G.HEROES.length, BAY = 510 / NH, ARCH = BAY / 2 - 23;
@@ -339,7 +342,7 @@
     }
     if (s.id === 'tally') return ['The Tally', G.feats.count() + ' of ' + G.feats.total + ' feats done', 'read it'];
     if (s.id === 'shrine') return ['The Shrine', '◆ ' + G.meta.shards + ' Sunshards', 'spend them'];
-    if (s.id === 'brazier') return ['The Brazier: ' + G.diff().name, NOTES[G.settings.difficulty], 'change the difficulty'];
+    if (s.id === 'brazier') return ['The Brazier: ' + G.diff().name + (G.ascLevel() ? ' (' + G.ASC[G.ascLevel()].name + ')' : ''), note(G.settings.difficulty), 'change the difficulty'];
     if (s.id === 'ring') {
       // the foe last practised, and what you have done against it: how often it fell, your fastest win
       const f = G.settings.firstFoe, kills = G.meta.kills[f] || 0, best = G.meta.bestTime(f);
@@ -392,7 +395,7 @@
     if (s.id === 'echo') {
       // trade places with the echo: the hero you were goes back to their own alcove
       const h = G.HEROES[s.hero], x = P.x, f = P.facing;
-      G.settings.hero = h.id; G.saveSettings();
+      G.settings.hero = h.id; G.saveSettings(); G.fitDiff();
       G.run.reset(); HUB.offer();
       P.reset(); G.flow.reset(); G.moments.reset(); G.sets.reset();
       P.x = x; P.facing = f; P.ember = G.PLAYER.SEG * P.segs;
@@ -408,7 +411,8 @@
     } else if (s.id === 'tally') {
       G.audio.play('uiSelect'); G.ui.showFeats();
     } else if (s.id === 'brazier') {
-      G.settings.difficulty = (G.settings.difficulty + 1) % 3; G.saveSettings();
+      const ch = G.diffChoices(); // (v3.0c: and on through the hero's Ascension steps)
+      G.settings.difficulty = ch[(ch.indexOf(G.settings.difficulty) + 1) % ch.length]; G.saveSettings();
       const c = FLAME[G.settings.difficulty];
       G.audio.play('whoosh'); F.shake(4);
       F.burst(s.x, FLOOR - 120, { n: 30, color: c, speed: [80, 420], angle: -Math.PI / 2, spread: 1.6, life: [0.3, 0.9], size: [2, 5], grav: -200 });
@@ -462,7 +466,7 @@
 
     // fires throw sparks, the gate drinks light, the shard sheds it
     const d = G.settings.difficulty, c = FLAME[d];
-    if (Math.random() < dt * 22) F.spawn({ x: BRAZIER_X + rnd(-16, 16), y: FLOOR - 112, vx: rnd(-18, 18), vy: -rnd(60, 170) * (1 + 0.4 * d), life: rnd(0.5, 1.1), size: rnd(1.6, 3.4), color: c, wob: 80, rot: rnd(0, 6) });
+    if (Math.random() < dt * 22) F.spawn({ x: BRAZIER_X + rnd(-16, 16), y: FLOOR - 112, vx: rnd(-18, 18), vy: -rnd(60, 170) * (1 + 0.4 * heat(d)), life: rnd(0.5, 1.1), size: rnd(1.6, 3.4), color: c, wob: 80, rot: rnd(0, 6) });
     if (Math.random() < dt * 14) F.spawn({ x: FIRE_X + rnd(-10, 10), y: FLOOR - 22, vx: rnd(-16, 16), vy: -rnd(50, 150), life: rnd(0.5, 1.2), size: rnd(1.4, 2.8), color: WARM, wob: 70, rot: rnd(0, 6) });
     for (const side of [-1, 1]) if (Math.random() < dt * 8) F.spawn({ x: GATE_X + side * 196 + rnd(-8, 8), y: FLOOR - 196, vx: rnd(-12, 12), vy: -rnd(40, 120), life: rnd(0.5, 1), size: rnd(1.4, 2.6), color: GOLD, wob: 60, rot: rnd(0, 6) });
     if (Math.random() < dt * 16) {
@@ -506,9 +510,10 @@
 
   // (v3.0a) Once any hero has beaten Sol the camp is at dawn for good: a morning sky, the sun lit, and a
   // sun crown in the Hall over each hero who beat her. HUB.checkDawn reads it again (on each return to camp).
-  let dawnOn = null, solW = {};
+  let dawnOn = null, solW = {}, ascW = {};
   HUB.checkDawn = function () {
     solW = G.store.load('sol', {}) || {};
+    ascW = G.store.load('asc', {}) || {}; // (v3.0c: a mark under the crown for each Ascension step beaten)
     const d = Object.keys(solW).length > 0;
     if (d !== dawnOn) { dawnOn = d; HUB.layers = null; }
   };
@@ -855,6 +860,12 @@
         ctx.globalAlpha = 1;
       }
       if (solW[h.id]) crown(ctx, cx, FLOOR - 150 + Math.sin(t * 1.4 + i) * 2.5, t, i); // (v3.0a: beat Sol)
+      const ab = (ascW[h.id] || {}).best || 0;
+      if (ab) {
+        ctx.globalCompositeOperation = 'lighter';
+        for (let j = 0; j < ab; j++) diamond(ctx, cx + (j - (ab - 1) / 2) * 9, FLOOR - 122 + Math.sin(t * 1.4 + i) * 2.5, 2.6, 4.5, G.rgba(FLAME[7], 0.95));
+        ctx.globalCompositeOperation = 'source-over';
+      }
     }
     // the arcade in front of them: piers, an arch over each bay, a beam, and what is left of the roof
     for (let i = 0; i < NH; i++) {
@@ -1009,7 +1020,7 @@
   // The brazier: a great bowl on a stepped plinth. Its flame is the difficulty.
   function drawBrazier(ctx, t) {
     if (!seen(BRAZIER_X, 420)) return;
-    const x = BRAZIER_X, d = G.settings.difficulty, c = FLAME[d], on = HUB.near && HUB.near.id === 'brazier';
+    const x = BRAZIER_X, d0 = G.settings.difficulty, c = FLAME[d0] || FLAME[2], on = HUB.near && HUB.near.id === 'brazier', d = heat(d0), asc = G.ascLevel(d0);
     glow(ctx, c, x, FLOOR - 130, 210 + 50 * d, (on ? 0.62 : 0.5) + 0.05 * Math.sin(t * 10));
     // chains out to two posts, each with a pennant
     for (const side of [-1, 1]) {
@@ -1025,6 +1036,12 @@
     ctx.fillStyle = G.rgba(c, 0.8); ctx.fillRect(x - 54, FLOOR - 106, 108, 2.5);
     flame(ctx, x, FLOOR - 104, 76, 70 + 44 * d, c, t, 3);
     pool(ctx, c, x, 240 + 40 * d, 0.55);
+    // (v3.0c) on Ascension: a mark lit on the plinth for each step
+    if (asc) {
+      ctx.globalCompositeOperation = 'lighter';
+      for (let i = 0; i < asc; i++) diamond(ctx, x + (i - (asc - 1) / 2) * 16, FLOOR - 46, 4, 7, G.rgba(c, 0.95));
+      ctx.globalCompositeOperation = 'source-over';
+    }
   }
 
   // The proving ring: two marker stones and a circle cut in the floor, where a single foe can be practised.

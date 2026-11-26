@@ -771,7 +771,7 @@
       { x: side > 0 ? R : L, y: FLOOR, to: side > 0 ? L : R },
       { x: side > 0 ? L : R, y: hiY, to: side > 0 ? R : L },
     ];
-    if (K.hard()) runs.push({ x: side > 0 ? R : L, y: FLOOR, to: side > 0 ? L : R });
+    if (K.hard() || G.twist()) runs.push({ x: side > 0 ? R : L, y: FLOOR, to: side > 0 ? L : R }); // (v3.0c: Ascension +3, its own way: G.twist()) another mirror image
     const real = Math.floor(G.rng() * runs.length);
     const gens = runs.map((r, i) => {
       const delay = i * 0.75;

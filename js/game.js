@@ -40,7 +40,7 @@
   G.pickHero = function (i) {
     const h = G.HEROES[i];
     if (!h) return;
-    G.settings.hero = h.id; G.saveSettings();
+    G.settings.hero = h.id; G.saveSettings(); G.fitDiff();
     G.run.reset();
     G.ui.showRelics(G.run.rollRelics());
   };
@@ -340,16 +340,23 @@
     const motes = G.motes.onVictory(grade, id); // (v2.9k)
     if (!G.practice && R.sum) R.sum.shards += meta.shards;
     const costume = G.practice ? null : G.mastery.gain(R.hero, 1 + (wonNow ? 3 : 0) + (id === 'sol' ? 2 : 0)); // (v2.8a: mastery, costumes.js; v2.9a: Sol gives 2 more)
-    let solFirst = false, solHeroFirst = false;
+    let solFirst = false, solHeroFirst = false, ascOpened = 0, ascBeat = 0;
     if (id === 'sol' && !G.practice) {
       const sw = G.store.load('sol', {}); // (v2.9a: who has beaten her: the sun crown in the Hall)
       solFirst = !Object.keys(sw).length; solHeroFirst = !sw[R.hero]; // (v3.0a: the first win brings dawn to the camp)
       sw[R.hero] = (sw[R.hero] || 0) + 1; G.store.save('sol', sw);
+      // (v3.0c) Ascension: Sol beaten on Merciless opens the hero's first step; beaten on a step, the next
+      if (d >= 2) {
+        const A = G.store.load('asc', {}), a = A[R.hero] || { open: 0, best: 0 }, lv = G.ascLevel(d), was = a.open, wasBest = a.best;
+        a.best = Math.max(a.best, lv); a.open = Math.max(a.open, Math.min(5, lv + 1));
+        A[R.hero] = a; G.store.save('asc', A);
+        ascOpened = a.open > was ? a.open : 0; ascBeat = lv > wasBest ? lv : 0;
+      }
     }
     if (R.daily && !G.practice) G.dailyRecord(); // (v2.8a)
     const offer = corrupt ? R.rollRelicReward() : id === 'sol' ? (R.offer = []) : R.rollOffer();
     R.current = null;
-    return { grade, title, newBest, best: best[d], trial, newDepth, done, wonNow, corrupt, newCorrupt, offer, meta, costume, motes, sol: id === 'sol', solFirst, solHeroFirst };
+    return { grade, title, newBest, best: best[d], trial, newDepth, done, wonNow, corrupt, newCorrupt, offer, meta, costume, motes, sol: id === 'sol', solFirst, solHeroFirst, ascOpened, ascBeat };
   }
 
   // The Champion beaten (champion.js): his trophy and gift (meta.js), and his hilt for the rest of the run.

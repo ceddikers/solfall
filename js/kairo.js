@@ -1201,7 +1201,7 @@
     B.musicMode = 'build';
     B.sunBar = { max: B.poiseMax };
     B.steadfast = true; B.poise = 0;
-    B.poiseMax = Math.round(SUN_BAR * (K.hard() ? 1.25 : 1) * (1 + 0.08 * (G.run.trial - 1)) * (dark ? 0.8 : 1));
+    B.poiseMax = Math.round(SUN_BAR * (K.hard() ? 1.25 : 1) * (G.twist() ? 1.25 : 1) * (1 + 0.08 * (G.run.trial - 1)) * (dark ? 0.8 : 1)); // (v3.0c: Ascension +3, its own way: G.twist()) the Gathered Sun bar a quarter longer
     B.sunOn = true; B.sunDark = !!dark;
     let e = 0, rockT = 1.1, broke = false;
     while (e < full) {

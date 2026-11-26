@@ -409,7 +409,7 @@
     let pool = G.BOONS.filter((b) => offerable(b) && G.boon(b.id) < b.max
       && (!b.heroes || b.heroes.includes(R.hero))
       && (b.id !== 'glass' || baseHp() - G.boon('glass') >= 3));
-    const n = 3 + G.up('choice');
+    const n = 3 + G.up('choice') - (base().lean ? 1 : 0); // (v3.0c: Ascension +4 offers one fewer)
     // a redraw shows different boons where there are enough left to do so
     const fresh = avoid ? pool.filter((b) => !avoid.includes(b)) : pool;
     if (fresh.length >= n) pool = fresh;
@@ -551,8 +551,8 @@
     // a corrupted boss: half again the health, shorter warnings, far less rest
     return Object.assign({}, b, {
       bossHp: b.bossHp * (1 + 0.15 * n) * (bulwark ? 1.2 : 1) * (cor ? 1.5 : 1),
-      tele: Math.max(cor ? 0.62 : 0.7, b.tele * (1 - 0.04 * n) * (cor ? 0.85 : 1)),
-      pace: Math.max(cor ? 0.42 : 0.5, Math.max(0.55, b.pace * (1 - 0.06 * n)) * (frenzy ? 0.75 : 1) * (cor ? 0.78 : 1)),
+      tele: Math.max((cor ? 0.62 : 0.7) * (b.asc ? 0.85 : 1), b.tele * (1 - 0.04 * n) * (cor ? 0.85 : 1)), // (v3.0c: Ascension's floors are lower too)
+      pace: Math.max((cor ? 0.42 : 0.5) * (b.asc ? 0.9 : 1), Math.max(0.55 * (b.asc ? 0.9 : 1), b.pace * (1 - 0.06 * n)) * (frenzy ? 0.75 : 1) * (cor ? 0.78 : 1)),
       stagger: b.stagger - (bulwark ? 0.8 : 0),
     });
   };
@@ -562,5 +562,5 @@
     if (f) R[k] = function () { const a = arguments; return R.seeded(k, () => f.apply(R, a)); };
   }
   // From the fifth trial (of seven, the last three met) they also use their Merciless patterns.
-  G.fierce = () => G.settings.difficulty === 2 || R.trial >= 5 || (G.corrupt && G.corrupt.on());
+  G.fierce = () => G.settings.difficulty >= 2 || R.trial >= 5 || (G.corrupt && G.corrupt.on());
 })();

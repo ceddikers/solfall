@@ -2191,7 +2191,7 @@
   //   The last is always low. 3 bites in I, 4 in II, 5 in III, each read a little shorter.
   function* atkThrash() {
     const b = B.body, P = G.player, T = K.T();
-    const n = 2 + B.phase;
+    const n = 2 + B.phase + (G.twist() ? 1 : 0); // (v3.0c: Ascension +3, its own way: G.twist()) one more bite
     let f = facePlayer();
     pose('skim');
     yield* glide(G.clamp(P.x - f * 300, WL + 110, WR - 110), FLOOR - 40, 0, aim(f, 0.2), 0.7, true);

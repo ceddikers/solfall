@@ -18,6 +18,7 @@
   // ------------------------------------------------------------------ the purse
   MO.held = () => R().motes || 0;
   MO.add = function (n) {
+    n = Math.round(n * (G.diff().motes || 1)); // (v3.0c: Ascension +4, a quarter fewer)
     if (!(n > 0)) return 0;
     const r = R();
     r.motes = (r.motes || 0) + n; r.motesEarned = (r.motesEarned || 0) + n;
@@ -228,6 +229,8 @@
       const it = itemById[id], sold = m.sold.includes('i' + i);
       out.push({ kind: 'item', i, id, name: it.name, desc: it.desc, price: it.price, sold, why: sold ? 'Sold' : MO.free() < 0 ? 'Your hands are full' : '' });
     });
+    const k = G.diff().shop || 1; // (v3.0c: Ascension +4, a quarter dearer)
+    if (k !== 1) for (const o of out) o.price = Math.round(o.price * k / 5) * 5;
     return out;
   };
   // buy row n: returns what was bought (for the road to show), or null

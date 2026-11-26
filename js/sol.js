@@ -998,7 +998,7 @@
     // cold builds; held too long, it takes a health. Her light is where she is: the fight is close.
     if (B.form === 'eclipse' && !B.lastLightOn && B.darkK > 0.9 && B.active && !B.dying && G.state === 'fight' && !P.dead) {
       const lit = litAt(P.x, P.y - 30);
-      B.cold = lit ? Math.max(0, B.cold - dt * 1.5) : B.cold + dt;
+      B.cold = lit ? Math.max(0, B.cold - dt * 1.5) : B.cold + dt * (G.twist() ? 1.4 : 1); // (v3.0c: Ascension +3, its own way: G.twist()) the cold of the eclipse sets in faster
       const limit = K.gentle() ? 2.6 : K.hard() ? 1.4 : 1.9;
       if (B.cold > limit) {
         B.cold = 0.4;
