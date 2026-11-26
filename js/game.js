@@ -147,6 +147,7 @@
     G.run.reset();
     G.setBoss('dummy');
     G.arena.reset(); G.hazards.clear(); F.reset();
+    G.hub.checkDawn(); // (v3.0a: morning, once Sol has fallen)
     G.hub.offer(); // the relics on the reliquary's plinths for this visit
     G.player.reset(); G.flow.reset(); G.boss.reset(); G.moments.reset(); G.sets.reset();
     G.player.x = G.hub.spawn(where); G.player.facing = where === 'gate' ? -1 : 1;
@@ -154,7 +155,7 @@
     G.player.ember = G.PLAYER.SEG * G.player.segs; // the special can be tried freely here
     G.state = 'hub'; G.paused = false; G.hitstop = 0; G.slowT = 0;
     G.ui.resetHud(); G.ui.close(); G.ui.buildHp(G.player.maxHp); G.ui.buildRun(); G.ui.hud(true, true);
-    if (where === 'fire') G.ui.campHint();
+    if (where === 'fire') { if (G.guide.due()) G.guide.open(true); else G.ui.campHint(); } else if (where === 'gate') G.ui.shrineHint(); // (v2.9n: the Guide, the first time)
     G.ui.fade(); G.ui.mood('fight');
     G.audio.init(); G.audio.startMusic(); G.audio.setIntensity(0); G.audio.duck(1);
     G.input.endStep();
@@ -253,7 +254,8 @@
     G.state = 'hub';
     G.ui.leaveTitle();
     G.ui.resetHud(); G.ui.buildHp(G.player.maxHp); G.ui.buildRun(); G.ui.hud(true, true);
-    G.ui.campHint();
+    if (G.guide.due()) setTimeout(() => { if (G.state === 'hub' && !G.ui.current) G.guide.open(true); }, 900); // (v2.9n: once the title has faded)
+    else G.ui.campHint();
     G.ui.mood('fight');
     G.audio.init(); G.audio.startMusic(); G.audio.setIntensity(0); G.audio.duck(1);
     G.input.endStep();
@@ -331,16 +333,23 @@
       else if (!R.beaten.includes(id)) R.beaten.push(id);
     }
     const done = !G.practice && R.runWon(), wonNow = done && !wasWon;
+    if (!G.practice) { const s = R.sum || (R.sum = { t: 0, hits: 0, perfect: 0, shards: 0 }); s.t += t; s.hits += P.stats.hits; s.perfect += P.stats.perfect; } // (v3.0a: for the end screen)
     if (wonNow) { const wins = G.store.load('wins', {}); wins[d] = (wins[d] || 0) + 1; G.store.save('wins', wins); }
     const newCorrupt = !G.practice && !corrupt ? R.rollCorruption(id) : null;
     const meta = G.meta.onVictory(grade, id);
     const motes = G.motes.onVictory(grade, id); // (v2.9k)
+    if (!G.practice && R.sum) R.sum.shards += meta.shards;
     const costume = G.practice ? null : G.mastery.gain(R.hero, 1 + (wonNow ? 3 : 0) + (id === 'sol' ? 2 : 0)); // (v2.8a: mastery, costumes.js; v2.9a: Sol gives 2 more)
-    if (id === 'sol' && !G.practice) { const sw = G.store.load('sol', {}); sw[R.hero] = (sw[R.hero] || 0) + 1; G.store.save('sol', sw); } // (v2.9a: who has beaten her: the sun crown in the Hall)
+    let solFirst = false, solHeroFirst = false;
+    if (id === 'sol' && !G.practice) {
+      const sw = G.store.load('sol', {}); // (v2.9a: who has beaten her: the sun crown in the Hall)
+      solFirst = !Object.keys(sw).length; solHeroFirst = !sw[R.hero]; // (v3.0a: the first win brings dawn to the camp)
+      sw[R.hero] = (sw[R.hero] || 0) + 1; G.store.save('sol', sw);
+    }
     if (R.daily && !G.practice) G.dailyRecord(); // (v2.8a)
     const offer = corrupt ? R.rollRelicReward() : id === 'sol' ? (R.offer = []) : R.rollOffer();
     R.current = null;
-    return { grade, title, newBest, best: best[d], trial, newDepth, done, wonNow, corrupt, newCorrupt, offer, meta, costume, motes, sol: id === 'sol' };
+    return { grade, title, newBest, best: best[d], trial, newDepth, done, wonNow, corrupt, newCorrupt, offer, meta, costume, motes, sol: id === 'sol', solFirst, solHeroFirst };
   }
 
   // The Champion beaten (champion.js): his trophy and gift (meta.js), and his hilt for the rest of the run.
@@ -351,6 +360,7 @@
     const grade = score >= 92 ? 'S' : score >= 76 ? 'A' : score >= 58 ? 'B' : 'C';
     const title = { S: 'Flawless light', A: 'Radiant', B: 'Steadfast', C: 'Survivor' }[grade];
     const meta = G.meta.onVictory(grade, 'champion');
+    const s = R.sum || (R.sum = { t: 0, hits: 0, perfect: 0, shards: 0 }); s.t += t; s.hits += P.stats.hits; s.perfect += P.stats.perfect; s.shards += meta.shards; R.champWon = true;
     const costume = G.mastery.gain(R.hero, 1); // (v2.8a)
     const hilt = !R.extraRelics.includes('hilt');
     if (hilt) R.extraRelics.push('hilt');
@@ -369,6 +379,7 @@
   function onAction(a) {
     G.audio.init(); G.audio.startMusic();
     if (G.ui.current) { G.ui.onAction(a); return; }
+    if (G.epilogue.on) { G.epilogue.skip(); return; } // (v3.0a: any button goes on to the end screen)
     if (a === 'pause') G.pause();
     if (a === 'moves') G.showMoves();
     // no need to wait for the defeat screen: R restarts at once
@@ -377,6 +388,8 @@
 
   // ------------------------------------------------------------------ simulation
   function step(dt) {
+    // (v3.0a) the dawn after Sol is a picture of its own: nothing else runs under it
+    if (G.epilogue.on) { G.t += dt; G.epilogue.update(dt); G.input.endStep(); return; }
     F.updateScreen(dt);
     if (G.hitstop > 0) { G.hitstop -= dt; return; }
     let ts = 1;
@@ -445,6 +458,7 @@
           const t = G.time, name = G.boss.short;
           G.toHub('ring'); G.hub.say(name + ' beaten in ' + G.ui.fmtTime(t));
         } else if (G.run.champFight) G.ui.showWin(champResult());
+        else if (G.boss.id === 'sol') { const res = result(); G.saveRun('won'); G.epilogue.start(res); } // (v3.0a: the dawn, then the end screen: epilogue.js)
         else { G.ui.showWin(result()); G.saveRun('won'); } // (a page closed now continues on the road)
       }
     }
@@ -458,6 +472,7 @@
     ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
     ctx.fillStyle = '#000';
     ctx.fillRect(0, 0, G.W, G.H);
+    if (G.epilogue.on) { G.epilogue.draw(ctx); return; }
     ctx.save();
     const v = F.view(), z = v.z; // (v.fx, v.fy: the middle of the view, moved by a cinematic push in: fx.js)
     ctx.translate(G.W / 2 + F.shakeX, G.H / 2 + F.shakeY);

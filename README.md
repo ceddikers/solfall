@@ -2,7 +2,7 @@
 
 A side-on boss rush for the browser: four heroes, seven three-phase bosses, played as a run of
 ever-harder trials. You pick a hero and a relic before the run and win a boon after each victory.
-Version 2.9l.
+Version 3.0b.
 
 This is an early slice of a planned boss-rush roguelite (short runs, a boon after each boss,
 bosses drawn from a pool). A run is seven trials, one for each boss, each harder than the last: the first boss
@@ -39,6 +39,7 @@ then open http://localhost:8321. There is no build step and no dependency.
 | Your hero's moves (the fight waits while it is up) | hold Tab, or Moves in the pause menu | |
 | Help: how a fight works and what every word means | Help on the title screen or in the pause menu | |
 | Pause | Esc or P | Start |
+| The Guide: a picture book of the camp, controls and screens | Guide in the pause menu (opens by itself the first time) | |
 | Use something in the camp | E or F, or Enter | LB |
 
 Keyboard keys can be changed in Settings, Controls: choose an action, press the key it should use. A key
@@ -115,6 +116,222 @@ hero (`tools/feel-check.js`).
 - Settings, Reset progress erases Sunshards, upgrades, trophies and records (it has to be chosen twice).
 
 Not done: touch controls, a colour-blind alternative to red-orange warnings, gamepad rebinding.
+
+## Sol: the sun cracks like glass (v3.0b)
+
+Asked: "i think the cracks from phase 1 to phase 2 could look more natural".
+
+- **On the sun:** the cracks were a few fixed straight lines that grew towards the middle. Now they are a fracture
+  that spreads from a point near the heart: jagged cracks that branch and thin out as they go, darker and wider
+  each time the sun cracks.
+- **In the sky:** the cracks were seven stiff lines from the middle of the sky that appeared a piece at a time
+  and looked like lightning. Now they run out from the sun itself, wherever it is when it breaks:
+  - straight-ish cracks with small kinks and a few branches;
+  - two rings of short cracks round the sun, like a struck pane of glass.
+
+  They spread smoothly on each of the three cracks and shatter outward when the sun bursts. When Sol dies they
+  close up again as the dawn comes back (before, they stayed and looked like lightning in the dawn).
+
+Video: shots/sol-cracks-v30b.mp4.
+
+Playtest checklist:
+- Do the cracks look like breaking glass now?
+
+## The ending: dawn, the end screen, and morning at the Vigil (v3.0a)
+
+Asked: "create a sort of end screen too now! like a small epilogue and a button to go back to the hub, maybe changing
+it a bit to show the victory". This is part 1 of the plan; Ascension (+1 to +5), its unlocks and weapon forms come next.
+
+**The dawn.** After Sol's death scene the picture fades to black, then to your hero standing alone on a ridge above
+the clouds. The view starts close on them and draws back and up while a new sun rises out of the cloud and the sky
+turns from night to morning. Three lines come in one at a time:
+- The sun fell.
+- You carried its light home.
+- Morning comes to the Vigil.
+
+Any button skips ahead.
+
+**The end screen: "The run is won".** It shows:
+- your hero and difficulty;
+- fight time, hits taken and perfect dodges for the whole run;
+- the Sunshards the run earned (leftover Motes included);
+- the bosses in the order you beat them, with corrupted ones marked, plus Aurel if you beat him, then Sol;
+- your relic, crown, duo and boons;
+- an **Unlocked** list: dawn at the Vigil (first win), a sun crown for this hero, a costume, a trophy, and any feats.
+
+**Return to camp** goes straight back to the Vigil.
+
+**The run ends at Sol.** The Last Portal now says when corrupted portals are still open: they close once you go in.
+The first touch warns you ("Corrupted portals close once you go in. Touch again to go"), and the second goes in.
+
+**Morning at the Vigil.** After the first time any hero beats Sol, the camp stays at dawn:
+- a blue and gold morning sky;
+- the sun lit (it was a black disc);
+- most stars and the moon faded;
+- the gate's keystone turned into a small lit sun.
+
+In the Hall of Echoes a small sun crown turns over every hero who has beaten Sol. The first time back you see
+"Morning, at last" over your hero.
+
+Checked in the preview:
+- Sol's real death scene runs into the dawn, the end screen and back to camp with no errors.
+- The warning at the Last Portal works.
+- The camp, Hall crown and gate sun draw at dawn.
+
+Video: shots/sol-ending-v30a.mp4.
+
+Playtest checklist:
+- The dawn: does it feel like an ending? Too long, too short?
+- The end screen: anything missing you want to see?
+- The dawn camp: does it feel like the camp has changed? Is the sun hidden too much behind the aqueduct?
+- The Last Portal warning: clear enough?
+
+## Sol: her hands become her blade, and a black sun for the Eclipse (v2.9q)
+
+Asked: "i think phase 2 to phase 3 could be cooler - and i think phase 2 could involve sucking in the hands to form
+the sword and make sure it looks sleek and polished".
+
+**Noon to the Fall: the blade is made from her hands.** When the sun bursts, her hands no longer blow apart: their
+arms of light snap and they hang slack in the sky while she falls. The gnomon breaks when she lands. After her
+eyes open she raises her hand to the sky:
+- the hands wake (their glyphs flare, the fingers open);
+- they swing out and over and dive in to her on two curving trails of light, turning, faster and smaller as they
+  come, and pour into her raised fist with a flash and a ring;
+- the light runs up out of her fist into the blade, with a glint at the tip;
+- one clean cut down and across, leaving afterimages and a slash in the air, then the blast and the close-up as
+  she points it at you.
+
+**The Fall to the Eclipse: a black sun.** After she drives the blade into her crown, a black sun (the same design
+as her Black Sun attack, ringed with dark blades edged in ember) rises out of nothing behind her and grows huge as
+every light in the world pours into it; the view backs right out to take it in. At totality a single point on its
+rim flares white (the "diamond ring" you see in a real eclipse) and goes out. Then the black sun falls on her and
+closes into her halo, a moment of black, and her rim catches fire as before.
+
+**The eclipse taking her** (asked: "the instant transition to the black form is a bit jarring", then "it should be
+a gradual change or like a showing of her getting corrupted by the eclipse"). Her light and black looks used to swap
+in one frame halfway through the drain. Now:
+- black veins edged in ember creep out from her crown (where the blade went in), down her neck and body, along both
+  arms and down to her feet, each with a glowing point where it is still spreading;
+- every colour of her darkens gradually: armour, skin, hair, wings, halo (its black sun fills in), blade and eyes;
+- it comes in surges, one with each heartbeat, and she flinches as each one bites, black smoke and embers
+  bursting off her; between beats it creeps, smoking;
+- once the last of her colour is gone the veins fade into the black. At her death it runs the other way.
+
+Checked in the preview: both changes run with no errors, the hands are gone and the blade whole after the Fall, and
+the black sun is cleared after the Eclipse. A rise-again into either form skips the scenes as before.
+
+Playtest checklist:
+- The hands coming in: does it read as her hands becoming the blade? Smooth enough?
+- The black sun and the diamond ring: cool, or too long?
+
+## Sol's changes of form shot like a finale; Aurel and Sol kept secret; Kairo the Monk (v2.9p)
+
+Asked: "aurel and sol should be surprises. maybe kairo should also have 'the monk' title or something. make sure
+sol's phase changes and fight is epic".
+
+**Surprises.** Until you've met them (beaten them, or seen any of their attacks), Aurel and Sol show as **???** in
+the Tally and the Journal, with "You haven't met this one yet." instead of their feats or moves (`G.meta.met`,
+`G.meta.hidden`).
+
+**Kairo** is now **Kairo, the Canyon Monk**, "The Monk" for short (on his portal, the Tally, the Journal and the
+end screens). He was "the Canyon Fist".
+
+**Sol's phase changes** now use the same camera work as Kairo's awakening: the blow that ends a form holds the
+frame, the music stops, the HUD goes, and each scene is cut together from close-ups and wide shots.
+
+- **Noon to the Fall.** Frozen on the hit, the view thrown up on to the sun. Silence; it cracks three times, each
+  louder, the view creeping in. It bursts (wide at once) and her hands blow apart into light. She falls as a comet
+  with the view riding down with her, time nearly stopping just before she lands; white, then quiet. Close on her
+  kneeling in the crater, two heartbeats, then a close-up on her face as her eyes open. She pulls the gnomon out of
+  the ridge; the blade's birth is a blast that throws the hero back, and she levels it at you in close-up.
+- **The Fall to the Eclipse.** The last blow throws her: frozen on the hit, she flies back in slow motion leaving
+  afterimages, lands on one knee and skids, her blade dragging sparks. Silence, close on her face, a heartbeat.
+  She stands and drives the blade into her crown; the view slowly backs away as the light pours into her, the
+  heartbeat louder each time, until everything is black and still. Then her rim catches fire: a burst of the
+  eclipse's corona that throws the hero back, and a close-up as she points the blade.
+- **Her death.** Close on her on her knees, closer as her blade breaks, on her face for "Then carry it", then wide
+  as she breaks into light and it pours into you.
+
+Checked in the preview: both changes and the death run start to finish with no errors, the HUD comes back after
+each, and the view returns to normal. A video of all three was recorded in a headless browser.
+
+Playtest checklist:
+- Do the scenes feel big enough? Too long? (about 12 s, 10 s and 10 s)
+- Anything that looks wrong in a cut (a close-up off target, the view jumping)?
+
+## A smaller Tally, and plainer Guide text (v2.9o)
+
+Asked: "the tally menu is a bit big so can we make it a list of the bosses and then you can click the boss to see
+its tally?" and, about the Guide, "make it less 'ai writing style' and more easy to understand".
+
+- **The Tally** (the feats stone in the camp) now works like the Journal: the bosses and the camp are listed on
+  the left, each with how many of its feats are done (2/4), and the one you point at or move to shows its feats on
+  the right. The screen is 860 wide instead of 1080 and shows four feats at a time instead of 34.
+- **The Guide's text** says plainly what each thing does ("Shows every boss attack you've seen so far", "A
+  practice dummy. Hit it to test your moves."). Some page titles changed to match: The camp, Starting a run,
+  Between fights, Picking the next boss.
+
+Playtest checklist:
+- The Tally: easy to read? Anything you'd want shown on the list itself?
+- Read the Guide as someone new would: is anything still unclear?
+
+## The Guide: a picture book of the game (v2.9n)
+
+Asked: "can we maybe add a tutorial screen that has screenshots with arrows to help explain what things are and
+their function is? it only opens the first time you play since the patch, and then it becomes part of the esc menu.
+i'm imagining it being a like book type style where you click through pages explaining how the hub is, controls, etc."
+
+**The Guide** (`js/guide.js`, pictures in `img/guide/`) is an open book, eleven spreads. On each, the left page has a
+screenshot from the game with numbered gold arrows on it, and the right page has one short line per number. The
+spreads: what a run is; the Vigil, in three parts (Journal, Tally, sparring post, brazier; Shrine, practice, Hall
+of Echoes, Wardrobe; reliquary and gate); the controls (read from your own key bindings, with the pad buttons);
+the fight screen in two halves (yours, zoomed in, and the boss's); staggering; the road between trials; the
+portals; Sunshards and Motes.
+
+- **Turning pages:** ← → or A / D (or the pad's left and right), a click on the right page or the left, or Back /
+  Next under the book. The page lifts and swings over the spine (no animation with reduced motion turned on in
+  the system). Esc closes it.
+- **When it opens:** by itself the first time you reach the camp after this update (once the title has faded),
+  then never again unless you open it. After that it's **Guide** in the pause menu, in the camp, on the road or
+  in a fight. Closing it the first time shows the camp's welcome line as before.
+- The screenshots were taken from the game itself in a headless browser (HUD and all) and saved as JPEGs, about
+  800 KB for all nine.
+
+Checked in the preview: it opens on the first visit and not the second; ← → / A D / clicks turn pages and the
+flip plays; Esc from the first-time book returns to the camp, Esc from the pause menu's book returns to the pause
+menu; no errors.
+
+Playtest checklist:
+- Is every arrow pointing at the right thing? Anything missing that a new player asked you about?
+- Is it the right length, or should some spreads go?
+
+## Playtest fixes: the Warden's hands, its corrupted lag, the Shrine, the difficulty (v2.9m)
+
+From a friend's playtest. Asked: "fix the others" (everything in it except the invulnerability chain, which came
+from an older build).
+
+- **The Warden's hands take a quarter.** A blow on a hand still breaks the hand at the same rate (its own health
+  takes all of it), but only 25% reaches the Warden's health. Before, every part a swing touched counted in full,
+  so one swing through a hand and the eye counted twice, or three times through both. The eye is what you fight.
+- **A corrupted Warden lags less.** In phases I and II it's now drawn in a box round its eye, hands and shards,
+  like the duelling bosses since v2.9j. It still uses the whole screen in phase III (the eye flies all over the
+  arena) and during the chain, the Pendulum and the dive. Checked by drawing corrupted Wardens frame by frame
+  through three whole fights and looking for any of it on the box's edge: phases I and II came out clean once
+  the floor below was included. The box covers about two thirds of the screen, so expect a smaller gain than the
+  other bosses got.
+- **The Shrine is easier to find.** The camp's welcome now mentions it. Until you've bought something there:
+  coming back from a run with enough Sunshards for an upgrade shows "You have N Sunshards. Walk back left to the
+  Shrine to spend them.", and the defeat screen adds "Spend Sunshards at the Shrine in camp to grow stronger."
+- **The difficulty is always shown** beside the boss's name ("Trial IV · Merciless"), and in the pause menu
+  ("Eos's run · Merciless"). Nothing changes it except the brazier.
+
+The bot against the Warden on Standard (all heroes, trials I, IV and VII, 24 fights) went from 25% won to 21%.
+It mostly hits whatever is closest, hands included, so a person who goes for the eye should lose less.
+
+Playtest checklist:
+- The Warden: does it still feel too easy, or are the hands now a waste of time to hit?
+- Corrupted Warden: smoother in phases I and II? Anything cut off at the edges?
+- New save: does the Shrine get noticed now?
 
 ## Longer stagger bars, much more boss health (v2.9l)
 

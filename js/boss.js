@@ -279,6 +279,33 @@
   }
 
   B.handBox = handBox; // (read by tools/hitbox-check.js)
+  const FULL_BOX = { pendulum: 1, dive: 1 };
+  const HAND_SHARE = 0.25; // (v2.9m) how much of a blow on a hand reaches the Warden's health
+
+  // (v2.9m) the box a corrupted Warden is drawn in (corrupt.js region): round the eye, the hands and the
+  // circling shards, or the whole screen while the chain is out or the shards are flung wide.
+  B.silBox = function () {
+    const c = B.core, out = { l: Infinity, r: -Infinity, t: Infinity, b: -Infinity };
+    const add = (x, y, p) => { out.l = Math.min(out.l, x - p); out.r = Math.max(out.r, x + p); out.t = Math.min(out.t, y - p); out.b = Math.max(out.b, y + p); };
+    // (the chain, the Pendulum and the dive's streak reach anywhere, and in phase III the eye flies all over the
+    // arena: the whole screen then. Checked by drawing corrupted Wardens through whole fights and looking for
+    // any of it on the box's edge.)
+    if (B.phase >= 3 || B.chain || B.dead || B.dying || B.toppled || FULL_BOX[B.attackName]) return null;
+    add(c.x + (c.pp ? c.pp.x : 0), c.y + (c.pp ? c.pp.y : 0), c.r * (1 + Math.max(0, c.swell || 0)) * 1.25 * (1 + (c.st || 0)) + 150 + (B.haloR || 0));
+    out.b = Math.max(out.b, FLOOR + 150); // (what it throws on the floor, and its light there)
+    for (const h of B.hands) if (h.alive) add(h.x + (h.pp ? h.pp.x : 0), h.y + (h.pp ? h.pp.y : 0), 190);
+    if (B.hasShards) {
+      const pk = B.shardPose ? B.shardPoseK : 0;
+      for (let i = 0; i < 6; i++) {
+        const a = B.shardA + i * G.TAU / 6;
+        let x = c.x + Math.cos(a) * B.shardR, y = c.y + Math.sin(a) * B.shardR;
+        if (pk > 0) { const q = B.shardPose(i), k = E.inOutCubic(Math.min(1, pk)); x = G.lerp(x, q.x, k); y = G.lerp(y, q.y, k); }
+        if (x < -80 || x > G.W + 80 || y < -80 || y > G.H + 80) continue;
+        add(x, y, 110);
+      }
+    }
+    return out;
+  };
 
   B.targets = function () {
     const out = [];
@@ -309,7 +336,9 @@
     let mult = t.kind === 'core' ? 1.5 : 1;
     if (B.staggered) mult *= 1.4 * G.relics.staggerK();
     if (B.hands.some((h) => h.alive && h.broken > 0)) mult *= 1.25; // exposed while a hand lies broken
-    const dmg = Math.round(amount * mult);
+    // (v2.9m) a blow on a hand breaks the hand (its own health takes all of it) but only a quarter reaches
+    // the Warden: the eye is what you fight. One swing through a hand and the eye no longer counts twice.
+    const handDmg = Math.round(amount * mult), dmg = t.kind === 'hand' ? Math.round(handDmg * HAND_SHARE) : handDmg;
     const floorHp = B.phase === 1 ? Math.floor(B.maxHp * 2 / 3) : B.phase === 2 ? Math.floor(B.maxHp / 3) : 0;
     B.hp = Math.max(floorHp, B.hp - dmg);
     G.player.stats.dmg += dmg; G.flow.dealt(dmg); G.sets.dealt(amount, info); G.relics.dealt(amount, info); G.run.tally(dmg, info);
@@ -336,7 +365,7 @@
     else if (B.phase < 3 && B.hp <= floorHp) beginPhase(B.phase + 1);
     else {
       if (t.kind === 'hand' && t.ref && usable(t.ref)) {
-        t.ref.hp -= dmg;
+        t.ref.hp -= handDmg;
         if (t.ref.hp <= 0) breakHand(t.ref);
       }
       if (!B.staggered && B.poise >= B.poiseMax) stagger();

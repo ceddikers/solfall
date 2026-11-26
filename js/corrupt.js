@@ -143,12 +143,23 @@
   // its core (the duelling bosses) is now worked in a box round it: wide enough for its reach, from
   // the floor up past its head, plus B.silTop() for anything it raises higher (Kairo's Sun). A boss
   // that draws across the arena (the Assassin's clones and threads, the Mage's crystals, the Wolf's
-  // pack: B.silWide) keeps the whole width but not the whole height. The Warden (its hands), the
-  // Leviathan's far coils and Sol (B.silFull) still use it all. Checked by drawing every corrupted
+  // pack: B.silWide) keeps the whole width but not the whole height. The Warden (v2.9m) gives its own
+  // box, B.silBox, round its eye, hands and shards. The Leviathan's far coils and Sol (B.silFull) still
+  // use it all. Checked by drawing every corrupted
   // duelling boss through whole bot fights and looking for any of it on the box's edge.
   const val = (v) => (typeof v === 'function' ? v() : v);
   function region(m, W, H, torn) {
     const B = G.boss, c = B && B.core;
+    if (torn && B && B.silBox) {
+      // (v2.9m) a boss that says where it is drawn (the Warden: its eye, hands and shards)
+      const b = B.silBox();
+      if (!b) return { x: 0, y: 0, w: W, h: H };
+      const k = m.a || 1, edge = 14 * k + Math.abs(C.tear || 0) * k;
+      const x0 = Math.max(0, Math.floor(m.a * b.l + m.e - edge)), x1 = Math.min(W, Math.ceil(m.a * b.r + m.e + edge));
+      const y0 = Math.max(0, Math.floor(m.d * b.t + m.f - edge)), y1 = Math.min(H, Math.ceil(m.d * b.b + m.f + edge));
+      if (x1 - x0 < 8 || y1 - y0 < 8) return { x: 0, y: 0, w: W, h: H };
+      return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
+    }
     if (!torn || !B || !B.kit || val(B.silFull) || !c) return { x: 0, y: 0, w: W, h: H };
     const padX = Math.max(330, (B.w || 80) * 1.6 + 220) + Math.abs(C.tear || 0);
     const top = c.y - (B.h || 100) - 330 - (B.silTop ? B.silTop() : 0), bot = G.FLOOR + 150;

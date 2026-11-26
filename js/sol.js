@@ -410,26 +410,68 @@
   // rings and rays, turning, her signature. In the eclipse the fills go black and the rim burns.
   const PL = { body: '#d8cab6', bodyD: '#2e2232', hair: '#221624', trim: '255,190,110', skin: '#ecd8c8', crack: FALL };
   const PL3 = { body: '#0c0608', bodyD: '#060304', hair: '#080405', trim: RIM, skin: '#140a0a', crack: RIM };
+  // (v2.9r) part way into the eclipse, every colour of her is mixed between her noon look and her black one
+  const hex3 = (h) => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
+  const mixRGB = (a, c, t) => { const A = a.split(',').map(Number), Z = c.split(',').map(Number); return A.map((v, i) => Math.round(v + (Z[i] - v) * t)).join(','); };
+  const mixHex = (a, c, t) => { const A = hex3(a), Z = hex3(c); return 'rgb(' + A.map((v, i) => Math.round(v + (Z[i] - v) * t)).join(',') + ')'; };
+  let palQ = -1, palM = null;
+  function palAt(t) {
+    if (t <= 0) return PL;
+    if (t >= 1) return PL3;
+    const q = Math.round(t * 80) / 80;
+    if (q !== palQ) { palQ = q; palM = { body: mixHex(PL.body, PL3.body, q), bodyD: mixHex(PL.bodyD, PL3.bodyD, q), hair: mixHex(PL.hair, PL3.hair, q), skin: mixHex(PL.skin, PL3.skin, q), trim: mixRGB(PL.trim, RIM, q), crack: mixRGB(FALL, RIM, q) }; }
+    return palM;
+  }
+  // (v2.9r) the eclipse taking her: black veins edged in ember creep out from her crown, down her neck and
+  // body, along both arms and down to her feet, a glowing point where each is still spreading. They fade
+  // as the last of her colour goes (and run back the other way when the light returns at her death).
+  const VEINS = [['crown', 'head', 0], ['head', 'sh', 0.12], ['sh', 'hip', 0.3], ['sh', 'hand', 0.32], ['sh', 'off', 0.36], ['hip', 'fF', 0.55], ['hip', 'fB', 0.6]];
+  function drawVeins(ctx, J, e) {
+    const fade = 1 - G.clamp((e - 0.86) / 0.13, 0, 1);
+    if (fade <= 0.01) return;
+    const P = { crown: { x: J.head.x, y: J.head.y - 14 }, head: J.head, sh: { x: J.shX, y: J.shY }, hip: { x: J.hipX, y: J.hipY }, hand: J.hand, off: J.off, fF: J.fF, fB: J.fB };
+    ctx.save(); ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.globalAlpha *= fade;
+    VEINS.forEach(([a, c, d0], si) => {
+      const k = G.clamp((e * 1.4 - d0) / 0.42, 0, 1);
+      if (k <= 0) return;
+      const A = P[a], Z = P[c], dx = Z.x - A.x, dy = Z.y - A.y, len = Math.hypot(dx, dy) || 1, nx = -dy / len, ny = dx / len;
+      for (let st = 0; st < 2; st++) {
+        const pts = [], n = 7;
+        for (let i = 0; i <= n; i++) {
+          const t = i / n * k, j = i === 0 ? 0 : Math.sin(si * 12.9 + i * 7.3 + st * 3.1) * 4 * (st ? -1 : 1) + (st ? -2 : 2);
+          pts.push([A.x + dx * t + nx * j, A.y + dy * t + ny * j]);
+        }
+        const path = () => { ctx.beginPath(); ctx.moveTo(pts[0][0], pts[0][1]); for (const q of pts) ctx.lineTo(q[0], q[1]); };
+        ctx.strokeStyle = 'rgba(6,1,4,0.95)'; ctx.lineWidth = st ? 1.6 : 2.6; path(); ctx.stroke();
+        ctx.save(); ctx.globalCompositeOperation = 'lighter';
+        ctx.strokeStyle = G.rgba(RIM, 0.6); ctx.lineWidth = 0.9; path(); ctx.stroke();
+        const tip = pts[pts.length - 1];
+        if (k < 1) D.glow(ctx, RIM, tip[0], tip[1], 11, 0.85);
+        ctx.restore();
+      }
+    });
+    ctx.restore();
+  }
   // Her halo: a small copy of the noon sun's wheel behind her head (an hour ring, a crown of short blades
   // turning, four points of light); in the eclipse a black sun fills it, with an ember rim.
   function drawHalo(ctx, cx, cy, k, ecl, t) {
-    const c = ecl ? RIM : SUNHOT, c2 = ecl ? RIMHOT : SUN, R = 34 + 6 * k;
+    const e = +ecl, c = mixRGB(SUNHOT, RIM, e), c2 = mixRGB(SUN, RIMHOT, e), R = 34 + 6 * k; // (v2.9r: e from 0 to 1)
     ctx.save(); ctx.lineCap = 'round';
     ctx.globalCompositeOperation = 'lighter';
-    D.glow(ctx, ecl ? RIM : SUN, cx, cy, 60 + 34 * k, 0.2 + 0.3 * k);
+    D.glow(ctx, mixRGB(SUN, RIM, e), cx, cy, 60 + 34 * k, 0.2 + 0.3 * k);
     // the crown: twelve short blades, and twelve hair-thin ones between, turning
     for (let i = 0; i < 12; i++) {
       const a = i / 12 * G.TAU + t * 0.25;
-      sunBlade(ctx, cx, cy, a, R + 2, R + (i % 3 === 0 ? 13 : 8) + 8 * k, 3, ecl ? RIM : FALL, 0.7 + 0.3 * k);
+      sunBlade(ctx, cx, cy, a, R + 2, R + (i % 3 === 0 ? 13 : 8) + 8 * k, 3, mixRGB(FALL, RIM, e), 0.7 + 0.3 * k);
       const a2 = a + G.TAU / 24;
       ctx.strokeStyle = G.rgba(c, 0.5); ctx.lineWidth = 1;
       D.line(ctx, cx + Math.cos(a2) * (R + 3), cy + Math.sin(a2) * (R + 3), cx + Math.cos(a2) * (R + 8 + 6 * k), cy + Math.sin(a2) * (R + 8 + 6 * k));
     }
     ctx.restore();
     ctx.save(); ctx.lineCap = 'round';
-    if (ecl) {
-      // the black sun behind her head
-      ctx.fillStyle = 'rgba(2,0,1,0.92)'; ctx.beginPath(); ctx.arc(cx, cy, R * 0.94, 0, G.TAU); ctx.fill();
+    if (e > 0.01) {
+      // the black sun behind her head (filling in as the eclipse takes her)
+      ctx.fillStyle = 'rgba(2,0,1,' + (0.92 * e) + ')'; ctx.beginPath(); ctx.arc(cx, cy, R * 0.94 * (0.4 + 0.6 * e), 0, G.TAU); ctx.fill();
     }
     ctx.globalCompositeOperation = 'lighter';
     ctx.strokeStyle = G.rgba(c, 0.95); ctx.lineWidth = 1.8;
@@ -447,8 +489,14 @@
   // at rest; they open (b.wingK) when she gathers light (her crown moves) and in the air. Drawn in her own
   // space (facing right, so her back is -x). In the eclipse they are black with an ember edge.
   function drawWings(ctx, b, shx, shy, ecl, ghost) {
+    const e = +ecl;
+    if (e > 0.01 && e < 0.99) { drawWings1(ctx, b, shx, shy, false, ghost, 1 - e); drawWings1(ctx, b, shx, shy, true, ghost, e); return; } // (v2.9r)
+    drawWings1(ctx, b, shx, shy, e >= 0.5, ghost, 1);
+  }
+  function drawWings1(ctx, b, shx, shy, ecl, ghost, am) {
     const wk = b.wingK != null ? b.wingK : (b.crownK || 0) * 0.8 + 0.15, t = B.t;
     const wing = (ox, oy, sc, a0) => {
+      a0 *= am;
       // feather 0 is the leading edge (long, up and back when open), 6 the trailing (short, back and down);
       // folded, all of them lie down along her back. (They turn the long way round, through "back".)
       for (let i = 6; i >= 0; i--) {
@@ -476,20 +524,22 @@
     };
     wing(5, -3, 0.85, ghost ? 0.5 : 0.6); // the far wing
     wing(0, 0, 1, 1);
-    if (!ecl && !ghost) { ctx.save(); ctx.globalCompositeOperation = 'lighter'; D.glow(ctx, SUN, shx - 6, shy + 12, 22 + 22 * wk, 0.3 + 0.3 * wk); ctx.restore(); }
+    if (!ecl && !ghost) { ctx.save(); ctx.globalCompositeOperation = 'lighter'; D.glow(ctx, SUN, shx - 6, shy + 12, 22 + 22 * wk, (0.3 + 0.3 * wk) * am); ctx.restore(); }
   }
   function drawFig(ctx, b, alpha, o) {
     o = o || {};
     if (alpha <= 0.01) return jointsOf(b, o.p || b.p);
-    const p = o.p || b.p, J = jointsOf(b, p), f = b.face, ecl = (b.eclipse || 0) > 0.5, C = ecl ? PL3 : PL;
-    const rimC = ecl ? RIM : C.trim, rimA = ecl ? 0.9 : 0.95;
+    // (v2.9r) ek: how far the eclipse has taken her. In between, her colours are mixed and the veins show
+    const ek = G.clamp(b.eclipse || 0, 0, 1), ecl = ek > 0.5, mid = ek > 0.001 && ek < 0.999;
+    const p = o.p || b.p, J = jointsOf(b, p), f = b.face, C = mid ? palAt(G.clamp((ek - 0.1) / 0.85, 0, 1)) : ecl ? PL3 : PL;
+    const rimC = C.trim, rimA = 0.95 - 0.05 * ek;
     const L = p[0], hip = -p[1] + (b.breath || 0) * 0.6;
     ctx.save();
     ctx.globalAlpha *= alpha;
     ctx.lineJoin = 'round'; ctx.lineCap = 'round';
     const real = !o.ghost && b === B.body;
     // the halo, behind everything of her (in the world, so it can be big and steady)
-    if (!o.ghost) drawHalo(ctx, J.head.x - f * 6, J.head.y - 4, b.crownK || 0, ecl, B.t);
+    if (!o.ghost) drawHalo(ctx, J.head.x - f * 6, J.head.y - 4, b.crownK || 0, mid ? ek : ecl, B.t);
     // her hair: a long dark ribbon streaming behind her with light along its edge (kept in the world)
     if (real && B.hairPts) {
       const strand = (pts, w0, a) => {
@@ -498,15 +548,15 @@
         ctx.strokeStyle = G.rgba(rimC, a); ctx.lineWidth = 1; ctx.stroke();
         ctx.restore();
       };
-      if (B.hairPts3) strand(B.hairPts3, 10, ecl ? 0.5 : 0.3);
-      if (B.hairPts2) strand(B.hairPts2, 12, ecl ? 0.6 : 0.35);
-      strand(B.hairPts, 17, ecl ? 0.85 : 0.55);
+      if (B.hairPts3) strand(B.hairPts3, 10, 0.3 + 0.2 * ek);
+      if (B.hairPts2) strand(B.hairPts2, 12, 0.35 + 0.25 * ek);
+      strand(B.hairPts, 17, 0.55 + 0.3 * ek);
     }
     ctx.translate(b.x, b.y);
     if (!o.ghost) K.recoil(ctx, b);
     ctx.scale(o.ghost ? f : K.faceX(b, 0.25), 1);
     // her wings, over the hair and behind the rest of her
-    drawWings(ctx, b, Math.sin(L) * 40 - 2, hip - Math.cos(L) * 40 + (b.breath || 0) * 0.8, ecl, !!o.ghost);
+    drawWings(ctx, b, Math.sin(L) * 40 - 2, hip - Math.cos(L) * 40 + (b.breath || 0) * 0.8, mid ? ek : ecl, !!o.ghost);
     if (!o.ghost && b.flash > 0) D.glow(ctx, '255,255,255', 0, -56, 70, b.flash * 0.3);
     const rimS = (w, a) => { ctx.strokeStyle = G.rgba(rimC, a == null ? rimA : a); ctx.lineWidth = w || 1; ctx.stroke(); };
     const shx = Math.sin(L) * 40 - 2, shy = hip - Math.cos(L) * 40 + (b.breath || 0) * 0.8;
@@ -559,7 +609,7 @@
     if (!o.ghost) {
       ctx.save(); ctx.globalCompositeOperation = 'lighter';
       D.glow(ctx, C.crack, shx + 2, shy + 9, 12, 0.8);
-      ctx.fillStyle = G.rgba(ecl ? RIMHOT : SUNHOT, 1); ctx.beginPath(); ctx.arc(shx + 2, shy + 9, 1.8, 0, G.TAU); ctx.fill();
+      ctx.fillStyle = G.rgba(mixRGB(SUNHOT, RIMHOT, ek), 1); ctx.beginPath(); ctx.arc(shx + 2, shy + 9, 1.8, 0, G.TAU); ctx.fill();
       ctx.restore();
     }
     leg(true);
@@ -569,7 +619,7 @@
     ctx.strokeStyle = G.rgba(rimC, rimA * 0.8); ctx.lineWidth = 1; D.line(ctx, 2, hip, 5 - sk * 3, hip + 24);
     // a sash of light at the waist
     ctx.save(); ctx.globalCompositeOperation = 'lighter';
-    ctx.strokeStyle = G.rgba(ecl ? RIM : SUN, 0.75); ctx.lineWidth = 1.6; D.line(ctx, -8, hip - 4, 9, hip - 3);
+    ctx.strokeStyle = G.rgba(mixRGB(SUN, RIM, ek), 0.75); ctx.lineWidth = 1.6; D.line(ctx, -8, hip - 4, 9, hip - 3);
     ctx.restore();
     // the head: a small face in shadow, two eyes of light, the hair falling over the brow
     ctx.save();
@@ -578,15 +628,16 @@
     D.poly(ctx, [-6, -6, 4, -8, 8, -3, 8.5, 2, 6, 6, 1, 8, -4, 6, -7, 1]); ctx.fill();
     ctx.fillStyle = C.hair;
     D.poly(ctx, [-6, 16, -12, 8, -12, -5, -6, -12, 3, -13, 10, -8, 11, -1, 9, 6, 7, -3, 3, -4, 1, 2, -2, -3, -5, 4, -3, 12]); ctx.fill(); rimS(1);
-    const eyesOpen = b.eyes != null ? b.eyes : 1, ec = ecl ? RIMHOT : SUNHOT;
+    const eyesOpen = b.eyes != null ? b.eyes : 1, ec = mixRGB(SUNHOT, RIMHOT, ek);
     if (eyesOpen > 0.5) { if (!o.ghost) D.glow(ctx, ec, 6, 0.5, 5, 0.55); ctx.fillStyle = G.rgba(ec, 1); D.poly(ctx, [3.5, -0.5, 8, -1, 7.5, 1.4, 4, 1.2]); ctx.fill(); }
     else { ctx.strokeStyle = 'rgba(40,24,30,0.9)'; ctx.lineWidth = 1.1; D.line(ctx, 3.5, 0.5, 8, 0.6); }
     ctx.restore();
     // the blade arm, and the blade of noon (the brightest thing on her)
     const lead = arm(true);
     if (b.palm > 0 && !o.ghost) D.glow(ctx, BURN, rear.ex, rear.ey, 30, b.palm);
-    if (b.blade !== false && !o.noBlade) drawBlade(ctx, lead.ex, lead.ey, p[8], 1, b.bladeK == null ? 1 : b.bladeK, ecl ? 1 : 0);
+    if (b.blade !== false && !o.noBlade) drawBlade(ctx, lead.ex, lead.ey, p[8], 1, b.bladeK == null ? 1 : b.bladeK, ek);
     ctx.restore();
+    if (mid && !o.ghost) drawVeins(ctx, J, ek);
     return J;
   }
   function drawBlade(ctx, x, y, a, f, k, ecl) {
@@ -595,9 +646,9 @@
     const tx = x + Math.cos(a) * len, ty = y + Math.sin(a) * len;
     const nx = -Math.sin(a), ny = Math.cos(a);
     const mx = (x + tx) / 2 - nx * cv, my = (y + ty) / 2 - ny * cv;
-    const col = ecl > 0.5 ? RIM : FALL, hot = ecl > 0.5 ? RIMHOT : SUNHOT;
+    const e = G.clamp(+ecl || 0, 0, 1), col = mixRGB(FALL, RIM, e), hot = mixRGB(SUNHOT, RIMHOT, e); // (v2.9r: mixed)
     // the back of the blade, dark; the edge, light
-    ctx.fillStyle = ecl > 0.5 ? '#0a0404' : '#2a1c20';
+    ctx.fillStyle = mixHex('#2a1c20', '#0a0404', e);
     ctx.beginPath(); ctx.moveTo(x - nx * 2, y - ny * 2); ctx.quadraticCurveTo(mx - nx * 4, my - ny * 4, tx, ty); ctx.quadraticCurveTo(mx + nx * 1, my + ny * 1, x + nx * 2, y + ny * 2); ctx.closePath(); ctx.fill();
     ctx.save();
     ctx.globalCompositeOperation = 'lighter'; ctx.lineCap = 'round';
@@ -607,7 +658,7 @@
     ctx.beginPath(); ctx.moveTo(x + nx * 1.5, y + ny * 1.5); ctx.quadraticCurveTo(mx + nx * 1.5, my + ny * 1.5, tx, ty); ctx.stroke();
     ctx.restore();
     // the guard
-    ctx.fillStyle = G.rgba(ecl > 0.5 ? RIM : '255,214,150', 0.9);
+    ctx.fillStyle = G.rgba(mixRGB('255,214,150', RIM, e), 0.9);
     ctx.beginPath(); ctx.ellipse(x, y, 2.5, 6, a + Math.PI / 2, 0, G.TAU); ctx.fill();
   }
 
@@ -711,13 +762,14 @@
     }
     // cracks: dark lines across the disc, opening as she breaks (the Fall)
     if (F.crack > 0.01) {
+      // (v3.0b) a fracture spreading from a point near the heart (see fracture()): dark fissures with a
+      // burnt edge, widening as she breaks
+      const fr = B.discCrack || (B.discCrack = fracture(57, { x: 0.08, y: -0.12, n: 6, span: G.TAU, a0: 0.4, len: 1.25, step: 0.075, jit: 0.62, branch: 0.11, depth: 2, w: 1 }));
       ctx.save();
       ctx.beginPath(); ctx.arc(x, y, r, 0, G.TAU); ctx.clip();
-      ctx.strokeStyle = 'rgba(60,24,20,' + (0.6 + 0.4 * F.crack) + ')'; ctx.lineWidth = 1.5 + 4 * F.crack;
-      ctx.beginPath();
-      const cr = [[-0.1, -1, 0.05, -0.4, -0.08, 0.15, 0.06, 1], [0.05, -0.4, 0.5, -0.2, 0.9, -0.45], [-0.08, 0.15, -0.55, 0.3, -0.95, 0.2], [0.06, 0.6, 0.45, 0.75]];
-      for (const c of cr) { ctx.moveTo(x + c[0] * r, y + c[1] * r); for (let i = 2; i < c.length; i += 2) ctx.lineTo(x + c[i] * r * Math.min(1, F.crack * 1.4), y + c[i + 1] * r * Math.min(1, F.crack * 1.4)); }
-      ctx.stroke();
+      ctx.translate(x, y); ctx.scale(r, r); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+      const c = F.crack;
+      drawFracture(ctx, fr, Math.min(1, c * 1.35), [[(2 + 6 * c) / r, 'rgba(160,64,26,' + (0.3 + 0.2 * c) + ')'], [(0.9 + 2.6 * c) / r, 'rgba(46,16,10,' + (0.75 + 0.25 * c) + ')']]);
       ctx.restore();
     }
     ctx.restore();
@@ -731,18 +783,19 @@
     const a = h.alpha == null ? 1 : h.alpha;
     ctx.save();
     ctx.globalAlpha = a * (1 - (h.gone || 0));
-    // the arm of light: a thin line out of the sun, bowing outward, to the wrist
-    const wx = h.x - f * 78 * Math.cos(h.rot), wy = h.y - f * 78 * Math.sin(h.rot);
+    // the arm of light: a thin line out of the sun, bowing outward, to the wrist (v2.9p: h.arm, it can go out)
+    const sc = h.sc == null ? 1 : h.sc, armK = h.arm == null ? 1 : h.arm;
+    const wx = h.x - f * 78 * sc * Math.cos(h.rot), wy = h.y - f * 78 * sc * Math.sin(h.rot);
     const S = B.sun, ax = S.x + h.side * 74 * B.faceS.scale, ay = S.y + B.faceS.sink + 20;
     const ex = (ax + wx) / 2 + h.side * 110, ey = Math.min(ay, wy) + 10;
-    ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.lineCap = 'round';
+    ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.lineCap = 'round'; ctx.globalAlpha *= armK;
     const arc = () => { ctx.beginPath(); ctx.moveTo(ax, ay); ctx.quadraticCurveTo(ex, ey, wx, wy); };
     ctx.strokeStyle = G.rgba(SUN, 0.22); ctx.lineWidth = 10; arc(); ctx.stroke();
     ctx.strokeStyle = G.rgba(SUNHOT, 0.85); ctx.lineWidth = 2; arc(); ctx.stroke();
     ctx.restore();
     ctx.translate(h.x, h.y);
     ctx.rotate(h.rot);
-    ctx.scale(f * HAND_S, HAND_S);
+    ctx.scale(f * HAND_S * sc, HAND_S * sc);
     const cr = h.broken ? 1 : h.crack, hurt = cr > 0.98;
     const fill = hurt ? '#3a1a14' : '#1c1218', rimC = hurt ? BURN : SUN;
     ctx.lineJoin = 'round'; ctx.lineCap = 'round';
@@ -1048,31 +1101,77 @@
     }
     ctx.restore();
   }
+  // (v3.0b) The sky breaking like glass round the sun: light leaking through fractures that run out from
+  // her rim, thinning and splitting as they go. k: how far they have spread (0..1); they pulse faintly.
   function drawSkyCrack(ctx, k) {
+    // (from wherever the sun is when the sky first cracks; they stay there after she falls)
+    const fr = B.crackLines || (B.crackLines = fracture(91, { x: B.sun.x, y: B.sun.y + B.faceS.sink, r0: 74, n: 10, span: G.TAU, a0: -1.2, len: 520, step: 24, jit: 0.34, pull: 0.3, branch: 0.08, depth: 2, w: 2, rings: [1.7, 2.9] }));
+    const a = Math.min(1, k * 2) * (0.9 + 0.1 * Math.sin(B.t * 6.3));
     ctx.save();
-    ctx.globalCompositeOperation = 'lighter';
-    ctx.lineJoin = 'round';
-    const lines = B.crackLines || (B.crackLines = mkCracks());
-    for (const [w, col, a] of [[7, BURN, 0.3], [2.5, SUNHOT, 0.9]]) {
-      ctx.strokeStyle = G.rgba(col, a * Math.min(1, k)); ctx.lineWidth = w;
-      ctx.beginPath();
-      for (const ln of lines) {
-        const n = Math.max(1, Math.floor(ln.length * Math.min(1, k)));
-        for (let i = 0; i < n; i++) { if (i) ctx.lineTo(ln[i][0], ln[i][1]); else ctx.moveTo(ln[i][0], ln[i][1]); }
-      }
-      ctx.stroke();
-    }
+    ctx.globalCompositeOperation = 'lighter'; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    drawFracture(ctx, fr, Math.min(1, k), [[3.2, G.rgba(BURN, 0.16 * a)], [1.3, G.rgba(SUN, 0.45 * a)], [0.6, G.rgba(SUNHOT, 0.9 * a)]]);
     ctx.restore();
   }
-  function mkCracks() {
-    const out = [], r = mulberry(91);
-    for (let j = 0; j < 7; j++) {
-      let x = MID + (r() - 0.5) * 200, y = SKY_Y + (r() - 0.5) * 60;
-      const ang = -Math.PI / 2 + (j - 3) * 0.45 + (r() - 0.5) * 0.3, ln = [[x, y]];
-      for (let i = 0; i < 9; i++) { x += Math.cos(ang + (r() - 0.5) * 0.9) * 70; y += Math.sin(ang + (r() - 0.5) * 0.9) * 50 + 22; ln.push([x, y]); }
-      out.push(ln);
+  // A fracture: a few main cracks from a point (o.x, o.y; o.r0 out from it), each a run of short jagged steps
+  // that keeps roughly to its heading and thins towards its end, with branches splitting off at angles.
+  // Every step knows how far along the crack it starts, so drawing it up to a reach makes it grow
+  // smoothly out from the point, branches and all, instead of in jumps. Steps are kept in buckets by width.
+  function fracture(seed, o) {
+    const r = mulberry(seed), segs = [];
+    function grow(x, y, ang, len, w, d, depth) {
+      let left = len;
+      const head = ang;
+      while (left > 0) {
+        const step = o.step * (0.55 + 0.9 * r());
+        ang += (r() - 0.5) * o.jit + (head - ang) * (o.pull || 0.18); // jagged, but it keeps its way
+        const nx = x + Math.cos(ang) * step, ny = y + Math.sin(ang) * step;
+        segs.push({ x0: x, y0: y, x1: nx, y1: ny, d0: d, d1: d + step, w: w * (0.3 + 0.7 * left / len) });
+        x = nx; y = ny; d += step; left -= step;
+        if (depth < o.depth && left > o.step * 3 && r() < o.branch) grow(x, y, ang + (r() < 0.5 ? -1 : 1) * (0.5 + r() * 0.55), left * (0.3 + 0.45 * r()), w * 0.6, d, depth + 1);
+      }
     }
-    return out;
+    const angs = [];
+    for (let i = 0; i < o.n; i++) {
+      const a = o.a0 + (i + (r() - 0.5) * 0.7) * (o.span / o.n), r0 = o.r0 || 0;
+      angs.push(a);
+      grow(o.x + Math.cos(a) * r0, o.y + Math.sin(a) * r0, a, o.len * (0.55 + 0.7 * r()), o.w, 0, 0);
+    }
+    // rings: short cracks running round between two neighbouring main cracks, as in a struck pane; each
+    // shows once the main cracks have reached its distance
+    for (const rk of o.rings || []) {
+      const R0 = (o.r0 || 1) * rk;
+      for (let i = 0; i < angs.length; i++) {
+        if (r() < 0.35) continue;
+        const a0 = angs[i], a1 = angs[(i + 1) % angs.length] + (i + 1 === angs.length ? G.TAU : 0), n = 5;
+        let px = o.x + Math.cos(a0) * R0, py = o.y + Math.sin(a0) * R0, d = R0 - (o.r0 || 0);
+        for (let j = 1; j <= n; j++) {
+          const a = a0 + (a1 - a0) * j / n, R = R0 * (0.92 + r() * 0.16), nx = o.x + Math.cos(a) * R, ny = o.y + Math.sin(a) * R, st = Math.hypot(nx - px, ny - py);
+          segs.push({ x0: px, y0: py, x1: nx, y1: ny, d0: d, d1: d + st, w: o.w * 0.45 });
+          px = nx; py = ny; d += st;
+        }
+      }
+    }
+    const buckets = new Map();
+    let max = 0;
+    for (const sg of segs) { max = Math.max(max, sg.d1); const q = Math.max(1, Math.round(sg.w / o.w * 6)); if (!buckets.has(q)) buckets.set(q, []); buckets.get(q).push(sg); }
+    return { buckets: Array.from(buckets.entries()).map(([q, list]) => ({ wk: q / 6 * o.w, list })), max };
+  }
+  // passes: [width per unit of crack width, colour] each, drawn in order (a glow first, the core last)
+  function drawFracture(ctx, fr, k, passes) {
+    const reach = fr.max * k;
+    for (const [wk, col] of passes) {
+      ctx.strokeStyle = col;
+      for (const b of fr.buckets) {
+        ctx.lineWidth = wk * b.wk;
+        ctx.beginPath();
+        for (const sg of b.list) {
+          if (sg.d0 >= reach) continue;
+          const t = Math.min(1, (reach - sg.d0) / (sg.d1 - sg.d0));
+          ctx.moveTo(sg.x0, sg.y0); ctx.lineTo(sg.x0 + (sg.x1 - sg.x0) * t, sg.y0 + (sg.y1 - sg.y0) * t);
+        }
+        ctx.stroke();
+      }
+    }
   }
   function mulberry(a) { return function () { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
   function drawFragment(ctx, fr) {
@@ -1096,9 +1195,12 @@
       drawFig(ctx, { x: g.x, y: g.y, face: g.face, eclipse: b.eclipse, eyes: 1, crownK: 0, breath: 0, blade: true }, 0.3 * k, { p: g.p, ghost: true });
       ctx.restore();
     }
-    const J = drawFig(ctx, b, b.alpha);
+    const J = drawShift(ctx, b, b.alpha);
     B.tipNow = J.tip;
   };
+  // (v2.9q/r) Her drawn body. (v2.9q wiped the black down over her; v2.9r shows the eclipse taking her
+  // instead, in drawFig: her colours mixed, the veins spreading.)
+  function drawShift(ctx, b, alpha) { return drawFig(ctx, b, alpha); }
 
   // Over the arena and her, under the hero: the dark of the eclipse. Only her light (her corona, round
   // her), the pools her flares leave, a faint light round the hero, and what burns on her shows in it.
@@ -2376,130 +2478,363 @@
   };
 
   B.phaseIn = function* (n) { if (n === 2) yield* fallScene(); else yield* eclipseScene(); };
-  // THE FALL. The sun cracks open; her hands break into light; the sky splits behind her.
-  // She falls out of the sky, a comet, onto the ridge beside the gnomon: white, then
-  // silence. In the crater, kneeling, someone your size. A long breath. She stands, looks at you, takes
-  // the gnomon (the shade that kept you safe) in her hand, pulls it out of the ridge, and it burns into a
-  // blade of noon. She levels it at you.
+  // (v2.9p) Both changes of form are shot like Kairo's awakening: the blow that ends a form holds the frame,
+  // the music stops and the HUD goes, and the scene is cut together from close-ups and wide shots. Asked for:
+  // "make sure sol's phase changes and fight is epic".
+  function* during(t, fn) { let e = 0; while (e < t) { const dt = yield; e += dt; fn(Math.min(1, e / t), dt, e); } }
+  const headOf = () => { const b = B.body, j = jointsOf(b, b.p).head; return { x: j.x + b.face * 4, y: j.y }; };
+  // THE FALL. The blow that ends Noon holds the frame on her face. Silence. The sun cracks once, twice,
+  // three times, the view creeping in; then it bursts and her hands blow apart into light (wide). She falls
+  // out of the sky, a comet, the view riding down with her and time all but stopping before she lands:
+  // white, then nothing. Close on someone your size, kneeling in the crater; two heartbeats; her eyes open.
+  // She pulls the gnomon (the shade that kept you safe) out of the ridge and it burns into a blade of noon;
+  // the blast throws the clouds back, and she levels it at you.
   function* fallScene() {
     const s = B.sun, F = B.faceS, b = B.body, P = G.player;
     H.clear(true);
     B.form = 'falling';
     for (const h of B.hands) { h.busy = true; h.broken = false; h.shade = false; }
-    // the sun cracks; the hands go
-    G.fx.cine.x = s.x; G.fx.cine.y = s.y + 60; G.fx.cine.to = 0.6;
-    AU.play('solCrack', { vol: 1.2 }); G.fx.shake(12);
-    let e = 0;
-    while (e < 1.0) {
-      const dt = yield; e += dt; const k = Math.min(1, e / 1.0);
-      F.crack = k; F.mouth = 0.6 * k; F.eyes = k < 0.5 ? 1 : 1 - (k - 0.5) * 2;
-      B.skyCrack = k;
-      for (const h of B.hands) { h.gone = k; h.ty = h.y - 40; if (Math.random() < dt * 30) G.fx.spawn({ kind: 'spark', x: h.x + G.rand(-80, 80), y: h.y + G.rand(-40, 40), vx: G.rand(-40, 40), vy: -G.rand(100, 300), life: 0.6, size: 2.5, color: SUN }); }
+    // the blow: held, the view thrown up on to her face
+    G.audio.duck(0); G.ui.hud(false);
+    AU.play('boom'); AU.play('kBolt');
+    G.fx.stop(0.2); G.fx.slow(0.3, 0.6);
+    G.fx.cineCut(s.x, s.y + 20, 0.9); G.fx.cineEase(4);
+    G.fx.flash(SUNHOT, 0.35, 0.25);
+    G.fx.ring(s.x, s.y, { r0: 60, r1: 520, life: 0.6, width: 8, color: SUNHOT, alpha: 0.7 });
+    G.fx.lines(s.x, s.y, 28, SUNHOT, { r0: 140, speed: [900, 1700] });
+    yield* wait(0.4);
+    // three cracks, each louder, the view creeping closer
+    AU.play('kWhoom', { vol: 0.6 });
+    const cracks = [0.15, 0.7, 1.2];
+    let ci = 0;
+    yield* during(1.6, (k, dt, e) => {
+      G.fx.cine.z = 0.9 + 0.45 * E.inOutQuad(k);
+      if (ci < cracks.length && e >= cracks[ci]) {
+        ci++;
+        AU.play('solCrack', { vol: 0.7 + 0.25 * ci });
+        F.mouth = 0.2 * ci; // (v3.0b: the cracks spread from here, below, rather than appearing at once)
+        G.fx.shake(5 + 5 * ci); G.fx.kick(0, 1.2); G.fx.punch(0.02);
+        G.fx.lines(s.x, s.y, 8 + 4 * ci, SUNHOT, { r0: 90, speed: [600, 1200] });
+        G.fx.light(s.x, s.y, 260, SUN, 0.35, 0.5);
+      }
+      F.crack = G.damp(F.crack, 0.27 * ci, 10, dt); B.skyCrack = G.damp(B.skyCrack, 0.22 * ci, 8, dt);
+      for (const h of B.hands) { h.shk = 3 * k; h.tx = HAND_REST[h.i].x + G.rand(-1, 1) * 4 * k; if (Math.random() < dt * 14) G.fx.spawn({ kind: 'spark', x: h.x + G.rand(-80, 80), y: h.y + G.rand(-40, 40), vx: G.rand(-40, 40), vy: -G.rand(80, 220), life: 0.6, size: 2.2, color: SUN }); }
+      F.eyes = 1 - 0.5 * k;
+    });
+    // it bursts: wide at once
+    G.fx.cine.k = 0; G.fx.cine.x = s.x; G.fx.cine.y = s.y + 120; G.fx.cine.to = 0.4; G.fx.cine.z = 0.3; G.fx.cineEase(2.6);
+    F.crack = 1; F.mouth = 0.6; F.eyes = 0;
+    const sk0 = B.skyCrack;
+    AU.play('solCrack', { vol: 1.5 }); AU.play('kPillar'); AU.play('boom');
+    G.fx.flash(SUNHOT, 0.55, 0.4); G.fx.shake(20); G.fx.stop(0.07);
+    G.fx.ripple(s.x, s.y, 700, 0.8, 1.6);
+    G.fx.ring(s.x, s.y, { r0: 80, r1: 1100, life: 0.9, width: 12, color: SUNHOT, alpha: 0.6 });
+    for (const h of B.hands) {
+      // the arm of light snaps: sparks all along it
+      for (let i = 0; i < 24; i++) { const t = i / 24; G.fx.spawn({ kind: 'spark', x: G.lerp(s.x, h.x, t) + h.side * 110 * Math.sin(Math.PI * t), y: G.lerp(s.y, h.y, t), vx: G.rand(-80, 80), vy: G.rand(-60, 120), life: G.rand(0.4, 0.9), size: G.rand(1.5, 3), color: SUN, len: 0.04 }); }
+      h.arm = 0; h.shk = 0; h.topen = 0.15; h.tcurl = 1.1; h.trot = 0.6 * h.side; h.ty = HAND_REST[h.i].y + 70; h.tx = HAND_REST[h.i].x;
     }
-    for (const h of B.hands) h.gone = 1;
-    AU.play('solCrack', { vol: 1.4 }); G.fx.flash(SUNHOT, 0.35, 0.3); G.fx.shake(18);
-    yield* wait(0.45);
-    // she falls: a comet out of the cracked sky, slowing as it nears the ridge
+    yield* during(0.5, (k) => { B.skyCrack = G.lerp(sk0, 1, 1 - Math.pow(1 - k, 3)); }); // (v3.0b) the sky shatters outward
+    B.skyCrack = 1;
+    // she falls: a comet out of the cracked sky, the view riding down with her, time all but stopping
     const land = MID + (P.x < MID ? 110 : -110);
-    AU.play('solComet', { dur: 1.3 });
-    G.fx.cine.to = 0.35;
-    e = 0;
+    AU.play('solComet', { dur: 1.4 });
     const sx = s.x, sy = s.y;
-    while (e < 1.3) {
-      const dt = yield; e += dt; const k = E.inQuad(Math.min(1, e / 1.3));
+    let slowed = false;
+    yield* during(1.3, (k0, dt, e) => {
+      const k = E.inQuad(k0);
       s.x = G.lerp(sx, land, k); s.y = G.lerp(sy, FLOOR - 60, k);
       F.scale = 1 - 0.75 * k; F.alpha = 1;
-      G.fx.cine.x = s.x; G.fx.cine.y = s.y;
-      if (e > 1.0 && !B.slowed) { B.slowed = true; G.fx.slow(0.25, 0.35); }
-      for (let i = 0; i < 3; i++) G.fx.spawn({ kind: 'spark', x: s.x + G.rand(-30, 30), y: s.y + G.rand(-30, 30), vx: (sx - land) * 0.4 + G.rand(-60, 60), vy: -G.rand(200, 500), life: G.rand(0.3, 0.7), size: G.rand(2, 4), color: i ? SUN : BURN, len: 0.06 });
-    }
-    B.slowed = false;
+      G.fx.cine.x = s.x; G.fx.cine.y = s.y; G.fx.cine.to = 0.7; G.fx.cine.z = 0.3 + 0.5 * k;
+      if (e > 0.95 && !slowed) { slowed = true; G.fx.slow(0.12, 0.45); AU.play('kWhoom', { vol: 0.9 }); G.fx.lines(s.x, s.y, 18, SUNHOT, { r0: 70, speed: [500, 1000] }); }
+      for (let i = 0; i < 4; i++) G.fx.spawn({ kind: 'spark', x: s.x + G.rand(-30, 30), y: s.y + G.rand(-30, 30), vx: (sx - land) * 0.4 + G.rand(-60, 60), vy: -G.rand(200, 500), life: G.rand(0.3, 0.8), size: G.rand(2, 4), color: i ? SUN : BURN, len: 0.06 });
+    });
     // the impact: white, the dial broken, then quiet
     F.alpha = 0; B.form = 'fall';
     b.x = land; b.y = FLOOR; b.face = G.sign(P.x - land) || 1; b.hidden = false; b.alpha = 1; b.blade = false; b.bladeK = 0; b.eyes = 0;
     b.p = POSES.kneel.slice(); b.pv.fill(0); setPose('kneel');
     B.whiteK = 1;
-    G.fx.impact(land, FLOOR - 40, 0.12); G.fx.shake(34); G.fx.punch(0.05); G.fx.stop(0.15);
-    AU.play('boom'); AU.play('slam'); AU.play('stagger');
-    G.fx.ring(land, FLOOR - 20, { r0: 40, r1: 1200, life: 1.0, color: SUNHOT, width: 18 });
+    G.fx.cine.k = 0; G.fx.cine.to = 0; G.fx.cine.z = 0.3;
+    G.fx.impact(land, FLOOR - 40, 0.12); G.fx.shake(34); G.fx.punch(0.06); G.fx.stop(0.2);
+    AU.play('boom'); AU.play('slam'); AU.play('stagger'); AU.play('kPillar');
+    G.fx.ring(land, FLOOR - 20, { r0: 40, r1: 1300, life: 1.0, color: SUNHOT, width: 18 });
+    G.fx.ripple(land, FLOOR - 40, 760, 0.9, 1.8);
     G.fx.thud(land, FLOOR, 2.6, { col: FALL });
-    for (const d of [-1, 1]) G.fx.dust(land + d * 60, FLOOR, 16, { dir: d, speed: [200, 900], size: [12, 26], life: [0.8, 1.8], up: 80 });
-    G.fx.burst(land, FLOOR - 10, { n: 40, color: '40,26,18', speed: [200, 900], angle: -Math.PI / 2, spread: 2.4, life: [0.8, 1.6], size: [6, 14], kind: 'chunk', grav: 1500 });
+    for (const d of [-1, 1]) G.fx.dust(land + d * 60, FLOOR, 18, { dir: d, speed: [200, 900], size: [12, 26], life: [0.8, 1.8], up: 80 });
+    G.fx.burst(land, FLOOR - 10, { n: 46, color: '40,26,18', speed: [200, 900], angle: -Math.PI / 2, spread: 2.4, life: [0.8, 1.6], size: [6, 14], kind: 'chunk', grav: 1500 });
     B.dialBroken = 1;
+    // (v2.9p) the gnomon breaks with the dial: the blade comes from her hands now
+    B.gnomon = 0;
+    G.fx.burst(MID, FLOOR - 90, { n: 22, color: '34,24,20', kind: 'chunk', speed: [200, 700], angle: -Math.PI / 2, spread: 2, life: [0.8, 1.4], size: [5, 12], grav: 1400 });
+    for (const h of B.hands) { h.ty = HAND_REST[h.i].y + 110; h.trot = 0.9 * h.side; }
     B.pushPlayer(700, 900);
     G.arena.setPhase(2, 0.4);
     G.audio.setIntensity(0);
-    e = 0;
-    while (e < 1.1) { const dt = yield; e += dt; B.whiteK = 1 - E.outQuad(Math.min(1, e / 1.1)); }
+    yield* during(1.1, (k) => { B.whiteK = 1 - E.outQuad(k); });
     B.whiteK = 0;
-    G.fx.cine.x = land; G.fx.cine.y = FLOOR - 70; G.fx.cine.to = 0.8;
-    // the standoff: embers drifting, nothing moving, a long breath
-    yield* wait(1.2);
+    // close on her, kneeling in the crater: embers drifting, two heartbeats
+    G.fx.cineCut(land, FLOOR - 55, 0.8); G.fx.cineEase(1.2);
+    AU.play('kWhoom', { vol: 0.5 });
+    let beat = 0;
+    yield* during(1.8, (k, dt, e) => {
+      G.fx.cine.z = 0.8 + 0.35 * E.inOutQuad(k);
+      if (beat < 2 && e >= [0.45, 1.2][beat]) {
+        beat++;
+        AU.play('kHeart', { vol: 0.8 + 0.3 * beat }); AU.play('solHeart', { vol: 0.4 + 0.2 * beat });
+        G.fx.ripple(b.x, b.y - 40, 120 + 70 * beat, 0.5, 0.6 + 0.3 * beat);
+        G.fx.kick(0, 0.8 * beat);
+        G.fx.burst(b.x, b.y - 30, { n: 10 + 8 * beat, color: FALL, kind: 'spark', speed: [40, 160], angle: -Math.PI / 2, spread: 2, life: [0.6, 1.2], size: [1.5, 3], grav: -60 });
+      }
+      if (Math.random() < dt * 8) G.fx.spawn({ kind: 'spark', x: b.x + G.rand(-140, 140), y: FLOOR - G.rand(0, 60), vx: G.rand(-10, 10), vy: -G.rand(20, 60), life: G.rand(1.2, 2.2), size: G.rand(1.2, 2.4), color: FALL });
+    });
+    // she stands; her eyes open (the view on her face)
     AU.play('step');
     setPose('idle'); b.eyes = 0;
-    yield* wait(0.6);
     b.face = G.sign(P.x - b.x) || b.face;
-    b.eyes = 1; G.fx.glint(jointsOf(b, b.p).head.x + b.face * 5, jointsOf(b, b.p).head.y, 30, SUNHOT, 0.3); AU.play('glint');
-    yield* wait(0.7);
-    // she takes the gnomon and pulls it from the ridge: it burns into her blade
-    const gx = MID;
-    yield* stepTo(gx - b.face * 46, 0.4);
-    b.face = G.sign(gx - b.x) || 1;
-    setPose('drawCrown');
-    AU.play('solDraw');
-    e = 0;
-    while (e < 1.0) {
-      const dt = yield; e += dt; const k = Math.min(1, e / 1.0);
-      B.gnomon = 1 - k; b.blade = true; b.bladeK = k;
-      G.fx.shake(2 + 4 * k);
-      if (Math.random() < dt * 60) G.fx.spawn({ kind: 'spark', x: gx + G.rand(-10, 10), y: FLOOR - G.rand(0, 150 * (1 - k)), vx: G.rand(-80, 80), vy: -G.rand(100, 400), life: 0.5, size: 2.5, color: k > 0.5 ? SUNHOT : FALL, len: 0.04 });
-    }
-    B.gnomon = 0; b.bladeK = 1;
-    G.fx.flash(SUNHOT, 0.4, 0.3); G.fx.shake(14); AU.play('solBlade', { k: 6 });
-    G.fx.lines(b.x, b.y - 100, 20, SUNHOT, { r0: 40, speed: [900, 1500] });
+    yield* wait(0.45);
+    let hd = headOf();
+    G.fx.cineCut(hd.x, hd.y + 4, 1.7); G.fx.cineEase(1.6);
+    AU.play('kWhoom', { vol: 0.7 });
+    yield* wait(0.35);
+    b.eyes = 1; hd = headOf();
+    AU.play('kGleam'); AU.play('glint');
+    G.fx.glint(hd.x, hd.y, 90, SUNHOT, 0.7);
+    G.fx.light(hd.x, hd.y, 140, SUN, 0.5, 0.6);
+    yield* during(0.75, (k, dt) => { G.fx.cine.z += dt * 0.12; });
+    // (v2.9p) she raises her hand to the sky and calls her hands home. They wake, turn, and come to her on
+    // two curving trails of light, faster and smaller as they come, and pour into her raised hand; the
+    // light runs up out of her fist into a blade of noon. One clean cut, and the blast.
+    facePlayer();
+    setPose('pointUp'); b.blade = false; b.bladeK = 0;
+    G.fx.cineCut(b.x, FLOOR - 230, 0.3); G.fx.cineEase(1.8);
+    AU.play('kWhoom', { vol: 0.6 });
+    yield* wait(0.45);
+    // they wake: the glyphs flare, the fingers open
+    AU.play('solHand', { vol: 1.2 }); AU.play('solGong', { vol: 0.5 });
+    for (const h of B.hands) { h.glow = 0.9; h.flash = 1; h.topen = 1; h.tcurl = 0; h.trot = -0.2 * h.side; G.fx.glint(h.x - 28 * h.side, h.y, 50, SUNHOT, 0.4); }
+    yield* during(0.4, (k) => { for (const h of B.hands) h.glow = 0.9 * (1 - k) + 0.3; });
+    // drawn in
+    const J0 = jointsOf(b, b.p), tgt = { x: J0.hand.x, y: J0.hand.y - 10 };
+    const from = B.hands.map((h) => ({ x: h.x, y: h.y, r: h.rot }));
+    B.pull = { trails: [[], []], a: 1, core: 0, x: tgt.x, y: tgt.y };
+    for (const h of B.hands) h.pin = true;
+    AU.play('solDrain', { dur: 1.1 }); AU.play('kRumble', { dur: 1.0 });
+    yield* during(1.05, (k0, dt) => {
+      const k = E.inCubic(k0);
+      B.hands.forEach((h, i) => {
+        const f0 = from[i], side = h.side;
+        // a curve that swings out and over before diving in: the hand arcs round, it does not slide
+        const cx = G.lerp(f0.x, tgt.x, 0.35) + side * 140, cy = Math.min(f0.y, tgt.y) - 230;
+        const u = 1 - k;
+        h.x = u * u * f0.x + 2 * u * k * cx + k * k * tgt.x; h.y = u * u * f0.y + 2 * u * k * cy + k * k * tgt.y;
+        h.sc = Math.max(0.08, 1 - 0.92 * Math.pow(k, 1.3)); h.rot = h.trot = f0.r - side * 2.6 * k;
+        h.glow = 0.3 + 0.6 * k; h.alpha = 1; h.gone = k0 > 0.88 ? (k0 - 0.88) / 0.12 : 0;
+        const tr = B.pull.trails[i]; tr.push([h.x, h.y]); if (tr.length > 26) tr.shift();
+        if (Math.random() < dt * 40) G.fx.spawn({ kind: 'spark', x: h.x + G.rand(-10, 10), y: h.y + G.rand(-10, 10), vx: G.rand(-40, 40), vy: G.rand(-40, 40), life: G.rand(0.3, 0.6), size: G.rand(1.5, 3), color: SUNHOT, len: 0.04 });
+      });
+      B.pull.core = k;
+      G.fx.cine.z = 0.3 + 0.35 * k; G.fx.cine.y = G.lerp(FLOOR - 230, tgt.y + 20, k); G.fx.cine.x = G.lerp(b.x, tgt.x, k);
+      G.fx.shake(1 + 4 * k);
+    });
+    for (const h of B.hands) { h.gone = 1; h.pin = false; }
+    // they meet in her hand
+    AU.play('solBlade', { k: 6 }); AU.play('kGleam'); AU.play('boom');
+    G.fx.stop(0.08); G.fx.slow(0.35, 0.35); G.fx.punch(0.03);
+    G.fx.flash(SUNHOT, 0.4, 0.2);
+    G.fx.ring(tgt.x, tgt.y, { r0: 10, r1: 300, life: 0.45, width: 5, color: SUNHOT, alpha: 0.9 });
+    G.fx.lines(tgt.x, tgt.y, 22, SUNHOT, { r0: 24, speed: [700, 1400] });
+    // the light runs up out of her fist into the blade
+    G.fx.cineCut(tgt.x, tgt.y - 40, 0.9); G.fx.cineEase(2.4);
+    b.blade = true;
+    yield* during(0.42, (k, dt) => {
+      b.bladeK = E.outCubic(k); B.pull.core = 1 - k; B.pull.a = 1 - k;
+      const J = jointsOf(b, b.p), L = 104 * b.bladeK, tx = J.hand.x + Math.cos(J.ba) * L, ty = J.hand.y + Math.sin(J.ba) * L;
+      if (Math.random() < dt * 60) G.fx.spawn({ kind: 'spark', x: tx, y: ty, vx: G.rand(-60, 60), vy: G.rand(-120, 0), life: G.rand(0.2, 0.4), size: G.rand(1.5, 2.5), color: SUNHOT, len: 0.03 });
+    });
+    B.pull = null; b.bladeK = 1;
+    const Jt = jointsOf(b, b.p);
+    G.fx.glint(Jt.tip.x, Jt.tip.y, 70, SUNHOT, 0.5); AU.play('glint');
+    yield* wait(0.3);
+    // one clean cut: she brings it down and across, leaving the air cut behind it
+    G.fx.cineCut(b.x + b.face * 40, b.y - 80, 0.55); G.fx.cineEase(3);
+    b.face = G.sign(P.x - b.x) || b.face;
+    setPose('sweep', true); AU.play('whoosh'); AU.play('solBlade', { k: 4 });
+    for (let i = 0; i < 6; i++) { yield* wait(0.03); ghost(0.3); }
+    G.fx.cut(b.x + b.face * 60, b.y - 50, b.face > 0 ? 0.12 : Math.PI - 0.12, 360, 3, FALL, SUNHOT, 0.4);
+    // the blast
+    G.audio.duck(1);
+    G.fx.flash(SUNHOT, 0.5, 0.35); G.fx.shake(20); G.fx.stop(0.1); G.fx.punch(0.04);
+    AU.play('boom'); AU.play('kPillar');
+    G.fx.ring(b.x, b.y - 100, { r0: 30, r1: 900, life: 0.8, width: 10, color: SUNHOT, alpha: 0.7 });
+    G.fx.ripple(b.x, b.y - 100, 640, 0.7, 1.6);
+    G.fx.lines(b.x, b.y - 100, 30, SUNHOT, { r0: 40, speed: [1000, 1800] });
+    for (const d of [-1, 1]) G.fx.dust(b.x + d * 40, FLOOR, 12, { dir: d, speed: [300, 900], size: [10, 20], life: [0.6, 1.3], up: 30, a: 0.5 });
+    if (G.arena.gust) G.arena.gust(b.x, b.y - 80, 2);
+    B.pushPlayer(520, 300);
+    // and levels it at you
     b.face = G.sign(P.x - b.x) || b.face;
     setPose('point', true);
-    G.fx.cine.to = 0.5;
-    yield* wait(0.7);
+    G.fx.cineCut(b.x + b.face * 50, b.y - 90, 0.8); G.fx.cineEase(1.4);
+    AU.play('kWhoom', { vol: 0.8 });
+    yield* wait(0.8);
+    G.fx.cine.to = 0.5; G.fx.cine.k = Math.min(G.fx.cine.k, 0.9);
   }
-  // THE ECLIPSE. She drives her blade up into her own crown and pulls the sun down into herself. The light
-  // drains out of the sky, the clouds, the ridge and her; a held note; a heartbeat; black.
+  // The last blow of a form throws her (the Fall's end): frozen on the impact, she flies back in slow motion
+  // with afterimages, lands on a knee and skids, her blade dragging sparks out of the ridge.
+  function* thrown() {
+    const b = B.body, P = G.player;
+    const d = G.sign(b.x - P.x) || -b.face, hx = b.x, hy = b.y - 60, ang = d > 0 ? 0 : Math.PI;
+    b.face = -d; b.air = true; setPose('reel', true);
+    AU.play('hitHeavy'); AU.play('boom'); AU.play('kBolt');
+    G.fx.stop(0.18); G.fx.slow(0.2, 0.9);
+    G.fx.cineCut(hx - d * 40, hy, 0.75); G.fx.cineEase(3);
+    G.fx.flash(SUNHOT, 0.45, 0.25);
+    G.fx.ring(hx, hy, { r0: 20, r1: 460, life: 0.55, width: 8, color: FALL, alpha: 0.75 });
+    G.fx.ring(hx, hy, { r0: 10, r1: 240, life: 0.35, width: 4, color: SUNHOT, alpha: 0.8 });
+    G.fx.lines(hx, hy, 30, SUNHOT, { r0: 50, speed: [1300, 2400] });
+    G.fx.ripple(hx, hy, 560, 0.7, 1.7);
+    G.fx.burst(hx, hy, { n: 50, color: FALL, kind: 'spark', speed: [350, 1100], angle: ang, spread: 1.6, life: [0.3, 0.9], size: [2, 4], drag: 1.4 });
+    G.fx.burst(hx, hy, { n: 18, color: SUNHOT, kind: 'spark', speed: [600, 1500], angle: ang, spread: 0.7, life: [0.15, 0.4], size: [1.5, 3] });
+    G.fx.kick(d * 7, -2); G.fx.shake(18);
+    let vx = d * 600, vy = b.y < FLOOR - 20 ? -120 : -360, e = 0, ghostT = 0, z = 0.75;
+    while (true) {
+      const dt = yield;
+      e += dt;
+      vy += 1500 * dt; b.x += vx * dt; b.y += vy * dt;
+      if (b.x <= WL + 50 || b.x >= WR - 50) { b.x = clampX(b.x); vx = -vx * 0.2; }
+      z = Math.max(0.45, z - dt * 0.8);
+      G.fx.cine.x = G.lerp(G.fx.cine.x, b.x - d * 30, Math.min(1, dt * 8)); G.fx.cine.y = G.lerp(G.fx.cine.y, b.y - 50, Math.min(1, dt * 8)); G.fx.cine.z = z;
+      ghostT -= dt;
+      if (ghostT <= 0) { ghostT = 0.045; ghost(0.32); }
+      if ((vy > 0 && b.y >= FLOOR) || e > 2) break;
+    }
+    // down on one knee, skidding, the blade dragging through the ridge
+    b.y = FLOOR; b.air = false; setPose('kneel', true);
+    AU.play('slam'); AU.play('stomp'); G.fx.stop(0.07); G.fx.shake(14); G.fx.punch(0.03);
+    G.fx.thud(b.x, FLOOR, 1.6, { col: FALL });
+    let v = Math.abs(vx) * 0.6;
+    yield* during(0.9, (k, dt) => {
+      v = Math.max(0, v - 700 * dt);
+      b.x = clampX(b.x + d * v * dt);
+      if (v > 30) {
+        if (Math.random() < dt * 50) G.fx.spawn({ kind: 'spark', x: b.x - b.face * -40, y: FLOOR - 2, vx: -d * G.rand(100, 360), vy: -G.rand(60, 260), life: G.rand(0.2, 0.5), size: G.rand(1.4, 2.6), color: k < 0.5 ? SUNHOT : FALL, len: 0.05 });
+        if (Math.random() < dt * 30) G.fx.dust(b.x, FLOOR, 1, { dir: -d, speed: [40, 180], size: [6, 12], up: 10, a: 0.4 });
+      }
+      G.fx.cine.x = G.lerp(G.fx.cine.x, b.x, Math.min(1, dt * 5)); G.fx.cine.y = G.lerp(G.fx.cine.y, b.y - 40, Math.min(1, dt * 5));
+    });
+  }
+  // THE ECLIPSE. The blow that ends the Fall throws her down. Silence; close on her, kneeling, her breath
+  // smoking; one heartbeat. She stands, drives her blade up into her own crown and pulls the sun down into
+  // herself: the view backs slowly away as the light drains out of the sky, the clouds, the ridge and her, the
+  // heartbeat louder each time. Black. A held moment with nothing in it (phaseOut: then her rim catches fire).
   function* eclipseScene() {
     const b = B.body, P = G.player;
     H.clear(true);
     B.form = 'eclipsing';
-    b.y = FLOOR; b.air = false; facePlayer();
+    G.audio.duck(0); G.ui.hud(false);
+    yield* thrown();
+    b.y = FLOOR; b.air = false;
+    // silence, close on her
+    let hd = headOf();
+    G.fx.cineCut(hd.x, hd.y + 20, 1.1); G.fx.cineEase(1.3);
+    AU.play('kWhoom', { vol: 0.6 });
+    yield* during(1.1, (k, dt, e) => {
+      G.fx.cine.z = 1.1 + 0.25 * k;
+      if (e >= 0.5 && e - dt < 0.5) { AU.play('kHeart', { vol: 1 }); G.fx.ripple(b.x, b.y - 40, 160, 0.5, 0.8); G.fx.kick(0, 1); }
+      if (Math.random() < dt * 10) { const h = headOf(); G.fx.spawn({ kind: 'spark', x: h.x + G.rand(-8, 8), y: h.y + 10, vx: G.rand(-14, 14), vy: -G.rand(20, 50), life: 1.2, size: 2, color: '200,190,180' }); }
+    });
+    // she stands and drives the blade up into her crown
+    facePlayer();
     setPose('drawCrown'); b.eyes = 0;
-    G.fx.cine.x = b.x; G.fx.cine.y = b.y - 90; G.fx.cine.to = 0.7;
-    yield* wait(0.5);
-    AU.play('solBlade', { k: 7 }); G.fx.flash(SUNHOT, 0.5, 0.3); G.fx.shake(14);
+    G.fx.cineCut(b.x, b.y - 110, 0.8); G.fx.cineEase(2);
+    yield* wait(0.45);
+    AU.play('solBlade', { k: 7 }); AU.play('boom'); G.fx.flash(SUNHOT, 0.55, 0.3); G.fx.shake(16); G.fx.stop(0.08);
+    G.fx.lines(b.x, b.y - 190, 22, SUNHOT, { r0: 40, speed: [900, 1600] });
     b.crownK = 1;
     yield* wait(0.3);
-    AU.play('solDrain', { dur: 2.6 });
-    G.arena.setPhase(3, 2.6);
+    // the drain: behind her a black sun rises out of nothing and grows, and every light in the world pours
+    // into it; the view backs away to take it all in, the heartbeat louder each time (v2.9p)
+    AU.play('solDrain', { dur: 2.8 }); AU.play('kRumble', { dur: 2.6 });
+    G.arena.setPhase(3, 2.8);
     G.audio.setIntensity(0);
-    let e = 0, beat = 0;
-    while (e < 2.6) {
-      const dt = yield; e += dt; const k = Math.min(1, e / 2.6);
-      B.darkK = E.inQuad(k); b.eclipse = k; B.lightR = 300 * (1 - k);
-      if (e > [0.9, 1.6, 2.2][beat] && beat < 3) { AU.play('solHeart', { vol: 0.5 + 0.25 * beat }); beat++; }
-      if (Math.random() < dt * 50) { const a = G.rand(0, G.TAU), r = G.rand(200, 600); G.fx.spawn({ kind: 'spark', x: b.x + Math.cos(a) * r, y: b.y - 90 + Math.sin(a) * r, vx: -Math.cos(a) * r * 1.5, vy: -Math.sin(a) * r * 1.5, life: 0.5, size: 2, color: SUN, len: 0.05 }); }
-    }
+    const sun = B.bigSun = { x: b.x, y: FLOOR - 300, r: 0, ring: 0 };
+    let beat = 0;
+    // (v2.9r) it takes her in surges, one with each heartbeat (and a slow creep between), and she flinches
+    const BEATS = [0.9, 1.7, 2.4];
+    const taken = (t) => { let v = 0.16 * Math.min(1, t / 2.8); for (const tb of BEATS) v += 0.28 * E.outCubic(G.clamp((t - tb) / 0.32, 0, 1)); return Math.min(1, v); };
+    yield* during(2.8, (k, dt, e) => {
+      B.darkK = E.inQuad(k); b.eclipse = taken(e); B.lightR = 300 * (1 - k);
+      b.rec = (b.rec || 0) * Math.exp(-7 * dt); b.sq = (b.sq || 0) * Math.exp(-7 * dt);
+      const sm = b.eclipse * (1 - b.eclipse) * 4;
+      if (Math.random() < dt * 26 * sm) G.fx.spawn({ x: b.x + G.rand(-22, 22), y: b.y - G.rand(10, 130), vx: G.rand(-18, 18), vy: -G.rand(30, 90), life: G.rand(0.7, 1.3), size: G.rand(3, 7), color: '14,4,10' });
+      if (Math.random() < dt * 14 * sm) G.fx.spawn({ kind: 'spark', x: b.x + G.rand(-18, 18), y: b.y - G.rand(10, 130), vx: G.rand(-30, 30), vy: -G.rand(40, 120), life: G.rand(0.3, 0.6), size: G.rand(1.2, 2.2), color: RIM });
+      sun.r = 175 * E.outCubic(Math.min(1, k * 1.15));
+      G.fx.cine.z = G.lerp(0.8, 0.12, E.inOutQuad(k)); G.fx.cine.y = G.lerp(b.y - 110, FLOOR - 230, E.inOutQuad(k)); G.fx.cine.x = b.x;
+      G.fx.shake(1 + 3 * k);
+      if (beat < 3 && e > [0.9, 1.7, 2.4][beat]) {
+        beat++;
+        AU.play('solHeart', { vol: 0.5 + 0.25 * beat }); AU.play('kHeart', { vol: 0.6 + 0.3 * beat });
+        G.fx.ripple(sun.x, sun.y, 200 + 120 * beat, 0.5, 0.8 + 0.4 * beat); G.fx.kick(0, 0.8 * beat); G.fx.punch(0.015 * beat);
+        // the surge: she flinches as it bites, and black bursts off her
+        b.rec = -0.1 * b.face; b.sq = 0.06; b.flash = 0.6;
+        G.fx.burst(b.x, b.y - 80, { n: 10 + 4 * beat, color: '14,4,10', speed: [60, 220], life: [0.6, 1.1], size: [3, 7], grav: -60 });
+        G.fx.burst(b.x, b.y - 80, { n: 8 + 4 * beat, color: RIM, kind: 'spark', speed: [120, 380], life: [0.2, 0.5], size: [1.2, 2.4] });
+      }
+      if (Math.random() < dt * 80) { const a = G.rand(0, G.TAU), r = G.rand(260, 760); G.fx.spawn({ kind: 'spark', x: sun.x + Math.cos(a) * r, y: sun.y + Math.sin(a) * r, vx: -Math.cos(a) * r * 1.7, vy: -Math.sin(a) * r * 1.7, life: 0.5, size: 2.2, color: SUN, len: 0.06 }); }
+    });
     B.darkK = 1; b.eclipse = 1; b.crownK = 0;
     B.form = 'eclipse';
+    // totality: one point of light left on the black sun's rim flares (the diamond ring), and goes out
+    AU.play('kGleam'); AU.play('solGong', { vol: 0.8 });
+    G.fx.flash(RIMHOT, 0.25, 0.3);
+    yield* during(1.1, (k) => { sun.ring = k < 0.18 ? k / 0.18 : 1 - E.inQuad((k - 0.18) / 0.82); });
+    sun.ring = 0;
+    yield* wait(0.25);
+    // it comes down into her: the black sun falls on her and closes into her halo
+    AU.play('kWhoom', { vol: 1 }); AU.play('solDrain', { dur: 0.5 });
+    const x0 = sun.x, y0 = sun.y, r0 = sun.r, h0 = headOf();
+    G.fx.cine.x = b.x;
+    yield* during(0.5, (k0, dt) => {
+      const k = E.inCubic(k0), h = headOf();
+      sun.x = G.lerp(x0, h.x - b.face * 6, k); sun.y = G.lerp(y0, h.y - 4, k); sun.r = G.lerp(r0, 18, k);
+      G.fx.cine.z = G.lerp(0.12, 0.6, k); G.fx.cine.y = G.lerp(FLOOR - 230, h.y + 10, k);
+      if (Math.random() < dt * 60) G.fx.spawn({ kind: 'spark', x: sun.x + G.rand(-sun.r, sun.r), y: sun.y + G.rand(-sun.r, sun.r), vx: (h0.x - sun.x) * 3, vy: (h0.y - sun.y) * 3, life: 0.25, size: 2, color: RIM, len: 0.05 });
+    });
+    B.bigSun = null;
+    G.fx.stop(0.06); G.fx.shake(10); G.fx.punch(0.03);
+    G.fx.lines(h0.x, h0.y, 20, RIMHOT, { r0: 30, speed: [600, 1100] });
+    // black: nothing at all for a moment
+    G.fx.cineCut(b.x, b.y - 80, 0.55); G.fx.cineEase(1);
+    yield* wait(0.55);
   }
   B.phaseOut = function* (n) {
     const b = B.body;
-    G.fx.cine.to = 0;
-    if (n === 2) { setPose('ready'); AU.play('roar'); yield* wait(0.3); B.skyCrack = 1; return; }
-    // her rim catches fire
-    AU.play('solFlare', { vol: 1.2 }); G.fx.shake(16); G.fx.stop(0.08);
+    if (n === 2) {
+      setPose('ready'); AU.play('roar'); B.skyCrack = 1;
+      G.ui.hud(true); G.fx.cine.to = 0; G.fx.cineEase(2.2);
+      yield* during(0.5, (k) => { G.fx.cine.z = G.lerp(G.fx.cine.z, 0.3, k); });
+      G.fx.cine.z = 0.3; G.fx.cineEase(2.6);
+      return;
+    }
+    // her rim catches fire: an eclipse's corona tearing open round her, the blast throwing you back
+    AU.play('solFlare', { vol: 1.4 }); AU.play('kPillar'); AU.play('boom');
+    G.audio.duck(1);
+    G.fx.shake(22); G.fx.stop(0.1); G.fx.punch(0.05);
+    G.fx.flash(RIM, 0.5, 0.4);
+    G.fx.ring(b.x, b.y - 90, { r0: 60, r1: 1300, life: 1.0, width: 16, color: RIM, alpha: 0.8 });
+    G.fx.ring(b.x, b.y - 90, { r0: 30, r1: 600, life: 0.6, width: 6, color: RIMHOT, alpha: 0.8 });
+    G.fx.ripple(b.x, b.y - 90, 800, 0.9, 2);
+    G.fx.lines(b.x, b.y - 90, 34, RIMHOT, { r0: 60, speed: [1100, 2000] });
+    G.fx.burst(b.x, b.y - 90, { n: 60, color: RIM, kind: 'spark', speed: [300, 1200], life: [0.4, 1.0], size: [2, 4], drag: 1.2 });
+    B.pushPlayer(560, 320);
     b.eyes = 1; setPose('point', true);
-    let e = 0;
-    while (e < 0.6) { const dt = yield; e += dt; B.lightR = 300 * E.outQuad(Math.min(1, e / 0.6)); }
+    G.fx.cineCut(b.x + b.face * 40, b.y - 90, 0.85); G.fx.cineEase(1.4);
+    yield* during(0.6, (k) => { B.lightR = 300 * E.outQuad(k); });
     B.lightR = 300;
     setPose('ready');
-    yield* wait(0.3);
+    G.ui.hud(true); G.fx.cine.to = 0; G.fx.cineEase(2.2);
+    yield* during(0.5, (k) => { G.fx.cine.z = G.lerp(G.fx.cine.z, 0.3, k); });
+    G.fx.cine.z = 0.3; G.fx.cineEase(2.6);
   };
 
   // The end. She comes down to her knees on the ridge; her blade breaks; light shows through the cracks
@@ -2519,22 +2854,34 @@
       b.y = FLOOR; slamFx(b.x, FLOOR, true);
     }
     b.air = false; setPose('kneel', true); B.blackSun = 0;
+    // (v2.9p) shot close: her on her knees, then her blade breaking, then the light coming back through her
+    G.ui.hud(false);
+    G.fx.cineCut(b.x, b.y - 60, 0.85); G.fx.cineEase(1.4);
+    AU.play('kWhoom', { vol: 0.6 });
+    yield* wait(0.6);
+    G.fx.cineCut(b.x + b.face * 40, FLOOR - 40, 1.25); G.fx.cineEase(2);
+    yield* wait(0.25);
+    b.blade = false; AU.play('tink'); AU.play('kSnap'); G.fx.shatter(b.x + b.face * 40, FLOOR - 40, RIM, 18, { hot: RIMHOT, r: 220 }); G.fx.stop(0.08); G.fx.shake(6);
     yield* wait(0.5);
-    b.blade = false; AU.play('tink'); G.fx.shatter(b.x + b.face * 40, FLOOR - 40, RIM, 14, { hot: RIMHOT, r: 200 });
     // the light coming back through her
+    G.fx.cineCut(b.x, b.y - 70, 0.7); G.fx.cineEase(1);
     G.arena.setPhase(4, 3.0);
     let e = 0;
     const d0 = B.darkK;
-    while (e < 1.4) { const dt = yield; e += dt; const k = Math.min(1, e / 1.4); B.darkK = d0 * (1 - k); b.eclipse = 1 - k; }
+    while (e < 1.4) { const dt = yield; e += dt; const k = Math.min(1, e / 1.4); B.darkK = d0 * (1 - k); b.eclipse = 1 - k; B.skyCrack = Math.min(B.skyCrack, 1 - k); G.fx.cine.z = 0.7 + 0.25 * k; } // (v3.0b: the sky's cracks close up)
     B.darkK = 0; b.eclipse = 0;
     G.ui.card('', 'THEN CARRY IT', '');
+    const hd = headOf();
+    G.fx.cineCut(hd.x, hd.y + 8, 1.5); G.fx.cineEase(0.8);
     yield* wait(1.6);
-    // she breaks into light, and it pours into the hero
+    // she breaks into light, and it pours into the hero (the view drawing back to hold you both)
+    G.fx.cineCut((b.x + P.x) / 2, FLOOR - 90, 0.45); G.fx.cineEase(1.2);
     B.dawn = { t: 0 };
     AU.play('solDawn');
     e = 0;
     while (e < 2.0) {
       const dt = yield; e += dt; B.dawn.t = e;
+      if (e > 1.2) { G.fx.cine.x = G.lerp(G.fx.cine.x, P.x, Math.min(1, dt * 2)); G.fx.cine.z = G.lerp(G.fx.cine.z, 0.7, Math.min(1, dt * 1.5)); }
       b.alpha = 1 - Math.min(1, e / 1.2);
       for (let i = 0; i < 4; i++) {
         const sx = b.x + G.rand(-20, 20), sy = b.y - G.rand(0, 100), dx = P.x - sx, dy = P.y - 30 - sy;
@@ -2545,6 +2892,7 @@
     G.fx.flash(SUNHOT, 0.6, 1.2); G.fx.shake(10);
     G.feats.bump('sol');
     yield* wait(1.4);
+    G.fx.cine.to = 0; G.fx.cineEase(2.2); // (z and the rate reset themselves once the view is back; v3.0a: the HUD stays off, the dawn comes next: epilogue.js)
   };
   function drawDawn(ctx) {
     const P = G.player, k = Math.min(1, B.dawn.t / 2);
@@ -2584,6 +2932,22 @@
     }
     draw0(ctx);
     const b = B.body;
+    // (v2.9p) her hands drawn in to her as light: a ribbon behind each, thinning towards its tail
+    if (B.pull) {
+      ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+      for (const tr of B.pull.trails) {
+        const n = tr.length;
+        for (let i = 1; i < n; i++) {
+          const k = i / n, [x0, y0] = tr[i - 1], [x1, y1] = tr[i];
+          ctx.strokeStyle = G.rgba(SUN, 0.25 * k * B.pull.a); ctx.lineWidth = 2 + 22 * k * k;
+          ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
+          ctx.strokeStyle = G.rgba(SUNHOT, 0.9 * k * B.pull.a); ctx.lineWidth = 1 + 3 * k;
+          ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
+        }
+      }
+      if (B.pull.core > 0.01) { D.glow(ctx, SUN, B.pull.x, B.pull.y, 30 + 90 * B.pull.core, 0.8 * B.pull.core); D.glow(ctx, SUNHOT, B.pull.x, B.pull.y, 10 + 24 * B.pull.core, B.pull.core); }
+      ctx.restore();
+    }
     // the echo she leaves (Afterglow), brightening
     if (B.echo) {
       const g = B.echo;
@@ -2598,6 +2962,33 @@
       drawFig(ctx, { x: d.x, y: FLOOR, face: d.face, eclipse: 1, eyes: 1, crownK: 0.3, breath: 0, blade: true }, 0.9, { p: POSES.ready });
     }
   };
+  // the noon sun's dark twin: an ember haze, a crown of black blades edged in ember, a black disc with the
+  // hours and her star on it in ember (v2.9p: drawn at any size, for the change to the Eclipse too)
+  function drawBlackSun(ctx, x, y, r) {
+    const tt = B.t;
+    ctx.save(); ctx.globalCompositeOperation = 'lighter';
+    D.glow(ctx, RIM, x, y, r * 3.7, 0.8);
+    for (let i = 0; i < 12; i++) sunBlade(ctx, x, y, (i + 0.5) / 12 * G.TAU + tt * 0.1, r * 0.98, r * (1.5 + 0.1 * Math.sin(tt * 3 + i)), r * 0.08, RIMHOT, 0.75);
+    ctx.restore();
+    ctx.save();
+    for (let i = 0; i < 12; i++) {
+      const a = i / 12 * G.TAU - tt * 0.06, r1 = r * (2.1 + (i % 3 === 0 ? 0.45 : 0) + 0.08 * Math.sin(tt * 2 + i * 1.7));
+      ctx.fillStyle = '#030001'; sunBladePath(ctx, x, y, a, r * 0.95, r1, r * 0.12); ctx.fill();
+      ctx.strokeStyle = G.rgba(RIM, 0.9); ctx.lineWidth = Math.max(1.5, r / 50); ctx.stroke();
+    }
+    ctx.fillStyle = '#010001'; ctx.beginPath(); ctx.arc(x, y, r, 0, G.TAU); ctx.fill();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.strokeStyle = G.rgba(RIM, 0.95); ctx.lineWidth = Math.max(4, r / 18); ctx.beginPath(); ctx.arc(x, y, r, 0, G.TAU); ctx.stroke();
+    ctx.strokeStyle = G.rgba(RIMHOT, 0.8); ctx.lineWidth = Math.max(1.5, r / 45); ctx.stroke();
+    ctx.strokeStyle = G.rgba(RIM, 0.5); ctx.lineWidth = Math.max(1, r / 70); ctx.beginPath(); ctx.arc(x, y, r * 0.68, 0, G.TAU); ctx.stroke();
+    ctx.fillStyle = G.rgba(RIMHOT, 0.9);
+    for (let i = 0; i < 12; i++) { const a = i / 12 * G.TAU - tt * 0.1; ctx.beginPath(); ctx.arc(x + Math.cos(a) * r * 0.68, y + Math.sin(a) * r * 0.68, (i % 3 === 0 ? 2.4 : 1.2) * Math.max(1, r / 70), 0, G.TAU); ctx.fill(); }
+    ctx.translate(x, y); ctx.rotate(tt * 0.15);
+    const q = r * 0.32, w = r * 0.07;
+    ctx.strokeStyle = G.rgba(RIMHOT, 0.95); ctx.lineWidth = Math.max(1.6, r / 44);
+    ctx.beginPath(); ctx.moveTo(0, -q); ctx.lineTo(w, -w); ctx.lineTo(q, 0); ctx.lineTo(w, w); ctx.lineTo(0, q); ctx.lineTo(-w, w); ctx.lineTo(-q, 0); ctx.lineTo(-w, -w); ctx.closePath(); ctx.stroke();
+    ctx.restore();
+  }
   const drawOver0 = B.drawOver;
   B.drawOver = function (ctx) {
     const b = B.body, P = G.player;
@@ -2626,32 +3017,24 @@
       const fl = d.real ? 0.5 + 0.5 * Math.sin(B.t * 9) * Math.sin(B.t * 5.3) : 0.75;
       D.glow(ctx, RIM, d.x, FLOOR - 56, 70, 0.25 + 0.5 * fl);
     }
-    if (B.blackSun > 0.01 && !b.hidden) {
-      const k = B.blackSun, x = b.x, y = b.y - 56;
-      // the noon sun's dark twin: an ember haze, a crown of black blades edged in ember, a black disc with
-      // the hours and her star on it in ember
-      const r = 70 * k, tt = B.t;
-      ctx.save(); ctx.globalCompositeOperation = 'lighter';
-      D.glow(ctx, RIM, x, y, 260 * k, 0.8);
-      for (let i = 0; i < 12; i++) sunBlade(ctx, x, y, (i + 0.5) / 12 * G.TAU + tt * 0.1, r * 0.98, r * (1.5 + 0.1 * Math.sin(tt * 3 + i)), r * 0.08, RIMHOT, 0.75);
-      ctx.restore();
-      for (let i = 0; i < 12; i++) {
-        const a = i / 12 * G.TAU - tt * 0.06, r1 = r * (2.1 + (i % 3 === 0 ? 0.45 : 0) + 0.08 * Math.sin(tt * 2 + i * 1.7));
-        ctx.fillStyle = '#030001'; sunBladePath(ctx, x, y, a, r * 0.95, r1, r * 0.12); ctx.fill();
-        ctx.strokeStyle = G.rgba(RIM, 0.9); ctx.lineWidth = 1.5; ctx.stroke();
+    if (B.blackSun > 0.01 && !b.hidden) drawBlackSun(ctx, b.x, b.y - 56, 70 * B.blackSun);
+    // (v2.9p) the change to the Eclipse: the black sun rising huge behind her, its diamond ring, and her
+    // drawn again in front of it
+    if (B.bigSun && B.bigSun.r > 1) {
+      const q = B.bigSun;
+      drawBlackSun(ctx, q.x, q.y, q.r);
+      if (q.ring > 0.01) {
+        const a = -0.75, rx = q.x + Math.cos(a) * q.r, ry = q.y + Math.sin(a) * q.r, k = q.ring;
+        ctx.save(); ctx.globalCompositeOperation = 'lighter';
+        D.glow(ctx, RIMHOT, rx, ry, 40 + 160 * k, 0.9 * k);
+        D.glow(ctx, '255,255,255', rx, ry, 14 + 30 * k, k);
+        ctx.strokeStyle = G.rgba('255,250,240', 0.9 * k); ctx.lineCap = 'round';
+        ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(rx - 420 * k, ry); ctx.lineTo(rx + 420 * k, ry); ctx.stroke();
+        ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(rx, ry - 160 * k); ctx.lineTo(rx, ry + 160 * k); ctx.stroke();
+        ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(rx - 90 * k, ry - 90 * k); ctx.lineTo(rx + 90 * k, ry + 90 * k); ctx.moveTo(rx - 90 * k, ry + 90 * k); ctx.lineTo(rx + 90 * k, ry - 90 * k); ctx.stroke();
+        ctx.restore();
       }
-      ctx.fillStyle = '#010001'; ctx.beginPath(); ctx.arc(x, y, r, 0, G.TAU); ctx.fill();
-      ctx.save(); ctx.globalCompositeOperation = 'lighter';
-      ctx.strokeStyle = G.rgba(RIM, 0.95); ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(x, y, r, 0, G.TAU); ctx.stroke();
-      ctx.strokeStyle = G.rgba(RIMHOT, 0.8); ctx.lineWidth = 1.5; ctx.stroke();
-      ctx.strokeStyle = G.rgba(RIM, 0.5); ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(x, y, r * 0.68, 0, G.TAU); ctx.stroke();
-      ctx.fillStyle = G.rgba(RIMHOT, 0.9);
-      for (let i = 0; i < 12; i++) { const a = i / 12 * G.TAU - tt * 0.1; ctx.beginPath(); ctx.arc(x + Math.cos(a) * r * 0.68, y + Math.sin(a) * r * 0.68, i % 3 === 0 ? 2.4 : 1.2, 0, G.TAU); ctx.fill(); }
-      ctx.translate(x, y); ctx.rotate(tt * 0.15);
-      const q = r * 0.32, w = r * 0.07;
-      ctx.strokeStyle = G.rgba(RIMHOT, 0.95); ctx.lineWidth = 1.6;
-      ctx.beginPath(); ctx.moveTo(0, -q); ctx.lineTo(w, -w); ctx.lineTo(q, 0); ctx.lineTo(w, w); ctx.lineTo(0, q); ctx.lineTo(-w, w); ctx.lineTo(-q, 0); ctx.lineTo(-w, -w); ctx.closePath(); ctx.stroke();
-      ctx.restore();
+      if (!b.hidden) drawShift(ctx, b, b.alpha);
     }
     if (B.total > 0.01) {
       ctx.fillStyle = 'rgba(0,0,0,' + (0.85 * B.total) + ')'; ctx.fillRect(-80, -80, G.W + 160, G.H + 160);
@@ -2711,8 +3094,8 @@
     setup0();
     B.form = 'noon'; B.flashed = false; B.lastLightOn = false; B.glaring = false; B.glareHit = false; B.armor = false;
     B.decoys = null; B.echo = null; B.flyBlade = null; B.ringOut = null; B.lash = null; B.steps = null; B.total = 0; B.totalR = 400;
-    B.blackSun = 0; B.lensSpot = null; B.diveShadow = null; B.stuck = false; B.breathe = false; B.flaring = 0; B.blindNow = false;
-    B.crackLines = null; B.slowed = false; B.hairPts = null; B.hairPts2 = null; B.hairPts3 = null;
+    B.blackSun = 0; B.lensSpot = null; B.diveShadow = null; B.stuck = false; B.breathe = false; B.flaring = 0; B.blindNow = false; B.bigSun = null; B.pull = null;
+    B.crackLines = null; B.discCrack = null; B.slowed = false; B.hairPts = null; B.hairPts2 = null; B.hairPts3 = null;
 
     // (v2.9a) risen again after she felled you (game.js G.riseAgain): straight into the form you fell in
     const n = G.solFrom || 1;

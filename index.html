@@ -276,6 +276,21 @@
       </div>
     </section>
 
+    <!-- (v2.9n) the Guide: a book of screenshots with arrows (guide.js) -->
+    <section id="s-guide" class="screen guidescreen">
+      <div class="book">
+        <div class="gpage left"><div class="gpg" id="guideL"></div></div>
+        <div class="gpage right"><div class="gpg" id="guideR"></div></div>
+        <div class="gspine"></div>
+      </div>
+      <nav class="gnav">
+        <div class="item" data-act="gprev">Back</div>
+        <span id="guideNum" class="gnum"></span>
+        <div class="item" data-act="gnext">Next</div>
+        <div class="item" data-act="gclose">Close</div>
+      </nav>
+    </section>
+
     <section id="s-journal" class="screen panelscreen">
       <div class="panel help journal">
         <h2>The Journal</h2>
@@ -298,12 +313,24 @@
     </section>
 
     <section id="s-feats" class="screen panelscreen">
-      <div class="panel feats">
-        <p class="over">Feats</p>
+      <div class="panel help tally">
         <h2>The Tally</h2>
         <p class="lead" id="featsLead"></p>
-        <div id="featsBody" class="featgrid"></div>
-        <nav class="row"><div class="item" data-act="back">Back</div></nav>
+        <div class="helpcols">
+          <nav id="featsTabs">
+            <div class="item" data-act="tal0"></div>
+            <div class="item" data-act="tal1"></div>
+            <div class="item" data-act="tal2"></div>
+            <div class="item" data-act="tal3"></div>
+            <div class="item" data-act="tal4"></div>
+            <div class="item" data-act="tal5"></div>
+            <div class="item" data-act="tal6"></div>
+            <div class="item" data-act="tal7"></div>
+            <div class="item" data-act="tal8"></div>
+            <div class="item" data-act="back">Back</div>
+          </nav>
+          <div id="featsBody"></div>
+        </div>
       </div>
     </section>
 
@@ -338,6 +365,7 @@
         <nav>
           <div class="item" data-act="resume">Resume</div>
           <div class="item" data-act="moves">Moves</div>
+          <div class="item" data-act="guide">Guide</div>
           <div class="item" data-act="journal">Journal</div>
           <div class="item" data-act="restart">Restart run</div>
           <div class="item" data-act="camp">Return to camp</div>
@@ -389,6 +417,18 @@
         </nav>
       </div>
     </section>
+    <!-- (v3.0a) the end of a run won: after Sol and the dawn (epilogue.js) -->
+    <section id="s-end" class="screen panelscreen">
+      <div class="panel result win endrun">
+        <p class="over" id="endOver"></p>
+        <h2>THE RUN IS WON</h2>
+        <div class="stats" id="endStats"></div>
+        <div class="endroad" id="endRoad"></div>
+        <div class="recap"><p class="rbuild" id="endBuild"></p></div>
+        <div class="unlocks"><h3>Unlocked</h3><ul id="endUnlocks"></ul></div>
+        <nav class="row"><div class="item" data-act="endcamp">Return to camp</div></nav>
+      </div>
+    </section>
   </div>
   <div id="fade"></div>
 </div>
@@ -429,6 +469,8 @@
 <script src="js/corrupt.js"></script>
 <script src="js/hexes.js"></script>
 <script src="js/ui.js"></script>
+<script src="js/guide.js"></script>
+<script src="js/epilogue.js"></script>
 <script src="js/game.js"></script>
 </body>
 </html>

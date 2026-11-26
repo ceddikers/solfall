@@ -311,6 +311,8 @@
       if (run.solOpen()) {
         if (!offerTaken()) { G.audio.play('empty'); say('Take from the offering first'); return; }
         if (G.relics.pending()) { G.audio.play('empty'); say('Your relic stirs at the fire'); return; }
+        // (v3.0a) the run ends at Sol: corrupted portals left open close for good. Warn once first.
+        if (run.corrupted.length && !run.lastWarned) { run.lastWarned = true; G.audio.play('uiMove'); say('Corrupted portals close once you go in. Touch again to go'); REST.msgT = 3.6; return; }
         G.audio.play('uiSelect'); G.audio.play('charge', { dur: 0.8 }); F.flash('255,250,236', 0.7, 0.8); F.shake(6);
         G.enterPortal('sol', false);
         return;
@@ -1257,7 +1259,7 @@
     }
     if (s.id === 'door') return ['The Doorway', 'Someone sits in the light inside, waiting. A duel: lose it, and you lose nothing.', 'step through'];
     if (s.id === 'duel') return ['The Duelling Shade', 'It dashes at you, six times at most. Strike it three times before its blade touches you and it leaves a relic.', 'duel'];
-    if (s.id === 'seventh') return ['The Last Portal', run.solOpen() ? 'Open. Light pours out of it: she is waiting on the other side.' : run.runWon() ? 'Spent. Its light is yours.' : 'Dormant. It waits for ' + G.roman(G.TRIALS) + ' trials won (' + run.trialsWon() + ' of ' + G.TRIALS + ').', run.solOpen() ? 'step through' : run.runWon() ? 'touch it' : ''];
+    if (s.id === 'seventh') return ['The Last Portal', run.solOpen() ? (run.corrupted.length ? 'Open. The run ends here: corrupted portals left open will close.' : 'Open. Light pours out of it: she is waiting on the other side.') : run.runWon() ? 'Spent. Its light is yours.' : 'Dormant. It waits for ' + G.roman(G.TRIALS) + ' trials won (' + run.trialsWon() + ' of ' + G.TRIALS + ').', run.solOpen() ? 'step through' : run.runWon() ? 'touch it' : ''];
     if (s.id === 'portal') {
       const B = G.bosses[s.boss], st = portalState(s.boss), ready = offerTaken();
       if (st === 'corrupt') return ['Corrupted: ' + B.name, 'Optional. Far stronger, and it does not count as a trial. Win it for a second relic and triple Sunshards.', ready ? 'enter, if you dare' : 'take from the offering first'];

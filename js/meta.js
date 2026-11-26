@@ -44,6 +44,13 @@
   for (const u of G.SHRINE) upById[u.id] = u;
   G.up = (id) => Math.min(M.up[id] || 0, upById[id] ? upById[id].costs.length : 0);
   M.cost = (u) => u.costs[G.up(u.id)]; // undefined once every rank is bought
+  // (v2.9p) met a boss at all: beaten it, or seen any of its attacks. Aurel and Sol are surprises: the Tally
+  // and the Journal keep their names to themselves until then (ui.js).
+  M.met = (id) => (M.kills[id] || 0) > 0 || Object.values((M.journal || {})[id] || {}).some((r) => r && r.seen);
+  M.SURPRISES = ['champion', 'sol'];
+  M.hidden = (id) => M.SURPRISES.includes(id) && !M.met(id);
+  // (v2.9m) someone who has never bought at the Shrine but could now: the camp and the defeat screen say so
+  M.newcomer = () => !G.SHRINE.some((u) => G.up(u.id) > 0) && G.SHRINE.some((u) => { const c = M.cost(u); return c != null && M.shards >= c; });
   M.buy = function (i) {
     const u = G.SHRINE[i], c = u && M.cost(u);
     if (c == null || M.shards < c) return false;

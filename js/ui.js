@@ -42,7 +42,7 @@
       'hint', 'lowhp', 'lbTop', 'lbBot', 'diffNote', 'bestLine', 'ver', 'deadLead', 'deadFill', 'deadStats',
       'pauseBoons', 'boons', 'trial', 'winOver', 'winPick', 'winCards', 'heroName', 'heroCards', 'relicCards', 'relicOver',
       'deadTip', 'winStats', 'winBest', 'gradeLetter', 'gradeTitle', 'gradeSub', 'stage',
-      'practiceOver', 'keyList', 'resetItem', 'movesOver', 'movesTitle', 'movesBody', 'movesFoot', 'ult', 'ultFill', 'ultKey', 'crown', 'crownFill', 'crownName', 'crownKey', 'flow', 'flowRank', 'flowFill', 'omen', 'shardCount', 'shrineLead', 'shrineList', 'shrineTrophies', 'rerollItem', 'featsLead', 'featsBody', 'helpBody', 'helpTabs', 'fountainLead', 'fountainList', 'smithLead', 'smithList', 'merchLead', 'merchList', 'items', 'item0', 'item1', 'motes', 'moteCount', 'continueItem', 'quickItem', 'deadRecap', 'winRecap', 'dailyItem', 'journalTabs', 'journalBody']) el[id] = $(id);
+      'practiceOver', 'keyList', 'resetItem', 'movesOver', 'movesTitle', 'movesBody', 'movesFoot', 'ult', 'ultFill', 'ultKey', 'crown', 'crownFill', 'crownName', 'crownKey', 'flow', 'flowRank', 'flowFill', 'omen', 'shardCount', 'shrineLead', 'shrineList', 'shrineTrophies', 'rerollItem', 'featsLead', 'featsBody', 'featsTabs', 'helpBody', 'helpTabs', 'fountainLead', 'fountainList', 'smithLead', 'smithList', 'merchLead', 'merchList', 'items', 'item0', 'item1', 'motes', 'moteCount', 'continueItem', 'quickItem', 'deadRecap', 'winRecap', 'dailyItem', 'journalTabs', 'journalBody']) el[id] = $(id);
     el.segs = Array.from(document.querySelectorAll('#ember .seg'));
     el.bbar = document.querySelector('.bbar');
     el.bname = document.getElementById('bname');
@@ -91,6 +91,8 @@
     items.forEach((it, k) => it.classList.toggle('focus', k === U.focus));
     const act = U.current === 'help' && items[U.focus] ? items[U.focus].dataset.act || '' : '';
     if (/^help\d$/.test(act)) U.fillHelp(Number(act.slice(4)));
+    const ta = U.current === 'feats' && items[U.focus] ? items[U.focus].dataset.act || '' : '';
+    if (/^tal\d$/.test(ta)) U.fillFeats(Number(ta.slice(3)));
     const ja = U.current === 'journal' && items[U.focus] ? items[U.focus].dataset.act || '' : '';
     if (/^jour\d$/.test(ja)) U.fillJournal(Number(ja.slice(4)));
   };
@@ -148,12 +150,14 @@
     else if (name === 'daily') G.startDaily();
     else if (name === 'journal') U.showJournal();
     else if (/^jour\d$/.test(name)) U.fillJournal(Number(name.slice(4)));
+    else if (/^tal\d$/.test(name)) U.fillFeats(Number(name.slice(3)));
     else if (name === 'retry' || name === 'restart') G.newRun();
     else if (name === 'heroes' || name === 'camp') G.toHub('gate');
     else if (/^hero\d$/.test(name)) G.pickHero(Number(name.slice(4)));
     else if (/^relic\d$/.test(name)) G.pickRelic(Number(name.slice(5)));
     else if (/^boon\d$/.test(name)) G.takeBoon(Number(name.slice(4)));
     else if (name === 'endrun') G.toHub('gate');
+    else if (name === 'endcamp') G.epilogue.finish();
     else if (name === 'rest') G.toRest();
     else if (name === 'reroll') G.rerollBoons();
     else if (name === 'shrine') U.showShrine();
@@ -162,6 +166,10 @@
     else if (/^temper\d$/.test(name)) temper(Number(name.slice(6)));
     else if (/^merch\d$/.test(name)) merchBuy(Number(name.slice(5)));
     else if (name === 'how') U.show('how', true);
+    else if (name === 'guide') G.guide.open(false);
+    else if (name === 'gprev') G.guide.turn(-1);
+    else if (name === 'gnext') G.guide.turn(1);
+    else if (name === 'gclose') G.guide.close();
     else if (name === 'help') U.showHelp();
     else if (/^help\d$/.test(name)) U.fillHelp(Number(name.slice(4)));
     else if (name === 'settings') U.show('settings', true);
@@ -186,6 +194,11 @@
     if (!items.length) return;
     if (performance.now() < U.lockUntil) return; // a result screen just opened: ignore mashed buttons
     const n = items.length, it = items[U.focus];
+    // (v2.9n) the Guide: left and right turn its pages, Esc closes it
+    if (U.current === 'guide') {
+      if (a === 'left' || a === 'right') { G.guide.turn(a === 'right' ? 1 : -1); return; }
+      if (a === 'pause') { G.guide.close(); return; }
+    }
     if (a === 'up') { U.setFocus((U.focus - 1 + n) % n); G.audio.play('uiMove'); }
     else if (a === 'down') { U.setFocus((U.focus + 1) % n); G.audio.play('uiMove'); }
     else if (a === 'left' || a === 'right') {
@@ -422,7 +435,7 @@
       const b = J_ORDER[i];
       if (!b) return;
       const B = G.bosses[b], all = Object.keys((G.JOURNAL || {})[b] || {}), seen = all.filter((a) => (jRec(b)[a] || {}).seen).length;
-      it.textContent = (B ? B.short : b) + '  ' + seen + '/' + all.length;
+      it.textContent = G.meta.hidden(b) ? '???' : (B ? B.short : b) + '  ' + seen + '/' + all.length; // (v2.9p: a surprise until met)
     });
     U.jPage = -1;
     U.show('journal', true);
@@ -433,6 +446,11 @@
     const b = J_ORDER[i], B = G.bosses[b], J = (G.JOURNAL || {})[b];
     if (!B || !J || U.jPage === i) return;
     U.jPage = i;
+    if (G.meta.hidden(b)) {
+      el.journalBody.innerHTML = '<h3>???</h3><p class="lead">You haven\u2019t met this one yet.</p>';
+      Array.from(el.journalTabs.children).forEach((it) => it.classList.toggle('open', it.dataset.act === 'jour' + i));
+      return;
+    }
     const rec = jRec(b), bags = B.bags || {}, cor = B.corruptBags || {};
     const phasesOf = (a) => [1, 2, 3].filter((p) => (bags[p] || []).includes(a));
     const corrupt = (a) => [1, 2, 3].some((p) => (cor[p] || []).includes(a));
@@ -454,14 +472,40 @@
       + ' \u00b7 its moves have hit you ' + hits + (hits === 1 ? ' time' : ' times') + (falls ? ', felled you ' + falls : '') + '</p><div class="jlist">' + rows.join('') + '</div>';
     Array.from(el.journalTabs.children).forEach((it) => it.classList.toggle('open', it.dataset.act === 'jour' + i));
   };
-  // ---- the Tally: every feat, done or not, and what it pays
+  // ---- the Tally: a list of the bosses (and the camp) on the left, with how many of each one's feats are
+  // done; the one in focus shows its feats on the right, done or not, and what each pays. (v2.9o: was every
+  // feat at once, which made the screen too big)
+  const talList = () => G.feats.BOSSES.filter((b) => G.bosses[b]).concat(['camp']);
+  const talFeats = (b) => (b === 'camp' ? G.feats.CAMP : G.feats.of(b));
   U.showFeats = function () {
-    const FE = G.feats;
-    const row = (f) => '<div class="feat' + (FE.done(f.id) ? ' done' : '') + '"><b>' + f.name + '</b><span>' + f.desc + '</span><i>' + (FE.done(f.id) ? 'done' : '\u25c6 ' + f.pay) + '</i></div>';
-    el.featsLead.innerHTML = '<b style="color:var(--gold)">' + FE.count() + '</b> of ' + FE.total + ' done. Each pays its Sunshards once, the first time you do it.';
-    el.featsBody.innerHTML = FE.BOSSES.filter((b) => G.bosses[b]).map((b) => '<div class="featcol"><h3>' + G.bosses[b].short + '</h3>' + FE.of(b).map(row).join('') + '</div>').join('')
-      + '<div class="featcol wide"><h3>The Vigil</h3>' + FE.CAMP.map(row).join('') + '</div>';
+    const FE = G.feats, list = talList();
+    el.featsLead.innerHTML = '<b style="color:var(--gold)">' + FE.count() + '</b> of ' + FE.total + ' done. Each one pays Sunshards the first time you do it.';
+    Array.from(el.featsTabs.children).forEach((it, i) => {
+      if (!/^tal\d$/.test(it.dataset.act)) return;
+      const b = list[i];
+      it.style.display = b ? '' : 'none';
+      if (!b) return;
+      const fs = talFeats(b), n = fs.filter((f) => FE.done(f.id)).length;
+      it.innerHTML = (G.meta.hidden(b) ? '???' : esc(b === 'camp' ? 'The camp' : G.bosses[b].short)) + '<span class="tcount' + (n === fs.length ? ' all' : '') + '">' + n + '/' + fs.length + '</span>';
+    });
+    U.talPage = -1;
     U.show('feats', true);
+    const f = el.featsTabs.children[U.focus];
+    U.fillFeats(f && /^tal\d$/.test(f.dataset.act) ? Number(f.dataset.act.slice(3)) : 0);
+  };
+  U.fillFeats = function (i) {
+    const FE = G.feats, b = talList()[i];
+    if (!b || U.talPage === i) return;
+    U.talPage = i;
+    const fs = talFeats(b), n = fs.filter((f) => FE.done(f.id)).length;
+    const row = (f) => '<div class="feat' + (FE.done(f.id) ? ' done' : '') + '"><b>' + f.name + '</b><span>' + f.desc + '</span><i>' + (FE.done(f.id) ? 'done' : '\u25c6 ' + f.pay) + '</i></div>';
+    if (G.meta.hidden(b)) { // (v2.9p: Aurel is a surprise until met)
+      el.featsBody.innerHTML = '<h3>???</h3><p class="lead">You haven\u2019t met this one yet.</p>';
+      Array.from(el.featsTabs.children).forEach((it) => it.classList.toggle('open', it.dataset.act === 'tal' + i));
+      return;
+    }
+    el.featsBody.innerHTML = '<h3>' + esc(b === 'camp' ? 'The camp' : G.bosses[b].name) + '</h3><p class="lead">' + n + ' of ' + fs.length + ' done</p>' + fs.map(row).join('');
+    Array.from(el.featsTabs.children).forEach((it) => it.classList.toggle('open', it.dataset.act === 'tal' + i));
   };
   // ---- the Moves page: every button, and what it does for the hero in play
   U.showMoves = function (fromMenu) {
@@ -571,7 +615,7 @@
     el.resetItem.textContent = 'Reset progress';
     const omens = G.run.omens.map((id) => '<p><b>Omen: ' + G.omenDef(id).name + '</b> ' + G.omenDef(id).desc + '</p>').join('');
     el.pauseBoons.innerHTML = (held.length || relic || omens)
-      ? '<h3>' + G.hero().name + '\u2019s run</h3>' + omens
+      ? '<h3>' + G.hero().name + '\u2019s run \u00b7 ' + G.diff().name + '</h3>' + omens
         + (relic ? '<p><b>' + esc(G.relics.title(relic.id)) + '</b> ' + G.relics.html(relic.id, { next: true }) + '</p>' : '')
         + (G.run.extraRelics || []).map((id) => G.relicDef(id)).filter(Boolean).map((r) => '<p><b>' + esc(G.relics.title(r.id)) + '</b> ' + G.relics.html(r.id) + ' <i>(' + (r.id === 'hilt' ? 'his gift, for this run' : 'from a corrupted portal') + ')</i></p>').join('')
         + (G.run.crownSet() ? '<p class="crownline" style="--tagc:' + G.SETS[G.run.crownSet()].css + '"><b>Crown · ' + G.SETS[G.run.crownSet()].crown + '</b> ' + esc(G.SETS[G.run.crownSet()].crownDesc) + '</p>' : '')
@@ -606,7 +650,8 @@
   // Trial label, boon list and Starlight segments for the fight that is starting.
   U.buildRun = function () {
     const R = G.run;
-    el.trial.textContent = G.practice ? 'Practice' : R.corrupt || R.champFight ? '' : R.trial > 1 ? 'Trial ' + G.roman(R.trial) : '';
+    // (v2.9m) the difficulty is always shown beside the boss's name
+    el.trial.textContent = [G.practice ? 'Practice' : R.corrupt || R.champFight ? '' : R.trial > 1 ? 'Trial ' + G.roman(R.trial) : '', G.state === 'hub' ? '' : G.diff().name].filter(Boolean).join(' \u00b7 ');
     el.omen.innerHTML = R.omens.map((id) => '<b>Omen \u00b7 ' + G.omenDef(id).name + '</b>' + G.omenDef(id).desc).join('');
     U.buildPrompts();
     H.ult = -1; H.ready = null; H.frank = -1; H.ffill = -1; H.cset = undefined;
@@ -660,9 +705,16 @@
   U.campHint = function () {
     if (!G.settings.hints || U.campSeen) return;
     U.campSeen = true;
-    el.hint.innerHTML = 'Welcome to the Vigil. Try your moves on the <b>sparring post</b>, then walk right: take a relic at <b>the reliquary</b> and step through <b>the gate</b>.';
+    el.hint.innerHTML = 'Welcome to the Vigil. Spend Sunshards at <b>the Shrine</b> to grow stronger, try your moves on the <b>sparring post</b>, then take a relic at <b>the reliquary</b> and step through <b>the gate</b>.';
     el.hint.classList.add('show', 'calm');
-    H.hintT = 9;
+    H.hintT = 10;
+  };
+  // (v2.9m) back from a run with Sunshards and nothing ever bought: point at the Shrine
+  U.shrineHint = function () {
+    if (!G.settings.hints || G.practice || !G.meta.newcomer()) return;
+    el.hint.innerHTML = 'You have <b>' + G.meta.shards + ' Sunshards</b>. Walk back left to <b>the Shrine</b> to spend them.';
+    el.hint.classList.add('show', 'calm');
+    H.hintT = 8;
   };
   // (v1.6b: not shown any more. The camp lists the controls and Tab opens the Moves page; a fight has no help text.)
   U.keysHint = function () {
@@ -878,7 +930,8 @@
     const lm = G.lastMotes;
     el.deadLead.textContent = [G.practice ? 'Practice.' : 'You fell in trial ' + G.roman(G.run.trial) + '.', felledBy(P, B),
       B.short + ' endured with ' + pct + '% of its strength, in phase ' + ROMAN[B.phase] + '.',
-      lm && lm.motes ? 'Your ' + lm.motes + ' Motes became ' + lm.shards + ' Sunshards.' : ''].filter(Boolean).join(' ');
+      lm && lm.motes ? 'Your ' + lm.motes + ' Motes became ' + lm.shards + ' Sunshards.' : '',
+      !G.practice && G.meta.newcomer() ? 'Spend Sunshards at the Shrine in camp to grow stronger.' : ''].filter(Boolean).join(' ');
     el.deadFill.style.transition = 'none';
     el.deadFill.style.width = '100%';
     void el.deadFill.offsetWidth;
@@ -1018,6 +1071,42 @@
     U.hud(false);
     U.lockUntil = performance.now() + 700;
     U.show('win');
+  };
+  // (v3.0a) The end of a run won, after the dawn (epilogue.js): what the run came to, the bosses in the
+  // order they fell (a corrupted one cleansed is marked), the build, and what the win unlocked.
+  U.showEnd = function (res) {
+    const R = G.run, s = R.sum || { t: G.time, hits: 0, perfect: 0, shards: 0 }, H = G.hero();
+    const fromMotes = Math.floor((R.motes || 0) / (G.motes.PER_SHARD || 10));
+    $('endOver').textContent = H.name + ' \u00b7 ' + G.diff().name;
+    $('endStats').innerHTML = statsHtml([
+      [U.fmtTime(s.t), 'Fight time'],
+      [s.hits, 'Hits taken'],
+      [s.perfect, 'Perfect dodges'],
+      ['+' + (s.shards + fromMotes), 'Sunshards'],
+    ]);
+    $('endStats').lastElementChild.firstElementChild.classList.add('gold');
+    const road = R.beaten.filter((id) => id !== 'sol').map((id, i) => {
+      const b = G.bosses[id], cor = R.cleansed.includes(id);
+      return '<span' + (cor ? ' class="cor"' : '') + '><i>' + G.roman(i + 1) + '</i>' + esc(b ? b.short : id) + (cor ? '<b>CORRUPTED</b>' : '') + '</span>';
+    });
+    if (R.champWon && G.bosses.champion) road.push('<span><i>\u2726</i>' + esc(G.bosses.champion.short) + '</span>');
+    road.push('<span class="sol"><i>\u2600</i>Sol</span>');
+    $('endRoad').innerHTML = road.join('');
+    const relic = G.relicDef(R.relic), held = R.held();
+    $('endBuild').innerHTML = (relic ? '<span class="t-relic">' + esc(G.relics.title(relic.id)) + '</span>' : '')
+      + (R.crownSet() ? '<span style="--tagc:' + G.SETS[R.crownSet()].css + '">Crown \u00b7 ' + esc(G.SETS[R.crownSet()].crown) + '</span>' : '')
+      + (R.duo() ? '<span class="t-duo">Duo \u00b7 ' + esc(R.duo().name) + '</span>' : '')
+      + held.map((h) => '<span class="t-' + h.def.tag.toLowerCase() + '">' + esc(h.def.name) + (h.n > 1 ? ' \u00d7' + h.n : '') + '</span>').join('');
+    const un = [];
+    if (res.solFirst) un.push('Dawn at the Vigil: the camp wakes up to morning.');
+    if (res.solHeroFirst) un.push('A sun crown over ' + H.name + ' in the Hall of Echoes.');
+    if (res.costume) un.push('The ' + res.costume.name + ' costume (the Wardrobe, in the Hall of Echoes).');
+    if (res.meta.relic) un.push('Trophy: ' + res.meta.relic.name + ' joins the relics you can be offered.');
+    for (const l of res.meta.lines) if (l.indexOf('Feat: ') === 0) un.push(l.replace(/\s*\+\d+$/, ''));
+    $('endUnlocks').innerHTML = un.length ? un.map((u) => '<li>' + esc(u) + '</li>').join('') : '<li class="none">Nothing new this time.</li>';
+    U.hud(false);
+    U.lockUntil = performance.now() + 900;
+    U.show('end');
   };
   // The boons on offer (three, or four with the Shrine's Fourth Boon), and the redraw button.
   U.fillBoons = function () {

@@ -293,6 +293,7 @@
     // (v2.9k) Motes, the run's own currency, the two consumables held, the road merchant's stock, and
     // what was bought from it (motes.js)
     R.motes = 0; R.motesEarned = 0; R.items = [null, null]; R.merch = null; R.mendsBought = 0; R.bonusHp = 0;
+    R.sum = { t: 0, hits: 0, perfect: 0, shards: 0 }; R.champWon = false; R.lastWarned = false; // (v3.0a) the run's totals, for the end screen
     if (typeof document !== 'undefined') document.documentElement.style.setProperty('--herocol', G.hero().css); // (a hero's own boons wear the hero's colour)
   };
 
@@ -322,6 +323,7 @@
     for (const id of Object.keys(R.boons || {})) if (!G.boonDef(id)) delete R.boons[id];
     if (!R.stats) R.stats = { dealt: {}, taken: {} };
     if (!R.fight) R.fight = { dealt: {}, taken: {} };
+    if (!R.sum) R.sum = { t: 0, hits: 0, perfect: 0, shards: 0 };
   };
   // (v2.8a) The daily trial. Every pick a run makes (the first boss, each offering and redraw, the omens,
   // a corrupted portal, a road's meeting, a banish's replacement, the relic) is drawn from the day itself and

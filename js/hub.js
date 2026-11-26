@@ -504,16 +504,32 @@
     x.lineTo(w, FLOOR + 10); x.closePath(); x.fill();
   }
 
+  // (v3.0a) Once any hero has beaten Sol the camp is at dawn for good: a morning sky, the sun lit, and a
+  // sun crown in the Hall over each hero who beat her. HUB.checkDawn reads it again (on each return to camp).
+  let dawnOn = null, solW = {};
+  HUB.checkDawn = function () {
+    solW = G.store.load('sol', {}) || {};
+    const d = Object.keys(solW).length > 0;
+    if (d !== dawnOn) { dawnOn = d; HUB.layers = null; }
+  };
+  HUB.dawn = () => !!dawnOn;
+  HUB.morning = function () { HUB.msg = 'Morning, at last'; HUB.msgT = 5; };
+
   function buildSky() {
-    const w = W + PAD * 2, [c, x] = canvas(w), T = -PAD;
+    const w = W + PAD * 2, [c, x] = canvas(w), T = -PAD, dawn = !!dawnOn;
     let g = x.createLinearGradient(0, T, 0, FLOOR + 20);
-    g.addColorStop(0, '#05071c'); g.addColorStop(0.28, '#12143c'); g.addColorStop(0.52, '#35285c');
-    g.addColorStop(0.72, '#84476a'); g.addColorStop(0.87, '#dc8660'); g.addColorStop(1, '#ffd098');
+    if (dawn) {
+      g.addColorStop(0, '#16285e'); g.addColorStop(0.3, '#34518e'); g.addColorStop(0.55, '#8676ac');
+      g.addColorStop(0.74, '#e0968a'); g.addColorStop(0.88, '#ffc08a'); g.addColorStop(1, '#ffe4b0');
+    } else {
+      g.addColorStop(0, '#05071c'); g.addColorStop(0.28, '#12143c'); g.addColorStop(0.52, '#35285c');
+      g.addColorStop(0.72, '#84476a'); g.addColorStop(0.87, '#dc8660'); g.addColorStop(1, '#ffd098');
+    }
     x.fillStyle = g; x.fillRect(0, T, w, FLOOR + 20 - T);
     const r = lcg(77);
     for (let i = 0; i < 340; i++) {
       const sx = r() * w, sy = T + r() * (FLOOR - 190 - T), a = r(), s = r();
-      const fade = Math.pow(1 - (sy - T) / (FLOOR - 150 - T), 1.4);
+      const fade = Math.pow(1 - (sy - T) / (FLOOR - 150 - T), 1.4) * (dawn ? 0.3 * Math.pow(1 - (sy - T) / (FLOOR - 150 - T), 2) : 1);
       x.fillStyle = 'rgba(255,255,255,' + ((0.25 + 0.75 * a) * fade).toFixed(3) + ')';
       const sz = s > 0.94 ? 2.3 : s > 0.6 ? 1.4 : 1;
       x.fillRect(sx, sy, sz, sz);
@@ -521,16 +537,34 @@
     // a thin moon, high on the left
     const mx = 250 + PAD, my = 116;
     g = x.createRadialGradient(mx, my, 10, mx, my, 150);
-    g.addColorStop(0, 'rgba(206,212,255,0.28)'); g.addColorStop(1, 'rgba(206,212,255,0)');
+    g.addColorStop(0, 'rgba(206,212,255,' + (dawn ? 0.1 : 0.28) + ')'); g.addColorStop(1, 'rgba(206,212,255,0)');
     x.fillStyle = g; x.fillRect(mx - 150, my - 150, 300, 300);
-    x.fillStyle = '#ecebff';
+    x.fillStyle = dawn ? 'rgba(236,235,255,0.3)' : '#ecebff';
     x.beginPath(); x.arc(mx, my, 30, 0.686, 4.733); x.arc(mx + 13, my - 6, 27, 4.236, 1.183, true); x.closePath(); x.fill();
     // dawn gathering on the horizon to the right, where the gate is
     g = x.createRadialGradient(980 + PAD, FLOOR + 50, 30, 980 + PAD, FLOOR + 50, 760);
-    g.addColorStop(0, 'rgba(255,196,128,0.6)'); g.addColorStop(0.45, 'rgba(255,150,110,0.2)'); g.addColorStop(1, 'rgba(255,150,110,0)');
+    g.addColorStop(0, 'rgba(255,196,128,' + (dawn ? 0.8 : 0.6) + ')'); g.addColorStop(0.45, 'rgba(255,150,110,' + (dawn ? 0.3 : 0.2) + ')'); g.addColorStop(1, 'rgba(255,150,110,0)');
     x.fillStyle = g; x.fillRect(0, T, w, FLOOR + 20 - T);
-    // the dimmed sun itself: a black disc with a thin crown
     const ex = 1000 + PAD, ey = 356;
+    if (dawn) {
+      // the sun, lit again: a warm halo, long soft rays and a bright disc
+      g = x.createRadialGradient(ex, ey, 30, ex, ey, 420);
+      g.addColorStop(0, 'rgba(255,236,190,0.75)'); g.addColorStop(0.35, 'rgba(255,200,140,0.25)'); g.addColorStop(1, 'rgba(255,190,130,0)');
+      x.fillStyle = g; x.fillRect(ex - 420, ey - 420, 840, 840);
+      for (let i = 0; i < 26; i++) {
+        const a = i / 26 * TAU + r() * 0.1, len = 70 + r() * 150, wd = 0.04 + r() * 0.03;
+        const lg = x.createLinearGradient(ex, ey, ex + Math.cos(a) * (50 + len), ey + Math.sin(a) * (50 + len));
+        lg.addColorStop(0, 'rgba(255,240,200,0.5)'); lg.addColorStop(1, 'rgba(255,240,200,0)');
+        x.fillStyle = lg;
+        x.beginPath(); x.moveTo(ex + Math.cos(a - wd) * 48, ey + Math.sin(a - wd) * 48); x.lineTo(ex + Math.cos(a) * (50 + len), ey + Math.sin(a) * (50 + len)); x.lineTo(ex + Math.cos(a + wd) * 48, ey + Math.sin(a + wd) * 48); x.closePath(); x.fill();
+      }
+      x.fillStyle = '#fff3d8'; x.beginPath(); x.arc(ex, ey, 48, 0, TAU); x.fill();
+      g = x.createRadialGradient(ex, ey, 10, ex, ey, 48);
+      g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(1, 'rgba(255,240,206,0)');
+      x.fillStyle = g; x.beginPath(); x.arc(ex, ey, 48, 0, TAU); x.fill();
+    }
+    // the dimmed sun itself: a black disc with a thin crown
+    if (!dawn) {
     g = x.createRadialGradient(ex, ey, 40, ex, ey, 190);
     g.addColorStop(0, 'rgba(255,220,170,0.55)'); g.addColorStop(1, 'rgba(255,220,170,0)');
     x.fillStyle = g; x.fillRect(ex - 190, ey - 190, 380, 380);
@@ -541,12 +575,13 @@
     }
     x.fillStyle = '#0a0716'; x.beginPath(); x.arc(ex, ey, 46, 0, TAU); x.fill();
     x.strokeStyle = 'rgba(255,238,206,0.95)'; x.lineWidth = 2.5; x.beginPath(); x.arc(ex, ey, 46, 0, TAU); x.stroke();
+    }
     // long thin clouds catching the first light
     for (let i = 0; i < 12; i++) {
       const cx = r() * w, cy = FLOOR - 330 + r() * 250, rw = 110 + r() * 260, rh = 4 + r() * 9, warm = (cy - (FLOOR - 330)) / 250;
       g = x.createLinearGradient(cx - rw, 0, cx + rw, 0);
-      const col = warm > 0.5 ? '255,176,140' : '190,150,210';
-      g.addColorStop(0, G.rgba(col, 0)); g.addColorStop(0.5, G.rgba(col, 0.2 + 0.14 * warm)); g.addColorStop(1, G.rgba(col, 0));
+      const col = dawn ? (warm > 0.4 ? '255,206,160' : '255,190,190') : warm > 0.5 ? '255,176,140' : '190,150,210';
+      g.addColorStop(0, G.rgba(col, 0)); g.addColorStop(0.5, G.rgba(col, (0.2 + 0.14 * warm) * (dawn ? 1.5 : 1))); g.addColorStop(1, G.rgba(col, 0));
       x.fillStyle = g; x.beginPath(); x.ellipse(cx, cy, rw, rh, 0, 0, TAU); x.fill();
     }
     return c;
@@ -563,6 +598,7 @@
     const g = x.createLinearGradient(0, FLOOR - 200, 0, FLOOR + 10);
     g.addColorStop(0, 'rgba(255,170,130,0)'); g.addColorStop(1, 'rgba(255,170,130,0.32)');
     x.fillStyle = g; x.fillRect(0, FLOOR - 200, w, 210);
+    if (dawnOn) { x.globalCompositeOperation = 'source-atop'; x.fillStyle = 'rgba(255,186,150,0.16)'; x.fillRect(0, -PAD, w, FLOOR + PAD + 20); x.globalCompositeOperation = 'source-over'; }
     return c;
   }
 
@@ -660,6 +696,7 @@
   }
 
   function build() {
+    if (dawnOn === null) HUB.checkDawn();
     HUB.layers = [
       { c: buildSky(), f: 0 }, { c: buildFar(0.1), f: 0.1 }, { c: buildMid(0.34), f: 0.34 }, { c: buildNear(0.68), f: 0.68 },
     ];
@@ -730,9 +767,9 @@
     const img = F.glow('255,255,255');
     for (const tw of HUB.twinkles) {
       const k = Math.sin(t * tw.sp + tw.ph);
-      if (k <= 0) continue;
+      if (k <= 0 || (dawnOn && tw.y > 120)) continue;
       const s = 3 + 5 * k * k;
-      ctx.globalAlpha = k * k * k * 0.9;
+      ctx.globalAlpha = k * k * k * (dawnOn ? 0.3 : 0.9);
       ctx.drawImage(img, cam + tw.x - s, tw.y - s, s * 2, s * 2);
     }
     ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
@@ -746,11 +783,12 @@
     // stars that twinkle (fixed to the view, like the sky they sit in)
     ctx.globalCompositeOperation = 'lighter';
     const img = F.glow('255,255,255');
+    if (dawnOn) { ctx.globalAlpha = 0.16 + 0.04 * Math.sin(t * 0.7); ctx.drawImage(F.glow('255,226,170'), cam + 1000 - 260, 356 - 260, 520, 520); } // the sun breathing a little
     for (const tw of HUB.twinkles) {
       const k = Math.sin(t * tw.sp + tw.ph);
-      if (k <= 0) continue;
+      if (k <= 0 || (dawnOn && tw.y > 120)) continue;
       const s = 3 + 5 * k * k;
-      ctx.globalAlpha = k * k * k * 0.9;
+      ctx.globalAlpha = k * k * k * (dawnOn ? 0.3 : 0.9);
       ctx.drawImage(img, cam + tw.x - s, tw.y - s, s * 2, s * 2);
     }
     ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
@@ -816,6 +854,7 @@
         G.drawHero(ctx, G.costumed(h), still); // (v2.8a: in the costume they wear)
         ctx.globalAlpha = 1;
       }
+      if (solW[h.id]) crown(ctx, cx, FLOOR - 150 + Math.sin(t * 1.4 + i) * 2.5, t, i); // (v3.0a: beat Sol)
     }
     // the arcade in front of them: piers, an arch over each bay, a beam, and what is left of the roof
     for (let i = 0; i < NH; i++) {
@@ -843,6 +882,20 @@
     poly(ctx, [312, FLOOR - 254, 420, FLOOR - 318, 560, FLOOR - 300, 600, FLOOR - 334, 668, FLOOR - 286, 720, FLOOR - 296, 742, FLOOR - 254], STONE);
     ctx.fillStyle = G.rgba(RIM, 0.55); ctx.fillRect(300, FLOOR - 254, 580, 2);
     ctx.restore();
+  }
+
+  // (v3.0a) A small sun crown, turning, over a hero who has beaten Sol.
+  function crown(ctx, x, y, t, i) {
+    glow(ctx, GOLD, x, y, 46, 0.5 + 0.1 * Math.sin(t * 2 + i));
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.strokeStyle = G.rgba(GOLD, 0.95); ctx.lineWidth = 2; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.arc(x, y, 8, 0, TAU); ctx.stroke();
+    for (let j = 0; j < 10; j++) {
+      const a = j / 10 * TAU + t * 0.4, r1 = j % 2 ? 16 : 21;
+      ctx.beginPath(); ctx.moveTo(x + Math.cos(a) * 12, y + Math.sin(a) * 12); ctx.lineTo(x + Math.cos(a) * r1, y + Math.sin(a) * r1); ctx.stroke();
+    }
+    ctx.fillStyle = 'rgba(255,248,226,0.95)'; ctx.beginPath(); ctx.arc(x, y, 4, 0, TAU); ctx.fill();
+    ctx.lineCap = 'butt'; ctx.globalCompositeOperation = 'source-over';
   }
 
   // The Shrine: a stepped dais under the ribs of a fallen dome, and the shard that turns above it.
@@ -1066,9 +1119,12 @@
     }
     poly(ctx, [x - 156, FLOOR - 372, x + 156, FLOOR - 372, x + 156, FLOOR - 398, x - 156, FLOOR - 398], STONE2);
     poly(ctx, [x - 148, FLOOR - 398, x + 148, FLOOR - 398, x + 120, FLOOR - 436, x, FLOOR - 470, x - 120, FLOOR - 436], STONE);
-    ctx.globalCompositeOperation = 'lighter';
-    diamond(ctx, x, FLOOR - 426, 11, 18, G.rgba(GOLD, 0.95)); diamond(ctx, x, FLOOR - 426, 5, 9, 'rgba(255,255,255,0.9)');
-    ctx.globalCompositeOperation = 'source-over';
+    if (dawnOn) crown(ctx, x, FLOOR - 428, t * 0.5, 0); // (v3.0a: lit since Sol fell)
+    else {
+      ctx.globalCompositeOperation = 'lighter';
+      diamond(ctx, x, FLOOR - 426, 11, 18, G.rgba(GOLD, 0.95)); diamond(ctx, x, FLOOR - 426, 5, 9, 'rgba(255,255,255,0.9)');
+      ctx.globalCompositeOperation = 'source-over';
+    }
     // fire-bowls either side
     for (const side of [-1, 1]) {
       const px = x + side * 196;
