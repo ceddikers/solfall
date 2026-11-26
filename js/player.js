@@ -22,8 +22,8 @@
     CHARGE_T: 0.9,   // how long Aster's smash takes to charge fully
     CHARGE_DMG: 0.8, // how much a full charge adds to the smash (0.8 = 36 becomes 65; v2.4c trimmed the smash, not the charge)
     // Eos keeps her blade in its sheath. Holding the attack gathers Focus; letting go is the draw.
-    FOCUS: [0.3, 0.65, 1.05],     // seconds of stance for the first, second and third mark (v2.1b: from 0.45, 0.95, 1.5)
-    DRAW_DMG: [18, 46, 60],       // (v2.9c: only the full draw is used now, at once from a full sheath; 60, from 100, as it is no longer held for)
+    FOCUS: [0.16, 0.32, 0.48],    // seconds of stance for the first, second and third mark (v3.1d: the draw's charge, from 0.3, 0.65, 1.05)
+    DRAW_DMG: [18, 46, 80],       // (v3.1d: 80, from 60, now that it is charged; v2.9c: only the full draw is used)
     DRAW_STEP: [170, 230, 300],   // how far it carries her
     DRAW_T: 0.1,                  // how long that takes
     DRAW_WAIT: [0.2, 0.32, 0.46], // how long after it the cut lands: the blade going home
@@ -1044,22 +1044,43 @@
   P.focusMark = focusMark;
   const mouthX = () => P.x + P.facing * 9, mouthY = () => P.y - 31; // where the mouth of the sheath is, for light
 
-  // (v2.9c) Eos's attack button. A press is the next cut of the string; a string whose finisher lands
-  // (v2.9e: the first two need not) puts one in the sheath. With two in it (or a blow turned by Still Point) the sheath is full: the next
-  // press is the full draw, at once, and empties it. Nothing is held for any more.
+  // (v3.1d) Eos's attack button. A press is always the next cut of the string; a string whose finisher lands puts
+  // one in the sheath. With two in it (or a blow turned by Still Point) the sheath is full, and that opens the draw
+  // as a charge: keep the button down (once the cut it pressed is done) and she sets her feet behind it, the three
+  // marks lighting one by one; let go with all three lit and she draws, emptying the sheath. Let go sooner and she
+  // only settles: the sheath stays full. (v2.9c-v3.1c: the next press with a full sheath was the draw itself, which
+  // swallowed the string.)
   function stance(dt, ctl, mx, up, down, free) {
     if (!ctl || P.stun > 0) { P.hold = null; P.focus = 0; P.edge = 0; return; }
-    P.hold = null; P.edge = 0;
-    const can = free && P.healT === 0 && P.flT === 0, full = (P.sheath || 0) >= C.SHEATH_COMBOS;
-    P.focus = full ? C.FOCUS[2] : 0; // (the three marks on the sheath light when it is full)
-    if (P.atkBuf > 0 && can && P.dashT <= 0) {
-      if (full) {
-        P.atkBuf = 0; P.cast = null; P.sheath = 0; P.focus = 0;
-        drawCut(3, mx, up, down);
-      } else if (P.atkCd <= 0) {
-        P.atkBuf = 0; P.cast = null;
-        flick(mx, up, down);
+    P.edge = 0;
+    const I = G.input, can = free && P.healT === 0 && P.flT === 0, full = (P.sheath || 0) >= C.SHEATH_COMBOS;
+    if (P.hold) {
+      if (!full || !can || P.dashT > 0 || P.atk) { P.hold = null; P.focus = 0; }
+      else if (I.down.attack) {
+        const was = focusMark(P.focus);
+        P.focus = Math.min(C.FOCUS[2], P.focus + dt);
+        const m = focusMark(P.focus);
+        if (m > was) { // each mark lights with a tick and a glint at the mouth of the sheath; the third rings
+          const hx = mouthX(), hy = mouthY();
+          G.audio.play('focus', { n: m });
+          G.fx.glint(hx, hy, m >= 3 ? 34 : 14 + 6 * m, m >= 3 ? GOLD : HOT, m >= 3 ? 0.3 : 0.16);
+          if (m >= 3) { G.fx.ring(hx, hy, { r0: 8, r1: 54, life: 0.3, color: GOLD, width: 3 }); G.fx.light(hx, hy, 120, GOLD, 0.25, 0.4); }
+        }
+        P.atkBuf = 0;
+        return;
+      } else {
+        const ready = P.focus >= C.FOCUS[2];
+        P.hold = null; P.focus = 0; P.atkBuf = 0;
+        if (ready) { P.cast = null; P.sheath = 0; drawCut(3, mx, up, down); }
+        return;
       }
+    }
+    P.focus = 0;
+    if (P.atkBuf > 0 && can && P.dashT <= 0 && P.atkCd <= 0) {
+      P.atkBuf = 0; P.cast = null;
+      flick(mx, up, down);
+    } else if (full && can && P.dashT <= 0 && !P.atk && P.atkBuf <= 0 && I.down.attack) {
+      P.hold = { t: 0 }; // the button still down after the cut: the charge begins
     }
   }
   // (v2.9a) a full string lands: one more in the sheath, and a chime and a flash at its mouth when it is full

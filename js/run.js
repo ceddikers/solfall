@@ -88,9 +88,9 @@
       ],
       down: 11, special: 'guard', specialName: 'Still Point', verb: 'guard',
       blurb: 'Patient and exact. One cut, when it counts.',
-      lines: ['Sheathed blade: land the finisher twice to fill the sheath, then one press draws through the foe', 'The draw blinks him through the foe; dash to get out of the way', 'Still Point: turn a blow aside and the sheath is full'],
+      lines: ['Sheathed blade: land two strings to fill the sheath, then hold attack to charge the draw', 'The draw blinks him through the foe; dash to get out of the way', 'Still Point: turn a blow aside and the sheath is full'],
       how: {
-        attack: 'Sheathed blade: cut (11), cut (13), finisher (27). Land the finisher twice to fill the sheath (it glows gold). Then one press is the draw: he blinks through the foe for 60.',
+        attack: 'Sheathed blade: cut (11), cut (13), finisher (27). Each string whose finisher lands puts one in the sheath; two fill it (it glows gold). Then hold attack until three marks light, and let go to draw: he blinks through the foe for 80.',
         aim: 'The draw goes where you aim. Down in the air strikes below and bounces.',
         dash: 'The draw is a cut, not a dodge: it does not pass through attacks.',
         special: 'Still Point: brace for two thirds of a second. A blow that lands is turned, does no harm, and fills the sheath. If nothing lands, half the Starlight comes back.',

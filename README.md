@@ -2,7 +2,7 @@
 
 A side-on boss rush for the browser: four heroes, seven three-phase bosses, played as a run of
 ever-harder trials. You pick a hero and a relic before the run and win a boon after each victory.
-Version 3.1c.
+Version 3.1d.
 
 This is an early slice of a planned boss-rush roguelite (short runs, a boon after each boss,
 bosses drawn from a pool). A run is seven trials, one for each boss, each harder than the last: the first boss
@@ -116,6 +116,28 @@ hero (`tools/feel-check.js`).
 - Settings, Reset progress erases Sunshards, upgrades, trophies and records (it has to be chosen twice).
 
 Not done: touch controls, a colour-blind alternative to red-orange warnings, gamepad rebinding.
+
+## Eos: the draw is a charge (v3.1d)
+
+Asked: "LC LC LC, get one stack, LC LC LC get another stack (as long as the third strong hit hits the stack is
+gotten) then unlocks the charge attack". Until now a full sheath turned the very next press into the draw, which
+swallowed the string.
+
+- A press is always the next cut. Each string whose finisher (the third, strong hit) lands puts one in the sheath;
+  two fill it, and it glows gold.
+- With a full sheath, **hold attack**: she sets her feet behind the sheath and its three marks light one by one
+  (about half a second). Let go with all three lit and she draws, blinking through the foe. Let go sooner and nothing
+  is lost: the sheath stays full. A blow taken while charging cancels the charge, not the sheath.
+- The draw now deals **80** (from 60), since it costs a charge. Still Point's turned blow still fills the sheath at
+  once.
+
+Tested: frame by frame (two strings fill it; a tap with a full sheath is a cut; a short hold keeps the sheath; a full
+hold and release draws). Bot, Eos against the seven bosses at Standard trial V, 21 fights: before 11 won, kills
+157 s on average; with the charge at 60 damage 10 won, 202 s; at 80 damage 10-11 won, 159-169 s.
+
+Playtest checklist:
+- Does LC LC LC, LC LC LC, then hold and release feel right? Is the charge too slow or too quick?
+- Is it clear when all three marks are lit (the gold ring and chime)?
 
 ## Tabs change on a click, not a hover (v3.1c)
 

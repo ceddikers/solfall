@@ -353,15 +353,22 @@
     }
     const half = tg.hw != null ? tg.hw : (tg.r || 0);
     const carry = C.DRAW_STEP[2] * (P.onGround ? 1 : C.AIR_REACH) + half - 10;
-    const go = (Math.abs(tg.cx - P.x) < carry && vgap < 150) || (threat && soonest < 0.3);
-    if (go) {
-      if (I.down.attack) lift('attack'); else press('attack');
-      G.drawStats = G.drawStats || { n: 0, lv: [0, 0, 0, 0], escape: 0 };
-      if (!I.down.attack) { G.drawStats.n++; G.drawStats.lv[3]++; }
-      return true;
+    // (v3.1d) the draw is a charge: hold until all three marks are lit, then let go. It is only begun when nothing is
+    // about to land (the charge cannot be dodged out of without losing it), and given up if something comes.
+    const near = Math.abs(tg.cx - P.x) < carry && vgap < 150;
+    G.drawStats = G.drawStats || { n: 0, lv: [0, 0, 0, 0], escape: 0 };
+    if (P.hold) {
+      if (P.focus >= C.FOCUS[2] && near) { lift('attack'); G.drawStats.n++; G.drawStats.lv[3]++; return true; }
+      if (threat && soonest < 0.45) { lift('attack'); G.drawStats.escape++; return false; }
+      I.down.attack = true; return true;
     }
-    lift('attack');
-    return false;
+    if (near && !(threat && soonest < 0.8)) {
+      if (!P.atk && !I.pressed.attack) { I.down.attack = true; return true; } // (held, not pressed: a press would be a cut)
+    }
+    if (!inReach) { lift('attack'); return false; }
+    if (st.tap) lift('attack'); else press('attack');
+    st.tap = !st.tap;
+    return true;
   }
 
   // ---------------------------------------------------------------- one whole fight
