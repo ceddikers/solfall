@@ -2,7 +2,7 @@
 
 A side-on boss rush for the browser: four heroes, seven three-phase bosses, played as a run of
 ever-harder trials. You pick a hero and a relic before the run and win a boon after each victory.
-Version 3.0d.
+Version 3.0e.
 
 This is an early slice of a planned boss-rush roguelite (short runs, a boon after each boss,
 bosses drawn from a pool). A run is seven trials, one for each boss, each harder than the last: the first boss
@@ -116,6 +116,69 @@ hero (`tools/feel-check.js`).
 - Settings, Reset progress erases Sunshards, upgrades, trophies and records (it has to be chosen twice).
 
 Not done: touch controls, a colour-blind alternative to red-orange warnings, gamepad rebinding.
+
+## Weapon forms: a second weapon for each hero (v3.0e)
+
+Part 4 of the plan. Asked for "a new weapon each". Beating Sol with a hero unlocks their second weapon. Take it from
+the **weapon rack** in the yard, next to the sparring post. The rack glows once a weapon is waiting; use it again to
+go back to the hero's first weapon. The end screen tells you when one unlocks, and the echoes in the Hall of Echoes
+carry the weapon their hero has chosen.
+
+| Hero | Weapon | Attacks | Special |
+|---|---|---|---|
+| Vesper | **Twin Blades**: two short swords | cut 7, cut 8, crossed finisher 20; quicker than the sword, and every cut is a cross (the second blade cuts the other way) | **Crossing Stars**: two crescents of light for 30 each, crossing in an X across the arena |
+| Aster | **Star Gauntlets**: two plated fists | jab 8, cross 9 (straight punches), haymaker 22; short reach, fast, no charged smash | **Meteor Fist**: lunge forward and punch out a short, wide burst of starlight for 54 |
+| Lune | **Moon Crossbow** | bolts 9, 10, then a heavy bolt 24; slower than the bow, harder per shot, still strongest up close | **Triple Bolt**: three heavy bolts for 16 each (more up close) in a tight spread, and a hop back |
+| Eos | **Dawn Naginata**: a curved blade on a long pole | sweep 15, sweep 17, finisher 40 that sends a short crescent on for 20; the longest reach of any weapon, no sheath or draw; stood upright at rest | **Still Point** as before, but a turned blow is answered with a sweep all around you for 60 |
+
+How it works:
+- Each new weapon moves like one the game already has: the twin blades, gauntlets and naginata swing like the
+  sword, and the crossbow shoots like the bow. Each is drawn as itself.
+- Boons built on the first weapon's special or mechanics are not offered while you carry the second one. These are
+  Split Lance, Pinning Lance, Twin Stars, Aftershock, Starborn, Fault Line, Unbroken, Full Quiver, Harvest Moon,
+  Hanging Cut and Second Sun.
+- With the naginata, Eos's Dawn Scabbard throws its crescent on every second finisher, since there is no draw.
+
+How they were tested. A bot can't feel fun, so this is what it can measure:
+- **The bot matrix:** every boss with every hero, each weapon, at Standard trials II and V and Merciless trial III,
+  3 runs each, plus a pass where the bot can't die (time to kill = raw damage).
+- **Frame-by-frame sheets** of each weapon's string and special, checked by eye.
+
+What the sheets turned up, now fixed:
+- Vesper's second sword never swung.
+- Aster's punches showed sword slash arcs, and Meteor Fist lunged her into the boss.
+- Triple Bolt did 114 point blank, far more than any other special.
+- The naginata's blade dragged in the floor at rest.
+
+What the matrix turned up, now tuned:
+- **Gauntlets** were too strong: they killed a third faster than the maul. Now jab 8, cross 9, haymaker 22, and
+  Meteor Fist 54.
+- **Naginata** was much too weak: it won 24% at trial V against the sheathed blade's 62%. Now 15/17/40, plus the
+  finisher's crescent.
+- **Crossbow:** slightly quicker shots.
+
+Bot wins after tuning (first weapon then second, 21 fights each):
+
+| Hero | Standard trial V | Merciless trial III |
+|---|---|---|
+| Vesper | 48% / 48% | 29% / 38% |
+| Aster | 33% / 48% | 33% / 52% |
+| Lune | 29% / 33% | 10% / 0% |
+| Eos | 62% / 57% | 48% / 43% |
+
+Raw damage (time to kill, first then second): Vesper 153 s / 121 s, Aster 165 s / 144 s, Lune 144 s / 186 s,
+Eos 135 s / 126 s.
+
+Notes:
+- The bot plays the maul's charge and Lune's slower shots badly, so read the Aster and Lune rows with care.
+- In a direct test where both stand and fire, the crossbow deals about 15% more than the bow.
+- The test also found a rare crash in Eos's Horizon (Dawnbreak): one line read the swing after it had been cleared.
+  It could happen with either weapon, and it is fixed.
+
+Playtest checklist:
+- Does each weapon feel different enough from the first one, and cool?
+- The naginata: strong enough without the draw?
+- The gauntlets: do the punches read as punches?
 
 ## Ascension unlocks: what each step gives a hero (v3.0d)
 

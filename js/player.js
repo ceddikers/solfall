@@ -43,6 +43,10 @@
   const GOLD = '255,214,140'; // the finisher's colour
   // The active hero and its two light colours; set in P.reset.
   let H = G.HEROES[0], STAR = H.col, HOT = H.hot;
+  // (v3.0e) the second weapons move like one the game already has: the twin blades, the gauntlets and the
+  // naginata swing like the sword, the crossbow shoots like the bow. Each is drawn as itself (weapon()).
+  const WBASE = { twin: 'sword', gauntlet: 'sword', naginata: 'sword', crossbow: 'bow' };
+  const wk = (h) => WBASE[h.weapon] || h.weapon;
 
   const P = G.player = {};
   G.shots = [];
@@ -469,7 +473,7 @@
     else if (P.atkBuf > 0 && free && P.atkCd <= 0 && P.dashT <= 0 && P.stun <= 0 && P.healT === 0 && !charging) {
       P.atkBuf = 0; P.cast = null;
       if (P.wraps > 0 && G.state === 'fight') wrapsBlink(); // Sparring Wraps (Kairo's trophy)
-      if (H.weapon === 'bow') startShot(mx, up, down);
+      if (wk(H) === 'bow') startShot(mx, up, down);
       else startSwing(mx, up, down);
     }
     if (P.atk) {
@@ -527,6 +531,9 @@
         else if (H.special === 'starfall') castStarfall();
         else if (H.special === 'arc') castArc(d.x, d.y);
         else if (H.special === 'guard') castGuard();
+        else if (H.special === 'cross') { castArc(d.x, d.y); P.cast.cross = true; } // (v3.0e: Crossing Stars)
+        else if (H.special === 'fist') { castArc(d.x, d.y); P.cast.fist = true; P.cast.wind = 0.1; } // (v3.0e: Meteor Fist)
+        else if (H.special === 'bolts') castBolts(d.x, d.y); // (v3.0e: Triple Bolt)
         else {
           castVolley(d.x, d.y);
           if (G.boon('harvest') && (P.harvestN = (P.harvestN || 0) + 1) % 3 === 0) { P.ember += C.SEG; P.emberFlash = 1; G.audio.play('segment'); } // (v3.0d: Harvest Moon)
@@ -603,10 +610,14 @@
 
   function slashArc(a, t0) {
     G.costumeFx('swing', P.x + a.dir * 28, P.y - 34, a.dir > 0 ? 0 : Math.PI);
-    P.slashes.push({
-      kind: a.kind, dir: a.dir, heavy: a.heavy, thrust: a.thrust, idx: a.idx, t: t0, dur: a.heavy ? 0.3 + 0.1 * a.charge : 0.19,
+    const sl = {
+      kind: a.kind, dir: a.dir, heavy: a.heavy, idx: a.idx, t: t0, dur: a.heavy ? 0.3 + 0.1 * a.charge : 0.19,
+      thrust: a.thrust || (H.weapon === 'gauntlet' && a.kind === 'side' && !a.heavy), // (v3.0e: a jab or a cross is a straight punch of light)
       reach: (1 + 0.25 * G.boon('reach')) * H.reach * (1 + 0.25 * a.charge), thick: H.thick * (1 + 0.5 * a.charge),
-    });
+    };
+    P.slashes.push(sl);
+    // (v3.0e) the twin blades: the second sword cuts the other way a moment behind, so every cut is a cross
+    if (H.weapon === 'twin' && a.kind !== 'down' && !sl.thrust) P.slashes.push(Object.assign({}, sl, { rev: true, t: t0 - 0.05, reach: sl.reach * 0.86, thick: sl.thick * 0.8 }));
   }
 
   // Aster holds her smash back: light gathers on the maul, she sinks into her stance, and at full it rings.
@@ -646,13 +657,15 @@
 
   function swing(a) {
     hiltEcho(a.dir, a.dmg);
+    // (v3.0e) the naginata's finisher sends a short crescent of light on past the blade
+    if (H.weapon === 'naginata' && a.heavy && a.kind === 'side') G.shots.push({ wave: true, arc: true, big: 1.1, x: P.x + a.dir * 70, y: P.y - 34, vx: a.dir * C.ARC_SPEED * 0.8, vy: 0, t: 0, life: 0.3, hit: new Set(), dmg: Math.round(20 * weaponMult(true)) });
     if (a.canCharge) {
       // a charged smash hits up to half again as hard and reaches further
       if (a.charge > 0) a.dmg = Math.round(a.dmg * (1 + C.CHARGE_DMG * a.charge));
       slashArc(a, 0);
       P.atkCd = Math.max(P.atkCd, (H.combo[2].cd - H.combo[2].wind) * haste());
     }
-    G.audio.play(a.heavy || H.weapon === 'maul' ? 'slash3' : 'slash');
+    G.audio.play(a.heavy || wk(H) === 'maul' ? 'slash3' : 'slash');
     // flecks of light thrown off the blade, and a lean into the blow
     const ang = swingAng(a), reach = H.reach * (a.heavy ? 1.2 : 1);
     G.fx.burst(P.x + Math.cos(ang) * 44 * reach, P.y - 30 + Math.sin(ang) * 44 * reach, {
@@ -667,7 +680,7 @@
       else if (a.heavy) P.vx += a.dir * 150;
     }
     if (a.heavy && a.kind === 'up' && !P.onGround) P.vy = Math.min(P.vy, -240);
-    if (a.heavy && H.weapon === 'maul' && P.onGround && a.kind === 'side') {
+    if (a.heavy && wk(H) === 'maul' && P.onGround && a.kind === 'side') {
       // the maul's finisher shakes the ground in front of it
       a.quake = true;
       const ck = a.charge || 0;
@@ -1453,6 +1466,44 @@
       arcShot(dx, dy, 1); G.audio.play('draw');
     }
     G.feats.bump('turned');
+    if (H.weapon === 'naginata') counterSweep(); // (v3.0e)
+  }
+
+  // (v3.0e) Aster's Meteor Fist: a lunge, and a short wide burst of light punched out in front
+  function meteorFist(c) {
+    const { dx, dy } = c;
+    G.shots.push({ wave: true, arc: true, big: 2.4, x: P.x + dx * 26, y: P.y - 34 + dy * 26, vx: dx * C.ARC_SPEED * 0.55, vy: dy * C.ARC_SPEED * 0.55, t: 0, life: 0.32, hit: new Set(), dmg: Math.round(54 * G.dmgMult() * spec()), cast: P.castN });
+    P.vx = dx * 340;
+    G.audio.play('slam'); G.audio.play('flare');
+    G.fx.shake(10); G.fx.punch(0.02);
+    G.fx.ring(P.x + dx * 30, P.y - 34 + dy * 30, { r0: 10, r1: 120, life: 0.3, color: HOT, width: 8 });
+    G.fx.lines(P.x + dx * 30, P.y - 34 + dy * 30, 12, HOT, { r0: 20, speed: [600, 1200] });
+  }
+  // (v3.0e) Lune's Triple Bolt: three heavy bolts in a tight spread, and a hop back
+  function castBolts(dx, dy) {
+    const dmg = Math.round(C.VOLLEY_DMG * 1.6 * G.dmgMult() * spec()); // (16 each; up to 60% more up close, like every arrow)
+    for (const a of [-0.07, 0, 0.07]) {
+      const c = Math.cos(a), s = Math.sin(a);
+      arrow(dx * c - dy * s, dx * s + dy * c, dmg, true, 0.6, true);
+      G.shots[G.shots.length - 1].cast = P.castN;
+    }
+    P.vx = -dx * 240;
+    if (dy > -0.5) { P.vy = Math.min(P.vy, -220); P.onGround = false; P.plat = null; }
+    P.atk = null;
+    P.cast = { kind: 'volley', t: 0, wind: 0, dur: 0.3, dx, dy, thrown: true };
+    G.audio.play('arrowHeavy'); G.audio.play('flare');
+    muzzle(dx, dy);
+  }
+  // (v3.0e) Eos's naginata: a blow turned by Still Point is answered with a sweep all around
+  function counterSweep() {
+    const cx = P.x, cy = P.y - 34, R = 150, dmg = Math.round(60 * G.dmgMult() * spec());
+    for (const t of G.boss.targets()) {
+      const inside = t.r ? G.dist(cx, cy, t.cx, t.cy) < R + t.r : G.circleRect(cx, cy, R, t);
+      if (inside) G.boss.damage(dmg, t, { x: t.cx, y: t.cy, heavy: true, poise: H.poise, dir: G.sign(t.cx - cx) || P.facing });
+    }
+    G.audio.play('slash3');
+    G.fx.ring(cx, cy, { r0: 20, r1: R, life: 0.3, color: HOT, width: 7 });
+    G.fx.cut(cx, cy, 0, R * 2, 6, STAR, HOT, 0.35);
   }
 
   // A cut thrown across the arena as a crescent of light. (It was Eos's special until v1.7c; now
@@ -1469,7 +1520,11 @@
     });
   }
   function throwArc(c) {
-    arcShot(c.dx, c.dy, 1);
+    if (c.fist) { meteorFist(c); return; }
+    if (c.cross) {
+      // Crossing Stars: two crescents, one tipped up and one down, crossing as they go
+      for (const t of [-0.17, 0.17]) { const cs = Math.cos(t), sn = Math.sin(t); arcShot(c.dx * cs - c.dy * sn, c.dx * sn + c.dy * cs, 0.75); }
+    } else arcShot(c.dx, c.dy, 1);
     if (G.boon('second')) P.arc2 = { t: 0.16, dx: c.dx, dy: c.dy };
     P.vx -= c.dx * 160;
     G.audio.play('draw'); G.audio.play('flare');
@@ -1521,7 +1576,7 @@
     const B = G.boss;
     if (G.boon('mirror') && B.active && !B.dead && !B.dying) {
       const dx = B.core.x - P.x, dy = B.core.y - (P.y - 36), d = Math.hypot(dx, dy) || 1;
-      if (H.weapon === 'bow') { arrow(dx / d, dy / d, Math.round(H.combo[2].dmg * 2 * weaponMult(true)), true, 0.7); G.audio.play('arrowHeavy'); }
+      if (wk(H) === 'bow') { arrow(dx / d, dy / d, Math.round(H.combo[2].dmg * 2 * weaponMult(true)), true, 0.7); G.audio.play('arrowHeavy'); }
       else { fireLance(dx / d, dy / d); G.audio.play('flare'); }
     }
     if (H.draw) hush();
@@ -1988,6 +2043,7 @@
         if (s.idx === 1) { a0 = 1.2; a1 = -1.2; }
         if (s.heavy) { a0 = -1.95; a1 = 1.5; }
       }
+      if (s.rev) { const t0 = a0; a0 = a1; a1 = t0; } // (v3.0e: the twin blades' second cut)
       R *= rs;
       const end = G.lerp(a0, a1, head);
       const start = G.lerp(a0, a1, Math.max(0, head - 0.8 + k * 0.5));
@@ -2020,9 +2076,9 @@
     if (a.thrust) return { kind: 'thrust', t: 0, dur: 0.24, at: 2 };
     // (v2.6f) an up or down cut (or one from the air) used to have no way back: the weapon jumped to rest
     // in a tenth of a second. Now it is carried back from where the cut ended.
-    if (a.kind !== 'side') return a.kind !== 'shot' && (H.weapon === 'sword' || H.weapon === 'maul')
-      ? { kind: 'settle', t: 0, dur: H.weapon === 'maul' ? 0.42 : 0.32, at: 2, from: swingAngle(Object.assign({}, a, { t: a.a1 })) } : null;
-    if (H.weapon === 'maul') return a.heavy ? { kind: 'smash', t: 0, dur: 0.5, at: 0.3 } : { kind: 'sweep', t: 0, dur: 0.34, at: 0.8 };
+    if (a.kind !== 'side') return a.kind !== 'shot' && (wk(H) === 'sword' || wk(H) === 'maul')
+      ? { kind: 'settle', t: 0, dur: wk(H) === 'maul' ? 0.42 : 0.32, at: 2, from: swingAngle(Object.assign({}, a, { t: a.a1 })) } : null;
+    if (wk(H) === 'maul') return a.heavy ? { kind: 'smash', t: 0, dur: 0.5, at: 0.3 } : { kind: 'sweep', t: 0, dur: 0.34, at: 0.8 };
     if (a.heavy) return { kind: 'fin', t: 0, dur: 0.4, at: 0.2 };
     return a.idx === 1 ? { kind: 'cut2', t: 0, dur: 0.28, at: 2 } : { kind: 'cut1', t: 0, dur: 0.24, at: 2 };
   }
@@ -2051,7 +2107,7 @@
     const u = G.clamp(r.t / r.dur, 0, 1), sm = (x) => { x = G.clamp(x, 0, 1); return x * x * (3 - 2 * x); };
     const home = sm((u - 0.45) / 0.55); // how far the hands have gone back to where they rest
     const toRest = (from, k) => from + G.angDiff(from, rest.ang) * k;
-    if (h.weapon === 'sword') {
+    if (wk(h) === 'sword') {
       let ang, len = 36;
       if (r.kind === 'cut1') ang = u < 0.25 ? G.lerp(1.3, 0.95, sm(u / 0.25)) : toRest(0.95, sm((u - 0.25) / 0.75));
       else if (r.kind === 'cut2') ang = u < 0.22 ? G.lerp(-1.6, -1.95, sm(u / 0.22)) : toRest(-1.95, sm((u - 0.22) / 0.78));
@@ -2062,7 +2118,7 @@
       const fx = G.lerp(1 + Math.cos(ang) * 11, rest.fx, home), fy = G.lerp(SH + Math.sin(ang) * 11, rest.fy, home);
       return { fx, fy, bx: G.lerp(-4, rest.bx, home), by: G.lerp(-27, rest.by, home), ang, len };
     }
-    if (h.weapon === 'maul') {
+    if (wk(h) === 'maul') {
       // over the top: down in front, up, and back onto the shoulder, running a little past it and settling
       const start = r.kind === 'settle' ? r.from : r.kind === 'smash' ? 1.5 : 1.3, hold = r.kind === 'smash' ? 0.3 : r.kind === 'settle' ? 0 : 0.08;
       let ang = start;
@@ -2140,34 +2196,34 @@
     const a = s.atk, air = !s.onGround, run = !air && Math.abs(s.vx) > 40;
     const sw = Math.sin(s.runT + Math.PI);
     const SH = -35; // shoulder height
-    if (h.weapon === 'blade') return bladePose(h, s, breath);
+    if (wk(h) === 'blade') return bladePose(h, s, breath);
     if (s.flT > 0) {
       // flourish: the weapon goes round once and is held high
       const k = G.clamp(s.flT / 0.3, 0, 1), spin = (1 - k) * (1 - k) * G.TAU, ang = -1.42 - spin;
       const fx = 3 + Math.cos(ang) * 6, fy = SH - 6 + Math.sin(ang) * 6;
-      if (h.weapon === 'sword') return { fx, fy, bx: -5, by: -24, ang, len: 38 };
-      if (h.weapon === 'maul') return { fx, fy, bx: fx - Math.cos(ang) * 7.5, by: fy - Math.sin(ang) * 7.5, ang, len: 34 };
+      if (wk(h) === 'sword') return { fx, fy, bx: -5, by: -24, ang, len: 38 };
+      if (wk(h) === 'maul') return { fx, fy, bx: fx - Math.cos(ang) * 7.5, by: fy - Math.sin(ang) * 7.5, ang, len: 34 };
       return { fx: 5, fy: SH - 14 * k, bx: -5, by: -22, ang: -1.25 * k, pull: 0, len: 0 };
     }
     if (s.cast && !a) { const p = castPose(h, s.cast, SH); if (p) return p; }
     if (s.stun > 0 && !a) {
       // knocked back: arms flung out, the weapon thrown wide
-      if (h.weapon === 'sword') return { fx: 9, fy: SH - 6, bx: -10, by: SH + 1, ang: -2.3, len: 36 };
-      if (h.weapon === 'maul') return { fx: 3, fy: SH - 4, bx: -3, by: SH - 1, ang: -2.75, len: 34, behind: true };
+      if (wk(h) === 'sword') return { fx: 9, fy: SH - 6, bx: -10, by: SH + 1, ang: -2.3, len: 36 };
+      if (wk(h) === 'maul') return { fx: 3, fy: SH - 4, bx: -3, by: SH - 1, ang: -2.75, len: 34, behind: true };
       return { fx: 10, fy: SH - 7, bx: -9, by: SH + 1, ang: -0.9, pull: 0, len: 0 };
     }
     if (s.healT > 0 && !a) {
       // mending: the hands come together at the chest and the weapon is lowered
       const k = G.clamp(s.healT / 0.12, 0, 1), q = Math.sin(G.t * 9) * 0.4;
-      if (h.weapon === 'sword') return { fx: 5, fy: -27 + q, bx: 2.5, by: -28.5 + q, ang: G.lerp(2.55, 1.62, k), len: 36 };
-      if (h.weapon === 'maul') return { fx: 6, fy: -26 + q, bx: 3, by: -29 + q, ang: G.lerp(-2.42, 1.42, k), len: 34 };
+      if (wk(h) === 'sword') return { fx: 5, fy: -27 + q, bx: 2.5, by: -28.5 + q, ang: G.lerp(2.55, 1.62, k), len: 36 };
+      if (wk(h) === 'maul') return { fx: 6, fy: -26 + q, bx: 3, by: -29 + q, ang: G.lerp(-2.42, 1.42, k), len: 34 };
       return { fx: 6.5, fy: -26 + q, bx: 3, by: -28.5 + q, ang: G.lerp(0.16, 1.25, k), pull: 0, len: 0 };
     }
     if (s.recov && !a && !s.dash && !s.plunge) {
       const rest = weaponPose0(h, Object.assign({}, s, { recov: null }), breath);
       return recoverPose(h, s.recov, SH, rest);
     }
-    if (h.weapon === 'sword') {
+    if (wk(h) === 'sword') {
       if (a && a.kind !== 'shot') {
         const ang = swingAngle(a), c = Math.cos(ang), sn = Math.sin(ang), r = a.thrust ? 12.5 : 11;
         const fx = 1 + c * r, fy = SH + sn * r;
@@ -2176,9 +2232,10 @@
       if (s.dash) return { fx: -6, fy: -27, bx: -2, by: -29, ang: Math.PI - 0.12, len: 36 };
       if (air) return { fx: 7, fy: -28, bx: -5, by: -27, ang: s.vy < 0 ? -0.75 : 2.3, len: 36 };
       if (run) return { fx: -1 + sw * 3, fy: -24, bx: 2 - sw * 4, by: -25, ang: 2.85, len: 36 };
+      if (h.weapon === 'naginata') return { fx: 7, fy: -25 + breath * 0.3, bx: 4, by: -33, ang: -1.32, len: 36 }; // (v3.0e: stood upright, the blade high)
       return { fx: 6.5, fy: -22.5 + breath * 0.3, bx: -4, by: -25, ang: 2.55, len: 36 };
     }
-    if (h.weapon === 'maul') {
+    if (wk(h) === 'maul') {
       let ang = -2.42, fx = 5.5, fy = -27.5 + (run ? sw * 0.8 : breath * 0.3);
       if (a && a.kind !== 'shot') { ang = swingAngle(a); fx = 1 + Math.cos(ang) * 10.5; fy = SH + Math.sin(ang) * 10.5; }
       else if (s.dash) { ang = Math.PI - 0.35; fx = -2; fy = -29; }
@@ -2206,16 +2263,16 @@
   const fidgetIn = (u, a, b) => smooth(G.clamp(u / a, 0, 1)) * (1 - smooth(G.clamp((u - (1 - b)) / b, 0, 1)));
   function fidgetPose(h, f, W) {
     const u = G.clamp(f.t / f.dur, 0, 1), SH = -35;
-    if (h.weapon === 'sword') {
+    if (wk(h) === 'sword') {
       const e = fidgetIn(u, 0.24, 0.26), turn = Math.sin(G.clamp((u - 0.3) / 0.4, 0, 1) * Math.PI * 2) * 0.3;
       return Object.assign({}, W, { fx: G.lerp(W.fx, 10, e), fy: G.lerp(W.fy, -31, e), bx: G.lerp(W.bx, 3, e), by: G.lerp(W.by, -29, e), ang: G.lerp(W.ang, -0.3 + turn, e) });
     }
-    if (h.weapon === 'maul') {
+    if (wk(h) === 'maul') {
       const k = smooth(G.clamp(u / 0.3, 0, 1)) * (1 - smooth(G.clamp((u - 0.72) / 0.28, 0, 1)));
       const ang = -2.42 + 3.57 * k + Math.sin(u * 11) * 0.03 * k, fx = G.lerp(W.fx, 7, k), fy = G.lerp(W.fy, -27, k), grip = 7.5 - 4.5 * k;
       return { fx, fy, bx: fx - Math.cos(ang) * grip, by: fy - Math.sin(ang) * grip, ang, len: 34, behind: ang < -1.7 };
     }
-    if (h.weapon === 'bow') {
+    if (wk(h) === 'bow') {
       const e = fidgetIn(u, 0.2, 0.25), let0 = 0.62;
       const pull = u < let0 ? 0.4 * smooth(G.clamp((u - 0.25) / 0.3, 0, 1)) : 0, twang = u >= let0 ? Math.max(0, 1 - (u - let0) / 0.16) : 0;
       const aim = -0.12, c = Math.cos(aim), sn = Math.sin(aim), fx1 = 0.5 + c * 12.5, fy1 = SH + 4 + sn * 12.5;
@@ -2385,7 +2442,7 @@
       const k = G.clamp(c.t / 0.08, 0, 1), fx = 0.5 + co * 13.5, fy = SH + sn * 13.5;
       return { fx, fy, bx: G.lerp(fx - co * 13, -7, k), by: G.lerp(fy - sn * 13, SH - 4, k), ang, pull: 0, len: 0, twang: 1 - G.clamp(c.t / 0.25, 0, 1) };
     }
-    if (c.kind === 'slam' && h.weapon === 'maul') {
+    if (c.kind === 'slam' && wk(h) === 'maul') {
       const k = G.ease.outCubic(G.clamp(c.t / 0.07, 0, 1)), ang = G.lerp(-1.75, 1.2, k);
       const fx = 2 + Math.cos(ang) * 10.5, fy = SH + 3 + Math.sin(ang) * 10.5;
       return { fx, fy, bx: fx - Math.cos(ang) * 7.5, by: fy - Math.sin(ang) * 7.5, ang, len: 34 };
@@ -2424,6 +2481,64 @@
     ctx.fillStyle = G.rgba(c, 1);
     poly(ctx, [0.4, -1.4, 2.6, -1.4, 4.4, -6.4, 2.2, -5.2]); ctx.fill();
     poly(ctx, [0.4, 1.4, 2.6, 1.4, 4.4, 6.4, 2.2, 5.2]); ctx.fill();
+    ctx.restore();
+  }
+
+  // (v3.0e) Aster's gauntlet: a heavy plated fist with a lit knuckle bar and a burning core
+  function drawGauntlet(ctx, x, y, ang, h, st, gold, k) {
+    ctx.save();
+    ctx.translate(x, y); ctx.rotate(ang); ctx.scale(k, k);
+    const c = gold ? GOLD : h.col;
+    glowAt(ctx, c, 3, 0, 22, gold ? 0.8 : 0.6);
+    ctx.fillStyle = st.plate;
+    poly(ctx, [-6, -5.4, 3.5, -6.4, 7.6, -4, 8, 4, 3.5, 6.4, -6, 5.4, -7.4, 0]); ctx.fill();
+    ctx.strokeStyle = G.rgba(c, 1); ctx.lineWidth = 1.1; ctx.stroke();
+    ctx.fillStyle = st.dark; poly(ctx, [-9.6, -4.6, -5, -5.6, -5, 5.6, -9.6, 4.6]); ctx.fill(); // the cuff
+    ctx.strokeStyle = G.rgba(c, 0.8); ctx.lineWidth = 0.8; ctx.stroke();
+    ctx.strokeStyle = G.rgba(gold ? GOLD : h.hot, 1); ctx.lineWidth = 1.6; line(ctx, 7.4, -3.4, 7.4, 3.4); // the knuckle bar
+    ctx.fillStyle = G.rgba(gold ? GOLD : h.hot, 0.98); poly(ctx, [0.6, -2.6, 3, 0, 0.6, 2.6, -1.8, 0]); ctx.fill();
+    ctx.restore();
+  }
+  // (v3.0e) Eos's naginata: a long dark haft with a curved blade at the end, held near the middle
+  function drawNaginata(ctx, W, h, st, gold) {
+    ctx.save();
+    ctx.translate(W.fx, W.fy); ctx.rotate(W.ang);
+    const L = W.len + 16, c = gold ? GOLD : h.col;
+    ctx.strokeStyle = '#0a0610'; ctx.lineWidth = 3.6; line(ctx, -30, 0, L, 0);
+    ctx.strokeStyle = st.plate; ctx.lineWidth = 1.8; line(ctx, -30, 0, L, 0);
+    ctx.strokeStyle = G.rgba(c, 0.8); ctx.lineWidth = 1; for (const bx of [-20, -4, 12]) line(ctx, bx, -1.8, bx, 1.8);
+    ctx.fillStyle = G.rgba(c, 1); poly(ctx, [-33, 0, -30, -2.2, -27, 0, -30, 2.2]); ctx.fill(); // the butt
+    ctx.fillStyle = st.dark; ctx.fillRect(L - 3, -2.8, 4, 5.6); // the collar
+    glowAt(ctx, c, L + 12, -1, 22, 0.5);
+    ctx.fillStyle = G.rgba(gold ? GOLD : h.hot, 1);
+    poly(ctx, [L, -2.2, L + 8, -3.4, L + 16, -5.6, L + 23, -9.4, L + 18, -2.6, L + 8, 2.4, L, 2.2]); ctx.fill();
+    ctx.strokeStyle = G.rgba(c, 0.95); ctx.lineWidth = 0.8; line(ctx, L + 1, -0.6, L + 17, -4);
+    ctx.restore();
+  }
+  // (v3.0e) Lune's crossbow: a dark stock, a short steel prod across its end, the string drawn to the nut
+  function drawCrossbow(ctx, W, h, a, st, gold) {
+    ctx.save();
+    ctx.translate(W.fx, W.fy); ctx.rotate(W.ang);
+    const c = gold ? GOLD : h.col;
+    glowAt(ctx, c, 4, 0, gold ? 26 : 18, gold ? 0.7 : 0.35);
+    ctx.fillStyle = '#150d26'; poly(ctx, [-18, -2.4, 15, -2, 15, 2, -12, 2.6, -18, 5.6]); ctx.fill(); // the stock
+    ctx.strokeStyle = G.rgba(c, 0.9); ctx.lineWidth = 0.9; line(ctx, -16, -2.2, 14, -1.8);
+    for (const sgn of [-1, 1]) { // the prod
+      ctx.strokeStyle = '#150d26'; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.moveTo(13, 0); ctx.quadraticCurveTo(14, sgn * 5, 11, sgn * 9); ctx.stroke();
+      ctx.strokeStyle = G.rgba(c, 1); ctx.lineWidth = 1.3;
+      ctx.beginPath(); ctx.moveTo(14, sgn * 0.6); ctx.quadraticCurveTo(15, sgn * 5, 11.8, sgn * 9.2); ctx.stroke();
+    }
+    const nx = 4 - 7 * (W.pull || 0);
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.strokeStyle = G.rgba(h.hot, 0.8); ctx.lineWidth = 0.8;
+    ctx.beginPath(); ctx.moveTo(11, -9); ctx.lineTo(nx, 0); ctx.lineTo(11, 9); ctx.stroke();
+    if (a && !a.swung) { // the bolt in its groove
+      ctx.strokeStyle = G.rgba(a.heavy ? GOLD : h.hot, 1); ctx.lineWidth = a.heavy ? 2.4 : 1.8;
+      line(ctx, nx, 0, nx + 18, 0);
+      ctx.fillStyle = ctx.strokeStyle; poly(ctx, [nx + 17, -2.4, nx + 23, 0, nx + 17, 2.4]); ctx.fill();
+    }
+    ctx.globalCompositeOperation = 'source-over';
     ctx.restore();
   }
 
@@ -2859,7 +2974,7 @@
     }
     else if (h.draw && s.recov && s.recov.kind === 'noto' && !s.dash) leanT = s.recov.t < s.recov.dur * s.recov.at ? 0.32 : 0.08;
     else if (h.draw && s.hold && s.focus > 0.12 && s.onGround && !s.dash) leanT = 0.2;
-    else if (s.fidget) leanT = lean0 + (h.weapon === 'maul' ? 0.1 : 0.035) * fidgetIn(G.clamp(s.fidget.t / s.fidget.dur, 0, 1), 0.3, 0.28);
+    else if (s.fidget) leanT = lean0 + (wk(h) === 'maul' ? 0.1 : 0.035) * fidgetIn(G.clamp(s.fidget.t / s.fidget.dur, 0, 1), 0.3, 0.28);
     const drawing = !!(a && a.kind === 'draw');
     const leanNow = ease('lean', leanT, c || drawing ? 45 : a ? 38 : s.recov ? 14 : 22); // (v2.6f: back from a blow over more frames, was 30)
     ctx.rotate(leanNow);
@@ -3011,7 +3126,7 @@
     // trails, and Eos's sheath swings from her belt. Never in a swing, a shot, a cast or on the way
     // back from one: those are shown exactly, to match the cuts they draw.
     const wfree = !a && !(s.flT > 0) && !s.cast && !s.recov && !(s.stun > 0) && !(s.healT > 0) && !s.plunge && !(s.hold && s.focus > 0.12);
-    if (h.weapon === 'blade') {
+    if (wk(h) === 'blade') {
       let sh = 0;
       if (K) {
         if (wfree && !W.free) {
@@ -3029,7 +3144,7 @@
       let wa = 0, wy = 0, bhx = 0, bhy = 0;
       if (K) {
         if (wfree) {
-          const maul = h.weapon === 'maul';
+          const maul = wk(h) === 'maul';
           wa = G.clamp(spr('wa', 0, maul ? 7 : 9, 0.32), -0.35, 0.35);
           kick('wa', (Math.sin(W.ang) * dvx - Math.cos(W.ang) * dvy) * (maul ? 0.0015 : 0.002) + hit * (maul ? -1.2 : 0.8));
           wy = G.clamp(spr('wy', 0, 14, 0.35), -3, 3);
@@ -3039,9 +3154,9 @@
         } else for (const k of ['wa', 'wy', 'bhx', 'bhy']) K.set(k, 0);
       }
       if (wa || wy || bhx || bhy) {
-        W.ang += h.weapon === 'bow' ? wa * 0.5 : wa;
+        W.ang += wk(h) === 'bow' ? wa * 0.5 : wa;
         W.fy += wy;
-        if (h.weapon === 'maul') { W.bx = W.fx - Math.cos(W.ang) * 7.5; W.by = W.fy - Math.sin(W.ang) * 7.5; } // both hands on the haft
+        if (wk(h) === 'maul') { W.bx = W.fx - Math.cos(W.ang) * 7.5; W.by = W.fy - Math.sin(W.ang) * 7.5; } // both hands on the haft
         else { W.bx += bhx; W.by += bhy + wy * 0.6; }
       }
     }
@@ -3069,13 +3184,20 @@
       ctx.beginPath(); ctx.arc(k.ex, k.ey, A[2] * 0.62, 0, G.TAU); ctx.fill();
     };
     const weapon = () => {
-      if (h.weapon === 'sword') drawSword(ctx, W, h, gold);
-      else if (h.weapon === 'maul') drawMaul(ctx, W, h, st, gold);
-      else if (h.weapon === 'blade') { drawScabbard(ctx, W, h, st, (s.sheath || 0) >= C.SHEATH_COMBOS ? 3 : 0, s.sheath || 0); drawKatana(ctx, W, h, gold); }
+      if (h.weapon === 'twin') drawSword(ctx, W, h, gold); // (v3.0e: the second weapons, each drawn as itself)
+      else if (h.weapon === 'gauntlet') drawGauntlet(ctx, W.fx, W.fy, W.ang, h, st, gold, 1.3);
+      else if (h.weapon === 'naginata') drawNaginata(ctx, W, h, st, gold);
+      else if (h.weapon === 'crossbow') drawCrossbow(ctx, W, h, a, st, gold);
+      else if (wk(h) === 'sword') drawSword(ctx, W, h, gold);
+      else if (wk(h) === 'maul') drawMaul(ctx, W, h, st, gold);
+      else if (wk(h) === 'blade') { drawScabbard(ctx, W, h, st, (s.sheath || 0) >= C.SHEATH_COMBOS ? 3 : 0, s.sheath || 0); drawKatana(ctx, W, h, gold); }
       else drawBow(ctx, W, h, a, gold);
     };
 
     arm(false);
+    // (v3.0e) the off hand: the second of the twin blades, the second gauntlet
+    if (h.weapon === 'twin') drawSword(ctx, { fx: W.bx, fy: W.by, ang: W.ang + (a ? 0.7 : 0.4), len: W.len * 0.82 }, h, gold);
+    if (h.weapon === 'gauntlet') drawGauntlet(ctx, W.bx, W.by, W.ang + 0.4, h, st, gold, 1.2);
     if (W.behind) weapon(); // the shouldered maul sits behind the body
     if (id === 'aster') pauldron(ctx, h, st, -9.4, SHY - 1 + pa1, 0.9, st.mid);
     if (id === 'vesper') bodyVesper(ctx, h, st, sw, -24);

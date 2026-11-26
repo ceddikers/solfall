@@ -1111,6 +1111,7 @@
     const un = [];
     if (res.solFirst) un.push('Dawn at the Vigil: the camp wakes up to morning.');
     if (res.solHeroFirst) un.push('A sun crown over ' + H.name + ' in the Hall of Echoes.');
+    if (res.solHeroFirst && G.FORMS[H.id]) un.push('A second weapon for ' + H.name + ', the ' + G.FORMS[H.id].formName + ': take it from the weapon rack in the yard.'); // (v3.0e)
     if (res.ascBeat) {
       un.push('Ascension +' + res.ascBeat + ' beaten with ' + H.name + '.');
       // (v3.0d) what that step gives the hero

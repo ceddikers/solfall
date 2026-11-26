@@ -98,9 +98,39 @@
       },
     },
   ];
+  // (v3.0e) Each hero's second weapon, unlocked by beating Sol with them and taken from the weapon rack in
+  // the yard. A form is laid over the hero: the weapon, its string of attacks, the special and the words.
+  // Each new weapon moves like one the game already has (wk in player.js: the twin blades, the gauntlets
+  // and the naginata swing like the sword, the crossbow shoots like the bow), and is drawn as itself.
+  G.FORMS = {
+    vesper: { formName: 'Twin Blades', weapon: 'twin', reach: 0.92, special: 'cross', specialName: 'Crossing Stars', verb: 'cross', down: 9,
+      combo: [{ dmg: 7, cd: 0.2, dur: 0.2, wind: 0.04, act: 0.09 }, { dmg: 8, cd: 0.21, dur: 0.2, wind: 0.04, act: 0.09 }, { dmg: 20, cd: 0.42, dur: 0.34, wind: 0.08, act: 0.14 }],
+      blurb: 'Two short swords. Faster cuts, and light thrown in an X.',
+      lines: ['Twin blades: a quick three-cut string', 'Crossing Stars: two crescents of light cross the arena', 'A slash out of a dash becomes a thrust'],
+      how: { attack: 'Twin blades: cut (7), cut (8), crossed finisher (20). Quicker than the sword.', special: 'Crossing Stars: two crescents of light for 30 each, crossing in an X across the arena.' } },
+    aster: { formName: 'Star Gauntlets', weapon: 'gauntlet', heavy: false, chain: 3, reach: 0.82, thick: 1.25, accel: 0.9, run: 312, special: 'fist', specialName: 'Meteor Fist', verb: 'fist', down: 13,
+      combo: [{ dmg: 8, cd: 0.22, dur: 0.2, wind: 0.04, act: 0.09 }, { dmg: 9, cd: 0.24, dur: 0.22, wind: 0.05, act: 0.09 }, { dmg: 22, cd: 0.48, dur: 0.36, wind: 0.1, act: 0.14 }], // (bot test: 9/10/26 won far more than the maul)
+      blurb: 'Two great fists. Close, fast and hard-hitting.',
+      lines: ['Gauntlets: jab, cross, then a haymaker', 'Meteor Fist: lunge and punch out a burst of starlight', 'One more health, and lighter on her feet than with the maul'],
+      how: { attack: 'Gauntlets: jab (8), cross (9), haymaker (22). Short reach, fast.', dash: 'A punch straight out of a dash hits 40% harder.', special: 'Meteor Fist: lunge forward and punch out a short burst of starlight for 54.' } },
+    lune: { formName: 'Moon Crossbow', weapon: 'crossbow', special: 'bolts', specialName: 'Triple Bolt', verb: 'bolts',
+      combo: [{ dmg: 9, cd: 0.44, wind: 0.08 }, { dmg: 10, cd: 0.44, wind: 0.08 }, { dmg: 24, cd: 0.74, wind: 0.14 }],
+      blurb: 'A crossbow. Slower shots that hit harder.',
+      lines: ['Crossbow: slow, heavy bolts, strongest up close', 'Triple Bolt: three heavy bolts in a tight spread', 'Triple jump; firing downward in the air lifts you; two less health'],
+      how: { attack: 'Crossbow: bolts (9, 10), then a heavy bolt (24). Slower than the bow, harder per shot; still strongest up close.', special: 'Triple Bolt: three heavy bolts for 16 each in a tight spread (more up close), and a hop back.' } },
+    eos: { formName: 'Dawn Naginata', weapon: 'naginata', draw: false, reach: 1.55, thick: 1.2,
+      combo: [{ dmg: 15, cd: 0.33, dur: 0.3, wind: 0.07, act: 0.12 }, { dmg: 17, cd: 0.35, dur: 0.3, wind: 0.07, act: 0.12 }, { dmg: 40, cd: 0.6, dur: 0.44, wind: 0.12, act: 0.16 }], // (bot test: 13/15/35 fell well short of his sheathed blade)
+      blurb: 'A long blade on a pole. The longest reach there is.',
+      lines: ['Naginata: two wide sweeps and a finisher, from far off', 'Still Point: a turned blow is answered with a sweep all around', 'The longest reach of any weapon'],
+      how: { attack: 'Naginata: sweep (15), sweep (17), finisher (40), which sends a short crescent of light on for 20. The longest reach of any weapon.', aim: 'Up sweeps overhead. Down in the air strikes below and bounces.', dash: 'A sweep straight out of a dash becomes a thrust: 40% more damage and reach.', special: 'Still Point: brace for two thirds of a second. A blow that lands is turned, does no harm, and is answered with a sweep all around you for 60. If nothing lands, half the Starlight comes back.' } },
+  };
   const heroById = {};
   for (const h of G.HEROES) heroById[h.id] = h;
-  G.hero = () => { const h = heroById[R.hero] || G.HEROES[0]; return G.costumed ? G.costumed(h) : h; }; // (v2.8a: as worn, costumes.js)
+  G.formOpen = (id) => !!(G.solMemo || (G.solMemo = G.store.load('sol', {}) || {}))[id]; // (beaten Sol with them)
+  G.formOn = (id) => !!(G.settings.form || {})[id] && G.formOpen(id) && !!G.FORMS[id];
+  const formCache = {};
+  G.formed = (h) => (h && G.formOn(h.id) ? formCache[h.id] || (formCache[h.id] = Object.assign({}, h, G.FORMS[h.id], { form: true, how: Object.assign({}, h.how, G.FORMS[h.id].how) })) : h);
+  G.hero = () => { const h = G.formed(heroById[R.hero] || G.HEROES[0]); return G.costumed ? G.costumed(h) : h; }; // (v2.8a: as worn, costumes.js; v3.0e: in the form chosen)
 
   // ------------------------------------------------------------------ relics (one, chosen before the first trial)
   // Each one awakens on the road after trials II, IV and VI (relics.js, which also holds what they do).

@@ -342,7 +342,7 @@
       e += yield;
       const k = Math.min(1, e / 0.08);
       P.x = G.lerp(x0, ex, k); P.y = G.lerp(y0, ey + 30, k); if (P.atk) P.atk.t = Math.min(0.08, e); // (v2.9l: something can clear the swing mid-draw)
-      P.ghosts.push({ x: P.x, y: P.y, f: dir, life: 0.34, atk: { kind: 'draw', t: P.atk.t, a0: 0, a1: 0.08, dx, dy, lvl: 3, heavy: true } });
+      P.ghosts.push({ x: P.x, y: P.y, f: dir, life: 0.34, atk: { kind: 'draw', t: P.atk ? P.atk.t : 0.08, a0: 0, a1: 0.08, dx, dy, lvl: 3, heavy: true } });
     }
     // the hair of light she leaves behind, right across the arena
     F.cut((x0 + ex) / 2, (sy + ey) / 2, ang, 2800, 2.2, GOLD, H.hot, 1.3);

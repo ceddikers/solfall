@@ -297,6 +297,7 @@
     { id: 'tally', x: TALLY_X, reach: 62, top: 204 },
     { id: 'journal', x: JOURNAL_X, reach: 40, top: 176 },
     { id: 'post', x: POST_X, reach: 0, top: 140 },
+    { id: 'rack', x: POST_X - 150, reach: 44, top: 176 }, // (v3.0e: the second weapons)
     { id: 'brazier', x: BRAZIER_X, reach: 70, top: 222 },
     { id: 'ring', x: RING_X, reach: 44, top: 150 },
     { id: 'gate', x: GATE_X, reach: 160, top: 474 },
@@ -342,6 +343,12 @@
     }
     if (s.id === 'tally') return ['The Tally', G.feats.count() + ' of ' + G.feats.total + ' feats done', 'read it'];
     if (s.id === 'shrine') return ['The Shrine', '◆ ' + G.meta.shards + ' Sunshards', 'spend them'];
+    if (s.id === 'rack') {
+      const h = G.HEROES.find((x) => x.id === G.run.hero), f = G.FORMS[h.id];
+      if (!G.formOpen(h.id)) return ['The Weapon Rack', 'Beat Sol with ' + h.name + ' to unlock a second weapon', ''];
+      return G.formOn(h.id) ? ['The Weapon Rack', h.name + ' carries the ' + f.formName + '. ' + f.blurb, 'take up the ' + h.weapon]
+        : ['The Weapon Rack', 'The ' + f.formName + ': ' + f.blurb, 'take up the ' + f.formName.toLowerCase()];
+    }
     if (s.id === 'brazier') return ['The Brazier: ' + G.diff().name + (G.ascLevel() ? ' (' + G.ASC[G.ascLevel()].name + ')' : ''), note(G.settings.difficulty), 'change the difficulty'];
     if (s.id === 'ring') {
       // the foe last practised, and what you have done against it: how often it fell, your fastest win
@@ -366,6 +373,7 @@
     if (s.id === 'echo') return G.HEROES[s.hero].id === G.run.hero ? 'Wardrobe' : G.HEROES[s.hero].name;
     if (s.id === 'journal') return 'Journal';
     if (s.id === 'relic') return G.run.relicOffer[s.i].name;
+    if (s.id === 'rack') return G.formOpen(G.run.hero) ? 'Weapon Rack' : '';
     return { shrine: 'The Shrine', tally: 'The Tally', post: 'Sparring post', brazier: G.diff().name, ring: 'Practice', gate: 'The Gate' }[s.id];
   }
 
@@ -389,6 +397,23 @@
       F.burst(P.x, P.y - 30, { n: 22, color: hh.col, speed: [30, 200], life: [0.5, 1.1], size: [2, 4], grav: -160, wob: 120, jitter: 18 });
       G.costumeFx('special', P.x, P.y - 34);
       say(c ? c.name : h.name + '’s own colours');
+      return;
+    }
+    if (s.id === 'rack') {
+      // (v3.0e) take the second weapon from the rack, or put it back
+      const h = G.HEROES.find((x) => x.id === G.run.hero);
+      if (!G.formOpen(h.id)) { G.audio.play('uiMove'); say('Beat Sol with ' + h.name + ' to unlock'); return; }
+      G.settings.form = Object.assign({}, G.settings.form || {}, { [h.id]: !G.formOn(h.id) }); G.saveSettings();
+      const x = P.x, f = P.facing;
+      G.run.reset(); HUB.offer();
+      P.reset(); G.flow.reset(); G.moments.reset(); G.sets.reset();
+      P.x = x; P.facing = f; P.ember = G.PLAYER.SEG * P.segs;
+      G.ui.buildRun();
+      const hh = G.hero();
+      G.audio.play('tink'); G.audio.play('whoosh'); F.shake(3);
+      F.ring(P.x, P.y - 30, { r0: 10, r1: 120, life: 0.4, color: hh.hot, width: 5 });
+      F.burst(P.x, P.y - 34, { n: 18, color: hh.col, speed: [60, 260], life: [0.3, 0.8], size: [2, 4], kind: 'spark' });
+      say(G.formOn(h.id) ? G.FORMS[h.id].formName : h.name + '\u2019s ' + h.weapon);
       return;
     }
     if (s.id === 'journal') { G.audio.play('uiSelect'); G.ui.showJournal(); return; }
@@ -857,7 +882,7 @@
         if (((ascW[h.id] || {}).best || 0) >= 5) G.drawAura(ctx, cx, FLOOR - 21, t); // (v3.0d: the Unfallen)
         ctx.globalAlpha = on ? 0.97 : 0.66;
         still.x = cx; still.y = FLOOR - 21; still.facing = 1;
-        G.drawHero(ctx, G.costumed(h), still); // (v2.8a: in the costume they wear)
+        G.drawHero(ctx, G.costumed(G.formed(h)), still); // (v2.8a: in the costume they wear; v3.0e: with the weapon they carry)
         ctx.globalAlpha = 1;
       }
       if (solW[h.id]) crown(ctx, cx, FLOOR - 150 + Math.sin(t * 1.4 + i) * 2.5, t, i); // (v3.0a: beat Sol)
@@ -1017,6 +1042,12 @@
     ctx.beginPath(); ctx.moveTo(rx - 14, FLOOR - 6); ctx.lineTo(rx - 10, FLOOR - 128); ctx.moveTo(rx + 2, FLOOR - 6); ctx.lineTo(rx + 4, FLOOR - 112); ctx.moveTo(rx + 16, FLOOR - 6); ctx.lineTo(rx + 20, FLOOR - 140); ctx.stroke();
     poly(ctx, [rx + 14, FLOOR - 140, rx + 20, FLOOR - 160, rx + 26, FLOOR - 140], '#8a86a8', false);
     ctx.strokeStyle = STONE2; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(rx - 17, FLOOR - 104); ctx.lineTo(rx - 3, FLOOR - 104); ctx.stroke();
+    // (v3.0e) a second weapon on the rack: it glows
+    if (G.formOpen(G.run.hero)) {
+      const on = HUB.near && HUB.near.id === 'rack', hc = G.hero().col;
+      glow(ctx, hc, rx, FLOOR - 92, on ? 70 : 52, (on ? 0.5 : 0.3) + 0.06 * Math.sin(t * 2.4));
+      ctx.globalCompositeOperation = 'lighter'; diamond(ctx, rx, FLOOR - 118, 3.5, 6, G.rgba(hc, 0.9)); ctx.globalCompositeOperation = 'source-over';
+    }
     // archery butt
     const bx = x + 150;
     ctx.strokeStyle = STONE2; ctx.lineWidth = 5;

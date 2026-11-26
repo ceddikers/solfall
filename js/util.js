@@ -3,7 +3,7 @@
 
 const G = window.G = {};
 
-G.VERSION = '3.0d';
+G.VERSION = '3.0e';
 G.bgK = 1; // how many pixels per unit the painted backdrops are kept at (set in game.js, resize)
 G.W = 1280;          // logical view size
 G.H = 720;
@@ -146,7 +146,8 @@ G.store = {
     } catch (e) { return fallback; }
   },
   save(key, value) {
-    if (key === 'asc') G.ascMemo = null; // (v3.0d: the Ascension ladders are read every frame from a copy)
+    if (key === 'asc') G.ascMemo = null;
+    if (key === 'sol') G.solMemo = null; // (v3.0e: who has beaten Sol: their second weapon) // (v3.0d: the Ascension ladders are read every frame from a copy)
     try { localStorage.setItem('solfall.' + key, JSON.stringify(value)); } catch (e) { /* private mode */ }
   },
 };
@@ -199,7 +200,10 @@ G.ascOf = (hero) => (G.ascMemo || (G.ascMemo = G.store.load('asc', {}) || {}))[h
 //   +5 a golden aura, the title "The Unfallen", and a star over their alcove in the Hall
 G.ASC_UNLOCKS = [null, 'costume', 'relic', 'slot', 'boon', 'aura'];
 G.ascBest = (hero) => G.ascOf(hero).best || 0;
-G.boonOpen = (b) => !b.asc || G.ascBest(G.run.hero) >= b.asc;
+// (v3.0e) boons built on a weapon or special a hero's second form does not have are not offered with it
+G.BOON_NEED = { split: 'lance', pinlance: 'lance', twinstar: 'lance', aftershock: 'starfall', starborn: 'starfall', quiver: 'volley', harvest: 'volley', hanging: 'draw', secondsun: 'draw', fault: 'charge', unbroken: 'charge' };
+G.heroCan = (need) => { const h = G.hero(); return need === 'draw' ? !!h.draw : need === 'charge' ? !!h.heavy : h.special === need; };
+G.boonOpen = (b) => (!b.asc || G.ascBest(G.run.hero) >= b.asc) && (!G.BOON_NEED[b.id] || G.heroCan(G.BOON_NEED[b.id]));
 G.heroTitle = (h) => (G.ascBest(h.id) >= 5 ? 'The Unfallen' : h.title);
 // the difficulties this hero can choose (the Brazier steps through them)
 G.diffChoices = (hero) => { const out = [0, 1, 2], o = G.ascOf(hero).open; for (let n = 1; n <= o; n++) out.push(2 + n); return out; };

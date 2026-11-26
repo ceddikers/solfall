@@ -97,7 +97,8 @@
   G.costumed = function (h) {
     const c = h && MA.worn(h.id);
     if (!c) return h;
-    return cache[c.id] || (cache[c.id] = Object.assign({}, h, { col: c.col, hot: c.hot, css: c.css, costume: c }));
+    const key = c.id + (h.form ? '+form' : ''); // (v3.0e: a costume over a second form is its own record)
+    return cache[key] || (cache[key] = Object.assign({}, h, { col: c.col, hot: c.hot, css: c.css, costume: c }));
   };
 
   // ------------------------------------------------------------------ what a costume's skills throw

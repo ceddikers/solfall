@@ -107,7 +107,7 @@
   // ------------------------------------------------------------------ what lasts a fight
   let st = null;
   RL.reset = function () {
-    st = { slowT: 0, blazeT: 0, anvilT: 0, wardRe: 0, pearlUsed: false, hiltUses: 0, crownN: 0, qs: false, pend: [], risen: false, finN: 0, arcT: 0 };
+    st = { slowT: 0, blazeT: 0, anvilT: 0, wardRe: 0, pearlUsed: false, hiltUses: 0, crownN: 0, qs: false, pend: [], risen: false, finN: 0, arcT: 0, scabN: 0 };
     if (lv('sun') < 3) R().sun = 0; // (Ascendant, it carries over)
   };
   RL.reset();
@@ -205,6 +205,7 @@
   // a blow landed (sets.js S.hit: 'light', 'finisher', or 'special' once a cast)
   RL.hit = function (kind) {
     if (!fighting()) return;
+    if (kind === 'finisher' && G.relic('scabbard') && !G.hero().draw && ++st.scabN % 2 === 0) RL.drew(); // (v3.0e: with the naginata, every second finisher)
     // (v3.0d) the heroes' own relics: a free lance (North Star), a Starfall (Meteor Heart)
     if (kind === 'finisher' && (G.relic('northstar') || G.relic('meteor'))) {
       st.finN++;
