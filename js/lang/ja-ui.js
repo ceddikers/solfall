@@ -578,3 +578,9 @@ G.i18n.add({
   'Settings, then Controls.': '設定 → 操作。',
   'Done': '終わり',
 });
+
+// ---- (v3.1b) the polish pass
+G.i18n.add({
+  'Everything that grows your hero during a run.': 'ラン中に英雄を強くするもの。',
+  'portal|Corrupted': '穢れた門',
+});

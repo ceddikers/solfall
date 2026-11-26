@@ -48,7 +48,11 @@ kbd {
 .lb.on { height: 54px; }
 
 /* ---------------------------------------------------------------- HUD */
-#hud { position: absolute; inset: 0; pointer-events: none; transition: opacity 0.5s; }
+#hud { position: absolute; inset: 0; pointer-events: none; transition: opacity 0.5s; isolation: isolate; }
+/* (v3.1b) soft shade behind the top corners, so meters and omens read over the brightest sky */
+#hud::before, #hud::after { content: ""; position: absolute; top: 0; z-index: -1; pointer-events: none; }
+#hud::before { left: 0; width: 620px; height: 280px; background: radial-gradient(ellipse 100% 100% at 0 0, rgba(6, 4, 16, 0.46), rgba(6, 4, 16, 0.2) 45%, transparent 72%); }
+#hud::after { right: 0; width: 560px; height: 220px; background: radial-gradient(ellipse 100% 100% at 100% 0, rgba(6, 4, 16, 0.42), rgba(6, 4, 16, 0.16) 45%, transparent 72%); }
 #hud.off { opacity: 0; }
 
 #phud { position: absolute; left: 58px; top: 24px; }
@@ -461,7 +465,7 @@ ul.tips b { color: var(--ink); font-weight: 600; }
 .flabel { font-size: 10px; letter-spacing: 0.3em; color: var(--dim); }
 #flow.r1 { --fcol: #9fb4c8; } #flow.r2 { --fcol: #96e1ff; } #flow.r3 { --fcol: #8cf5b9; } #flow.r4 { --fcol: #ffd68c; } #flow.r5 { --fcol: #ff9a4a; }
 
-#omen { position: absolute; right: 58px; top: 112px; max-width: 300px; text-align: right; font-size: 12px; line-height: 1.5; color: var(--dim); text-shadow: 0 1px 4px #000; }
+#omen { position: absolute; right: 58px; top: 112px; max-width: 300px; text-align: right; font-size: 12px; line-height: 1.5; color: var(--dim); text-shadow: 0 1px 3px #000, 0 0 12px rgba(0, 0, 0, 0.85); }
 #omen b { display: block; font-weight: 600; font-size: 11px; letter-spacing: 0.3em; text-transform: uppercase; color: var(--danger); }
 
 /* ---------------------------------------------------------------- the Shrine */
@@ -500,6 +504,9 @@ ul.tips b { color: var(--ink); font-weight: 600; }
 .panel.keys { width: 620px; padding-top: 26px; padding-bottom: 20px; }
 .panel.keys h2 { margin-bottom: 8px; }
 .panel.keys .lead { text-align: center; margin-bottom: 12px; font-size: 13px; }
+#keyList .v kbd { margin: 0 0 0 5px; padding: 0 5px; font-size: 10.5px; line-height: 14px; text-transform: none; color: var(--gold); border-color: rgba(255, 196, 120, 0.4); }
+#keyList .item.focus .v kbd { color: #fff; border-color: rgba(255, 220, 170, 0.7); }
+#keyList .item.opt { line-height: 1.2; }
 .panel.narrow .lead, .panel.narrow .over { text-align: center; }
 .panel.narrow .lead { margin-bottom: 14px; font-size: 13px; line-height: 1.5; }
 .panel.wide { padding-top: 26px; padding-bottom: 20px; }
@@ -519,7 +526,7 @@ ul.tips b { color: var(--ink); font-weight: 600; }
 .panel.help nav .item.open { color: var(--gold); }
 #helpBody { min-height: 470px; border-left: 1px solid rgba(255, 255, 255, 0.1); padding-left: 34px; }
 #helpBody h3 { margin: 2px 0 4px; font: 400 20px var(--display); letter-spacing: 0.16em; color: var(--ink); text-transform: uppercase; }
-#helpBody .lead { margin: 0 0 14px; color: var(--dim); font-size: 13.5px; }
+#helpBody .lead { margin: 0 0 14px; color: var(--dim); font-size: 13.5px; text-wrap: pretty; }
 .helpsteps { margin: 0; padding-left: 22px; font-size: 14px; line-height: 1.45; color: var(--dim); }
 .helpsteps li { margin-bottom: 9px; padding-left: 4px; }
 .helpsteps li::marker { color: var(--gold); font-weight: 600; }
@@ -538,7 +545,7 @@ ul.tips b { color: var(--ink); font-weight: 600; }
 .panel.tally .tcount.all { color: var(--star); }
 #featsBody { min-height: 330px; border-left: 1px solid rgba(255, 255, 255, 0.1); padding-left: 30px; }
 #featsBody h3 { margin: 2px 0 4px; font: 400 20px var(--display); letter-spacing: 0.16em; color: var(--ink); text-transform: uppercase; }
-#featsBody .lead { margin: 0 0 10px; color: var(--dim); font-size: 13px; }
+#featsBody .lead { margin: 0 0 10px; color: var(--dim); font-size: 13px; text-wrap: pretty; }
 .feat { display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; padding: 10px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.06); font-size: 14px; line-height: 1.4; }
 .feat b { color: var(--ink); font-weight: 600; letter-spacing: 0.04em; }
 .feat span { grid-column: 1; color: var(--dim); }
@@ -564,7 +571,7 @@ ul.tips b { color: var(--ink); font-weight: 600; }
 .awake { display: block; margin-top: 0.4em; color: #ffe2a8; }
 .awake b { color: #ffc861; font-weight: 700; margin-right: 0.3em; }
 .awake.next { color: var(--dim); opacity: 0.75; font-style: italic; }
-.awake.next b { color: var(--dim); }
+.awake.next b { color: var(--dim); margin-right: 0; }
 .boonlist p.cursed b { color: #ff6e8c; }
 #boons .t-corrupted.clean { --tagc: #aadcff; }
 .panel.fountain .item.up .uname { color: #ff8aa4; }
@@ -605,7 +612,7 @@ ul.tips b { color: var(--ink); font-weight: 600; }
 /* ---------------------------------------------------------------- v2.8a: the Boss Journal */
 .panel.journal #journalBody { min-height: 470px; max-height: 540px; overflow-y: auto; border-left: 1px solid rgba(255, 255, 255, 0.1); padding-left: 30px; padding-right: 8px; }
 .panel.journal #journalBody h3 { margin: 2px 0 4px; font: 400 20px var(--display); letter-spacing: 0.16em; color: var(--ink); text-transform: uppercase; }
-.panel.journal #journalBody .lead { margin: 0 0 12px; color: var(--dim); font-size: 13px; }
+.panel.journal #journalBody .lead { margin: 0 0 12px; color: var(--dim); font-size: 13px; text-wrap: pretty; }
 .panel.journal nav .item { text-align: left; padding: 7px 8px 7px 30px; font-size: 14px; letter-spacing: 0.12em; }
 .panel.journal nav .item::after { display: none; }
 .panel.journal nav .item.open { color: var(--gold); }
@@ -698,4 +705,19 @@ html[lang=ja] { --ui: "Yu Gothic UI", "Yu Gothic", "Hiragino Sans", "Hiragino Ka
 /* wide tracking suits capitals, not kana: tighten it everywhere in Japanese */
 html[lang=ja] body * { letter-spacing: 0.04em !important; }
 html[lang=ja] h1, html[lang=ja] h2, html[lang=ja] .over, html[lang=ja] #card .title { padding-left: 0 !important; }
-html[lang=ja] .titleblock h1 { letter-spacing: 0.4em !important; padding-left: 0.4em !important; }
+html[lang=ja] .titleblock h1 { letter-spacing: 0.4em !important; padding-left: 0 !important; font-family: "Palatino Linotype", "Book Antiqua", Palatino, Georgia, serif; }
+/* (v3.1b) Japanese has no true italics (the browser only slants the glyphs), and wraps best at phrase breaks */
+html[lang=ja] body * { font-style: normal !important; }
+html[lang=ja] body { word-break: auto-phrase; line-break: strict; }
+html[lang=ja] .elabel { font-size: 11px; }
+html[lang=ja] .item.card .ctag, html[lang=ja] .hhp { font-size: 11.5px; }
+html[lang=ja] .over { font-size: 12.5px; }
+/* (v3.1b) big Japanese words keep a little air: phase cards, callouts, screen titles */
+html[lang=ja] #card .title { font-size: 34px; letter-spacing: 0.24em !important; padding-left: 0.24em !important; }
+html[lang=ja] #card .sub { font-size: 18px; }
+html[lang=ja] #callout .big { font-size: 36px; letter-spacing: 0.16em !important; padding-left: 0.16em; }
+html[lang=ja] .panel h2 { letter-spacing: 0.14em !important; padding-left: 0.14em !important; }
+/* (v3.1b) the omens get their own soft shade, fading from the right edge, for arenas with a sun in that corner */
+#omen { max-width: 380px; padding: 9px 12px 10px 48px; margin-right: -12px; background: linear-gradient(270deg, rgba(6, 4, 16, 0.72), rgba(6, 4, 16, 0.62) calc(100% - 56px), rgba(6, 4, 16, 0));
+  -webkit-mask-image: linear-gradient(180deg, transparent, #000 8px, #000 calc(100% - 8px), transparent); mask-image: linear-gradient(180deg, transparent, #000 8px, #000 calc(100% - 8px), transparent); }
+#omen:empty { display: none; }

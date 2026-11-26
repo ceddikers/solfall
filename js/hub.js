@@ -1234,12 +1234,59 @@
     }
   };
 
+  // (v3.1b) Japanese takes a Japanese face, so kana and kanji match the Latin around them
+  const FONT = G.ja ? '"Yu Gothic UI", "Hiragino Sans", "Noto Sans JP", Bahnschrift, sans-serif' : 'Bahnschrift, "Segoe UI", sans-serif';
   function text(ctx, str, x, y, size, color, alpha, weight) {
-    ctx.font = (weight || '600') + ' ' + size + 'px Bahnschrift, "Segoe UI", sans-serif';
+    ctx.font = (weight || '600') + ' ' + size + 'px ' + FONT;
     ctx.fillStyle = 'rgba(0,0,0,' + 0.7 * alpha + ')'; ctx.fillText(str, x + 1, y + 2);
     ctx.fillStyle = G.rgba(color, alpha); ctx.fillText(str, x, y);
   }
   HUB.paint.text = text;
+  // (v3.1b) the label of the place you stand at sits on a soft dark plate, so it reads over the brightest sky,
+  // and the names of the places it would cover step aside while it shows
+  // a long description is split in two balanced lines (between words; in Japanese, best after 、 or 。)
+  const MAXW = 540;
+  function wrap(ctx, str) {
+    const full = ctx.measureText(str).width;
+    if (full <= MAXW) return [str];
+    let best = null, bestW = 1e9, bestP = null, bestPW = 1e9;
+    for (let i = 1; i < str.length - 1; i++) {
+      const c = str[i - 1], n = str[i];
+      const ok = G.ja ? !/[、。）」ー・ぁぃぅぇぉっゃゅょァィゥェォッャュョ]/.test(n) : n === ' ';
+      if (!ok) continue;
+      const a = str.slice(0, i).trimEnd(), b = str.slice(i).trimStart();
+      const w = Math.max(ctx.measureText(a).width, ctx.measureText(b).width);
+      if (w < bestW) { bestW = w; best = [a, b]; }
+      if (G.ja && /[、。]/.test(c) && w < bestPW) { bestPW = w; bestP = [a, b]; }
+    }
+    if (bestP && bestPW <= MAXW + 40) return bestP;
+    return best || [str];
+  }
+  function labelBox(ctx, Lb, x, y, key) {
+    ctx.font = '600 18px ' + FONT; let w = ctx.measureText(Lb[0].toUpperCase()).width;
+    ctx.font = '500 13px ' + FONT; const lines = Lb[1] ? wrap(ctx, Lb[1]) : [];
+    for (const l of lines) w = Math.max(w, ctx.measureText(l).width);
+    if (Lb[2]) { ctx.font = '600 14px ' + FONT; w = Math.max(w, ctx.measureText(key + '  ' + Lb[2]).width); }
+    const py = y + 22 + 18 * Math.max(0, lines.length - 1) + 22;
+    return { x, y, lines, py, x0: x - w / 2 - 22, x1: x + w / 2 + 22, y0: y - 19, y1: (Lb[2] ? py : py - 22) + 13 };
+  }
+  // the label itself: name, description (one or two lines), and the prompt
+  function drawLabel(ctx, b, Lb, key, nameCol, promptCol, pulse) {
+    plate(ctx, b);
+    text(ctx, Lb[0].toUpperCase(), b.x, b.y, 18, nameCol, 1);
+    b.lines.forEach((l, i) => text(ctx, l, b.x, b.y + 22 + 18 * i, 13, '236,233,244', 0.9, '500'));
+    if (Lb[2]) text(ctx, key + '  ' + Lb[2], b.x, b.py, 14, promptCol, pulse);
+  }
+  function plate(ctx, b) {
+    ctx.save();
+    ctx.filter = 'blur(12px)'; ctx.fillStyle = 'rgba(8,6,20,0.56)';
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(b.x0, b.y0, b.x1 - b.x0, b.y1 - b.y0, 16); else ctx.rect(b.x0, b.y0, b.x1 - b.x0, b.y1 - b.y0);
+    ctx.fill();
+    ctx.restore();
+  }
+  const covers = (b, x, y) => !!b && x > b.x0 - 36 && x < b.x1 + 36 && y > b.y0 - 16 && y < b.y1 + 12;
+  HUB.paint.labelBox = labelBox; HUB.paint.plate = plate; HUB.paint.covers = covers; HUB.paint.drawLabel = drawLabel;
 
   // Names over each place, what the nearest one does, and a line on how to move. In front of everything.
   HUB.drawOver = function (ctx) {
@@ -1251,30 +1298,29 @@
   function drawOver0(ctx) {
     const P = G.player, near = HUB.near, pad = G.input.device === 'gamepad', cam = G.cam.x;
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    // a relic's lines sit above the reliquary wall, clear of its neighbours' names
+    const key = pad ? 'LB' : G.input.label('heal');
+    const Lb = near && !G.ui.current ? label(near) : null;
+    const lx = near ? G.clamp(near.x, cam + 200, cam + W - 200) : 0, ly = near ? FLOOR - (near.id === 'relic' ? 226 : near.top) - 40 : 0;
+    const box = Lb ? labelBox(ctx, Lb, lx, ly, key) : null;
     for (const s of places()) {
-      if (s === near || !seen(s.x, 200)) continue;
+      if (s === near || !seen(s.x, 200) || covers(box, s.x, FLOOR - s.top)) continue;
       const name = shortName(s);
       if (!name) continue;
       // the relic you have taken is named in gold; the others fade once you have chosen
       const mine = s.id === 'relic' && G.run.relic === G.run.relicOffer[s.i].id, dim = s.id === 'relic' && G.run.relic && !mine;
       text(ctx, name.toUpperCase(), s.x, FLOOR - s.top, s.id === 'relic' ? 11 : 12, mine ? GOLD : '236,233,244', mine ? 0.95 : dim ? 0.3 : 0.55);
     }
-    if (seen(RELIQ_X, 200) && relicStations().length && !(near && near.id === 'relic')) text(ctx, G.run.relic ? G.T('THE RELIQUARY') : G.T('THE RELIQUARY  ·  CHOOSE ONE'), RELIQ_X, FLOOR - 204, 12, G.run.relic ? '236,233,244' : GOLD, G.run.relic ? 0.55 : 0.6 + 0.25 * Math.sin(HUB.t * 3));
-    if (seen(BELL_X, 200)) text(ctx, G.T('THE OLD BELL'), BELL_X, FLOOR - 212, 12, '236,233,244', 0.55);
-    if (seen(lamp.x, 200) && lamp.n < 2) text(ctx, G.meta.toys.keep ? G.T('LANTERN  ·  BEST {0}', G.meta.toys.keep) : G.T('LANTERN'), lamp.x, lamp.y - 46, 12, '236,233,244', 0.55);
+    if (seen(RELIQ_X, 200) && relicStations().length && !(near && near.id === 'relic') && !covers(box, RELIQ_X, FLOOR - 204)) text(ctx, G.run.relic ? G.T('THE RELIQUARY') : G.T('THE RELIQUARY  ·  CHOOSE ONE'), RELIQ_X, FLOOR - 204, 12, G.run.relic ? '236,233,244' : GOLD, G.run.relic ? 0.55 : 0.6 + 0.25 * Math.sin(HUB.t * 3));
+    if (seen(BELL_X, 200) && !covers(box, BELL_X, FLOOR - 212)) text(ctx, G.T('THE OLD BELL'), BELL_X, FLOOR - 212, 12, '236,233,244', 0.55);
+    if (seen(lamp.x, 200) && lamp.n < 2 && !covers(box, lamp.x, lamp.y - 46)) text(ctx, G.meta.toys.keep ? G.T('LANTERN  ·  BEST {0}', G.meta.toys.keep) : G.T('LANTERN'), lamp.x, lamp.y - 46, 12, '236,233,244', 0.55);
     // the post reports what the last flurry came to, and how Dawnbreak stands
     if (D.sum > 0) text(ctx, G.T('{0} damage', D.sum), POST_X, FLOOR - 164, 16, GOLD, Math.min(1, D.sumT * 2));
     if (P.ult > 0 && Math.abs(P.x - POST_X) < 240) {
       const full = P.ult >= 100;
       text(ctx, full ? G.T('Dawnbreak ready: press {0}', pad ? 'RT' : G.input.label('ult')) : G.T('Dawnbreak {0}%', Math.round(P.ult)), POST_X, FLOOR - 186, 13, GOLD, full ? 0.7 + 0.3 * Math.sin(HUB.t * 8) : 0.7);
     }
-    if (near && !G.ui.current) {
-      // a relic's lines sit above the reliquary wall, clear of its neighbours' names
-      const Lb = label(near), x = G.clamp(near.x, cam + 200, cam + W - 200), y = FLOOR - (near.id === 'relic' ? 226 : near.top) - 40;
-      text(ctx, Lb[0].toUpperCase(), x, y, 18, '255,255,255', 1);
-      text(ctx, Lb[1], x, y + 22, 13, '236,233,244', 0.85, '500');
-      text(ctx, (pad ? 'LB' : G.input.label('heal')) + '  ' + Lb[2], x, y + 44, 14, GOLD, 0.85 + 0.15 * Math.sin(HUB.t * 6));
-    }
+    if (Lb) drawLabel(ctx, box, Lb, key, '255,255,255', GOLD, 0.85 + 0.15 * Math.sin(HUB.t * 6));
     if (HUB.msgT > 0) text(ctx, HUB.msg.toUpperCase(), P.x, P.y - 104, 15, GOLD, Math.min(1, HUB.msgT * 2));
     if (!G.ui.current) {
       text(ctx, G.T('THE VIGIL'), cam + W / 2, 40, 20, '236,233,244', 0.75, '400');

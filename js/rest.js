@@ -1271,7 +1271,7 @@
   function shortName(s) {
     if (s.id === 'boon') return shownDef(s.i).name;
     if (s.id === 'card') return s.i === 1 ? G.T('The Fortune-Teller') : '';
-    if (s.id === 'portal') { const B = G.bosses[s.boss]; return B ? (portalState(s.boss) === 'corrupt' ? G.T('Corrupted') : B.short) : ''; }
+    if (s.id === 'portal') { const B = G.bosses[s.boss]; return B ? (portalState(s.boss) === 'corrupt' ? G.Tx('portal', 'Corrupted') : B.short) : ''; }
     return { fire: G.T('The Fire'), merchant: G.T('The Merchant'), stone: G.T('Second Thoughts'), seventh: G.T('The Last Portal'), home: G.T('The Way Home'), fountain: G.T('The Fountain'), smith: G.T('The Smith'), pledge: G.T('The Omen Altar'), duel: G.T('The Shade'), door: G.T('The Doorway') }[s.id];
   }
 
@@ -1279,10 +1279,15 @@
   REST.drawOver = function (ctx) {
     const p = P(), near = REST.near, pad = G.input.device === 'gamepad', cam = G.cam.x, text = paint.text, run = R();
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    // (v3.1b) the near place's label first measured, so the names it would cover can step aside
+    const key = pad ? 'LB' : G.input.label('heal');
+    const Lb = near && near.id !== 'boon' && !G.ui.current ? label(near) : null;
+    const lx = Lb ? G.clamp(near.x, cam + 260, cam + W - 260) : 0, ly = Lb ? FLOOR - near.top - 40 : 0;
+    const box = Lb ? paint.labelBox(ctx, Lb, lx, ly, key) : null;
     for (const s of places()) {
       // (the offering's plinths carry no names: a boon is read by standing at it, on its card, so a
       // corrupted one gives nothing away until you are there)
-      if ((near && s.id === near.id && s.x === near.x) || s.id === 'boon' || !seen(s.x, 200)) continue;
+      if ((near && s.id === near.id && s.x === near.x) || s.id === 'boon' || !seen(s.x, 200) || paint.covers(box, s.x, FLOOR - s.top)) continue;
       const name = shortName(s);
       if (!name) continue;
       const mine = s.id === 'boon' && mineI(s.i), dim = (s.id === 'boon' && closed() && !mine) || (s.id === 'portal' && portalState(s.boss) === 'sealed') || (s.id === 'card' && REST.ev.done);
@@ -1290,16 +1295,13 @@
       const col = mine ? paint.GOLD : cursed || (s.id === 'portal' && portalState(s.boss) === 'corrupt') ? '255,90,120' : '236,233,244';
       text(ctx, name.toUpperCase(), s.x, FLOOR - s.top, s.id === 'boon' ? 11 : 12, col, mine ? 0.95 : dim ? 0.3 : 0.6);
     }
-    if (seen(ALTAR_X, 200) && altars().length && !(near && near.id === 'boon')) {
+    if (seen(ALTAR_X, 200) && altars().length && !(near && near.id === 'boon') && !paint.covers(box, ALTAR_X, FLOOR - 200)) {
       const what = run.offerKind === 'relic' ? G.T('THE SPOILS') : G.T('THE OFFERING');
       text(ctx, closed() ? what : REST.taken >= 0 ? G.T('{0}  ·  CHOOSE ONE MORE', what) : REST.extra ? G.T('{0}  ·  CHOOSE TWO', what) : G.T('{0}  ·  CHOOSE ONE', what), ALTAR_X, FLOOR - 200, 12, closed() ? '236,233,244' : paint.GOLD, closed() ? 0.55 : 0.6 + 0.25 * Math.sin(REST.t * 3));
     }
-    if (near && near.id !== 'boon' && !G.ui.current) {
-      const Lb = label(near), x = G.clamp(near.x, cam + 260, cam + W - 260), y = FLOOR - near.top - 40;
+    if (Lb) {
       const corrupt = near.id === 'portal' && portalState(near.boss) === 'corrupt';
-      text(ctx, Lb[0].toUpperCase(), x, y, 18, corrupt ? '255,110,140' : '255,255,255', 1);
-      text(ctx, Lb[1], x, y + 22, 13, '236,233,244', 0.85, '500');
-      if (Lb[2]) text(ctx, (pad ? 'LB' : G.input.label('heal')) + '  ' + Lb[2], x, y + 44, 14, corrupt ? '255,110,140' : paint.GOLD, 0.85 + 0.15 * Math.sin(REST.t * 6));
+      paint.drawLabel(ctx, box, Lb, key, corrupt ? '255,110,140' : '255,255,255', corrupt ? '255,110,140' : paint.GOLD, 0.85 + 0.15 * Math.sin(REST.t * 6));
     }
     if (REST.msgT > 0) text(ctx, REST.msg.toUpperCase(), p.x, p.y - 104, 15, paint.GOLD, Math.min(1, REST.msgT * 2));
     if (!G.ui.current) {

@@ -405,15 +405,17 @@
       [G.T('Corrupted'), G.T('Now and then a beaten boss\u2019s portal turns corrupted: an optional, far harder fight that is not a trial. Win it for a second relic and three times the Sunshards; fall in it and the run ends.')],
       [G.T('Relic'), G.T('One power chosen at the reliquary before the gate. It lasts the whole run, and stays with you if you fall and go again; it is given up only by going back to the camp.')],
       [G.T('Boon'), G.T('A smaller power chosen after each victory. They add up through the run.')],
+      [G.T('Grade'), G.T('S, A, B or C for a victory. Every blow you take lowers it, and so does a fight that runs past two and a half minutes; perfect dodges raise it. A better grade pays more.')],
+      [G.T('Sunshards'), G.T('What every fight pays, win or lose. They are kept between runs and spent at the Shrine.')],
+      [G.T('Trophy'), G.T('The boss you beat in your last trial, at its strongest, adds its relic to those the reliquary can offer. One a run.')],
+      [G.T('Feat'), G.T('One of eighteen things worth doing once, each paying Sunshards. The Tally stone in the Vigil lists them.')],
+    ] },
+    { name: G.T('Boons'), lead: G.T('Everything that grows your hero during a run.'), words: [
       [G.T('Pair'), G.T('A gold boon offered only once you hold both of the two boons it joins. A card that would open one says so.')],
       [G.T('Redraw, banish'), G.T('Each run has one redraw of the offering, at the standing stone (the Shrine sells more), and, once the Shrine sells you Banishment, a banish: at a plinth, the flourish key strikes that boon from the run and draws another in its place.')],
       [G.T('Sets and duos'), G.T('Ember, Storm, Tide and Gloam boons each fill a slot: Strike, Special, Dash, Mend or Jump. Three of one set open its crown; two each of two sets wake their duo, which works for as long as both sets stay slotted.')],
       [G.T('Corrupted boon'), G.T('A crimson boon, far stronger than the rest, with a drawback written under it. Once a boss has fallen, one sometimes takes a card\u2019s place.')],
       [G.T('Cleansing Fountain'), G.T('At the crossroads. Spend Motes to purge a corrupted boon\u2019s drawback and keep the rest of it. Each use in a run costs twice the last.')],
-      [G.T('Grade'), G.T('S, A, B or C for a victory. Every blow you take lowers it, and so does a fight that runs past two and a half minutes; perfect dodges raise it. A better grade pays more.')],
-      [G.T('Sunshards'), G.T('What every fight pays, win or lose. They are kept between runs and spent at the Shrine.')],
-      [G.T('Trophy'), G.T('The boss you beat in your last trial, at its strongest, adds its relic to those the reliquary can offer. One a run.')],
-      [G.T('Feat'), G.T('One of eighteen things worth doing once, each paying Sunshards. The Tally stone in the Vigil lists them.')],
     ] },
     { name: G.T('The Vigil'), lead: G.T('Your camp, from left to right.'), words: [
       [G.T('The old bell, the lantern'), G.T('Toys. Keep the bell ringing; keep the lantern off the ground.')],
@@ -554,7 +556,9 @@
       const a = (row.dataset.act || '').slice(4);
       if (!ACTIONS[a]) return;
       row.querySelector('.k').textContent = ACTIONS[a];
-      row.querySelector('.v').textContent = U.capturing === a ? G.T('press a key…') : G.input.keys(a).join('  ');
+      const v = row.querySelector('.v');
+      if (U.capturing === a) v.textContent = G.T('press a key…');
+      else v.innerHTML = G.input.keys(a).map((k) => '<kbd>' + esc(k) + '</kbd>').join(''); // (v3.1b: each key its own chip)
       row.classList.toggle('wait', U.capturing === a);
     });
   };
@@ -894,9 +898,9 @@
   // (v2.7a) The recap under a result: where this fight's damage came from, what hurt most, and (at the
   // end of a run) the build it was won or lost with and the run's own count.
   const attackWords = (a) => (a || '').replace(/\d+$/, '').replace(/([A-Z])/g, ' $1').toLowerCase();
-  // (v3.1a) in Japanese, an attack is named as the Journal names it, when it has an entry there
+  // (v3.1a/b) an attack is named as the Journal names it, when it has an entry there
   const atkName = (bid, a) => {
-    const e = G.ja && a && ((G.JOURNAL || {})[bid] || {})[a.replace(/\d+$/, '')];
+    const e = a && ((G.JOURNAL || {})[bid] || {})[a.replace(/\d+$/, '')];
     return e && e.name ? e.name : attackWords(a);
   };
   const topOf = (taken) => Object.entries(taken).sort((x, y) => y[1] - x[1])[0];
@@ -1116,7 +1120,7 @@
     $('endStats').lastElementChild.firstElementChild.classList.add('gold');
     const road = R.beaten.filter((id) => id !== 'sol').map((id, i) => {
       const b = G.bosses[id], cor = R.cleansed.includes(id);
-      return '<span' + (cor ? ' class="cor"' : '') + '><i>' + G.roman(i + 1) + '</i>' + esc(b ? b.short : id) + (cor ? '<b>' + G.T('CORRUPTED') + '</b>' : '') + '</span>';
+      return '<span' + (cor ? ' class="cor"' : '') + '><i>' + G.roman(i + 1) + '</i>' + esc(b ? b.short.replace(/^The /, '') : id) + (cor ? '<b>' + G.T('CORRUPTED') + '</b>' : '') + '</span>';
     });
     if (R.champWon && G.bosses.champion) road.push('<span><i>\u2726</i>' + esc(G.bosses.champion.short) + '</span>');
     road.push('<span class="sol"><i>☀</i>' + G.T('Sol') + '</span>');

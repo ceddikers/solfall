@@ -2,7 +2,7 @@
 
 A side-on boss rush for the browser: four heroes, seven three-phase bosses, played as a run of
 ever-harder trials. You pick a hero and a relic before the run and win a boon after each victory.
-Version 3.1a.
+Version 3.1b.
 
 This is an early slice of a planned boss-rush roguelite (short runs, a boon after each boss,
 bosses drawn from a pool). A run is seven trials, one for each boss, each harder than the last: the first boss
@@ -116,6 +116,34 @@ hero (`tools/feel-check.js`).
 - Settings, Reset progress erases Sunshards, upgrades, trophies and records (it has to be chosen twice).
 
 Not done: touch controls, a colour-blind alternative to red-orange warnings, gamepad rebinding.
+
+## A polish pass over every screen, in English and Japanese (v3.1b)
+
+Asked for "a full ui and text (eng and jp) polish". Every screen, camp place and road stop was captured in both
+languages (79 shots each) and checked side by side. What changed:
+
+- **Camp and road labels:** the label of the place you stand at now sits on a soft dark plate, so it reads over the
+  brightest sunset. The small names of the places it would cover step aside while it shows. A long description
+  (relics, the wardrobe) wraps onto two balanced lines instead of running across the Gate.
+- **HUD:** soft shade behind the top corners, and the omens get their own backing, so they read over Sol's sun.
+- **Help:** "A run" was taller than the screen and pushed the panel off the top. It is now two pages, "A run" and
+  "Boons". Page intros use the full width instead of wrapping at half.
+- **Controls:** each key is its own chip ("Shift  K  C  R Shift" ran together).
+- **Results:** the defeat screen names a boss's moves as the Journal does ("The last blow was its Overhead.", not
+  "its souls."). The end screen's road fits on one line. "Kindled , after trial II" lost its stray space.
+- **Japanese:** the title logo lines up with the menu again; no fake italics (Japanese is set upright); lines wrap
+  at phrase breaks; the camp and road use a Japanese face; phase cards, callouts and panel titles keep a little
+  letter spacing; small labels (meters, hero titles) are a touch larger. A corrupted portal reads 穢れた門.
+- **Fixed:** the Help entry for the Cleansing Fountain said it costs Sunshards (it costs Motes).
+
+Checked: both languages, every screen, no stray English or placeholders in Japanese; 36 bot fights per language
+across all nine bosses with no errors.
+
+Playtest checklist:
+- Walk the camp and the road: is every label readable over the sky, with nothing overlapping?
+- A fight on a bright arena (Sol): meters and omens readable?
+- Help: "A run" and "Boons" pages fit; Controls shows key chips.
+- In Japanese: anything still cramped, cut off or oddly wrapped?
 
 ## Japanese (v3.1a)
 
