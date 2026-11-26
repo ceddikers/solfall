@@ -107,21 +107,21 @@
   // ------------------------------------------------------------------ the arena: a ridge above the clouds
   G.THEMES.sol = [null,
     {
-      name: 'NOON', scene: 'sunridge',
+      name: G.T('NOON'), scene: 'sunridge',
       sky: ['#2c2438', '#6c4c5c', '#c48a68', '#f0c890'],
       far: '#6a5058', near: '#46323c', pillar: '#2a1e2a', rim: '255,220,170',
       floorTop: '#6e5448', floor: '#1c1418',
       boss: SUN, hot: SUNHOT, ember: '255,230,170', stars: 0,
     },
     {
-      name: 'THE FALL', scene: 'sunridge',
+      name: G.T('THE FALL'), scene: 'sunridge',
       sky: ['#1a0c16', '#43182a', '#86342e', '#d8784c'],
       far: '#4e2226', near: '#30161c', pillar: '#1c0c12', rim: '255,170,110',
       floorTop: '#5e3a34', floor: '#180e10',
       boss: FALL, hot: '255,244,214', ember: '255,170,90', stars: 0,
     },
     {
-      name: 'ECLIPSE', scene: 'sunridge',
+      name: G.T('ECLIPSE'), scene: 'sunridge',
       sky: ['#010102', '#040206', '#0a0408', '#14080a'],
       far: '#0c0608', near: '#080406', pillar: '#040203', rim: RIM,
       floorTop: '#241812', floor: '#060404',
@@ -172,27 +172,27 @@
 
   // ------------------------------------------------------------------ the boss
   const B = {
-    id: 'sol', name: 'SOL, THE FALLING SUN', short: 'Sol', theme: 'sol', event: true,
+    id: 'sol', name: G.T('SOL, THE FALLING SUN'), short: G.T('Sol'), theme: 'sol', event: true,
     snapTurn: true,
-    sub: '“So. You are the one who made it.”', taunt: 'the last portal', blurb: 'The dying sun, in a body',
+    sub: G.T('“So. You are the one who made it.”'), taunt: G.T('the last portal'), blurb: G.T('The dying sun, in a body'),
     tips: [
-      'At noon her light burns. The gnomon’s shadow is safe, and it moves as she drifts across the sky.',
-      'Break both of her hands and the sun itself comes down to the ridge. Strike it.',
-      'A hand that slams open stays down a moment. A fist sends a ripple both ways.',
-      'Under the Kind Hand: when the burning stops, watch its fingers. Curling, it closes.',
-      'After the Fall, a shadow on the ridge means something is about to land there.',
-      'How high she lifts the blade says how many cuts: at her crown two, straight up three.',
-      'When she stands utterly still with her eyes shut, do not strike her blade. Your special breaks it.',
-      'In the eclipse the dark burns. Stay in her light, or in the pools her flares leave.',
-      'When her rim goes out, follow the embers: she steps out of the dark where the last one glows.',
-      'At the very end, climb the steps of light. At the top the Dawnbreak is yours.',
+      G.T('At noon her light burns. The gnomon’s shadow is safe, and it moves as she drifts across the sky.'),
+      G.T('Break both of her hands and the sun itself comes down to the ridge. Strike it.'),
+      G.T('A hand that slams open stays down a moment. A fist sends a ripple both ways.'),
+      G.T('Under the Kind Hand: when the burning stops, watch its fingers. Curling, it closes.'),
+      G.T('After the Fall, a shadow on the ridge means something is about to land there.'),
+      G.T('How high she lifts the blade says how many cuts: at her crown two, straight up three.'),
+      G.T('When she stands utterly still with her eyes shut, do not strike her blade. Your special breaks it.'),
+      G.T('In the eclipse the dark burns. Stay in her light, or in the pools her flares leave.'),
+      G.T('When her rim goes out, follow the embers: she steps out of the dark where the last one glows.'),
+      G.T('At the very end, climb the steps of light. At the top the Dawnbreak is yours.'),
     ],
     hudCols: [null, ['#ffe0a0', '#fffcee'], ['#ffb054', '#fff4d6'], ['#ff7c34', '#ffe2c4']],
     BASE_HP: 3900, poise0: 400, w: 40, h: 104,
     answer: 'answer', antiAir: 'antiair', finale: 'lastlight',
     gaps: [0, 1.0, 0.78, 0.66],
     bags: { 1: [], 2: [], 3: [] },
-    cards: { 2: ['THE FALL', 'She comes down to fight you'], 3: ['ECLIPSE', 'The light goes out'] },
+    cards: { 2: [G.T('THE FALL'), G.T('She comes down to fight you')], 3: [G.T('ECLIPSE'), G.T('The light goes out')] },
     first: { 1: 'noonray', 2: 'meridian', 3: 'umbra' },
     bpm: [70, 76, 128, 96],
   };
@@ -2444,7 +2444,7 @@
   };
   B.staggerMult = 1.4;
   Object.defineProperty(B, 'staggerDur', { get() { return B.form === 'noon' ? 0.85 : B.form === 'fall' ? 0.7 : 0.5; } });
-  Object.defineProperty(B, 'staggerWord', { get() { return B.form === 'noon' ? 'BROKEN' : B.form === 'fall' ? 'OPEN' : 'BLINDED'; } });
+  Object.defineProperty(B, 'staggerWord', { get() { return B.form === 'noon' ? G.T('BROKEN') : B.form === 'fall' ? G.T('OPEN') : G.T('BLINDED'); } });
 
   // ---------------------------------------------------------------- scenes
   // The light grows until the ridge is nearly white; the sun comes down into the sky out of it; her
@@ -2870,7 +2870,7 @@
     const d0 = B.darkK;
     while (e < 1.4) { const dt = yield; e += dt; const k = Math.min(1, e / 1.4); B.darkK = d0 * (1 - k); b.eclipse = 1 - k; B.skyCrack = Math.min(B.skyCrack, 1 - k); G.fx.cine.z = 0.7 + 0.25 * k; } // (v3.0b: the sky's cracks close up)
     B.darkK = 0; b.eclipse = 0;
-    G.ui.card('', 'THEN CARRY IT', '');
+    G.ui.card('', G.T('THEN CARRY IT'), '');
     const hd = headOf();
     G.fx.cineCut(hd.x, hd.y + 8, 1.5); G.fx.cineEase(0.8);
     yield* wait(1.6);

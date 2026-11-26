@@ -7,28 +7,28 @@
   G.PAL = [
     null,
     {
-      name: 'DUSK',
+      name: G.T('DUSK'),
       sky: ['#090b22', '#241a48', '#6e3440', '#e0935a'],
       far: '#231a3e', near: '#150f2a', pillar: '#0f0b20', rim: '255,170,110',
       floorTop: '#352c4c', floor: '#141024',
       boss: '255,186,92', hot: '255,240,205', ember: '255,170,90', stars: 0.3,
     },
     {
-      name: 'TOTALITY',
+      name: G.T('TOTALITY'),
       sky: ['#04030c', '#150a2a', '#3d0f2e', '#a02a48'],
       far: '#1a0c26', near: '#0e0718', pillar: '#090512', rim: '255,90,110',
       floorTop: '#2c1c38', floor: '#0e0916',
       boss: '255,78,96', hot: '255,222,214', ember: '255,90,120', stars: 0.95,
     },
     {
-      name: 'BLACK SUN',
+      name: G.T('BLACK SUN'),
       sky: ['#010102', '#08060b', '#1c0a10', '#b8a8b4'],
       far: '#0d0a10', near: '#070508', pillar: '#040305', rim: '236,228,255',
       floorTop: '#26222c', floor: '#09080b',
       boss: '226,216,255', hot: '255,255,255', ember: '214,204,255', stars: 0.15,
     },
     {
-      name: 'DAWN',
+      name: G.T('DAWN'),
       sky: ['#243f7a', '#7a6aa0', '#f09a78', '#ffe2a6'],
       far: '#4a4470', near: '#2c2848', pillar: '#1c1a32', rim: '255,226,170',
       floorTop: '#5a4f6a', floor: '#221d30',
@@ -44,21 +44,21 @@
     // the Magus: an observatory under a cold aurora
     mage: [null,
       {
-        name: 'FIRST VERSE', scene: 'spires',
+        name: G.T('FIRST VERSE'), scene: 'spires',
         sky: ['#040816', '#0e1c44', '#1f4a78', '#7ec8d8'],
         far: '#142848', near: '#0c1830', pillar: '#081022', rim: '150,215,255',
         floorTop: '#28406a', floor: '#0c1428',
         boss: '150,170,255', hot: '238,240,255', ember: '160,210,255', stars: 0.8,
       },
       {
-        name: 'CONFLUENCE', scene: 'spires',
+        name: G.T('CONFLUENCE'), scene: 'spires',
         sky: ['#0a0414', '#2a0c3c', '#6a1c50', '#f08a70'],
         far: '#2a1238', near: '#180a24', pillar: '#0e0618', rim: '255,150,170',
         floorTop: '#44284e', floor: '#150a1c',
         boss: '255,130,170', hot: '255,232,225', ember: '255,150,160', stars: 0.6,
       },
       {
-        name: 'TRINITY', scene: 'spires',
+        name: G.T('TRINITY'), scene: 'spires',
         sky: ['#020204', '#0c0a14', '#2a2238', '#e8dcb0'],
         far: '#14121c', near: '#0b0a10', pillar: '#060508', rim: '255,240,190',
         floorTop: '#34303c', floor: '#0c0b10',
@@ -67,21 +67,21 @@
     // the Veil: rooftops under a great moon
     assassin: [null,
       {
-        name: 'MOONRISE', scene: 'city', moon: { x: 930, y: 190, r: 120, col: '214,214,255' },
+        name: G.T('MOONRISE'), scene: 'city', moon: { x: 930, y: 190, r: 120, col: '214,214,255' },
         sky: ['#03040c', '#0b1030', '#1c2456', '#5a5a98'],
         far: '#10143a', near: '#090c22', pillar: '#05060f', rim: '170,160,255',
         floorTop: '#262a52', floor: '#0a0b1c',
         boss: '190,135,255', hot: '242,230,255', ember: '180,160,255', stars: 0.7,
       },
       {
-        name: 'SHADOWS', scene: 'city', moon: { x: 930, y: 190, r: 120, col: '150,235,205' },
+        name: G.T('SHADOWS'), scene: 'city', moon: { x: 930, y: 190, r: 120, col: '150,235,205' },
         sky: ['#010504', '#06180f', '#0e3428', '#3c8a72'],
         far: '#0a2018', near: '#06120e', pillar: '#030806', rim: '120,255,200',
         floorTop: '#1c3a30', floor: '#07120e',
         boss: '110,255,195', hot: '228,255,244', ember: '120,240,190', stars: 0.3,
       },
       {
-        name: 'EXECUTION', scene: 'city', moon: { x: 780, y: 230, r: 210, col: '255,255,255' },
+        name: G.T('EXECUTION'), scene: 'city', moon: { x: 780, y: 230, r: 210, col: '255,255,255' },
         sky: ['#000000', '#040406', '#101016', '#8c8c9c'],
         far: '#0a0a0e', near: '#050507', pillar: '#020203', rim: '240,240,255',
         floorTop: '#26262e', floor: '#070709',
@@ -90,21 +90,21 @@
     // the Knight: a drowned graveyard
     knight: [null,
       {
-        name: 'THE OATH', scene: 'graves',
+        name: G.T('THE OATH'), scene: 'graves',
         sky: ['#04070c', '#0c1a2a', '#1e3a4e', '#86a8b4'],
         far: '#122230', near: '#0a141e', pillar: '#060c12', rim: '150,205,255',
         floorTop: '#2a3c4c', floor: '#0a1118',
         boss: '130,195,255', hot: '232,246,255', ember: '150,200,240', stars: 0.25,
       },
       {
-        name: 'THE HOST', scene: 'graves',
+        name: G.T('THE HOST'), scene: 'graves',
         sky: ['#020503', '#0a1a0c', '#1e3c18', '#8cae5a'],
         far: '#12240f', near: '#0a1408', pillar: '#050a04', rim: '170,255,120',
         floorTop: '#2a3c22', floor: '#0a1108',
         boss: '160,255,110', hot: '238,255,224', ember: '160,240,120', stars: 0.1,
       },
       {
-        name: 'BLOOD OATH', scene: 'graves',
+        name: G.T('BLOOD OATH'), scene: 'graves',
         sky: ['#020000', '#140406', '#40080c', '#c0483c'],
         far: '#1c0608', near: '#100405', pillar: '#080203', rim: '255,90,80',
         floorTop: '#3a1c1e', floor: '#100607',
@@ -114,7 +114,7 @@
 
   // the Vigil: the camp between runs, in the last hour before dawn. One palette for every "phase".
   const VIGIL = {
-    name: 'VIGIL', scene: 'camp',
+    name: G.T('VIGIL'), scene: 'camp',
     sky: ['#0a1030', '#2a2858', '#7c4c68', '#f2b684'],
     far: '#2c2850', near: '#1c1a38', pillar: '#121026', rim: '255,206,150',
     floorTop: '#40385a', floor: '#181428',

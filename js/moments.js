@@ -43,8 +43,8 @@
     const hp = Math.round((DPS[P.hero.id] || 45) * 3.3 * Math.min(1.6, 1 + 0.08 * (G.run.trial - 1)) * [0.8, 1, 1.15][Math.min(2, G.settings.difficulty)]);
     const p0 = pos();
     B.ward = { hp, max: hp, t: 0, dur, x: p0.x, y: p0.y, r: p0.r, flash: 0 };
-    G.ui.callout(B.reckonName || 'RECKONING', 'Break the ward before the ring closes');
-    G.ui.hint('reckon', 'Strike the boss to break its ward. If the ring closes first, dash through the blast.');
+    G.ui.callout(B.reckonName || G.T('RECKONING'), G.T('Break the ward before the ring closes'));
+    G.ui.hint('reckon', G.T('Strike the boss to break its ward. If the ring closes first, dash through the blast.'));
     G.audio.play('charge', { dur: Math.min(dur, 6) }); G.audio.play('bell');
     F.shake(9); F.flash(pal.boss, 0.2, 0.4);
     F.ring(p0.x, p0.y, { r0: 420, r1: p0.r, life: 0.6, color: pal.hot, width: 6 });
@@ -70,7 +70,7 @@
     // too late
     const w = B.ward;
     B.ward = null;
-    G.ui.callout('TOO LATE', 'Dash through the blast');
+    G.ui.callout(G.T('TOO LATE'), G.T('Dash through the blast'));
     G.audio.play('roar'); F.flash(pal.hot, 0.5, 0.4); F.shake(18); F.punch(0.03);
     yield* wait(0.4);
     for (let i = 0; i < 2; i++) {
@@ -94,7 +94,7 @@
     const P = G.player;
     P.ult = Math.min(100, (P.ult || 0) + 25); G.flow.add(25);
     G.audio.play('shatter'); G.audio.play('finish');
-    G.ui.callout('WARD BROKEN', 'It is helpless');
+    G.ui.callout(G.T('WARD BROKEN'), G.T('It is helpless'));
     F.stop(0.2); F.slow(0.3, 0.5); F.flash(pal.hot, 0.55, 0.45); F.shake(22); F.punch(0.055);
     F.shatter(w.x, w.y, pal.boss, 40, { hot: pal.hot, r: 520, speed: [220, 980], size: [4, 10], jitter: w.r * 0.6, r0: w.r });
     F.ring(w.x, w.y, { r0: w.r, r1: 620, life: 0.7, color: pal.hot, width: 14 });
@@ -118,7 +118,7 @@
     if (em.kind === 'sunder') {
       M.sunder = false;
       G.audio.play('finish'); G.audio.play('slam');
-      F.text(x, y - 58, 'SUNDER', { color: GOLD, size: 30, life: 1.1 });
+      F.text(x, y - 58, G.T('SUNDER'), { color: GOLD, size: 30, life: 1.1 });
       F.stop(0.2); F.slow(0.35, 0.4); F.flash(H0.hot, 0.4, 0.35); F.shake(20); F.punch(0.05);
       F.cut(x, y, ang + 0.5, 760, 22, GOLD, H0.hot, 0.4); F.cut(x, y, ang - 0.5, 760, 22, GOLD, H0.hot, 0.4);
       F.shatter(x, y, G.pal().boss, 26, { hot: G.pal().hot, r: 440, r0: 40 });
@@ -127,7 +127,7 @@
     } else if (em.kind === 'riposte') {
       P.riposteT = 0; G.feats.bump('riposte');
       G.audio.play('riposte');
-      F.text(x, y - 52, 'RIPOSTE', { color: GOLD, size: 24, life: 0.9 });
+      F.text(x, y - 52, G.T('RIPOSTE'), { color: GOLD, size: 24, life: 0.9 });
       F.stop(0.11); F.slow(0.4, 0.22); F.shake(9); F.punch(0.03); F.flash(H0.hot, 0.16, 0.2);
       F.cut(x, y, ang, 560, 14, GOLD, H0.hot, 0.3);
       F.lines(x, y, 12, GOLD, { r0: 26 });
@@ -141,7 +141,7 @@
         h.dead = true;
         const mx = (P.x + x) / 2, my = (P.y - 30 + y) / 2, dir = G.sign(P.x - x) || -P.facing;
         G.audio.play('clash');
-        F.text(mx, my - 60, 'CLASH', { color: '255,255,255', size: 30, life: 1 });
+        F.text(mx, my - 60, G.T('CLASH'), { color: '255,255,255', size: 30, life: 1 });
         F.stop(0.17); F.slow(0.35, 0.35); F.shake(15); F.punch(0.04); F.flash('255,255,255', 0.3, 0.25);
         F.cut(mx, my, 0.8, 520, 11, GOLD, '255,255,255', 0.34); F.cut(mx, my, -0.8, 520, 11, GOLD, '255,255,255', 0.34);
         F.burst(mx, my, { n: 34, color: GOLD, speed: [200, 900], life: [0.2, 0.6], kind: 'spark', size: [2, 4.5], grav: 600 });
@@ -168,7 +168,7 @@
     P.ult = Math.min(100, (P.ult || 0) + 35);
     P.ember = Math.min(G.PLAYER.SEG * P.segs, P.ember + 50);
     G.audio.play('lastLight');
-    G.ui.callout('LAST LIGHT', 'One more blow ends it. Make this count');
+    G.ui.callout(G.T('LAST LIGHT'), G.T('One more blow ends it. Make this count'));
     F.slow(0.22, 0.9); F.flash(H0.hot, 0.35, 0.5); F.punch(0.035);
     F.ring(P.x, P.y - 24, { r0: 300, r1: 30, life: 0.6, color: H0.hot, width: 6 });
     F.lines(P.x, P.y - 24, 18, H0.hot, { r0: 34 });
@@ -197,7 +197,7 @@
     if (B.active && !B.dying && !B.dead && B.phase === 3 && !B.invuln) {
       if (!M.push && B.hp < B.maxHp * 0.1) {
         M.push = true;
-        G.ui.callout('ONE LAST PUSH', B.short + ' is almost spent');
+        G.ui.callout(G.T('ONE LAST PUSH'), G.T('{0} is almost spent', B.short));
         G.audio.play('bell'); F.flash(G.pal().hot, 0.25, 0.4); F.shake(10);
         F.ring(B.core.x, B.core.y, { r0: 30, r1: 520, life: 0.7, color: G.pal().hot, width: 8 });
       }

@@ -217,7 +217,7 @@
     G.audio.play('crownTaken');
     F.ring(p.x, p.y - 40, { r0: 10, r1: 190, life: 0.6, color: S.col, width: 6 });
     F.burst(p.x, p.y - 40, { n: 26, color: S.col, speed: [40, 260], life: [0.6, 1.3], size: [2, 4.5], grav: -160, wob: 120, jitter: 20 });
-    say('The ' + S.name + ' crown: ' + S.crown);
+    say(G.T('The {0} crown: {1}', S.name, S.crown));
   }
   REST.crowned = crowned;
   // (v2.6c) Two boons each of two sets wake their duo: the two sets' lights wind round the hero.
@@ -225,14 +225,14 @@
   function duoed(was) {
     const d = R().duo(), p = P();
     if (d === was) return;
-    if (!d) { G.audio.play('uiMove'); say('Your duo ' + was.name + ' goes quiet'); return; }
+    if (!d) { G.audio.play('uiMove'); say(G.T('Your duo {0} goes quiet', was.name)); return; }
     G.audio.play('crownTaken');
     for (const s of d.of) {
       const c = G.SETS[s].col;
       F.ring(p.x, p.y - 40, { r0: 10, r1: 170, life: 0.6, color: c, width: 5 });
       F.burst(p.x, p.y - 40, { n: 16, color: c, speed: [40, 240], life: [0.6, 1.2], size: [2, 4], grav: -160, wob: 120, jitter: 20 });
     }
-    say('Duo: ' + d.name);
+    say(G.T('Duo: {0}', d.name));
   }
 
   // ------------------------------------------------------------------ the relic awakens (v2.6a)
@@ -248,7 +248,7 @@
     F.shake(5); F.stop(0.06);
     F.ring(FIRE_X, FLOOR - 80, { r0: 10, r1: 220, life: 0.6, color: c, width: 6 });
     F.burst(FIRE_X, FLOOR - 40, { n: 30, color: c, speed: [80, 320], angle: -Math.PI / 2, spread: 1.4, life: [0.5, 1.1], size: [2, 4], grav: -140 });
-    say(G.relicDef(id).name + ': ' + G.relics.STAGES[s]);
+    say(G.T('{0}: {1}', G.relicDef(id).name, G.relics.STAGES[s]));
     cardFor = null;
   }
   function updateAwake(dt) {
@@ -278,7 +278,7 @@
     const p = P(), run = R();
     if (s.id === 'boon') {
       if (turning(s.i)) { startTurn(); return; } // (nothing can be taken while it turns)
-      if (mineI(s.i) || closed()) { G.audio.play('uiMove'); say(mineI(s.i) ? 'Yours for the run' : 'One each rest'); return; }
+      if (mineI(s.i) || closed()) { G.audio.play('uiMove'); say(mineI(s.i) ? G.T('Yours for the run') : G.T('One each rest')); return; }
       const b = run.offer[s.i], c = colOf(b), crownWas = run.crownSet(), duoWas = run.duo();
       if (b.relicReward) run.extraRelics.push(b.id); else run.take(s.i);
       if (REST.taken < 0) REST.taken = s.i; else REST.taken2 = s.i;
@@ -288,7 +288,7 @@
       F.shatter(s.x, FLOOR - 104, c, 14, { r: 240, r0: 24 });
       F.ring(s.x, FLOOR - 104, { r0: 10, r1: 150, life: 0.45, color: c, width: 6 });
       F.burst(p.x, p.y - 10, { n: 16, color: c, speed: [20, 130], life: [0.6, 1.2], size: [2, 4], grav: -220, wob: 130, jitter: 22 });
-      say(run.replaced ? b.name + ' (for ' + run.replaced.name + ')' : b.name);
+      say(run.replaced ? G.T('{0} (for {1})', b.name, run.replaced.name) : b.name);
       crowned(crownWas);
       duoed(duoWas);
     } else if (s.id === 'stone') {
@@ -296,35 +296,35 @@
         G.audio.play('uiSelect'); G.audio.play('whoosh'); F.shake(4);
         for (const a of altars()) F.shatter(a.x, FLOOR - 104, '236,233,244', 8, { r: 160, r0: 16 });
         initTurn();
-        say('The offering is redrawn');
+        say(G.T('The offering is redrawn'));
       } else G.audio.play('empty');
     } else if (s.id === 'portal') {
       const st = portalState(s.boss);
-      if (st === 'sealed') { G.audio.play('uiMove'); say(run.beaten.includes(s.boss) ? 'Sealed: beaten this run' : 'Sealed'); return; }
-      if (!offerTaken()) { G.audio.play('empty'); say('Take from the offering first'); return; }
-      if (G.relics.pending()) { G.audio.play('empty'); say('Your relic stirs at the fire'); return; }
+      if (st === 'sealed') { G.audio.play('uiMove'); say(run.beaten.includes(s.boss) ? G.T('Sealed: beaten this run') : G.T('Sealed')); return; }
+      if (!offerTaken()) { G.audio.play('empty'); say(G.T('Take from the offering first')); return; }
+      if (G.relics.pending()) { G.audio.play('empty'); say(G.T('Your relic stirs at the fire')); return; }
       G.audio.play('uiSelect');
       if (st === 'corrupt') { G.audio.play('roar'); F.shake(8); }
       G.enterPortal(s.boss, st === 'corrupt');
     } else if (s.id === 'seventh') {
       // (v2.9a) six trials won: it opens on Sol
       if (run.solOpen()) {
-        if (!offerTaken()) { G.audio.play('empty'); say('Take from the offering first'); return; }
-        if (G.relics.pending()) { G.audio.play('empty'); say('Your relic stirs at the fire'); return; }
+        if (!offerTaken()) { G.audio.play('empty'); say(G.T('Take from the offering first')); return; }
+        if (G.relics.pending()) { G.audio.play('empty'); say(G.T('Your relic stirs at the fire')); return; }
         // (v3.0a) the run ends at Sol: corrupted portals left open close for good. Warn once first.
-        if (run.corrupted.length && !run.lastWarned) { run.lastWarned = true; G.audio.play('uiMove'); say('Corrupted portals close once you go in. Touch again to go'); REST.msgT = 3.6; return; }
+        if (run.corrupted.length && !run.lastWarned) { run.lastWarned = true; G.audio.play('uiMove'); say(G.T('Corrupted portals close once you go in. Touch again to go')); REST.msgT = 3.6; return; }
         G.audio.play('uiSelect'); G.audio.play('charge', { dur: 0.8 }); F.flash('255,250,236', 0.7, 0.8); F.shake(6);
         G.enterPortal('sol', false);
         return;
       }
       G.audio.play(run.runWon() ? 'pulse' : 'uiMove', { k: 0.4 });
-      say(run.runWon() ? 'Its light is yours now' : 'Dormant');
+      say(run.runWon() ? G.T('Its light is yours now') : G.T('Dormant'));
     } else if (s.id === 'home') {
       G.audio.play('uiSelect');
       G.toHub('gate');
     } else if (s.id === 'fountain') {
       // the Cleansing Fountain: purge a corrupted boon's bane, for Motes (ui.js shows the choice)
-      if (!run.banes().length) { G.audio.play('uiMove'); say(run.order.some((id) => G.boonDef(id).cursed) ? 'Nothing left to cleanse' : 'Nothing here needs cleansing'); return; }
+      if (!run.banes().length) { G.audio.play('uiMove'); say(run.order.some((id) => G.boonDef(id).cursed) ? G.T('Nothing left to cleanse') : G.T('Nothing here needs cleansing')); return; }
       G.audio.play('uiSelect');
       G.ui.showFountain();
     } else if (s.id === 'merchant') { G.audio.play('uiSelect'); G.ui.showMerchant(); }
@@ -341,7 +341,7 @@
     else if (s.id === 'fire') {
       G.audio.play('whoosh');
       F.burst(FIRE_X, FLOOR - 30, { n: 24, color: '255,170,90', speed: [60, 260], angle: -Math.PI / 2, spread: 1.2, life: [0.4, 1], size: [1.6, 3.4], grav: -120 });
-      say('The fire is warm');
+      say(G.T('The fire is warm'));
     }
   }
 
@@ -351,8 +351,8 @@
     const run = R();
     if (turning(s.i)) { startTurn(); return; }
     if (mineI(s.i) || closed()) { G.audio.play('uiMove'); return; }
-    if (run.offerKind !== 'boon') { G.audio.play('empty'); say('Spoils cannot be banished'); return; }
-    if (run.banishes <= 0) { G.audio.play('empty'); say('No banish left this run'); return; }
+    if (run.offerKind !== 'boon') { G.audio.play('empty'); say(G.T('Spoils cannot be banished')); return; }
+    if (run.banishes <= 0) { G.audio.play('empty'); say(G.T('No banish left this run')); return; }
     const old = run.offer[s.i], cy = FLOOR - 104, wasCursed = !!old.cursed;
     const nb = run.banish(s.i);
     G.audio.play('shatter'); G.audio.play('whoosh'); F.shake(5);
@@ -360,7 +360,7 @@
     F.burst(s.x, cy, { n: 16, color: '20,16,30', speed: [60, 260], life: [0.5, 1], size: [4, 8], grav: -60 });
     if (wasCursed || (REST.turn && REST.turn.i === s.i)) initTurn();
     cardFor = null;
-    say(old.name + ' banished' + (nb ? '' : ''));
+    say(G.T('{0} banished', old.name) + (nb ? '' : ''));
   }
 
   // ------------------------------------------------------------------ who you meet on the road (v2.2a)
@@ -415,7 +415,7 @@
   REST.back = function (lost) {
     REST.near = null;
     if (REST.ev && REST.ev.kind === 'champion') REST.ev.done = true;
-    say(lost ? 'He helps you up. The doorway closes behind you.' : 'He nods, and the doorway closes');
+    say(lost ? G.T('He helps you up. The doorway closes behind you.') : G.T('He nods, and the doorway closes'));
     cardFor = null;
   };
   function rollEvent() {
@@ -450,13 +450,13 @@
   const CARD_GAP = 74;
   function turnCard(s) {
     const ev = REST.ev, run = R(), c = ev.cards[s.i];
-    if (ev.done) { G.audio.play('uiMove'); say('The cards are spent'); return; }
+    if (ev.done) { G.audio.play('uiMove'); say(G.T('The cards are spent')); return; }
     ev.done = true; ev.pick = c.i;
     for (const k of ev.cards) k.flip = k === c ? 0.001 : -0.25 - 0.15 * Math.abs(k.i - c.i); // (the others turn a moment later)
     let got = '', col = EV_COL.fortune;
     if (c.what === 'boon') { const was = run.crownSet(), dw = run.duo(), b = run.freeBoon(); if (b) { got = b.name; col = colOf(b); crowned(was); duoed(dw); } else c.what = 'shards'; }
     if (c.what === 'curse') { const b = run.freeCurse(); if (b) { got = b.name; col = BLOOD; } else c.what = 'shards'; }
-    if (c.what === 'shards') { G.motes.add(30); got = '+30 Motes'; col = G.motes.COL; }
+    if (c.what === 'shards') { G.motes.add(30); got = G.T('+{0} Motes', 30); col = G.motes.COL; }
     retake();
     G.audio.play('cardflip'); G.audio.play(c.what === 'curse' ? 'shatter' : 'segment');
     F.shake(c.what === 'curse' ? 6 : 3);
@@ -468,7 +468,7 @@
 
   // -- the wandering smith: Motes (v2.9k: was Sunshards) for one more of a boon you hold (ui.js shows the choice)
   function smith() {
-    if (!R().temperable().length) { G.audio.play('uiMove'); say('Nothing you hold can be tempered'); return; }
+    if (!R().temperable().length) { G.audio.play('uiMove'); say(G.T('Nothing you hold can be tempered')); return; }
     G.audio.play('uiSelect');
     G.ui.showSmith();
   }
@@ -480,7 +480,7 @@
     F.burst(p.x, p.y - 10, { n: 16, color: c, speed: [20, 130], life: [0.6, 1.2], size: [2, 4], grav: -220, wob: 130, jitter: 22 });
     F.burst(MERCH_X, FLOOR - 70, { n: 10, color: G.motes.COL, speed: [40, 160], life: [0.4, 0.9], size: [1.5, 3], grav: -120 });
     if (row.kind === 'boon') { crowned(crownWas); duoed(duoWas); }
-    say(row.kind === 'mend' ? 'One more health, for the run' : row.name);
+    say(row.kind === 'mend' ? G.T('One more health, for the run') : row.name);
   };
   REST.tempered = function () {
     const x = EVENT_X;
@@ -493,13 +493,13 @@
   // -- the omen altar: an omen more in the next trial, for a second boon from this offering
   function pledge(s) {
     const ev = REST.ev, run = R();
-    if (ev.done) { G.audio.play('uiMove'); say('Your pledge is made'); return; }
+    if (ev.done) { G.audio.play('uiMove'); say(G.T('Your pledge is made')); return; }
     ev.done = true; run.pledge = true; REST.extra = true; cardFor = null;
     G.audio.play('pledge'); F.shake(5);
     F.ring(s.x, FLOOR - 120, { r0: 10, r1: 170, life: 0.6, color: BLOOD, width: 5 });
     F.burst(s.x, FLOOR - 120, { n: 20, color: '16,3,10', speed: [40, 200], life: [0.6, 1.2], size: [4, 8], grav: -80, wob: 50 });
     F.burst(P().x, P().y - 30, { n: 12, color: BLOOD, speed: [60, 220], life: [0.3, 0.7], size: [2, 3], kind: 'spark' });
-    say(REST.taken >= 0 ? 'Take a second boon' : 'Take two from the offering');
+    say(REST.taken >= 0 ? G.T('Take a second boon') : G.T('Take two from the offering'));
   }
 
   // -- the duelling shade: it dashes at you, six times at most. Strike it three times before its blade
@@ -527,13 +527,13 @@
     const ev = REST.ev, sh = ev.sh, run = R();
     ev.state = won ? 'won' : 'lost'; ev.done = true; ev.t = 0; sh.tilt = 0;
     setPose(sh, won ? 'kneel' : 'sheathe');
-    if (!won) { G.audio.play('uiBack'); say('Not this time'); return; }
+    if (!won) { G.audio.play('uiBack'); say(G.T('Not this time')); return; }
     const pool = G.RELICS.filter((r) => G.meta.unlocked(r) && !G.relic(r.id) && r.id !== 'crown' && r.id !== 'phoenix');
     G.audio.play('pulse'); G.audio.play('heal');
     F.ring(sh.x, sh.y - 40, { r0: 10, r1: 160, life: 0.5, color: paint.GOLD, width: 6 });
     F.burst(P().x, P().y - 10, { n: 16, color: paint.GOLD, speed: [20, 130], life: [0.6, 1.2], size: [2, 4], grav: -220, wob: 130, jitter: 22 });
     if (pool.length) { const r = G.pick(pool); run.extraRelics.push(r.id); retake(); say(r.name); }
-    else { G.motes.add(40); say('+40 Motes'); } // (v2.9k: was 60 Sunshards)
+    else { G.motes.add(40); say(G.T('+{0} Motes', 40)); } // (v2.9k: was 60 Sunshards)
   }
   function shadeSpot() {
     const ev = REST.ev, p = P();
@@ -839,23 +839,23 @@
     const b = G.run.offer[s.i], own = b.relicReward ? 0 : G.boon(b.id), mine = mineI(s.i);
     el.className = 'item card focus show t-' + b.tag.toLowerCase();
     document.body.classList.toggle('pad', G.input.device === 'gamepad');
-    el.querySelector('.ctag').textContent = b.relicReward ? 'A second relic' : b.duo ? G.ui.boonTag(b) : b.pair ? 'Pair · ' + b.of.map((id) => G.boonDef(id).name).join(' + ') : G.ui.boonTag(b);
+    el.querySelector('.ctag').textContent = b.relicReward ? G.T('A second relic') : b.duo ? G.ui.boonTag(b) : b.pair ? G.T('Pair · {0}', b.of.map((id) => G.boonDef(id).name).join(' + ')) : G.ui.boonTag(b);
     el.querySelector('.cname').textContent = b.name;
-    el.querySelector('.cdesc').innerHTML = G.ui.esc(b.desc) + (own && !mine ? ' You hold ' + own + '.' : '') + (mine || b.relicReward ? '' : G.ui.pairNote(b) + G.ui.setNote(b))
+    el.querySelector('.cdesc').innerHTML = G.ui.esc(b.desc) + (own && !mine ? G.T(' You hold {0}.', own) : '') + (mine || b.relicReward ? '' : G.ui.pairNote(b) + G.ui.setNote(b))
       + (b.cursed ? '<span class="bane">' + G.ui.esc(b.bane) + '</span>' : '');
     const pad = G.input.device === 'gamepad', canBan = !b.relicReward && G.run.banishes > 0;
-    el.querySelector('.cuse').textContent = mine ? 'Yours for the run' : closed() ? 'You have taken one'
-      : (pad ? 'LB' : G.input.label('heal')) + '  take it' + (canBan ? '   \u00b7   ' + (pad ? 'Back' : G.input.label('taunt')) + '  banish (' + G.run.banishes + ' left)' : '');
+    el.querySelector('.cuse').textContent = mine ? G.T('Yours for the run') : closed() ? G.T('You have taken one')
+      : G.T('{0}  take it', pad ? 'LB' : G.input.label('heal')) + (canBan ? G.T('   ·   {0}  banish ({1} left)', pad ? 'Back' : G.input.label('taunt'), G.run.banishes) : '');
   }
   // the relic's card at the fire: what it does at each stage it has woken to, and the next one
   function relicCard(el) {
     const run = R(), ids = G.relics.held(), id = ids[0], s = run.awake || 0, due = G.relics.pending();
     el.className = 'item card focus show t-relic';
-    el.querySelector('.ctag').textContent = 'Your relic' + (s ? ' \u00b7 ' + G.relics.STAGES[s] : '') + (ids.length > 1 ? ' \u00b7 and ' + (ids.length - 1) + ' more' : '');
+    el.querySelector('.ctag').textContent = G.T('Your relic') + (s ? ' · ' + G.relics.STAGES[s] : '') + (ids.length > 1 ? G.T(' · and {0} more', ids.length - 1) : '');
     el.querySelector('.cname').textContent = G.relicDef(id).name;
     el.querySelector('.cdesc').innerHTML = G.relics.html(id, { next: true });
-    el.querySelector('.cuse').textContent = due ? (G.input.device === 'gamepad' ? 'LB' : G.input.label('heal')) + '  awaken it: ' + G.relics.STAGES[G.relics.due()]
-      : s >= 3 ? 'Ascendant' : 'It stirs again after trial ' + G.roman(G.relics.AT[s]);
+    el.querySelector('.cuse').textContent = due ? G.T('{0}  awaken it: {1}', G.input.device === 'gamepad' ? 'LB' : G.input.label('heal'), G.relics.STAGES[G.relics.due()])
+      : s >= 3 ? G.T('Ascendant') : G.T('It stirs again after trial {0}', G.roman(G.relics.AT[s]));
   }
   REST.leave = function () { cardFor = null; const el = document.getElementById('restCard'); if (el) el.classList.remove('show'); };
 
@@ -1233,46 +1233,46 @@
 
   function label(s) {
     const run = R(), next = G.roman(run.trial + 1), of = G.roman(G.RUN_FIGHTS);
-    if (s.id === 'fire' && G.relics.pending()) return ['The Fire', 'Your relic stirs in the flames. Hold it to the fire.', 'awaken it'];
-    if (s.id === 'fire') return ['The Fire', run.runWon() ? 'All ' + G.roman(G.RUN_FIGHTS) + ' trials won. Rest a while.' : 'Trial ' + G.roman(run.trial) + ' won. Rest a while; nothing here can hurt you.', 'warm your hands'];
-    if (s.id === 'stone') return ['Second Thoughts', 'Redraw the whole offering (' + run.rerolls + ' left this run)', 'redraw'];
-    if (s.id === 'home') return ['The Way Home', 'The run is won. Back to the camp.', 'go home'];
+    if (s.id === 'fire' && G.relics.pending()) return [G.T('The Fire'), G.T('Your relic stirs in the flames. Hold it to the fire.'), G.T('awaken it')];
+    if (s.id === 'fire') return [G.T('The Fire'), run.runWon() ? G.T('All {0} trials won. Rest a while.', G.roman(G.RUN_FIGHTS)) : G.T('Trial {0} won. Rest a while; nothing here can hurt you.', G.roman(run.trial)), G.T('warm your hands')];
+    if (s.id === 'stone') return [G.T('Second Thoughts'), G.T('Redraw the whole offering ({0} left this run)', run.rerolls), G.T('redraw')];
+    if (s.id === 'home') return [G.T('The Way Home'), G.T('The run is won. Back to the camp.'), G.T('go home')];
     if (s.id === 'fountain') {
       const n = run.banes().length, cost = run.cleanseCost();
-      return ['The Cleansing Fountain', n ? 'Purge a corrupted boon\u2019s drawback: ' + cost + ' Motes (you hold ' + G.motes.held() + ')'
-        : 'Its water purges the drawback of a corrupted boon. You carry none.', n ? 'cleanse' : ''];
+      return [G.T('The Cleansing Fountain'), n ? G.T('Purge a corrupted boon’s drawback: {0} Motes (you hold {1})', cost, G.motes.held())
+        : G.T('Its water purges the drawback of a corrupted boon. You carry none.'), n ? G.T('cleanse') : ''];
     }
     if (s.id === 'card') {
       const done = REST.ev.done;
-      return ['A Face-Down Card', done ? 'Turned. The fortune-teller has nothing more for you.' : 'Turn one of the three: a boon, Motes, or a corrupted boon. You will not know which.', done ? '' : 'turn it'];
+      return [G.T('A Face-Down Card'), done ? G.T('Turned. The fortune-teller has nothing more for you.') : G.T('Turn one of the three: a boon, Motes, or a corrupted boon. You will not know which.'), done ? '' : G.T('turn it')];
     }
     if (s.id === 'smith') {
       const n = run.temperable().length, cost = run.temperCost();
-      return ['The Wandering Smith', n ? 'Temper a boon you hold: one more of it, even past its limit. ' + cost + ' Motes (you hold ' + G.motes.held() + ')' : 'Nothing you hold can be tempered.', n ? 'temper' : ''];
+      return [G.T('The Wandering Smith'), n ? G.T('Temper a boon you hold: one more of it, even past its limit. {0} Motes (you hold {1})', cost, G.motes.held()) : G.T('Nothing you hold can be tempered.'), n ? G.T('temper') : ''];
     }
     if (s.id === 'merchant') {
-      return ['The Road Merchant', 'Health for the run, boons, and things for the fight. You hold ' + G.motes.held() + ' Motes.', 'trade'];
+      return [G.T('The Road Merchant'), G.T('Health for the run, boons, and things for the fight. You hold {0} Motes.', G.motes.held()), G.T('trade')];
     }
     if (s.id === 'pledge') {
       const done = REST.ev.done;
-      return ['The Omen Altar', done ? 'Pledged. An omen more walks with you into the next trial.' : 'Pledge yourself: an omen more in the next trial, and a second boon from this offering.', done ? '' : 'pledge'];
+      return [G.T('The Omen Altar'), done ? G.T('Pledged. An omen more walks with you into the next trial.') : G.T('Pledge yourself: an omen more in the next trial, and a second boon from this offering.'), done ? '' : G.T('pledge')];
     }
-    if (s.id === 'door') return ['The Doorway', 'Someone sits in the light inside, waiting. A duel: lose it, and you lose nothing.', 'step through'];
-    if (s.id === 'duel') return ['The Duelling Shade', 'It dashes at you, six times at most. Strike it three times before its blade touches you and it leaves a relic.', 'duel'];
-    if (s.id === 'seventh') return ['The Last Portal', run.solOpen() ? (run.corrupted.length ? 'Open. The run ends here: corrupted portals left open will close.' : 'Open. Light pours out of it: she is waiting on the other side.') : run.runWon() ? 'Spent. Its light is yours.' : 'Dormant. It waits for ' + G.roman(G.TRIALS) + ' trials won (' + run.trialsWon() + ' of ' + G.TRIALS + ').', run.solOpen() ? 'step through' : run.runWon() ? 'touch it' : ''];
+    if (s.id === 'door') return [G.T('The Doorway'), G.T('Someone sits in the light inside, waiting. A duel: lose it, and you lose nothing.'), G.T('step through')];
+    if (s.id === 'duel') return [G.T('The Duelling Shade'), G.T('It dashes at you, six times at most. Strike it three times before its blade touches you and it leaves a relic.'), G.T('duel')];
+    if (s.id === 'seventh') return [G.T('The Last Portal'), run.solOpen() ? (run.corrupted.length ? G.T('Open. The run ends here: corrupted portals left open will close.') : G.T('Open. Light pours out of it: she is waiting on the other side.')) : run.runWon() ? G.T('Spent. Its light is yours.') : G.T('Dormant. It waits for {0} trials won ({1} of {2}).', G.roman(G.TRIALS), run.trialsWon(), G.TRIALS), run.solOpen() ? G.T('step through') : run.runWon() ? G.T('touch it') : ''];
     if (s.id === 'portal') {
       const B = G.bosses[s.boss], st = portalState(s.boss), ready = offerTaken();
-      if (st === 'corrupt') return ['Corrupted: ' + B.name, 'Optional. Far stronger, and it does not count as a trial. Win it for a second relic and triple Sunshards.', ready ? 'enter, if you dare' : 'take from the offering first'];
-      if (st === 'sealed') return [B.name, run.beaten.includes(s.boss) ? (run.cleansed.includes(s.boss) ? 'Beaten, and its corruption cleansed' : 'Beaten this run') : 'Sealed', ''];
-      return [B.name, 'Trial ' + next + ' of ' + of, !ready ? 'take from the offering first' : G.relics.pending() ? 'awaken your relic at the fire first' : 'enter'];
+      if (st === 'corrupt') return [G.T('Corrupted: {0}', B.name), G.T('Optional. Far stronger, and it does not count as a trial. Win it for a second relic and triple Sunshards.'), ready ? G.T('enter, if you dare') : G.T('take from the offering first')];
+      if (st === 'sealed') return [B.name, run.beaten.includes(s.boss) ? (run.cleansed.includes(s.boss) ? G.T('Beaten, and its corruption cleansed') : G.T('Beaten this run')) : G.T('Sealed'), ''];
+      return [B.name, G.T('Trial {0} of {1}', next, of), !ready ? G.T('take from the offering first') : G.relics.pending() ? G.T('awaken your relic at the fire first') : G.T('enter')];
     }
     return ['', '', ''];
   }
   function shortName(s) {
     if (s.id === 'boon') return shownDef(s.i).name;
-    if (s.id === 'card') return s.i === 1 ? 'The Fortune-Teller' : '';
-    if (s.id === 'portal') { const B = G.bosses[s.boss]; return B ? (portalState(s.boss) === 'corrupt' ? 'Corrupted' : B.short) : ''; }
-    return { fire: 'The Fire', merchant: 'The Merchant', stone: 'Second Thoughts', seventh: 'The Last Portal', home: 'The Way Home', fountain: 'The Fountain', smith: 'The Smith', pledge: 'The Omen Altar', duel: 'The Shade', door: 'The Doorway' }[s.id];
+    if (s.id === 'card') return s.i === 1 ? G.T('The Fortune-Teller') : '';
+    if (s.id === 'portal') { const B = G.bosses[s.boss]; return B ? (portalState(s.boss) === 'corrupt' ? G.T('Corrupted') : B.short) : ''; }
+    return { fire: G.T('The Fire'), merchant: G.T('The Merchant'), stone: G.T('Second Thoughts'), seventh: G.T('The Last Portal'), home: G.T('The Way Home'), fountain: G.T('The Fountain'), smith: G.T('The Smith'), pledge: G.T('The Omen Altar'), duel: G.T('The Shade'), door: G.T('The Doorway') }[s.id];
   }
 
   // names over each place, what the nearest one does; in front of everything
@@ -1291,8 +1291,8 @@
       text(ctx, name.toUpperCase(), s.x, FLOOR - s.top, s.id === 'boon' ? 11 : 12, col, mine ? 0.95 : dim ? 0.3 : 0.6);
     }
     if (seen(ALTAR_X, 200) && altars().length && !(near && near.id === 'boon')) {
-      const what = run.offerKind === 'relic' ? 'THE SPOILS' : 'THE OFFERING';
-      text(ctx, closed() ? what : what + (REST.taken >= 0 ? '  ·  CHOOSE ONE MORE' : REST.extra ? '  ·  CHOOSE TWO' : '  ·  CHOOSE ONE'), ALTAR_X, FLOOR - 200, 12, closed() ? '236,233,244' : paint.GOLD, closed() ? 0.55 : 0.6 + 0.25 * Math.sin(REST.t * 3));
+      const what = run.offerKind === 'relic' ? G.T('THE SPOILS') : G.T('THE OFFERING');
+      text(ctx, closed() ? what : REST.taken >= 0 ? G.T('{0}  ·  CHOOSE ONE MORE', what) : REST.extra ? G.T('{0}  ·  CHOOSE TWO', what) : G.T('{0}  ·  CHOOSE ONE', what), ALTAR_X, FLOOR - 200, 12, closed() ? '236,233,244' : paint.GOLD, closed() ? 0.55 : 0.6 + 0.25 * Math.sin(REST.t * 3));
     }
     if (near && near.id !== 'boon' && !G.ui.current) {
       const Lb = label(near), x = G.clamp(near.x, cam + 260, cam + W - 260), y = FLOOR - near.top - 40;
@@ -1303,13 +1303,14 @@
     }
     if (REST.msgT > 0) text(ctx, REST.msg.toUpperCase(), p.x, p.y - 104, 15, paint.GOLD, Math.min(1, REST.msgT * 2));
     if (!G.ui.current) {
-      text(ctx, 'THE CROSSROADS', cam + W / 2, 40, 20, '236,233,244', 0.75, '400');
-      const sub = run.solOpen() && !G.relics.pending() ? 'Six trials won  \u00b7  ' + (offerTaken() ? 'the last portal is open' : 'take from the offering, then the last portal')
-        : G.relics.pending() && run.runWon() ? 'All ' + G.roman(G.RUN_FIGHTS) + ' trials won  \u00b7  your relic stirs at the fire, one last time' : run.runWon()
-        ? 'All ' + G.roman(G.RUN_FIGHTS) + ' trials won' + (run.corrupted.length ? '  ·  ' + (run.corrupted.length > 1 ? 'corrupted portals wait' : 'a corrupted portal waits') + ', if you dare  ·  or the way home, behind you' : '  ·  the way home is behind you')
-        : G.relics.pending() ? 'Trial ' + G.roman(run.trial) + ' won  \u00b7  your relic stirs at the fire' : (run.offerKind === 'relic' ? 'The corruption is cleansed  ·  take a relic, then choose a portal' : 'Trial ' + G.roman(run.trial) + ' of ' + G.roman(G.RUN_FIGHTS) + ' won  ·  take from the offering, then choose a portal');
+      text(ctx, G.T('THE CROSSROADS'), cam + W / 2, 40, 20, '236,233,244', 0.75, '400');
+      const RF = G.roman(G.RUN_FIGHTS);
+      const sub = run.solOpen() && !G.relics.pending() ? (offerTaken() ? G.T('Six trials won  ·  the last portal is open') : G.T('Six trials won  ·  take from the offering, then the last portal'))
+        : G.relics.pending() && run.runWon() ? G.T('All {0} trials won  ·  your relic stirs at the fire, one last time', RF) : run.runWon()
+        ? (run.corrupted.length ? (run.corrupted.length > 1 ? G.T('All {0} trials won  ·  corrupted portals wait, if you dare  ·  or the way home, behind you', RF) : G.T('All {0} trials won  ·  a corrupted portal waits, if you dare  ·  or the way home, behind you', RF)) : G.T('All {0} trials won  ·  the way home is behind you', RF))
+        : G.relics.pending() ? G.T('Trial {0} won  ·  your relic stirs at the fire', G.roman(run.trial)) : (run.offerKind === 'relic' ? G.T('The corruption is cleansed  ·  take a relic, then choose a portal') : G.T('Trial {0} of {1} won  ·  take from the offering, then choose a portal', G.roman(run.trial), RF));
       text(ctx, sub, cam + W / 2, 66, 12, '236,233,244', 0.45, '500');
-      if (PORTAL_X > cam + W + 40 && offerTaken()) text(ctx, 'THE PORTALS  ›', cam + W - 96, 40, 12, paint.GOLD, 0.5 + 0.2 * Math.sin(REST.t * 3));
+      if (PORTAL_X > cam + W + 40 && offerTaken()) text(ctx, G.T('THE PORTALS  ›'), cam + W - 96, 40, 12, paint.GOLD, 0.5 + 0.2 * Math.sin(REST.t * 3));
     }
   };
 })();

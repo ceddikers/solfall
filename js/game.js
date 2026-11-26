@@ -204,7 +204,7 @@
     G.solFrom = G.solRise; G.solRise = null;
     G.startFight();
     G.solFrom = null;
-    G.ui.callout('RISE AGAIN');
+    G.ui.callout(G.T('RISE AGAIN'));
   };
   G.nextTrial = function () { if (G.run.solOpen()) { G.enterPortal('sol', false); return; } const left = G.run.left(); G.enterPortal(G.pick(left.length ? left : G.BOSS_IDS), false); };
   G.rerollBoons = function () { if (G.run.reroll()) { G.audio.play('uiSelect'); G.ui.fillBoons(); } else G.audio.play('empty'); };
@@ -316,7 +316,7 @@
     const P = G.player, t = G.time;
     const score = 100 - P.stats.hits * 9 - Math.max(0, t - 150) * 0.12 + Math.min(10, P.stats.perfect * 1.5);
     const grade = score >= 92 ? 'S' : score >= 76 ? 'A' : score >= 58 ? 'B' : 'C';
-    const title = { S: 'Flawless light', A: 'Radiant', B: 'Steadfast', C: 'Survivor' }[grade];
+    const title = { S: G.T('Flawless light'), A: G.T('Radiant'), B: G.T('Steadfast'), C: G.T('Survivor') }[grade];
     const d = G.settings.difficulty, trial = G.run.trial;
     // fastest time counts for the first trial only, where every run starts equal
     const best = G.store.load('best', {});
@@ -365,7 +365,7 @@
     const P = G.player, t = G.time, R = G.run;
     const score = 100 - P.stats.hits * 9 - Math.max(0, t - 150) * 0.12 + Math.min(10, P.stats.perfect * 1.5);
     const grade = score >= 92 ? 'S' : score >= 76 ? 'A' : score >= 58 ? 'B' : 'C';
-    const title = { S: 'Flawless light', A: 'Radiant', B: 'Steadfast', C: 'Survivor' }[grade];
+    const title = { S: G.T('Flawless light'), A: G.T('Radiant'), B: G.T('Steadfast'), C: G.T('Survivor') }[grade];
     const meta = G.meta.onVictory(grade, 'champion');
     const s = R.sum || (R.sum = { t: 0, hits: 0, perfect: 0, shards: 0 }); s.t += t; s.hits += P.stats.hits; s.perfect += P.stats.perfect; s.shards += meta.shards; R.champWon = true;
     const costume = G.mastery.gain(R.hero, 1); // (v2.8a)
@@ -463,7 +463,7 @@
         if (G.practice) {
           // a practice win goes straight back to the ring it started from
           const t = G.time, name = G.boss.short;
-          G.toHub('ring'); G.hub.say(name + ' beaten in ' + G.ui.fmtTime(t));
+          G.toHub('ring'); G.hub.say(G.T('{0} beaten in {1}', name, G.ui.fmtTime(t)));
         } else if (G.run.champFight) G.ui.showWin(champResult());
         else if (G.boss.id === 'sol') { const res = result(); G.saveRun('won'); G.epilogue.start(res); } // (v3.0a: the dawn, then the end screen: epilogue.js)
         else { G.ui.showWin(result()); G.saveRun('won'); } // (a page closed now continues on the road)

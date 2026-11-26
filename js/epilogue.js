@@ -9,7 +9,7 @@
   const EP = G.epilogue = { on: false, t: 0, res: null };
   const W = G.W, H = G.H;
   const RIDGE_Y = 566, HERO_X = 452, SUN_X = 980, CLOUD_Y = 520;
-  const LINES = ['The sun fell.', 'You carried its light home.', 'Morning comes to the Vigil.'];
+  const LINES = [G.T('The sun fell.'), G.T('You carried its light home.'), G.T('Morning comes to the Vigil.')];
   const LINE_T = [3.0, 4.8, 6.6], END_T = 9.4;
   const sm = (a, b, x) => { const k = G.clamp((x - a) / (b - a), 0, 1); return k * k * (3 - 2 * k); };
   const lerp = G.lerp;

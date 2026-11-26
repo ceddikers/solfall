@@ -327,7 +327,7 @@
     R.daily = null; R.dn = {}; // (v2.8a) the day of a daily trial, and how often each of its picks has been drawn
     // (v2.9k) Motes, the run's own currency, the two consumables held, the road merchant's stock, and
     // what was bought from it (motes.js)
-    R.motes = 0; R.motesEarned = 0; R.items = G.ascBest(R.hero) >= 3 ? [null, null, null] : [null, null]; // (v3.0d: a third slot from Ascension +3) R.merch = null; R.mendsBought = 0; R.bonusHp = 0;
+    R.motes = 0; R.motesEarned = 0; R.items = G.ascBest(R.hero) >= 3 ? [null, null, null] : [null, null]; R.merch = null; R.mendsBought = 0; R.bonusHp = 0; // (v3.0d: a third slot from Ascension +3)
     R.sum = { t: 0, hits: 0, perfect: 0, shards: 0 }; R.champWon = false; R.lastWarned = false; // (v3.0a) the run's totals, for the end screen
     if (typeof document !== 'undefined') document.documentElement.style.setProperty('--herocol', G.hero().css); // (a hero's own boons wear the hero's colour)
   };

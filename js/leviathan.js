@@ -123,21 +123,21 @@
   // ------------------------------------------------------------------ the arena
   G.THEMES.leviathan = [null,
     {
-      name: 'LOW TIDE', scene: 'drowned',
+      name: G.T('LOW TIDE'), scene: 'drowned',
       sky: ['#02060c', '#08182a', '#123848', '#4e8c94'],
       far: '#0c2230', near: '#07141c', pillar: '#040b10', rim: '130,226,218',
       floorTop: '#24404a', floor: '#081216',
       boss: '90,228,205', hot: '226,255,248', ember: '120,220,210', stars: 0.35,
     },
     {
-      name: 'HIGH WATER', scene: 'drowned',
+      name: G.T('HIGH WATER'), scene: 'drowned',
       sky: ['#020403', '#0a1610', '#1c3426', '#6a7a4c'],
       far: '#0e1c14', near: '#08110c', pillar: '#040906', rim: '255,206,130',
       floorTop: '#2a3424', floor: '#0a0e08',
       boss: '255,188,96', hot: '255,242,214', ember: '255,200,120', stars: 0.05,
     },
     {
-      name: 'MAELSTROM', scene: 'drowned',
+      name: G.T('MAELSTROM'), scene: 'drowned',
       sky: ['#010103', '#06050e', '#141028', '#5c5488'],
       far: '#0c0a18', near: '#06050c', pillar: '#030207', rim: '200,190,255',
       floorTop: '#24203a', floor: '#08070e',
@@ -222,25 +222,25 @@
 
   // ------------------------------------------------------------------ the boss
   const B = {
-    id: 'leviathan', name: 'THE DROWNED LEVIATHAN', short: 'The Leviathan', theme: 'leviathan',
-    sub: 'The sea remembers the coast it swallowed', taunt: 'the tide turns again',
-    blurb: 'A sea serpent that strikes from the deep',
+    id: 'leviathan', name: G.T('THE DROWNED LEVIATHAN'), short: G.T('The Leviathan'), theme: 'leviathan',
+    sub: G.T('The sea remembers the coast it swallowed'), taunt: G.T('the tide turns again'),
+    blurb: G.T('A sea serpent that strikes from the deep'),
     tips: [
-      'Watch how it rears. Head held low with its snout to the ground: it strikes low, so jump. Reared up tall with its snout to the sky: it strikes high, so stay on the ground.',
-      'After a lunge, a snap or a dive its head lies on the shore. Strike it then.',
-      'One slap of its tail on the water: one great blow from above. Three quick shakes: three lighter ones that follow you.',
-      'If it rolls sideways as it dives, the spouts come up in rows: stand in a gap, then step into the row that has finished. If it sinks straight down, they come up under you.',
-      'Its jaw chatters before a double snap.',
-      'In high water the floor drags at your legs. A dash is still a dash, and the wreckage is dry.',
-      'If the spines on its coil stand up and rattle, the coil comes back off the far wall.',
-      'In the maelstrom the current drags you towards the eye. Count how often its fin circles: twice round, and it comes up twice.',
-      'Watch how far the sea draws back before a wave. Far out, the bed laid bare: a breaker too tall to jump, so dash through it. Only a little: a low swell to jump.',
-      'Jaws clamped and gills flared, it is about to spit a jet. Head up high: the jet comes down from the sky to the floor, so get in under its chin. Head down by the floor: a swell runs along the floor, then the jet follows over your head, so jump the first and stay down for the second.',
-      'Ride on its head, or wait on the wreckage over it, and it goes down and comes up under you. The ground heaves where it will: step off the spot.',
-      'Its gills pumping while it rears for a lunge: it is holding its breath, and goes late. Wait for it.',
-      'Barnacles burst a moment after they land. Its head swinging wide as it fills: they land all over. A quick tight bob: a line of them laid towards you.',
-      'When it bites its way after you, watch its snout each time it draws back: down at the sand, jump; cocked up, stay down. The last bite buries its jaws. Hit it then.',
-      'When it coils round the bay, the spouts come up everywhere but in the gap in its coil. Keep with the gap.',
+      G.T('Watch how it rears. Head held low with its snout to the ground: it strikes low, so jump. Reared up tall with its snout to the sky: it strikes high, so stay on the ground.'),
+      G.T('After a lunge, a snap or a dive its head lies on the shore. Strike it then.'),
+      G.T('One slap of its tail on the water: one great blow from above. Three quick shakes: three lighter ones that follow you.'),
+      G.T('If it rolls sideways as it dives, the spouts come up in rows: stand in a gap, then step into the row that has finished. If it sinks straight down, they come up under you.'),
+      G.T('Its jaw chatters before a double snap.'),
+      G.T('In high water the floor drags at your legs. A dash is still a dash, and the wreckage is dry.'),
+      G.T('If the spines on its coil stand up and rattle, the coil comes back off the far wall.'),
+      G.T('In the maelstrom the current drags you towards the eye. Count how often its fin circles: twice round, and it comes up twice.'),
+      G.T('Watch how far the sea draws back before a wave. Far out, the bed laid bare: a breaker too tall to jump, so dash through it. Only a little: a low swell to jump.'),
+      G.T('Jaws clamped and gills flared, it is about to spit a jet. Head up high: the jet comes down from the sky to the floor, so get in under its chin. Head down by the floor: a swell runs along the floor, then the jet follows over your head, so jump the first and stay down for the second.'),
+      G.T('Ride on its head, or wait on the wreckage over it, and it goes down and comes up under you. The ground heaves where it will: step off the spot.'),
+      G.T('Its gills pumping while it rears for a lunge: it is holding its breath, and goes late. Wait for it.'),
+      G.T('Barnacles burst a moment after they land. Its head swinging wide as it fills: they land all over. A quick tight bob: a line of them laid towards you.'),
+      G.T('When it bites its way after you, watch its snout each time it draws back: down at the sand, jump; cocked up, stay down. The last bite buries its jaws. Hit it then.'),
+      G.T('When it coils round the bay, the spouts come up everywhere but in the gap in its coil. Keep with the gap.'),
     ],
     hudCols: [null, ['#3ad6c0', '#cffff6'], ['#ffb44a', '#ffe8c4'], ['#a896ff', '#ece6ff']],
     BASE_HP: 3200, poise0: 400, w: 128, h: 80, // (v2.9g: 2900; it won every bot fight)
@@ -253,7 +253,7 @@
       2: ['lunge', 'snap', 'slam', 'spouts', 'sweep', 'volley', 'snap', 'breaker', 'jet', 'barnacles', 'thrash', 'gyre'],
       3: ['lunge', 'snap', 'slam', 'spouts', 'sweep', 'maw', 'volley', 'maw', 'breaker', 'jet', 'barnacles', 'thrash', 'gyre'],
     },
-    cards: { 2: ['HIGH WATER', 'The sea comes in'], 3: ['MAELSTROM', 'All of it goes down'] },
+    cards: { 2: [G.T('HIGH WATER'), G.T('The sea comes in')], 3: [G.T('MAELSTROM'), G.T('All of it goes down')] },
     first: { 1: 'lunge', 2: 'sweep', 3: 'maw' },
   };
 
@@ -2655,7 +2655,7 @@
   B.corruptBags = { 1: ['hydra'], 2: ['hydra', 'undertow'], 3: ['hydra', 'undertow'] };
 
   // ------------------------------------------------------------------ stagger and topple: beached
-  B.staggerWord = 'BEACHED';
+  B.staggerWord = G.T('BEACHED');
   B.staggerMult = 1.5;
   B.staggerDur = 1.0;
   B.onStagger = function () {

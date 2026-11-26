@@ -3,7 +3,7 @@
 
 const G = window.G = {};
 
-G.VERSION = '3.0e';
+G.VERSION = '3.1a';
 G.bgK = 1; // how many pixels per unit the painted backdrops are kept at (set in game.js, resize)
 G.W = 1280;          // logical view size
 G.H = 720;
@@ -204,7 +204,7 @@ G.ascBest = (hero) => G.ascOf(hero).best || 0;
 G.BOON_NEED = { split: 'lance', pinlance: 'lance', twinstar: 'lance', aftershock: 'starfall', starborn: 'starfall', quiver: 'volley', harvest: 'volley', hanging: 'draw', secondsun: 'draw', fault: 'charge', unbroken: 'charge' };
 G.heroCan = (need) => { const h = G.hero(); return need === 'draw' ? !!h.draw : need === 'charge' ? !!h.heavy : h.special === need; };
 G.boonOpen = (b) => (!b.asc || G.ascBest(G.run.hero) >= b.asc) && (!G.BOON_NEED[b.id] || G.heroCan(G.BOON_NEED[b.id]));
-G.heroTitle = (h) => (G.ascBest(h.id) >= 5 ? 'The Unfallen' : h.title);
+G.heroTitle = (h) => (G.ascBest(h.id) >= 5 ? G.T('The Unfallen') : h.title);
 // the difficulties this hero can choose (the Brazier steps through them)
 G.diffChoices = (hero) => { const out = [0, 1, 2], o = G.ascOf(hero).open; for (let n = 1; n <= o; n++) out.push(2 + n); return out; };
 // a hero without that step open drops to the highest they have

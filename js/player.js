@@ -123,7 +123,7 @@
     G.fx.burst(P.x, y, { n: brazen ? 26 : 12, color: brazen ? GOLD : HOT, speed: [80, 380], life: [0.3, 0.8], size: [2, 4.5], kind: 'spark' });
     G.fx.light(P.x, y, brazen ? 260 : 150, brazen ? GOLD : STAR, 0.4, 0.5);
     if (G.state !== 'fight') return; // in the camp it is only for show
-    G.fx.text(P.x, P.y - 118, brazen ? 'BRAZEN' : 'FLOURISH', { color: brazen ? GOLD : HOT, size: brazen ? 24 : 16, life: 0.9 });
+    G.fx.text(P.x, P.y - 118, brazen ? G.T('BRAZEN') : G.T('FLOURISH'), { color: brazen ? GOLD : HOT, size: brazen ? 24 : 16, life: 0.9 });
     G.flow.add(brazen ? 30 : 10);
     P.ult = Math.min(100, P.ult + (brazen ? 10 : 3));
     if (brazen) { G.feats.bump('brazen'); G.fx.shake(5); }
@@ -270,7 +270,7 @@
         G.fx.burst(P.x, P.y - 24, { n: 18, color: HOT, speed: [60, 240], life: [0.3, 0.7], size: [3, 6] });
         G.fx.burst(P.x, P.y - 8, { n: 12, color: STAR, speed: [10, 60], life: [0.6, 1.2], size: [2, 3.5], grav: -260, wob: 120, jitter: 16 });
         G.fx.light(P.x, P.y - 24, 170, STAR, 0.35, 0.5);
-        G.fx.text(P.x, P.y - 70, 'MENDED', { color: STAR, size: 16 });
+        G.fx.text(P.x, P.y - 70, G.T('MENDED'), { color: STAR, size: 16 });
         if (G.boon('emberward') && !P.ward) {
           P.ward = true; P.wardT = 4;
           G.fx.ring(P.x, P.y - 22, { r0: 70, r1: 30, life: 0.4, color: HOT, width: 4 });
@@ -1569,7 +1569,7 @@
     G.fx.lines(P.x, P.y - 22, 14, HOT, { r0: 30, speed: [500, 1000] });
     G.fx.light(P.x, P.y - 22, 220, STAR, 0.3, 0.55);
     G.fx.punch(0.012);
-    G.fx.text(P.x, P.y - 74, 'PERFECT', { color: HOT, size: 17, life: 0.9 });
+    G.fx.text(P.x, P.y - 74, G.T('PERFECT'), { color: HOT, size: 17, life: 0.9 });
     // Wellspring (a pair): a whole segment of Starlight
     if (G.boon('well')) { P.ember = Math.min(C.SEG * P.segs, P.ember + C.SEG); P.emberFlash = 1; }
     // Mirror Step answers a perfect dodge with a free shot at the core
@@ -1633,7 +1633,7 @@
       G.fx.shake(6);
       G.fx.ring(P.x, P.y - 22, { r0: 26, r1: 130, life: 0.45, color: HOT, width: 8 });
       G.fx.shatter(P.x, P.y - 22, HOT, 10, { r: 180 });
-      G.fx.text(P.x, P.y - 78, 'WARDED', { color: HOT, size: 18, life: 1 });
+      G.fx.text(P.x, P.y - 78, G.T('WARDED'), { color: HOT, size: 18, life: 1 });
       G.relics.warded(); // (the Wardstone, awakened: relics.js)
       return false;
     }
@@ -1644,7 +1644,7 @@
       G.fx.shake(6);
       G.fx.ring(P.x, P.y - 22, { r0: 26, r1: 130, life: 0.45, color: '170,220,255', width: 8 });
       G.fx.shatter(P.x, P.y - 22, '170,220,255', 10, { r: 180 });
-      G.fx.text(P.x, P.y - 78, 'WARDED', { color: '170,220,255', size: 18, life: 1 });
+      G.fx.text(P.x, P.y - 78, G.T('WARDED'), { color: '170,220,255', size: 18, life: 1 });
       return false;
     }
     dmg = G.relics.blowDmg(dmg); // (Anvil Heart, Ascendant)
@@ -1667,7 +1667,7 @@
     G.feats.bump('hurt');
     if (braced) {
       // Aster, mid-charge: it hurts, but she is not moved and the blow she is holding is not lost
-      G.fx.text(P.x, P.y - 84, 'UNMOVED', { color: HOT, size: 15, life: 0.8 });
+      G.fx.text(P.x, P.y - 84, G.T('UNMOVED'), { color: HOT, size: 15, life: 0.8 });
     } else {
       P.stun = 0.2; P.atk = null;
       P.vx = dir * 430; P.vy = (src && typeof src.popVy === 'number') ? src.popVy : -430; P.onGround = false; P.plat = null; P.jumpHeld = false;
@@ -1681,24 +1681,24 @@
     if (P.hp <= 0 && G.boon('dawn') && !P.dawnUsed) {
       // Second Dawn: survive the killing blow once per trial
       P.dawnUsed = true; P.hp = 1; P.inv = 2.6;
-      revived('SECOND DAWN');
+      revived(G.ja ? G.boonDef('dawn').name : 'SECOND DAWN');
       if (G.boon('dying') && G.boss.forceStagger) G.boss.forceStagger(); // Dying Light (a pair)
     }
     if (P.hp <= 0 && G.boon('borrowed') && !P.borrowUsed) {
       // Borrowed Time (corrupted): once per trial
       P.borrowUsed = true; P.hp = 2; P.inv = 2.6;
-      revived('BORROWED TIME');
+      revived(G.ja ? G.boonDef('borrowed').name : 'BORROWED TIME');
       if (G.boss.forceStagger) G.boss.forceStagger();
     }
     if (P.hp <= 0 && G.relics.phoenixReady()) {
       // Phoenix Feather: once per run (twice, Awakened)
       G.relics.phoenix();
-      revived('REBORN');
+      revived(G.T('REBORN'));
     }
     if (P.hp <= 0 && G.motes.ash()) {
       // (v2.9k) Phoenix Ash, held: it burns away and the hero stands on 2 health
       P.hp = Math.min(2, P.maxHp); P.inv = 2.6;
-      revived('ASHES');
+      revived(G.T('ASHES'));
     }
     if (P.hp <= 0) { P.hp = 0; die(); } else G.moments.hurt();
     return true;

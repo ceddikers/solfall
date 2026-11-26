@@ -76,21 +76,21 @@
   // ------------------------------------------------------------------ the arena: a still place at frozen dawn
   G.THEMES.champion = [null,
     {
-      name: 'THE DUEL', scene: 'stilldawn',
+      name: G.T('THE DUEL'), scene: 'stilldawn',
       sky: ['#11131f', '#2c2c42', '#7a6a76', '#e6c39a'],
       far: '#2b2733', near: '#1c1922', pillar: '#120f16', rim: '255,226,186',
       floorTop: '#5a524c', floor: '#1a1618',
       boss: GOLD, hot: '255,248,230', ember: '255,232,196', stars: 0.15,
     },
     {
-      name: 'THE TROPHIES', scene: 'stilldawn',
+      name: G.T('THE TROPHIES'), scene: 'stilldawn',
       sky: ['#0e0a16', '#2e2034', '#8a5a52', '#ffc98a'],
       far: '#2a1e26', near: '#1a1218', pillar: '#0e0a0e', rim: '255,210,150',
       floorTop: '#5e4c3e', floor: '#181210',
       boss: '255,214,140', hot: '255,250,232', ember: '255,214,150', stars: 0.05,
     },
     {
-      name: 'THE OTHER SIDE', scene: 'stilldawn',
+      name: G.T('THE OTHER SIDE'), scene: 'stilldawn',
       sky: ['#010103', '#050207', '#12040a', '#2c0712'],
       far: '#0a0508', near: '#060305', pillar: '#030103', rim: '150,20,44',
       floorTop: '#1c1216', floor: '#060405',
@@ -147,28 +147,28 @@
 
   // ------------------------------------------------------------------ the boss
   const B = {
-    id: 'champion', name: 'AUREL, THE FIRST LIGHT', short: 'Aurel', theme: 'champion', event: true,
+    id: 'champion', name: G.T('AUREL, THE FIRST LIGHT'), short: G.T('Aurel'), theme: 'champion', event: true,
     snapTurn: true, // (v2.5e) flips at once when it turns: see K.turn
-    sub: 'He waited on the other side', taunt: 'he waited on the other side',
-    blurb: 'The hero who ran the trials before you',
+    sub: G.T('He waited on the other side'), taunt: G.T('he waited on the other side'),
+    blurb: G.T('The hero who ran the trials before you'),
     tips: [
-      'Watch the rack on his back: the weapon that glows is the one that comes next.',
-      'Two glows at once: the brighter one is real.',
-      'When all four weapons go dark and he stands still, he is waiting to turn your blow.',
-      'Count the marks on his sheath. Three means the long draw.',
-      'Each stone that flares behind him is a move he took from a boss you beat.',
-      'In the dark, read the rack. It is the only light on him.',
-      'The Black Dawn is won on the beat: press as each flash meets the light.',
+      G.T('Watch the rack on his back: the weapon that glows is the one that comes next.'),
+      G.T('Two glows at once: the brighter one is real.'),
+      G.T('When all four weapons go dark and he stands still, he is waiting to turn your blow.'),
+      G.T('Count the marks on his sheath. Three means the long draw.'),
+      G.T('Each stone that flares behind him is a move he took from a boss you beat.'),
+      G.T('In the dark, read the rack. It is the only light on him.'),
+      G.T('The Black Dawn is won on the beat: press as each flash meets the light.'),
     ],
     hudCols: [null, ['#d6ba80', '#fff0d0'], ['#ffd68c', '#fffae8'], ['#eb1e50', '#ffd6e2']],
     BASE_HP: 3800, poise0: 380, w: 34, h: 86,
     answer: 'lunge', antiAir: 'rise', finale: 'blackdawn',
     gaps: [0, 0.95, 0.75, 0.58],
     bags: { 1: [], 2: [], 3: [] }, // (filled in setup: phase II and III carry a move for each boss beaten this run)
-    cards: { 2: ['THE TROPHIES', 'Then you have earned them'], 3: ['THE OTHER SIDE', 'What the last door keeps'] },
+    cards: { 2: [G.T('THE TROPHIES'), G.T('Then you have earned them')], 3: [G.T('THE OTHER SIDE'), G.T('What the last door keeps')] },
     first: { 1: 'string', 2: '', 3: 'fourfold' },
     bpm: [72, 96, 112, 132],
-    staggerWord: 'OPEN', staggerMult: 1.5,
+    staggerWord: G.T('OPEN'), staggerMult: 1.5,
   };
   // the stagger is longest in the duel and shortest in the dark (2.5, 2 and 1.6 s on Standard)
   Object.defineProperty(B, 'staggerDur', { get: () => [0, 0.62, 0.5, 0.4][B.phase] || 0.5 });
@@ -473,7 +473,7 @@
   B.onHit = function (dmg) {
     const P = G.player;
     // a blow while he mends breaks it, and him
-    if (B.mending) { B.mending = false; B.poise = B.poiseMax; G.ui.callout('BROKEN'); }
+    if (B.mending) { B.mending = false; B.poise = B.poiseMax; G.ui.callout(G.T('BROKEN')); }
     // blows from behind count more towards opening him
     else if (!B.staggered && behindNow()) B.poise += dmg * 0.6;
     if (P) { /* (nothing else) */ }
@@ -1125,7 +1125,7 @@
     // it reaches you: your light holds it
     bd.front = P.x - dir * 26; bd.hx = P.x; bd.state = 'hold';
     P.grabbed = { mash: true, presses: 0, x: P.x, y: Math.min(P.y, FLOOR), face: -dir };
-    G.flow.cutin = { t0: performance.now(), hero: { col: VOID.boss, hot: VOID.hot }, name: 'BLACK DAWN' };
+    G.flow.cutin = { t0: performance.now(), hero: { col: VOID.boss, hot: VOID.hot }, name: G.T('BLACK DAWN') };
     G.fx.stop(0.12); G.fx.shake(18); G.audio.play('clash');
     yield* wait(0.7);
     // the three flashes
@@ -1138,7 +1138,7 @@
       // a full Dawnbreak meter takes the first flash by itself
       if (i === 0 && P.ult >= 100) {
         P.ult = 0;
-        G.flow.cutin = { t0: performance.now(), hero: G.hero(), name: 'DAWNBREAK' };
+        G.flow.cutin = { t0: performance.now(), hero: G.hero(), name: G.T('DAWNBREAK') };
         yield* wait(run);
         bd.flash.done = true; bd.flash.won = true;
       } else {

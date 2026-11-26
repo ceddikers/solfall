@@ -101,21 +101,21 @@
     }
     let n = base() * (GRADE[grade] || 1);
     const rank = G.flow.peak;
-    if (rank > 0) { n += 2 * rank; out.lines.push('Flow ' + G.flow.RANKS[rank].name + ' +' + 2 * rank); }
-    if (G.moments.broke) { n += 6 * G.moments.broke; out.lines.push('Wards broken +' + 6 * G.moments.broke); }
+    if (rank > 0) { n += 2 * rank; out.lines.push(G.T('Flow {0} +{1}', G.flow.RANKS[rank].name, 2 * rank)); }
+    if (G.moments.broke) { n += 6 * G.moments.broke; out.lines.push(G.T('Wards broken +{0}', 6 * G.moments.broke)); }
     n *= scale();
     if (!M.kills[bossId]) {
       out.first = true; n += 25;
-      out.lines.push('First victory over ' + G.bosses[bossId].short + ' +25');
+      out.lines.push(G.T('First victory over {0} +25', G.bosses[bossId].short));
     }
     if (!M.trophy[bossId] && M.trophyHere(bossId)) {
       const tr = TROPHIES.find((t) => t.boss === bossId);
       if (tr) { M.trophy[bossId] = true; out.relic = tr; }
     }
     // the Champion's own gift, on top (not scaled): more the first time
-    if (bossId === 'champion') { const g = out.first ? 60 : 30; n += g; out.lines.push('His gift +' + g); }
-    if (G.run.omens.length) out.lines.push('Omen +' + 25 * G.run.omens.length + '%');
-    if (G.run.corrupt) out.lines.push('Corrupted \u00d73');
+    if (bossId === 'champion') { const g = out.first ? 60 : 30; n += g; out.lines.push(G.T('His gift +{0}', g)); }
+    if (G.run.omens.length) out.lines.push(G.T('Omen +{0}%', 25 * G.run.omens.length));
+    if (G.run.corrupt) out.lines.push(G.T('Corrupted \u00d73'));
     // feats done for the first time in this fight (see feats.js); their pay is not scaled
     for (const f of G.feats.win(bossId)) { n += f.pay; out.lines.push('Feat: ' + f.name + ' +' + f.pay); }
     M.kills[bossId] = (M.kills[bossId] || 0) + 1;

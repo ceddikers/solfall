@@ -7,16 +7,16 @@
   const WL = G.WALL_L, WR = G.WALL_R;
 
   const B = G.boss = {
-    BASE_HP: 5400, id: 'warden', reckonName: 'ECLIPSE', name: 'THE ECLIPSED WARDEN', short: 'The Warden', theme: 'warden',
-    blurb: 'A dimmed sun and its two hands',
+    BASE_HP: 5400, id: 'warden', reckonName: G.T('ECLIPSE'), name: G.T('THE ECLIPSED WARDEN'), short: G.T('The Warden'), theme: 'warden',
+    blurb: G.T('A dimmed sun and its two hands'),
     tips: [
-      'Slash downward in the air to bounce off a hand and stay above the shockwaves.',
-      'The hands are stuck after a slam, a clap or a rocket punch. Three slashes fit in that window.',
-      'A Star Lance aimed upward reaches the core from the ground. Hold up and fire.',
-      'When the floor burns, the platforms are safe.',
-      'A hand that takes enough damage breaks, and the Warden is weaker until it mends.',
-      'Count the blinks. The eye shuts once for each lance it is about to throw.',
-      'A fist that glows and trembles on the way up lands for two health, and a second wave follows the first.',
+      G.T('Slash downward in the air to bounce off a hand and stay above the shockwaves.'),
+      G.T('The hands are stuck after a slam, a clap or a rocket punch. Three slashes fit in that window.'),
+      G.T('A Star Lance aimed upward reaches the core from the ground. Hold up and fire.'),
+      G.T('When the floor burns, the platforms are safe.'),
+      G.T('A hand that takes enough damage breaks, and the Warden is weaker until it mends.'),
+      G.T('Count the blinks. The eye shuts once for each lance it is about to throw.'),
+      G.T('A fist that glows and trembles on the way up lands for two health, and a second wave follows the first.'),
     ],
     hudCols: [null, ['#ff8a3c', '#ffd07a'], ['#ff3c5a', '#ffa2ac'], ['#b6a6ff', '#ffffff']],
   };
@@ -387,7 +387,7 @@
     G.fx.burst(h.x, h.y, { n: 22, color: G.pal().hot, speed: [200, 760], life: [0.3, 0.8], kind: 'spark', size: [2, 5] });
     G.fx.shatter(h.x, h.y, G.pal().boss, 22, { hot: G.pal().hot, r: 320, jitter: 40, r0: 50 });
     G.fx.dust(h.x, h.y, 6, { speed: [30, 160], size: [12, 22], life: [0.6, 1.2], up: 60, a: 0.4, color: '84,78,100', jitter: 40 });
-    G.ui.callout('HAND BROKEN', 'The Warden is exposed');
+    G.ui.callout(G.T('HAND BROKEN'), G.T('The Warden is exposed'));
     // if it broke in the middle of its own attack, that attack is cut short
     if (busy && !B.staggered) { interrupt(); B.script = flinch(); }
   }
@@ -434,7 +434,7 @@
     G.fx.burst(B.core.x, B.core.y, { n: 30, color: G.pal().hot, speed: [200, 700], life: [0.3, 0.8], kind: 'spark', size: [2, 5] });
     G.fx.shatter(B.core.x, B.core.y, G.pal().boss, 20, { hot: G.pal().hot, r: 340, jitter: 30, r0: 60 });
     G.fx.punch(0.022);
-    G.ui.callout('STAGGERED', 'Strike the core');
+    G.ui.callout(G.T('STAGGERED'), G.T('Strike the core'));
     G.relics.onStagger(); // (the Offered Hilt's echoes, the Sunstone: relics.js)
     G.motes.onStagger(); // (v2.9k: a few Motes shaken loose)
     B.script = staggerScript();
@@ -505,7 +505,7 @@
     G.arena.setPhase(2, 1.8);
     G.audio.setIntensity(2);
     G.audio.play('roar'); G.audio.play('card');
-    G.ui.card('', 'TOTALITY', '');
+    G.ui.card('', G.T('TOTALITY'), '');
     pushPlayer();
     yield* wait(0.35);
     // and up again, with the ground in its fists
@@ -566,7 +566,7 @@
     G.arena.layout('warden', 3); // the wings fall away; three steps rise towards the black sun
     G.audio.setIntensity(3);
     G.audio.play('roar'); G.audio.play('card');
-    G.ui.card('', 'BLACK SUN', '');
+    G.ui.card('', G.T('BLACK SUN'), '');
     B.hasShards = true; B.shardR = 30;
     pushPlayer();
     c.jit = 0; c.open = 1;
@@ -677,7 +677,7 @@
       tween(R, { y: HOME_Y[1] + 128 }, 2.0, E.outBack)
     );
     G.audio.play('roar'); G.audio.play('card');
-    G.ui.card('', 'THE ECLIPSED WARDEN', G.run.trial > 1 ? 'Trial ' + G.roman(G.run.trial) + ' \u00b7 it remembers you' : 'Keeper of the dimmed sun');
+    G.ui.card('', G.T('THE ECLIPSED WARDEN'), G.run.trial > 1 ? G.T('Trial {0} \u00b7 it remembers you', G.roman(G.run.trial)) : G.T('Keeper of the dimmed sun'));
     G.fx.shake(12);
     G.fx.ring(c.x, c.y, { r0: c.r, r1: 700, life: 0.9, color: G.pal().boss, width: 12, alpha: 0.7 });
     c.charge = 1;
@@ -1703,7 +1703,7 @@
   function* atkSupernova() {
     const c = B.core, T = G.diff().tele, P = G.player;
     c.ctrl = true;
-    G.ui.callout('LAST LIGHT', 'It burns everything it has left');
+    G.ui.callout(G.T('LAST LIGHT'), G.T('It burns everything it has left'));
     G.audio.play('roar');
     G.fx.shake(16); G.fx.flash(G.pal().hot, 0.4, 0.5);
     yield* tween(c, { x: 640, y: 310 }, 0.7);

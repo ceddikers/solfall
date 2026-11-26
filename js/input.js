@@ -106,8 +106,8 @@
   // mouse, so attack and special are shown as the mouse buttons (their keys still work), and Shift
   // is dash's first key.
   I.label = function (action) {
-    if (action === 'attack') return 'Left click';
-    if (action === 'flare') return 'Right click';
+    if (action === 'attack') return G.T('Left click');
+    if (action === 'flare') return G.T('Right click');
     return MAP[action] && MAP[action].length ? I.keyName(MAP[action][0]) : '?';
   };
   I.mouse = true;

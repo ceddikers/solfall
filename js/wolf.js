@@ -12,18 +12,18 @@
   const KNOLL = 42; // how high the rock at the back of its forest stands (see G.SCENES.pyre)
 
   const B = {
-    id: 'wolf', name: 'THE CINDER WOLF', short: 'The Wolf', theme: 'wolf',
-    sub: 'The forest remembers what burned it', taunt: 'it has your scent',
-    blurb: 'A burning wolf that reads like a book, if you watch its body',
+    id: 'wolf', name: G.T('THE CINDER WOLF'), short: G.T('The Wolf'), theme: 'wolf',
+    sub: G.T('The forest remembers what burned it'), taunt: G.T('it has your scent'),
+    blurb: G.T('A burning wolf that reads like a book, if you watch its body'),
     tips: [
-      'Watch its haunches. A shallow crouch is a short pounce; when they drop low and the tail lifts, it is coming a long way.',
-      'Head low: it lunges along the floor, so jump or back off. Head high: it snaps at the air, so stay on the ground.',
-      'If its ears stay flat after a bite, a second bite is coming.',
-      'The tail sweep reaches both sides of it. Jump it. A tail that curls before the sweep means two.',
-      'A wolf high on the wall dives on you; a wolf low on the wall flies flat across the arena. Stay on the ground for that one.',
-      'Its breath rakes the floor away from it. The safe place is close to it, or behind it.',
-      'In its last phase the embers flare every few seconds. Stand on scorched stone or a ledge when they brighten.',
-      'Paws spread wide when it rears: the slam throws fire along the floor both ways.',
+      G.T('Watch its haunches. A shallow crouch is a short pounce; when they drop low and the tail lifts, it is coming a long way.'),
+      G.T('Head low: it lunges along the floor, so jump or back off. Head high: it snaps at the air, so stay on the ground.'),
+      G.T('If its ears stay flat after a bite, a second bite is coming.'),
+      G.T('The tail sweep reaches both sides of it. Jump it. A tail that curls before the sweep means two.'),
+      G.T('A wolf high on the wall dives on you; a wolf low on the wall flies flat across the arena. Stay on the ground for that one.'),
+      G.T('Its breath rakes the floor away from it. The safe place is close to it, or behind it.'),
+      G.T('In its last phase the embers flare every few seconds. Stand on scorched stone or a ledge when they brighten.'),
+      G.T('Paws spread wide when it rears: the slam throws fire along the floor both ways.'),
     ],
     hudCols: [null, ['#ffaa46', '#ffe4b4'], ['#ff6e2e', '#ffd8b0'], ['#8cc8ff', '#ecf6ff']],
     BASE_HP: 3500, poise0: 420, w: 160, h: 112,
@@ -36,7 +36,7 @@
       2: ['pounce', 'bite', 'sweep', 'howl', 'rake', 'wallrun', 'breath', 'prowl', 'shake', 'harry', 'cinders', 'blaze'],
       3: ['frenzy', 'pounce', 'bite', 'sweep', 'howl', 'rake', 'wallrun', 'breath', 'prowl', 'shake', 'harry', 'cinders', 'blaze'],
     },
-    cards: { 2: ['WILDFIRE', 'The forest takes the flame'], 3: ['EMBERBED', 'Nothing left to burn but you'] },
+    cards: { 2: [G.T('WILDFIRE'), G.T('The forest takes the flame')], 3: [G.T('EMBERBED'), G.T('Nothing left to burn but you')] },
     first: { 1: 'pounce', 2: 'wallrun', 3: 'frenzy' },
     // its corrupted self only (corrupt.js): the void pack in every phase, the void comet from phase II
     corruptBags: { 1: ['pack'], 2: ['pack', 'ricochet'], 3: ['pack', 'ricochet'] },
@@ -48,21 +48,21 @@
   // ------------------------------------------------------------------ the arena
   G.THEMES.wolf = [null,
     {
-      name: 'CINDER', scene: 'pyre', burn: 0,
+      name: G.T('CINDER'), scene: 'pyre', burn: 0,
       sky: ['#050302', '#170905', '#3d1608', '#b4521c'],
       far: '#1c0d07', near: '#100704', pillar: '#080403', rim: '255,150,80',
       floorTop: '#3a2216', floor: '#120a06',
       boss: '255,168,70', hot: '255,232,190', ember: '255,160,80', stars: 0.15,
     },
     {
-      name: 'WILDFIRE', scene: 'pyre', burn: 1,
+      name: G.T('WILDFIRE'), scene: 'pyre', burn: 1,
       sky: ['#060101', '#200503', '#5a1206', '#e0601e'],
       far: '#2a0c05', near: '#160603', pillar: '#0a0302', rim: '255,112,52',
       floorTop: '#4a1e10', floor: '#150704',
       boss: '255,112,46', hot: '255,224,176', ember: '255,124,60', stars: 0,
     },
     {
-      name: 'EMBERBED', scene: 'pyre', burn: 2,
+      name: G.T('EMBERBED'), scene: 'pyre', burn: 2,
       sky: ['#010101', '#07050a', '#16121c', '#5a4a58'],
       far: '#120e14', near: '#0a080c', pillar: '#050406', rim: '170,200,255',
       floorTop: '#2a1a16', floor: '#0c0706',
@@ -563,7 +563,7 @@
   }
   // nothing reaches it while it stands far back in the dark (the pack)
   B.blocked = () => B.body.back > 0.4;
-  B.staggerWord = 'FLOORED'; B.staggerMult = 1.6; B.staggerDur = 0.9;
+  B.staggerWord = G.T('FLOORED'); B.staggerMult = 1.6; B.staggerDur = 0.9;
   // It is thrown onto its back: the flames gutter to smoke and the burning heart in its chest shows.
   B.staggerIn = function* () {
     const b = B.body;

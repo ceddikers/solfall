@@ -12,7 +12,7 @@
 
   const FL = G.flow = { v: 0, rank: 0, peak: 0, idle: 0, pop: 0, dark: 0, script: null, ready: false };
   FL.RANKS = [{ at: 0, name: '' }, { at: 18, name: 'C' }, { at: 42, name: 'B' }, { at: 72, name: 'A' }, { at: 108, name: 'S' }, { at: 150, name: 'SS' }];
-  FL.NAMES = { vesper: 'THOUSAND STARS', aster: 'WORLDBREAKER', lune: 'MOONFALL', eos: 'HORIZON' };
+  FL.NAMES = { vesper: G.T('THOUSAND STARS'), aster: G.T('WORLDBREAKER'), lune: G.T('MOONFALL'), eos: G.T('HORIZON') };
   FL.SLOW = 0.05; // how fast the boss and its attacks run while a Dawnbreak plays
 
   // Heroes land hits at different rates, so each hit is worth more for the slower ones: steady
@@ -42,7 +42,7 @@
       FL.rank = r; FL.peak = Math.max(FL.peak, r); FL.pop = 1;
       const H = P.hero, top = r >= 4;
       G.audio.play('rank', { n: r });
-      F.text(P.x, P.y - 94, 'FLOW ' + FL.RANKS[r].name, { color: top ? GOLD : H.hot, size: 13 + r * 2, life: 0.9 });
+      F.text(P.x, P.y - 94, G.T('FLOW {0}', FL.RANKS[r].name), { color: top ? GOLD : H.hot, size: 13 + r * 2, life: 0.9 });
       F.ring(P.x, P.y - 24, { r0: 14, r1: 60 + r * 16, life: 0.35, color: top ? GOLD : H.col, width: 3 + r });
       if (top) F.lines(P.x, P.y - 24, 10, GOLD, { r0: 24, speed: [400, 800] });
     }

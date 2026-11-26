@@ -91,21 +91,21 @@
   // ------------------------------------------------------------------ the arena: an old canyon
   G.THEMES.kairo = [null,
     {
-      name: 'SPARRING', scene: 'canyon',
+      name: G.T('SPARRING'), scene: 'canyon',
       sky: ['#0c0a1c', '#2c1c34', '#7a3c34', '#e2945c'],
       far: '#3a2230', near: '#24151e', pillar: '#170d14', rim: '255,176,120',
       floorTop: '#4a3226', floor: '#1a100c',
       boss: '255,170,96', hot: '255,238,210', ember: '255,190,130', stars: 0.25,
     },
     {
-      name: 'RISEN', scene: 'canyon',
+      name: G.T('RISEN'), scene: 'canyon',
       sky: ['#06050a', '#1c1626', '#4a3424', '#c8a050'],
       far: '#251c1c', near: '#161012', pillar: '#0c0809', rim: '255,214,110',
       floorTop: '#43382a', floor: '#14100a',
       boss: '255,214,90', hot: '255,248,214', ember: '255,220,120', stars: 0.05,
     },
     {
-      name: 'STILL SKY', scene: 'canyon',
+      name: G.T('STILL SKY'), scene: 'canyon',
       sky: ['#020308', '#0a0e1c', '#1c2438', '#a8b8d4'],
       far: '#121626', near: '#0a0d18', pillar: '#05060c', rim: '210,226,255',
       floorTop: '#2c3242', floor: '#0a0c14',
@@ -171,20 +171,20 @@
 
   // ------------------------------------------------------------------ the boss
   const B = {
-    id: 'kairo', name: 'KAIRO, THE CANYON MONK', short: 'The Monk', // (v2.9p: was THE CANYON FIST, short Kairo) theme: 'kairo',
+    id: 'kairo', name: G.T('KAIRO, THE CANYON MONK'), short: G.T('The Monk'), // (v2.9p: was THE CANYON FIST, short Kairo) theme: 'kairo',
     snapTurn: true, // (v2.5e) flips at once when it turns: see K.turn
-    sub: 'He came to spar', taunt: 'he wants another round',
-    blurb: 'A martial artist who powers up as the fight goes on',
+    sub: G.T('He came to spar'), taunt: G.T('he wants another round'),
+    blurb: G.T('A martial artist who powers up as the fight goes on'),
     tips: [
-      'Every punch combo starts the same way. Watch the third punch: hips turning with a sharp breath, kicks are coming; a hand dropped glowing to his hip with a hum, a short beam; nothing, and he is open.',
-      'The kicks reach further than his fists and the last one rises over your head. Dash through to his back: he lands facing away.',
-      'If he jumps at you with his hands open, it is a throw, not a dash. Dashing does not save you; jump over him or be out of reach.',
-      'The Sunwell Wave follows you until it holds. Be in the air when it holds and it goes over you as you land, or get round behind him (it only aims in front) and strike while it plays out. If the orb pulses twice, he is holding it: wait.',
-      'In his gold aura the Wave can warp. When the charge hum cuts off with a crack, he is about to appear behind you: turn and dash through him.',
-      'His blows crack the ridge. A slab cracked three times falls away, and a fall costs you. Choose where you let him transform: the slab under him goes.',
-      'Break the Gathered Sun\'s bar fast: the sooner he has to throw it, the smaller it is, the smaller the crater, and the longer he is spent after.',
-      'In the Still Sky he slips blows to his front when he stands waiting. Strike from behind, or while he recovers.',
-      'Eyes shut and nothing moving: do not touch him. Be ready to dash when they open.',
+      G.T('Every punch combo starts the same way. Watch the third punch: hips turning with a sharp breath, kicks are coming; a hand dropped glowing to his hip with a hum, a short beam; nothing, and he is open.'),
+      G.T('The kicks reach further than his fists and the last one rises over your head. Dash through to his back: he lands facing away.'),
+      G.T('If he jumps at you with his hands open, it is a throw, not a dash. Dashing does not save you; jump over him or be out of reach.'),
+      G.T('The Sunwell Wave follows you until it holds. Be in the air when it holds and it goes over you as you land, or get round behind him (it only aims in front) and strike while it plays out. If the orb pulses twice, he is holding it: wait.'),
+      G.T('In his gold aura the Wave can warp. When the charge hum cuts off with a crack, he is about to appear behind you: turn and dash through him.'),
+      G.T('His blows crack the ridge. A slab cracked three times falls away, and a fall costs you. Choose where you let him transform: the slab under him goes.'),
+      G.T('Break the Gathered Sun\'s bar fast: the sooner he has to throw it, the smaller it is, the smaller the crater, and the longer he is spent after.'),
+      G.T('In the Still Sky he slips blows to his front when he stands waiting. Strike from behind, or while he recovers.'),
+      G.T('Eyes shut and nothing moving: do not touch him. Be ready to dash when they open.'),
     ],
     hudCols: [null, ['#ff9a56', '#ffe0b8'], ['#ffd040', '#fff4c4'], ['#c8dcff', '#ffffff']],
     BASE_HP: 2700, poise0: 330, w: 40, h: 88,
@@ -195,7 +195,7 @@
       2: ['combo', 'combo', 'combo', 'combo', 'throw', 'throw', 'wave', 'wave', 'hailfire', 'flare', 'meteor', 'comets'],
       3: ['combo', 'combo', 'combo', 'combo', 'sweep', 'sweep', 'throw', 'empty', 'empty', 'heel', 'comets', 'hailfire'],
     },
-    cards: { 2: ['RISEN', 'Now he means it'], 3: ['STILL SKY', 'Every movement has a meaning'] },
+    cards: { 2: [G.T('RISEN'), G.T('Now he means it')], 3: [G.T('STILL SKY'), G.T('Every movement has a meaning')] },
     first: { 1: 'combo', 2: 'risen', 3: 'sun' },
     // his corrupted self's own (corrupt.js): the Scorched Wave, the Black Sun (it opens phase II) and the Shadow Partner
     corruptBags: { 1: ['scorch'], 2: ['scorch', 'blacksun', 'partner'], 3: ['scorch', 'partner'] },
@@ -440,7 +440,7 @@
     B.musicMode = B.phase === 3 ? 'full' : '';
     G.fx.cine.to = 0;
   };
-  B.staggerWord = 'WINDED'; B.staggerMult = 1.6; B.staggerDur = 0.4; // short, but it bites
+  B.staggerWord = G.T('WINDED'); B.staggerMult = 1.6; B.staggerDur = 0.4; // short, but it bites
   B.onStagger = function () {
     const b = B.body;
     b.pose = 'kneel'; b.air = false; b.hidden = false; b.open = 0; b.handHip = 0; b.hips = 0; b.orb = 0; b.sunK = 0; b.spin = 0; b.hurt = false;

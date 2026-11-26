@@ -11,11 +11,11 @@
   const GOLD = '255,214,140', RIM = '255,206,150', WARM = '255,170,90';
   const STONE = '#120f26', STONE2 = '#1c1736', DARK = '#0b0919';
   const HW = 3820, WALL_L = 150, WALL_R = HW - 110, PAD = 48;
-  const NOTES = ['7 health. Warnings last longer, attacks come slower', '5 health. The fight as intended', '4 health. Shorter warnings, less rest, extra attacks'];
+  const NOTES = [G.T('7 health. Warnings last longer, attacks come slower'), G.T('5 health. The fight as intended'), G.T('4 health. Shorter warnings, less rest, extra attacks')];
   const FLAME = ['150,215,255', '255,170,90', '255,70,60', '236,190,255', '226,170,255', '214,150,255', '204,130,255', '255,236,255'];
   // (v3.0c) how big the brazier burns: up to Merciless by difficulty, a little more for Ascension
   const heat = (d) => Math.min(2, d) + (d > 2 ? 0.35 + 0.08 * (d - 3) : 0);
-  const note = (d) => d < 3 ? NOTES[d] : d === 3 ? G.ASC[1].note : 'All of the steps below, and ' + G.ASC[d - 2].note;
+  const note = (d) => d < 3 ? NOTES[d] : d === 3 ? G.ASC[1].note : G.T('All of the steps below, and {0}', G.ASC[d - 2].note);
   // where things stand
   // The Hall of Echoes has one bay for each hero, between piers that stand BAY apart
   const NH = G.HEROES.length, BAY = 510 / NH, ARCH = BAY / 2 - 23;
@@ -41,7 +41,7 @@
   // It stands in for a boss while the hero is in the camp, so every attack, special and Dawnbreak
   // can be tried on it. It cannot be hurt for good, and it charges Dawnbreak three times as fast.
   const D = G.bosses.dummy = {
-    id: 'dummy', kit: true, name: 'SPARRING POST', short: 'The post', theme: 'hub', tips: [],
+    id: 'dummy', kit: true, name: G.T('SPARRING POST'), short: G.T('The post'), theme: 'hub', tips: [],
     hudCols: [null, ['#ffba5c', '#ffe08a'], ['#ffba5c', '#ffe08a'], ['#ffba5c', '#ffe08a']],
     w: 44, h: 96, ATTACKS: {},
     reset() {
@@ -133,7 +133,7 @@
   }
   const bellAt = () => ({ x: BELL_X + Math.sin(bell.a) * 62, y: FLOOR - 150 + Math.cos(bell.a) * 62 });
   function featSay(f) {
-    HUB.msg = 'Feat: ' + f.name + '  ◆ +' + f.pay; HUB.msgT = 4;
+    HUB.msg = G.T('Feat: {0}  ◆ +{1}', f.name, f.pay); HUB.msgT = 4;
     G.audio.play('segment'); G.audio.play('heal');
     F.flash(GOLD, 0.16, 0.3);
   }
@@ -153,7 +153,7 @@
       F.burst(at.x, at.y, { n: 40, color: '214,255,170', speed: [60, 420], life: [0.8, 1.8], size: [2, 4], grav: -120, wob: 120 });
       F.shake(4);
       const f = G.feats.camp('camp.bell');
-      if (f) featSay(f); else say('A full peal');
+      if (f) featSay(f); else say(G.T('A full peal'));
     }
     return true;
   }
@@ -178,8 +178,8 @@
     if (n < 2) return;
     if (n > (G.meta.toys.keep || 0)) {
       G.meta.toys.keep = n; if (G.meta.earning()) G.meta.save();
-      say('Lantern: ' + n + ' blows, your best'); G.audio.play('segment');
-    } else say('Lantern: ' + n + ' blows');
+      say(G.T('Lantern: {0} blows, your best', n)); G.audio.play('segment');
+    } else say(G.T('Lantern: {0} blows', n));
   }
   function toysUpdate(dt) {
     bell.quiet += dt; bell.flash = Math.max(0, bell.flash - dt * 3);
@@ -302,7 +302,7 @@
     { id: 'ring', x: RING_X, reach: 44, top: 150 },
     { id: 'gate', x: GATE_X, reach: 160, top: 474 },
   ];
-  const foeName = (v) => (G.bosses[v] ? G.bosses[v].short : 'Whoever comes');
+  const foeName = (v) => (G.bosses[v] ? G.bosses[v].short : G.T('Whoever comes'));
   // (v2.8a: your own empty bay in the Hall is the Wardrobe, where costumes are put on)
   const usable = (s) => s.reach > 0;
   const ownBay = (s) => s.id === 'echo' && G.HEROES[s.hero].id === G.run.hero;
@@ -328,53 +328,54 @@
     if (ownBay(s)) {
       // the Wardrobe: mastery, and the costume worn
       const h = G.HEROES[s.hero], MA = G.mastery, lv = MA.level(h.id), nx = MA.next(h.id), c = MA.worn(h.id), n = MA.unlocked(h.id).length;
-      const mast = 'Mastery ' + (lv ? G.roman(lv) : '0') + (nx ? ' (' + MA.xp(h.id) + ' of ' + nx + ' toward the next costume: a trial won is 1, a run won 4)' : ' (every costume unlocked)');
-      return ['The Wardrobe: ' + (c ? c.name : h.name + '’s own colours'), (c ? c.note + ' ' : '') + mast, n ? 'change costume (' + (n + 1) + ' to choose from)' : ''];
+      const lvs = lv ? G.roman(lv) : '0';
+      const mast = nx ? G.T('Mastery {0} ({1} of {2} toward the next costume: a trial won is 1, a run won 4)', lvs, MA.xp(h.id), nx) : G.T('Mastery {0} (every costume unlocked)', lvs);
+      return [c ? G.T('The Wardrobe: {0}', c.name) : G.T('The Wardrobe: {0}’s own colours', h.name), (c ? c.note + ' ' : '') + mast, n ? G.T('change costume ({0} to choose from)', n + 1) : ''];
     }
     if (s.id === 'echo') {
       const h = G.HEROES[s.hero];
-      return [h.name + ', ' + G.heroTitle(h), h.blurb, 'take up ' + h.name + '’s ' + h.weapon];
+      return [G.T('{0}, {1}', h.name, G.heroTitle(h)), h.blurb, G.T('take up {0}’s {1}', h.name, h.weapon)];
     }
     if (s.id === 'journal') {
       const J = G.JOURNAL || {}, rec = G.meta.journal || {};
       let all = 0, seen = 0;
       for (const b in J) for (const a in J[b]) { all++; if (((rec[b] || {})[a] || {}).seen) seen++; }
-      return ['The Journal', seen + ' of ' + all + ' attacks written down: each boss move, once you have met it', 'read it'];
+      return [G.T('The Journal'), G.T('{0} of {1} attacks written down: each boss move, once you have met it', seen, all), G.T('read it')];
     }
-    if (s.id === 'tally') return ['The Tally', G.feats.count() + ' of ' + G.feats.total + ' feats done', 'read it'];
-    if (s.id === 'shrine') return ['The Shrine', '◆ ' + G.meta.shards + ' Sunshards', 'spend them'];
+    if (s.id === 'tally') return [G.T('The Tally'), G.T('{0} of {1} feats done', G.feats.count(), G.feats.total), G.T('read it')];
+    if (s.id === 'shrine') return [G.T('The Shrine'), G.T('◆ {0} Sunshards', G.meta.shards), G.T('spend them')];
     if (s.id === 'rack') {
       const h = G.HEROES.find((x) => x.id === G.run.hero), f = G.FORMS[h.id];
-      if (!G.formOpen(h.id)) return ['The Weapon Rack', 'Beat Sol with ' + h.name + ' to unlock a second weapon', ''];
-      return G.formOn(h.id) ? ['The Weapon Rack', h.name + ' carries the ' + f.formName + '. ' + f.blurb, 'take up the ' + h.weapon]
-        : ['The Weapon Rack', 'The ' + f.formName + ': ' + f.blurb, 'take up the ' + f.formName.toLowerCase()];
+      if (!G.formOpen(h.id)) return [G.T('The Weapon Rack'), G.T('Beat Sol with {0} to unlock a second weapon', h.name), ''];
+      return G.formOn(h.id) ? [G.T('The Weapon Rack'), G.T('{0} carries the {1}. {2}', h.name, f.formName, f.blurb), G.T('take up the {0}', h.weapon)]
+        : [G.T('The Weapon Rack'), G.T('The {0}: {1}', f.formName, f.blurb), G.T('take up the {0}', f.formName.toLowerCase())];
     }
-    if (s.id === 'brazier') return ['The Brazier: ' + G.diff().name + (G.ascLevel() ? ' (' + G.ASC[G.ascLevel()].name + ')' : ''), note(G.settings.difficulty), 'change the difficulty'];
+    if (s.id === 'brazier') return [G.ascLevel() ? G.T('The Brazier: {0} ({1})', G.diff().name, G.ASC[G.ascLevel()].name) : G.T('The Brazier: {0}', G.diff().name), note(G.settings.difficulty), G.T('change the difficulty')];
     if (s.id === 'ring') {
       // the foe last practised, and what you have done against it: how often it fell, your fastest win
       const f = G.settings.firstFoe, kills = G.meta.kills[f] || 0, best = G.meta.bestTime(f);
-      const rec = !G.bosses[f] ? 'Any boss, from any phase' : foeName(f) + ': ' + (!kills ? 'not yet beaten'
-        : 'beaten ' + kills + (kills > 1 ? ' times' : ' time') + (best ? ' \u00b7 fastest ' + G.ui.fmtTime(best) + ' on ' + G.diff().name : ''));
-      return ['The Proving Ring', rec, 'step in'];
+      const rec = !G.bosses[f] ? G.T('Any boss, from any phase') : !kills ? G.T('{0}: not yet beaten', foeName(f))
+        : (kills > 1 ? G.T('{0}: beaten {1} times', foeName(f), kills) : G.T('{0}: beaten {1} time', foeName(f), kills)) + (best ? G.T(' · fastest {0} on {1}', G.ui.fmtTime(best), G.diff().name) : '');
+      return [G.T('The Proving Ring'), rec, G.T('step in')];
     }
     if (s.id === 'relic') {
       const r = G.run.relicOffer[s.i];
-      return [r.name, r.desc + ' It awakens three times in a run.', G.run.relic === r.id ? 'this is your relic for the run' : 'take it for the run'];
+      return [r.name, G.T('{0} It awakens three times in a run.', r.desc), G.run.relic === r.id ? G.T('this is your relic for the run') : G.T('take it for the run')];
     }
     if (s.id === 'gate') {
       const deep = G.store.load('depth', {})[G.settings.difficulty], r = G.relicDef(G.run.relic);
       const won = G.store.load('wins', {})[G.settings.difficulty];
-      return ['The Gate', (r ? 'Relic: ' + r.name : 'No relic chosen: the reliquary is just behind you')
-        + (won ? ' \u00b7 runs won ' + won : deep ? ' \u00b7 deepest trial ' + G.roman(deep) + ' of ' + G.roman(G.RUN_FIGHTS) : ''), r ? 'begin the run' : 'choose a relic and begin'];
+      return [G.T('The Gate'), (r ? G.T('Relic: {0}', r.name) : G.T('No relic chosen: the reliquary is just behind you'))
+        + (won ? G.T(' · runs won {0}', won) : deep ? G.T(' · deepest trial {0} of {1}', G.roman(deep), G.roman(G.RUN_FIGHTS)) : ''), r ? G.T('begin the run') : G.T('choose a relic and begin')];
     }
     return ['', '', ''];
   }
   function shortName(s) {
-    if (s.id === 'echo') return G.HEROES[s.hero].id === G.run.hero ? 'Wardrobe' : G.HEROES[s.hero].name;
-    if (s.id === 'journal') return 'Journal';
+    if (s.id === 'echo') return G.HEROES[s.hero].id === G.run.hero ? G.T('Wardrobe') : G.HEROES[s.hero].name;
+    if (s.id === 'journal') return G.T('Journal');
     if (s.id === 'relic') return G.run.relicOffer[s.i].name;
-    if (s.id === 'rack') return G.formOpen(G.run.hero) ? 'Weapon Rack' : '';
-    return { shrine: 'The Shrine', tally: 'The Tally', post: 'Sparring post', brazier: G.diff().name, ring: 'Practice', gate: 'The Gate' }[s.id];
+    if (s.id === 'rack') return G.formOpen(G.run.hero) ? G.T('Weapon Rack') : '';
+    return { shrine: G.T('The Shrine'), tally: G.T('The Tally'), post: G.T('Sparring post'), brazier: G.diff().name, ring: G.T('Practice'), gate: G.T('The Gate') }[s.id];
   }
 
   function say(text) { HUB.msg = text; HUB.msgT = 3; }
@@ -385,7 +386,7 @@
     if (ownBay(s)) {
       // the Wardrobe: the next costume unlocked, or back to the hero's own colours
       const h = G.HEROES[s.hero], MA = G.mastery;
-      if (!MA.unlocked(h.id).length) { G.audio.play('uiMove'); say('Win trials as ' + h.name + ' to unlock a costume (' + MA.xp(h.id) + ' of ' + MA.next(h.id) + ')'); return; }
+      if (!MA.unlocked(h.id).length) { G.audio.play('uiMove'); say(G.T('Win trials as {0} to unlock a costume ({1} of {2})', h.name, MA.xp(h.id), MA.next(h.id))); return; }
       const c = MA.cycle(h.id), x = P.x, f = P.facing;
       G.run.reset(); HUB.offer();
       P.reset(); G.flow.reset(); G.moments.reset(); G.sets.reset();
@@ -396,13 +397,13 @@
       F.ring(P.x, P.y - 30, { r0: 10, r1: 150, life: 0.45, color: hh.hot, width: 6 });
       F.burst(P.x, P.y - 30, { n: 22, color: hh.col, speed: [30, 200], life: [0.5, 1.1], size: [2, 4], grav: -160, wob: 120, jitter: 18 });
       G.costumeFx('special', P.x, P.y - 34);
-      say(c ? c.name : h.name + '’s own colours');
+      say(c ? c.name : G.T('{0}’s own colours', h.name));
       return;
     }
     if (s.id === 'rack') {
       // (v3.0e) take the second weapon from the rack, or put it back
       const h = G.HEROES.find((x) => x.id === G.run.hero);
-      if (!G.formOpen(h.id)) { G.audio.play('uiMove'); say('Beat Sol with ' + h.name + ' to unlock'); return; }
+      if (!G.formOpen(h.id)) { G.audio.play('uiMove'); say(G.T('Beat Sol with {0} to unlock', h.name)); return; }
       G.settings.form = Object.assign({}, G.settings.form || {}, { [h.id]: !G.formOn(h.id) }); G.saveSettings();
       const x = P.x, f = P.facing;
       G.run.reset(); HUB.offer();
@@ -413,7 +414,7 @@
       G.audio.play('tink'); G.audio.play('whoosh'); F.shake(3);
       F.ring(P.x, P.y - 30, { r0: 10, r1: 120, life: 0.4, color: hh.hot, width: 5 });
       F.burst(P.x, P.y - 34, { n: 18, color: hh.col, speed: [60, 260], life: [0.3, 0.8], size: [2, 4], kind: 'spark' });
-      say(G.formOn(h.id) ? G.FORMS[h.id].formName : h.name + '\u2019s ' + h.weapon);
+      say(G.formOn(h.id) ? G.FORMS[h.id].formName : G.T('{0}’s {1}', h.name, h.weapon));
       return;
     }
     if (s.id === 'journal') { G.audio.play('uiSelect'); G.ui.showJournal(); return; }
@@ -430,7 +431,7 @@
       F.shatter(s.x, FLOOR - 70, h.col, 18, { hot: h.hot, r: 280, r0: 30 });
       F.ring(P.x, P.y - 24, { r0: 10, r1: 170, life: 0.45, color: h.hot, width: 6 });
       F.burst(P.x, P.y - 10, { n: 20, color: h.col, speed: [20, 130], life: [0.6, 1.3], size: [2, 4], grav: -220, wob: 130, jitter: 22 });
-      say(h.name + ' takes up the vigil');
+      say(G.T('{0} takes up the vigil', h.name));
     } else if (s.id === 'shrine') {
       G.audio.play('uiSelect'); G.ui.showShrine();
     } else if (s.id === 'tally') {
@@ -543,7 +544,7 @@
     if (d !== dawnOn) { dawnOn = d; HUB.layers = null; }
   };
   HUB.dawn = () => !!dawnOn;
-  HUB.morning = function () { HUB.msg = 'Morning, at last'; HUB.msgT = 5; };
+  HUB.morning = function () { HUB.msg = G.T('Morning, at last'); HUB.msgT = 5; };
 
   function buildSky() {
     const w = W + PAD * 2, [c, x] = canvas(w), T = -PAD, dawn = !!dawnOn;
@@ -1258,14 +1259,14 @@
       const mine = s.id === 'relic' && G.run.relic === G.run.relicOffer[s.i].id, dim = s.id === 'relic' && G.run.relic && !mine;
       text(ctx, name.toUpperCase(), s.x, FLOOR - s.top, s.id === 'relic' ? 11 : 12, mine ? GOLD : '236,233,244', mine ? 0.95 : dim ? 0.3 : 0.55);
     }
-    if (seen(RELIQ_X, 200) && relicStations().length && !(near && near.id === 'relic')) text(ctx, G.run.relic ? 'THE RELIQUARY' : 'THE RELIQUARY  \u00b7  CHOOSE ONE', RELIQ_X, FLOOR - 204, 12, G.run.relic ? '236,233,244' : GOLD, G.run.relic ? 0.55 : 0.6 + 0.25 * Math.sin(HUB.t * 3));
-    if (seen(BELL_X, 200)) text(ctx, 'THE OLD BELL', BELL_X, FLOOR - 212, 12, '236,233,244', 0.55);
-    if (seen(lamp.x, 200) && lamp.n < 2) text(ctx, 'LANTERN' + (G.meta.toys.keep ? '  \u00b7  BEST ' + G.meta.toys.keep : ''), lamp.x, lamp.y - 46, 12, '236,233,244', 0.55);
+    if (seen(RELIQ_X, 200) && relicStations().length && !(near && near.id === 'relic')) text(ctx, G.run.relic ? G.T('THE RELIQUARY') : G.T('THE RELIQUARY  ·  CHOOSE ONE'), RELIQ_X, FLOOR - 204, 12, G.run.relic ? '236,233,244' : GOLD, G.run.relic ? 0.55 : 0.6 + 0.25 * Math.sin(HUB.t * 3));
+    if (seen(BELL_X, 200)) text(ctx, G.T('THE OLD BELL'), BELL_X, FLOOR - 212, 12, '236,233,244', 0.55);
+    if (seen(lamp.x, 200) && lamp.n < 2) text(ctx, G.meta.toys.keep ? G.T('LANTERN  ·  BEST {0}', G.meta.toys.keep) : G.T('LANTERN'), lamp.x, lamp.y - 46, 12, '236,233,244', 0.55);
     // the post reports what the last flurry came to, and how Dawnbreak stands
-    if (D.sum > 0) text(ctx, D.sum + ' damage', POST_X, FLOOR - 164, 16, GOLD, Math.min(1, D.sumT * 2));
+    if (D.sum > 0) text(ctx, G.T('{0} damage', D.sum), POST_X, FLOOR - 164, 16, GOLD, Math.min(1, D.sumT * 2));
     if (P.ult > 0 && Math.abs(P.x - POST_X) < 240) {
       const full = P.ult >= 100;
-      text(ctx, full ? 'Dawnbreak ready: press ' + (pad ? 'RT' : G.input.label('ult')) : 'Dawnbreak ' + Math.round(P.ult) + '%', POST_X, FLOOR - 186, 13, GOLD, full ? 0.7 + 0.3 * Math.sin(HUB.t * 8) : 0.7);
+      text(ctx, full ? G.T('Dawnbreak ready: press {0}', pad ? 'RT' : G.input.label('ult')) : G.T('Dawnbreak {0}%', Math.round(P.ult)), POST_X, FLOOR - 186, 13, GOLD, full ? 0.7 + 0.3 * Math.sin(HUB.t * 8) : 0.7);
     }
     if (near && !G.ui.current) {
       // a relic's lines sit above the reliquary wall, clear of its neighbours' names
@@ -1276,14 +1277,14 @@
     }
     if (HUB.msgT > 0) text(ctx, HUB.msg.toUpperCase(), P.x, P.y - 104, 15, GOLD, Math.min(1, HUB.msgT * 2));
     if (!G.ui.current) {
-      text(ctx, 'THE VIGIL', cam + W / 2, 40, 20, '236,233,244', 0.75, '400');
-      text(ctx, pad ? 'Stick move  ·  A jump  ·  X attack  ·  B dash  ·  LB use  ·  Back flourish  ·  Start menu'
-        : [G.input.label('left') + ' / ' + G.input.label('right') + ' move', G.input.label('jump') + ' jump', G.input.label('attack') + (G.input.mouse ? ' attack' : ' or click attack'), G.input.label('dash') + ' dash',
-          G.input.label('flare') + (G.input.mouse ? ' special' : ' or right click special'), G.input.label('heal') + ' use', 'hold Tab moves'].join('  \u00b7  '),
+      text(ctx, G.T('THE VIGIL'), cam + W / 2, 40, 20, '236,233,244', 0.75, '400');
+      text(ctx, pad ? G.T('Stick move  ·  A jump  ·  X attack  ·  B dash  ·  LB use  ·  Back flourish  ·  Start menu')
+        : [G.T('{0} / {1} move', G.input.label('left'), G.input.label('right')), G.T('{0} jump', G.input.label('jump')), G.input.mouse ? G.T('{0} attack', G.input.label('attack')) : G.T('{0} or click attack', G.input.label('attack')), G.T('{0} dash', G.input.label('dash')),
+          G.input.mouse ? G.T('{0} special', G.input.label('flare')) : G.T('{0} or right click special', G.input.label('flare')), G.T('{0} use', G.input.label('heal')), G.T('hold Tab moves')].join('  ·  '),
         cam + W / 2, 66, 12, '236,233,244', 0.45, '500');
-      text(ctx, '\u25c6 ' + G.meta.shards + ' Sunshards', cam + W - 112, 66, 12, GOLD, 0.8);
+      text(ctx, G.T('◆ {0} Sunshards', G.meta.shards), cam + W - 112, 66, 12, GOLD, 0.8);
       // which way the gate lies, until it is in view
-      if (GATE_X > cam + W + 40) text(ctx, 'THE GATE  ›', cam + W - 96, 40, 12, GOLD, 0.5 + 0.2 * Math.sin(HUB.t * 3));
+      if (GATE_X > cam + W + 40) text(ctx, G.T('THE GATE  ›'), cam + W - 96, 40, 12, GOLD, 0.5 + 0.2 * Math.sin(HUB.t * 3));
     }
   }
 })();

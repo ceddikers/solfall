@@ -12,118 +12,118 @@
 
   const PAGES = [
     {
-      title: 'Solfall', img: 'welcome', lead: 'You fight bosses one after another. Each portal leads to a different boss.',
+      title: G.T('Solfall'), img: 'welcome', lead: G.T('You fight bosses one after another. Each portal leads to a different boss.'),
       notes: [
-        { name: 'A run', text: 'Beat a boss, pick a boon (a power-up), then pick the next boss. Beat 7 bosses to win. Each one is tougher than the last.' },
-        { name: 'If you die', text: 'The run is over and you start again. You keep the Sunshards you earned.' },
-        { name: 'This book', text: 'Use ← → or click a page to turn it. You can open it again from the pause menu (Esc).' },
+        { name: G.T('A run'), text: G.T('Beat a boss, pick a boon (a power-up), then pick the next boss. Beat 7 bosses to win. Each one is tougher than the last.') },
+        { name: G.T('If you die'), text: G.T('The run is over and you start again. You keep the Sunshards you earned.') },
+        { name: G.T('This book'), text: G.T('Use ← → or click a page to turn it. You can open it again from the pause menu (Esc).') },
       ],
     },
     {
-      title: 'The camp', img: 'vigil-west', lead: 'This is where you start. Walk up to things and press E to use them.',
+      title: G.T('The camp'), img: 'vigil-west', lead: G.T('This is where you start. Walk up to things and press E to use them.'),
       notes: [
-        { name: 'Journal', text: 'Shows every boss attack you’ve seen so far.', x: 155, y: 548, lx: 120, ly: 300 },
-        { name: 'Tally', text: 'A list of challenges. Each one pays Sunshards the first time you do it.', x: 300, y: 520, lx: 330, ly: 300 },
-        { name: 'Sparring post', text: 'A practice dummy. Hit it to test your moves.', x: 800, y: 556, lx: 690, ly: 380 },
-        { name: 'Brazier', text: 'Changes the difficulty. Merciless gives bosses extra attacks.', x: 1170, y: 520, lx: 1060, ly: 300 },
+        { name: G.T('Journal'), text: G.T('Shows every boss attack you’ve seen so far.'), x: 155, y: 548, lx: 120, ly: 300 },
+        { name: G.T('Tally'), text: G.T('A list of challenges. Each one pays Sunshards the first time you do it.'), x: 300, y: 520, lx: 330, ly: 300 },
+        { name: G.T('Sparring post'), text: G.T('A practice dummy. Hit it to test your moves.'), x: 800, y: 556, lx: 690, ly: 380 },
+        { name: G.T('Brazier'), text: G.T('Changes the difficulty. Merciless gives bosses extra attacks.'), x: 1170, y: 520, lx: 1060, ly: 300 },
       ],
     },
     {
-      title: 'The camp', img: 'vigil-shrine', lead: 'Keep walking right.',
+      title: G.T('The camp'), img: 'vigil-shrine', lead: G.T('Keep walking right.'),
       notes: [
-        { name: 'Shrine', text: 'Spend Sunshards on permanent upgrades, like more health or damage.', x: 178, y: 455, lx: 300, ly: 250 },
-        { name: 'Practice', text: 'Fight any boss, starting at any phase. Nothing is lost if you die.', x: 520, y: 560, lx: 520, ly: 360 },
-        { name: 'Hall of Echoes', text: 'Walk into an alcove to switch to that hero.', x: 930, y: 520, lx: 860, ly: 250 },
-        { name: 'Wardrobe', text: 'Change your hero’s outfit. Playing a hero unlocks more.', x: 1182, y: 530, lx: 1170, ly: 250 },
+        { name: G.T('Shrine'), text: G.T('Spend Sunshards on permanent upgrades, like more health or damage.'), x: 178, y: 455, lx: 300, ly: 250 },
+        { name: G.T('Practice'), text: G.T('Fight any boss, starting at any phase. Nothing is lost if you die.'), x: 520, y: 560, lx: 520, ly: 360 },
+        { name: G.T('Hall of Echoes'), text: G.T('Walk into an alcove to switch to that hero.'), x: 930, y: 520, lx: 860, ly: 250 },
+        { name: G.T('Wardrobe'), text: G.T('Change your hero’s outfit. Playing a hero unlocks more.'), x: 1182, y: 530, lx: 1170, ly: 250 },
       ],
     },
     {
-      title: 'Starting a run', img: 'vigil-gate', lead: 'At the far right of the camp.',
+      title: G.T('Starting a run'), img: 'vigil-gate', lead: G.T('At the far right of the camp.'),
       notes: [
-        { name: 'Relics', text: 'Pick one relic. It gives you a bonus for the whole run. Walk up to one to read what it does.', x: 510, y: 520, lx: 380, ly: 300 },
-        { name: 'Gate', text: 'Walk in to start the run.', x: 960, y: 420, lx: 700, ly: 200 },
+        { name: G.T('Relics'), text: G.T('Pick one relic. It gives you a bonus for the whole run. Walk up to one to read what it does.'), x: 510, y: 520, lx: 380, ly: 300 },
+        { name: G.T('Gate'), text: G.T('Walk in to start the run.'), x: 960, y: 420, lx: 700, ly: 200 },
       ],
     },
-    { title: 'Controls', controls: true },
+    { title: G.T('Controls'), controls: true },
     {
-      title: 'In a fight', img: 'fight', crop: [0, 0, 640, 360], lead: 'The top left of the screen is about you.',
+      title: G.T('In a fight'), img: 'fight', crop: [0, 0, 640, 360], lead: G.T('The top left of the screen is about you.'),
       notes: [
-        { name: 'Health', text: 'Lose it all and you die. It refills before every fight.', x: 194, y: 56, lx: 330, ly: 50 },
-        { name: 'Starlight', text: 'Fills when you hit the boss. Use it for your special attack or to heal.', x: 226, y: 89, lx: 400, ly: 84 },
-        { name: 'Dawnbreak', text: 'Fills as you fight. When it’s full, use it for a huge attack.', x: 226, y: 113, lx: 440, ly: 126 },
-        { name: 'Items and Motes', text: 'Items you’ve bought. Press 1 or 2 to use them. The number is your Motes.', x: 306, y: 170, lx: 460, ly: 196 },
-        { name: 'Boons', text: 'The power-ups you’ve picked this run.', x: 230, y: 210, lx: 320, ly: 280 },
-        { name: 'Omen', text: 'Some fights have an extra rule. It’s shown at the top right.' },
-      ],
-    },
-    {
-      title: 'In a fight', img: 'fight', crop: [320, 360, 640, 360], lead: 'Anything red-orange is about to hurt you.',
-      notes: [
-        { name: 'The boss', text: 'It moves a certain way before each attack. Learn the moves and you’ll know what’s coming.', x: 560, y: 480, lx: 420, ly: 440 },
-        { name: 'Boss health', text: 'The lines split it into 3 phases. The boss gets new attacks each phase.', x: 820, y: 677, lx: 880, ly: 590 },
-        { name: 'Stagger bar', text: 'Fills when you hit the boss. See the next page.', x: 690, y: 692, lx: 640, ly: 610 },
+        { name: G.T('Health'), text: G.T('Lose it all and you die. It refills before every fight.'), x: 194, y: 56, lx: 330, ly: 50 },
+        { name: G.T('Starlight'), text: G.T('Fills when you hit the boss. Use it for your special attack or to heal.'), x: 226, y: 89, lx: 400, ly: 84 },
+        { name: G.T('Dawnbreak'), text: G.T('Fills as you fight. When it’s full, use it for a huge attack.'), x: 226, y: 113, lx: 440, ly: 126 },
+        { name: G.T('Items and Motes'), text: G.T('Items you’ve bought. Press 1 or 2 to use them. The number is your Motes.'), x: 306, y: 170, lx: 460, ly: 196 },
+        { name: G.T('Boons'), text: G.T('The power-ups you’ve picked this run.'), x: 230, y: 210, lx: 320, ly: 280 },
+        { name: G.T('Omen'), text: G.T('Some fights have an extra rule. It’s shown at the top right.') },
       ],
     },
     {
-      title: 'Staggering', img: 'stagger', crop: [200, 180, 960, 540], lead: 'Keep hitting the boss to fill its stagger bar.',
+      title: G.T('In a fight'), img: 'fight', crop: [320, 360, 640, 360], lead: G.T('Anything red-orange is about to hurt you.'),
       notes: [
-        { name: 'Full bar', text: 'The boss is stunned for a few seconds and takes more damage.', x: 700, y: 692, lx: 960, ly: 600 },
-        { name: 'Stunned boss', text: 'It can’t attack, so hit it as much as you can. The bar is longer next time.', x: 560, y: 560, lx: 380, ly: 380 },
-        { name: 'Dodging', text: 'You can’t be hurt while dashing. Dash right before a hit lands for a perfect dodge: you get Starlight and can dash again at once.' },
+        { name: G.T('The boss'), text: G.T('It moves a certain way before each attack. Learn the moves and you’ll know what’s coming.'), x: 560, y: 480, lx: 420, ly: 440 },
+        { name: G.T('Boss health'), text: G.T('The lines split it into 3 phases. The boss gets new attacks each phase.'), x: 820, y: 677, lx: 880, ly: 590 },
+        { name: G.T('Stagger bar'), text: G.T('Fills when you hit the boss. See the next page.'), x: 690, y: 692, lx: 640, ly: 610 },
       ],
     },
     {
-      title: 'Between fights', img: 'road', lead: 'After each win you walk here. Nothing can hurt you here.',
+      title: G.T('Staggering'), img: 'stagger', crop: [200, 180, 960, 540], lead: G.T('Keep hitting the boss to fill its stagger bar.'),
       notes: [
-        { name: 'Fire', text: 'Shows your relic. It gets stronger as the run goes on.', x: 35, y: 580, lx: 90, ly: 360 },
-        { name: 'Merchant', text: 'Spend Motes on more health, boons or items.', x: 290, y: 545, lx: 220, ly: 300 },
-        { name: 'Boons', text: 'Pick one. Get 3 from the same set (the card tells you) to unlock a Crown, a strong extra move.', x: 530, y: 525, lx: 470, ly: 400 },
-        { name: 'Second Thoughts', text: 'Don’t like the boons? Swap them for new ones.', x: 840, y: 520, lx: 900, ly: 340 },
-        { name: 'Other stops', text: 'A fountain, a smith, a fortune teller or a duel. They change each time.', x: 1055, y: 500, lx: 1160, ly: 300 },
+        { name: G.T('Full bar'), text: G.T('The boss is stunned for a few seconds and takes more damage.'), x: 700, y: 692, lx: 960, ly: 600 },
+        { name: G.T('Stunned boss'), text: G.T('It can’t attack, so hit it as much as you can. The bar is longer next time.'), x: 560, y: 560, lx: 380, ly: 380 },
+        { name: G.T('Dodging'), text: G.T('You can’t be hurt while dashing. Dash right before a hit lands for a perfect dodge: you get Starlight and can dash again at once.') },
       ],
     },
     {
-      title: 'Picking the next boss', img: 'portals', lead: 'Walk into a portal to fight that boss.',
+      title: G.T('Between fights'), img: 'road', lead: G.T('After each win you walk here. Nothing can hurt you here.'),
       notes: [
-        { name: 'Portal', text: 'The next boss. You have to pick a boon before you can go in.', x: 298, y: 470, lx: 300, ly: 200 },
-        { name: 'Corrupted', text: 'A boss you already beat, but much harder. Optional. Beat it to get a second relic.', x: 686, y: 470, lx: 686, ly: 200 },
-        { name: 'Closed', text: 'You’ve already beaten this one.', x: 880, y: 470, lx: 880, ly: 200 },
+        { name: G.T('Fire'), text: G.T('Shows your relic. It gets stronger as the run goes on.'), x: 35, y: 580, lx: 90, ly: 360 },
+        { name: G.T('Merchant'), text: G.T('Spend Motes on more health, boons or items.'), x: 290, y: 545, lx: 220, ly: 300 },
+        { name: G.T('Boons'), text: G.T('Pick one. Get 3 from the same set (the card tells you) to unlock a Crown, a strong extra move.'), x: 530, y: 525, lx: 470, ly: 400 },
+        { name: G.T('Second Thoughts'), text: G.T('Don’t like the boons? Swap them for new ones.'), x: 840, y: 520, lx: 900, ly: 340 },
+        { name: G.T('Other stops'), text: G.T('A fountain, a smith, a fortune teller or a duel. They change each time.'), x: 1055, y: 500, lx: 1160, ly: 300 },
       ],
     },
     {
-      title: 'Sunshards and Motes', img: 'shrine', crop: [190, 50, 900, 506], lead: 'There are two kinds of money.',
+      title: G.T('Picking the next boss'), img: 'portals', lead: G.T('Walk into a portal to fight that boss.'),
       notes: [
-        { name: 'Sunshards', text: 'You get some after every fight, even if you lose. You keep them forever.', x: 455, y: 172, lx: 300, ly: 120 },
-        { name: 'Shrine upgrades', text: 'Buy these with Sunshards. They stay for every run after.', x: 300, y: 262, lx: 250, ly: 420 },
-        { name: 'Motes', text: 'Only for this run. Spend them at the merchant. Any left over turn into Sunshards when the run ends.' },
+        { name: G.T('Portal'), text: G.T('The next boss. You have to pick a boon before you can go in.'), x: 298, y: 470, lx: 300, ly: 200 },
+        { name: G.T('Corrupted'), text: G.T('A boss you already beat, but much harder. Optional. Beat it to get a second relic.'), x: 686, y: 470, lx: 686, ly: 200 },
+        { name: G.T('Closed'), text: G.T('You’ve already beaten this one.'), x: 880, y: 470, lx: 880, ly: 200 },
+      ],
+    },
+    {
+      title: G.T('Sunshards and Motes'), img: 'shrine', crop: [190, 50, 900, 506], lead: G.T('There are two kinds of money.'),
+      notes: [
+        { name: G.T('Sunshards'), text: G.T('You get some after every fight, even if you lose. You keep them forever.'), x: 455, y: 172, lx: 300, ly: 120 },
+        { name: G.T('Shrine upgrades'), text: G.T('Buy these with Sunshards. They stay for every run after.'), x: 300, y: 262, lx: 250, ly: 420 },
+        { name: G.T('Motes'), text: G.T('Only for this run. Spend them at the merchant. Any left over turn into Sunshards when the run ends.') },
       ],
     },
   ];
 
   function controls() {
     const rows = [
-      ['Move', k('left') + ' ' + k('right'), 'Stick'],
-      ['Jump', k('jump'), 'A'],
-      ['Attack', '<kbd>Left click</kbd> ' + k('attack'), 'X'],
-      ['Dash', k('dash'), 'B'],
-      ['Special', '<kbd>Right click</kbd> ' + k('flare'), 'Y'],
-      ['Mend (hold)', k('heal'), 'LB'],
-      ['Dawnbreak', k('ult'), 'RT'],
-      ['Crown', k('crown'), 'LT'],
-      ['Items', k('item1') + ' ' + k('item2'), 'L3 R3'],
-      ['Use, in camp', k('heal'), 'LB'],
-      ['Your moves', 'hold <kbd>Tab</kbd>', ''],
-      ['Pause', '<kbd>Esc</kbd>', 'Start'],
+      [G.T('Move'), k('left') + ' ' + k('right'), G.T('Stick')],
+      [G.T('Jump'), k('jump'), 'A'],
+      [G.T('Attack'), '<kbd>' + G.T('Left click') + '</kbd> ' + k('attack'), 'X'],
+      [G.T('Dash'), k('dash'), 'B'],
+      [G.T('Special'), '<kbd>' + G.T('Right click') + '</kbd> ' + k('flare'), 'Y'],
+      [G.T('Mend (hold)'), k('heal'), 'LB'],
+      [G.T('Dawnbreak'), k('ult'), 'RT'],
+      [G.T('Crown'), k('crown'), 'LT'],
+      [G.T('Items'), k('item1') + ' ' + k('item2'), 'L3 R3'],
+      [G.T('Use, in camp'), k('heal'), 'LB'],
+      [G.T('Your moves'), G.T('hold {0}', '<kbd>Tab</kbd>'), ''],
+      [G.T('Pause'), '<kbd>Esc</kbd>', 'Start'],
     ];
-    const L = '<h2>Controls</h2><table class="gkeys"><tr><th></th><th>Keyboard</th><th>Pad</th></tr>'
+    const L = '<h2>' + G.T('Controls') + '</h2><table class="gkeys"><tr><th></th><th>' + G.T('Keyboard') + '</th><th>' + G.T('Pad') + '</th></tr>'
       + rows.map((r) => '<tr><td>' + r[0] + '</td><td>' + r[1] + '</td><td>' + (r[2] ? '<kbd>' + r[2] + '</kbd>' : '') + '</td></tr>').join('') + '</table>';
     const R = notes([
-      { name: 'Dash', text: 'You can’t be hurt while dashing. Use it to go through attacks.' },
-      { name: 'Special and Mend', text: 'Each uses one bar of Starlight. Hold Mend while standing still to heal 1 health.' },
-      { name: 'Dawnbreak', text: 'Your huge attack. Only works when its bar is full.' },
-      { name: 'Crown', text: 'Unlocked by getting 3 boons from the same set.' },
-      { name: 'Hero moves', text: 'Hold Tab in a fight to see everything your hero can do.' },
-      { name: 'Change keys', text: 'Settings, then Controls.' },
+      { name: G.T('Dash'), text: G.T('You can’t be hurt while dashing. Use it to go through attacks.') },
+      { name: G.T('Special and Mend'), text: G.T('Each uses one bar of Starlight. Hold Mend while standing still to heal 1 health.') },
+      { name: G.T('Dawnbreak'), text: G.T('Your huge attack. Only works when its bar is full.') },
+      { name: G.T('Crown'), text: G.T('Unlocked by getting 3 boons from the same set.') },
+      { name: G.T('Hero moves'), text: G.T('Hold Tab in a fight to see everything your hero can do.') },
+      { name: G.T('Change keys'), text: G.T('Settings, then Controls.') },
     ]);
     return { L, R };
   }
@@ -157,7 +157,7 @@
         + '<text x="' + m.lx + '" y="' + f(m.ly + 11 * z) + '" font-size="' + f(30 * z) + '">' + n + '</text></g>';
     }
     const at = 'width:' + f(128000 / cw) + '%;height:' + f(72000 / ch) + '%;left:' + f(-cx / cw * 100) + '%;top:' + f(-cy / ch * 100) + '%';
-    return '<figure class="gfig"><img src="img/guide/' + p.img + '.jpg" alt="" draggable="false" style="' + at + '">'
+    return '<figure class="gfig"><img src="img/guide/' + (G.ja ? 'ja/' : '') + p.img + '.jpg" alt="" draggable="false" style="' + at + '">'
       + '<svg viewBox="' + cx + ' ' + cy + ' ' + cw + ' ' + ch + '" preserveAspectRatio="none">' + svg + '</svg></figure>';
   }
 
@@ -184,7 +184,7 @@
   function status() {
     elNum.textContent = (GD.page + 1) + ' / ' + PAGES.length;
     const next = document.querySelector('#s-guide [data-act="gnext"]');
-    if (next) next.textContent = GD.page === PAGES.length - 1 ? 'Done' : 'Next';
+    if (next) next.textContent = GD.page === PAGES.length - 1 ? G.T('Done') : G.T('Next');
     const prev = document.querySelector('#s-guide [data-act="gprev"]');
     if (prev) prev.classList.toggle('off', GD.page === 0);
   }

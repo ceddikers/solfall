@@ -95,10 +95,10 @@
     if (!id) { G.audio.play('empty'); return; }
     if (!G.canHurt() || P.dead) return;
     const def = itemById[id];
-    if (def.passive) { nope('It works by itself'); return; }
+    if (def.passive) { nope(G.T('It works by itself')); return; }
     let ok = false;
     if (id === 'flask') {
-      if (P.hp >= P.maxHp) { nope('Already whole'); return; }
+      if (P.hp >= P.maxHp) { nope(G.T('Already whole')); return; }
       P.hp = Math.min(P.maxHp, P.hp + 2);
       G.audio.play('heal'); G.audio.play('segment');
       F.ring(P.x, P.y - 24, { r0: 10, r1: 130, life: 0.5, color: def.col, width: 6 });
@@ -106,7 +106,7 @@
       ok = true;
     } else if (id === 'bomb') {
       const t = main();
-      if (!t) { nope('Nothing to strike'); return; }
+      if (!t) { nope(G.T('Nothing to strike')); return; }
       MO.bombs.push({ x: t.cx + G.rand(-20, 20), y: -160, ty: t.cy, t: 0 });
       G.audio.play('whoosh'); G.audio.play('charge', { dur: 0.4 });
       ok = true;
@@ -116,7 +116,7 @@
       F.ring(P.x, P.y - 30, { r0: 20, r1: 700, life: 0.8, color: def.col, width: 4, alpha: 0.5 });
       ok = true;
     } else if (id === 'charm') {
-      if (P.charm) { nope('Already warded'); return; }
+      if (P.charm) { nope(G.T('Already warded')); return; }
       P.charm = true;
       G.audio.play('tink'); G.audio.play('segment');
       F.ring(P.x, P.y - 24, { r0: 60, r1: 24, life: 0.4, color: def.col, width: 5 });
@@ -220,14 +220,14 @@
   MO.rows = function () {
     const r = R(), m = r.merch || MO.rollStock(), out = [];
     const mends = r.mendsBought || 0;
-    out.push({ kind: 'mend', name: 'Mending', desc: 'One more health for the rest of the run.', price: MO.mendCost(), why: mends >= MO.MENDS ? 'Twice a run' : '' });
+    out.push({ kind: 'mend', name: G.T('Mending'), desc: G.T('One more health for the rest of the run.'), price: MO.mendCost(), why: mends >= MO.MENDS ? G.T('Twice a run') : '' });
     m.boons.forEach((id, i) => {
       const b = G.boonDef(id), sold = m.sold.includes('b' + i);
-      out.push({ kind: 'boon', i, id, name: b.name, desc: b.desc, price: MO.BOON_PRICE, sold, why: sold ? 'Sold' : G.boon(id) >= b.max ? 'You hold all of it' : '' });
+      out.push({ kind: 'boon', i, id, name: b.name, desc: b.desc, price: MO.BOON_PRICE, sold, why: sold ? G.T('Sold') : G.boon(id) >= b.max ? G.T('You hold all of it') : '' });
     });
     m.items.forEach((id, i) => {
       const it = itemById[id], sold = m.sold.includes('i' + i);
-      out.push({ kind: 'item', i, id, name: it.name, desc: it.desc, price: it.price, sold, why: sold ? 'Sold' : MO.free() < 0 ? 'Your hands are full' : '' });
+      out.push({ kind: 'item', i, id, name: it.name, desc: it.desc, price: it.price, sold, why: sold ? G.T('Sold') : MO.free() < 0 ? G.T('Your hands are full') : '' });
     });
     const k = G.diff().shop || 1; // (v3.0c: Ascension +4, a quarter dearer)
     if (k !== 1) for (const o of out) o.price = Math.round(o.price * k / 5) * 5;

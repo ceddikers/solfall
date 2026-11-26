@@ -99,7 +99,7 @@
     if (!a) return h;
     for (let i = 0; i < 3; i++) {
       if (i < s) h += '<span class="awake"><b>' + RL.STAGES[i + 1] + '</b> ' + G.ui.esc(a[i]) + '</span>';
-      else if (o && o.next && i === s) h += '<span class="awake next"><b>' + RL.STAGES[i + 1] + '</b>, after trial ' + G.roman(RL.AT[i]) + ': ' + G.ui.esc(a[i]) + '</span>';
+      else if (o && o.next && i === s) h += '<span class="awake next">' + G.T('<b>{0}</b>, after trial {1}: {2}', RL.STAGES[i + 1], G.roman(RL.AT[i]), G.ui.esc(a[i])) + '</span>';
     }
     return h;
   };
@@ -232,7 +232,7 @@
       st.crownN++;
       if (st.crownN % 25 === 0 && P.hp < P.maxHp) {
         P.hp++; G.audio.play('heal');
-        F.text(P.x, P.y - 84, 'THORNS MEND', { color: RL.col('crown'), size: 15, life: 0.9 });
+        F.text(P.x, P.y - 84, G.T('THORNS MEND'), { color: RL.col('crown'), size: 15, life: 0.9 });
         F.ring(P.x, P.y - 24, { r0: 10, r1: 70, life: 0.4, color: RL.col('crown'), width: 4 });
       }
     }
@@ -241,7 +241,7 @@
       r.sun = Math.min(cap, (r.sun || 0) + 1);
       if (r.sun >= cap && !st.risen) {
         st.risen = true; G.audio.play('segment');
-        F.text(P.x, P.y - 96, 'RISEN', { color: RL.col('sun'), size: 17, life: 1 });
+        F.text(P.x, P.y - 96, G.Tx('relic', 'RISEN'), { color: RL.col('sun'), size: 17, life: 1 });
         F.ring(P.x, P.y - 30, { r0: 12, r1: 120, life: 0.5, color: RL.col('sun'), width: 5 });
       }
     }
@@ -257,7 +257,7 @@
     if (lv('pearl') >= 3 && P.hp === 1 && !st.pearlUsed && fighting()) {
       st.pearlUsed = true; P.hp = Math.min(P.maxHp, 3);
       G.audio.play('heal');
-      F.text(P.x, P.y - 96, 'THE PEARL', { color: RL.col('pearl'), size: 17, life: 1.1 });
+      F.text(P.x, P.y - 96, G.T('THE PEARL'), { color: RL.col('pearl'), size: 17, life: 1.1 });
       F.ring(P.x, P.y - 24, { r0: 80, r1: 20, life: 0.5, color: RL.col('pearl'), width: 6 });
     }
   };
@@ -334,7 +334,7 @@
     }
     if (lv('sunstone') >= 3 && fighting()) {
       seg(1); P.ult = Math.min(100, P.ult + 20);
-      F.text(P.x, P.y - 96, 'SUNSTONE', { color: RL.col('sunstone'), size: 15, life: 0.9 });
+      F.text(P.x, P.y - 96, G.T('SUNSTONE'), { color: RL.col('sunstone'), size: 15, life: 0.9 });
     }
   };
   // the boss's clock (game.js): the Still Hourglass slows it after a perfect dodge

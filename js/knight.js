@@ -9,18 +9,18 @@
   const RING_L = 290, RING_R = 990;
 
   const B = {
-    id: 'knight', name: 'THE UNBURIED KNIGHT', short: 'The Knight', theme: 'knight',
+    id: 'knight', name: G.T('THE UNBURIED KNIGHT'), short: G.T('The Knight'), theme: 'knight',
     snapTurn: true, // (v2.5e) flips at once when it turns: see K.turn
-    sub: 'An oath that outlived its keeper', taunt: 'it rises again',
-    blurb: 'A death knight whose back is its weakness',
+    sub: G.T('An oath that outlived its keeper'), taunt: G.T('it rises again'),
+    blurb: G.T('A death knight whose back is its weakness'),
     tips: [
-      'The Knight cannot cut behind itself. Dash through it as it swings and strike its back for extra damage.',
-      'After an overhead blow, a charge into the wall or a whirl it is helpless for a moment. A finisher timed into one of its cuts turns the cut aside.',
-      'Jump the low wave; stay on the ground for the high one.',
-      'Its charge is too tall for one jump. Dash through it, or jump twice.',
-      'Rotting ground fades after a few seconds. Fight on what is left.',
-      'Watch its feet. If the Knight stamps after a cut, another cut is coming; if the blade just drags, it is open.',
-      'A blade that burns red as it rises takes two health and throws a wave along the floor. Get behind it, or get out and jump.',
+      G.T('The Knight cannot cut behind itself. Dash through it as it swings and strike its back for extra damage.'),
+      G.T('After an overhead blow, a charge into the wall or a whirl it is helpless for a moment. A finisher timed into one of its cuts turns the cut aside.'),
+      G.T('Jump the low wave; stay on the ground for the high one.'),
+      G.T('Its charge is too tall for one jump. Dash through it, or jump twice.'),
+      G.T('Rotting ground fades after a few seconds. Fight on what is left.'),
+      G.T('Watch its feet. If the Knight stamps after a cut, another cut is coming; if the blade just drags, it is open.'),
+      G.T('A blade that burns red as it rises takes two health and throws a wave along the floor. Get behind it, or get out and jump.'),
     ],
     hudCols: [null, ['#6ab4ff', '#d4ecff'], ['#8ce04a', '#e0ffc8'], ['#ff4c46', '#ffd0c8']],
     BASE_HP: 4300, poise0: 460, w: 62, h: 122,
@@ -31,7 +31,7 @@
       2: ['cleave2', 'overhead', 'charge', 'grip', 'graves', 'wraiths', 'desecrate', 'whirl', 'rend', 'hurl', 'sever', 'heel', 'thrust', 'march', 'souls', 'tolling'],
       3: ['reap', 'overhead', 'charge', 'grip', 'wraiths', 'desecrate', 'whirl', 'rend', 'leap', 'hurl', 'sever', 'heel', 'thrust', 'march', 'souls', 'tolling'],
     },
-    cards: { 2: ['THE HOST', 'The dead answer the call'], 3: ['BLOOD OATH', 'It will not fall alone'] },
+    cards: { 2: [G.T('THE HOST'), G.T('The dead answer the call')], 3: [G.T('BLOOD OATH'), G.T('It will not fall alone')] },
     first: { 1: 'cleave', 2: 'wraiths', 3: 'leap' },
     // its corrupted self's own two (corrupt.js): the Requiem in every phase, the Colossus from the second
     corruptBags: { 1: ['requiem'], 2: ['requiem', 'colossus'], 3: ['requiem', 'colossus'] },
@@ -273,7 +273,7 @@
   B.onRelease = function () { const b = B.body; b.hurt = false; b.pose = 'idle'; b.stiff = 0; b.spinning = false; b.fast = false; b.unarmed = false; b.blaze = 0; b.voidOn = false; b.lookT = 0; b.gazeT = 0; b.burn = 0; b.jit = 0; unhush(); };
   B.onStagger = function () { B.body.pose = 'kneel'; B.body.stiff = 0; };
   B.onInterrupt = function () { B.lost = null; unhush(); };
-  B.staggerWord = 'DISARMED';
+  B.staggerWord = G.T('DISARMED');
   B.staggerIn = function* () {
     const b = B.body;
     b.y = FLOOR; b.unarmed = true;
@@ -313,7 +313,7 @@
     G.audio.play('blade'); G.fx.shake(5);
     G.fx.ring(b.x, b.y - 80, { r0: 60, r1: 12, life: 0.25, color: tint.hot, width: 4 });
   };
-  B.reckonName = 'DIRGE';
+  B.reckonName = G.T('DIRGE');
   B.onReckon = function (on) { B.body.pose = on ? 'overRaise' : 'idle'; };
   B.onRecover = function () { B.body.pose = 'idle'; };
   B.dying0 = function () { B.body.pose = 'kneel'; };

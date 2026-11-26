@@ -2,7 +2,7 @@
 
 A side-on boss rush for the browser: four heroes, seven three-phase bosses, played as a run of
 ever-harder trials. You pick a hero and a relic before the run and win a boon after each victory.
-Version 3.0e.
+Version 3.1a.
 
 This is an early slice of a planned boss-rush roguelite (short runs, a boon after each boss,
 bosses drawn from a pool). A run is seven trials, one for each boss, each harder than the last: the first boss
@@ -116,6 +116,36 @@ hero (`tools/feel-check.js`).
 - Settings, Reset progress erases Sunshards, upgrades, trophies and records (it has to be chosen twice).
 
 Not done: touch controls, a colour-blind alternative to red-orange warnings, gamepad rebinding.
+
+## Japanese (v3.1a)
+
+Asked for "a complete japanese language translation to everything" with a toggle at the start. The title screen
+now has **English / 日本語** under Settings; picking one reloads the game in that language. The first time, the game
+follows the browser's language. Everything a player reads is translated: menus, help, the guide book (with its own
+Japanese screenshots), the Journal, the Tally, heroes, weapons, boons, relics, items, omens, the Shrine, the camp and
+road labels, boss names, phase cards, callouts, tips, the results screens and the ending. About 1,700 phrases.
+
+How it works, for later changes:
+- English is still written in the code. Text a player reads goes through `G.T('English {0}', value)`, which returns
+  the Japanese when the game is in Japanese, else the English unchanged. A phrase with no Japanese falls back to
+  English, so a new line never breaks anything; it just shows in English until it is translated.
+- The Japanese lives in `js/lang/ja-*.js` (data, journal, ui, camp, bosses). Data tables (heroes, boons, relics...)
+  are rewritten by id in Japanese only; the page's own text is matched phrase by phrase.
+- `js/lang/glossary.md` fixes every name and game term (ヴェスパー, 星光, 暁光, 恩恵, 遺物, 崩し, ジャスト回避...) and
+  the style: short, plain game Japanese, no です／ます in descriptions.
+- Japanese uses Japanese fonts (Yu Gothic / Hiragino / Noto Sans JP, Yu Mincho for titles) and tighter letter spacing.
+
+Also fixed: since v3.0d, health bought from the merchant, its stock and the mend count carried over into the next
+run (a comment had swallowed the line that resets them).
+
+Playtest checklist:
+- Title: switch to 日本語 and back. Does the game come back in the language you picked after a reload?
+- Read through the hero picker, help, guide, Journal and Tally in Japanese: anything still in English, cut off or
+  overlapping?
+- A run in Japanese: camp labels, boon cards, the merchant, phase cards, callouts, the win and defeat screens, Sol's
+  ending.
+- Does the Japanese read naturally? Note any line that feels stiff.
+- Health bought from the merchant should be gone at the start of the next run.
 
 ## Weapon forms: a second weapon for each hero (v3.0e)
 

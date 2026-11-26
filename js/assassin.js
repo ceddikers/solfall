@@ -7,17 +7,17 @@
   const WL = G.WALL_L, WR = G.WALL_R;
 
   const B = {
-    id: 'assassin', name: 'THE SILENT VEIL', short: 'The Veil', theme: 'assassin',
+    id: 'assassin', name: G.T('THE SILENT VEIL'), short: G.T('The Veil'), theme: 'assassin',
     snapTurn: true, // (v2.5e) flips at once when it turns: see K.turn
-    sub: 'You will not hear it coming', taunt: 'it has studied you',
-    blurb: 'A hooded killer that strikes from nowhere',
+    sub: G.T('You will not hear it coming'), taunt: G.T('it has studied you'),
+    blurb: G.T('A hooded killer that strikes from nowhere'),
     tips: [
-      'Every attack leaves the Veil open for a moment afterwards. Wait for it, then strike.',
-      'When it sinks into a crouch and its blade catches the light, it is about to cross the floor. Jump it, or dash through it for a perfect dodge.',
-      'When it drops from above its blade sticks in the floor, and it takes extra damage until it pulls free.',
-      'Its shadows vanish at a single hit and give Starlight.',
-      'A line across the arena is a cut. Step off it, or jump it if it lies flat.',
-      'Listen to the tempo of its flurry. Three measured cuts end in a fan of knives; five quick ones end in a single knife that bursts for two health.',
+      G.T('Every attack leaves the Veil open for a moment afterwards. Wait for it, then strike.'),
+      G.T('When it sinks into a crouch and its blade catches the light, it is about to cross the floor. Jump it, or dash through it for a perfect dodge.'),
+      G.T('When it drops from above its blade sticks in the floor, and it takes extra damage until it pulls free.'),
+      G.T('Its shadows vanish at a single hit and give Starlight.'),
+      G.T('A line across the arena is a cut. Step off it, or jump it if it lies flat.'),
+      G.T('Listen to the tempo of its flurry. Three measured cuts end in a fan of knives; five quick ones end in a single knife that bursts for two health.'),
     ],
     hudCols: [null, ['#a070ff', '#e4d4ff'], ['#40e0a8', '#c8ffe8'], ['#d8d8f0', '#ffffff']],
     BASE_HP: 3000, poise0: 340, w: 36, h: 84,
@@ -30,7 +30,7 @@
       2: ['pincer', 'flurry', 'knives', 'ambush', 'backstab', 'mirror', 'rain', 'cross', 'echo', 'stance', 'crescent', 'snare', 'dance', 'moonfall'],
       3: ['pincer', 'flurry', 'ambush', 'backstab', 'mirror', 'rain', 'cross', 'cuts', 'mark', 'echo', 'hunt', 'stance', 'crescent', 'snare', 'dance', 'moonfall'],
     },
-    cards: { 2: ['SHADOWS', 'It no longer hunts alone'], 3: ['EXECUTION', 'No more warnings than these'] },
+    cards: { 2: [G.T('SHADOWS'), G.T('It no longer hunts alone')], 3: [G.T('EXECUTION'), G.T('No more warnings than these')] },
     first: { 1: 'lunge', 2: 'mirror', 3: 'cuts' },
   };
 
@@ -313,7 +313,7 @@
     return true;
   };
   B.onStagger = function () { B.body.pose = 'kneel'; };
-  B.staggerWord = 'CAUGHT'; B.staggerMult = 1.9; B.staggerDur = 0.7;
+  B.staggerWord = G.T('CAUGHT'); B.staggerMult = 1.9; B.staggerDur = 0.7;
   B.staggerIn = function* () {
     const b = B.body, dir = -(G.sign(G.player.x - b.x) || b.face);
     const x0 = b.x, y0 = Math.min(b.y, FLOOR), tx = dir > 0 ? WR - 26 : WL + 26;
@@ -337,7 +337,7 @@
     yield* tween(b, { y: FLOOR }, 0.28, E.inQuad);
     G.fx.thud(b.x, FLOOR, 0.6, { noCrack: true });
   };
-  B.reckonName = 'DEATH MARK';
+  B.reckonName = G.T('DEATH MARK');
   B.onReckon = function (on) { B.body.pose = on ? 'crouch' : 'idle'; };
   B.onRecover = function () { B.body.pose = 'idle'; };
   B.dying0 = function () { B.body.pose = 'kneel'; B.clones.length = 0; };
@@ -863,7 +863,7 @@
     yield* wait(0.55 * T + 0.2);
     appear(640, FLOOR, 'kneel');
     b.exposed = true;
-    G.ui.callout('SPENT', 'Strike now');
+    G.ui.callout(G.T('SPENT'), G.T('Strike now'));
     yield* wait(2.5);
     b.exposed = false;
   }

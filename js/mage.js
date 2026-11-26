@@ -17,18 +17,18 @@
   const HOVER = 26, GY = FLOOR - HOVER;
 
   const B = {
-    id: 'mage', name: 'THE THREEFOLD MAGUS', short: 'The Magus', theme: 'mage',
+    id: 'mage', name: G.T('THE THREEFOLD MAGUS'), short: G.T('The Magus'), theme: 'mage',
     snapTurn: true, // (v2.5e) flips at once when it turns: see K.turn
-    sub: 'Three tongues, one voice', taunt: 'the verses quicken',
-    blurb: 'A blinking caster of ice, fire and lightning',
+    sub: G.T('Three tongues, one voice'), taunt: G.T('the verses quicken'),
+    blurb: G.T('A blinking caster of ice, fire and lightning'),
     tips: [
-      'The Magus stands still while it casts. That is the time to reach it.',
-      'Jump as the ice reaches you; it only bites for a moment.',
-      'A wall of flame is low: a platform clears it, and so does a dash straight through.',
-      'Break the crystals before their rings empty and they never burst.',
-      'Lightning marks a column before it strikes. One step to the side is enough.',
-      'Watch the staff, not the spell. Held straight up, the lightning comes from the sky; levelled at you, along the ground; driven into the floor, through the floor.',
-      'One mote burning in the staff is an ordinary fireball. All three flying into it is the great one: two health, and a wide blast.',
+      G.T('The Magus stands still while it casts. That is the time to reach it.'),
+      G.T('Jump as the ice reaches you; it only bites for a moment.'),
+      G.T('A wall of flame is low: a platform clears it, and so does a dash straight through.'),
+      G.T('Break the crystals before their rings empty and they never burst.'),
+      G.T('Lightning marks a column before it strikes. One step to the side is enough.'),
+      G.T('Watch the staff, not the spell. Held straight up, the lightning comes from the sky; levelled at you, along the ground; driven into the floor, through the floor.'),
+      G.T('One mote burning in the staff is an ordinary fireball. All three flying into it is the great one: two health, and a wide blast.'),
     ],
     hudCols: [null, ['#7ea0ff', '#d8e4ff'], ['#ff7ea8', '#ffd4dc'], ['#ffe08a', '#ffffff']],
     BASE_HP: 3900, poise0: 380, w: 52, h: 112, platformsFrom: 1,
@@ -41,7 +41,7 @@
       2: ['shards', 'rime', 'fireball', 'bolts', 'spheres', 'firewall', 'crystals', 'storm', 'comet', 'invoke', 'nova', 'serpent', 'motes', 'blink', 'glacier'],
       3: ['shards', 'fireball', 'bolts', 'firewall', 'crystals', 'storm', 'blizzard', 'rime', 'comet', 'invoke', 'nova', 'serpent', 'motes', 'blink', 'glacier'],
     },
-    cards: { 2: ['CONFLUENCE', 'The spells begin to overlap'], 3: ['TRINITY', 'Every element answers'] },
+    cards: { 2: [G.T('CONFLUENCE'), G.T('The spells begin to overlap')], 3: [G.T('TRINITY'), G.T('Every element answers')] },
     first: { 1: 'shards', 2: 'crystals', 3: 'blizzard' },
     finale: 'cataclysm',
     // corrupted only (corrupt.js): the Black Sun from the start, Foresight from the second phase
@@ -153,7 +153,7 @@
     }
     return '';
   };
-  B.staggerWord = 'SILENCED'; B.staggerMult = 1.2; B.staggerDur = 1.15;
+  B.staggerWord = G.T('SILENCED'); B.staggerMult = 1.2; B.staggerDur = 1.15;
   B.onHit = function (dmg, info) {
     if (!B.staggered) return;
     G.player.gain(7);
@@ -161,7 +161,7 @@
     G.fx.burst(info.x, info.y, { n: 5, color: el.boss, speed: [120, 420], angle: -Math.PI / 2, spread: 2.4, life: [0.3, 0.7], size: [3, 6], grav: 600 });
     G.fx.glint(info.x + G.rand(-14, 14), info.y - G.rand(6, 30), 18, el.hot, 0.2);
   };
-  B.reckonName = 'CONVERGENCE'; B.reckonY = GY;
+  B.reckonName = G.T('CONVERGENCE'); B.reckonY = GY;
   B.onReckon = function (on) { const b = B.body; b.want = on ? 1 : 0; B.spin = on ? 6 : 1; b.alpha = 1; };
   B.onRecover = function () { B.body.homeY = GY; };
   B.dying0 = function () { B.crystals.length = 0; B.body.elem = null; };
@@ -756,7 +756,7 @@
           G.fx.burst(this.x, FLOOR - 46, { n: 10, color: ICE.boss, speed: [80, 400], life: [0.5, 1], size: [5, 10], kind: 'chunk', grav: 1300 });
           G.fx.shatter(this.x, FLOOR - 46, ICE.boss, 16, { hot: ICE.hot, r: 240, jitter: 16 });
           G.fx.stop(0.05);
-          G.fx.text(this.x, FLOOR - 110, 'BROKEN', { color: ICE.hot, size: 15, life: 0.8 });
+          G.fx.text(this.x, FLOOR - 110, G.T('BROKEN'), { color: ICE.hot, size: 15, life: 0.8 });
         }
         return true;
       },
@@ -845,7 +845,7 @@
   // The last verse, once: ice, then fire, then lightning, and the Magus is spent.
   function* atkCataclysm() {
     const b = B.body, T = K.T();
-    G.ui.callout('CATACLYSM', 'Ice, then fire, then lightning');
+    G.ui.callout(G.T('CATACLYSM'), G.T('Ice, then fire, then lightning'));
     yield* blink(640, FLOOR - 170);
     b.want = 1; B.spin = 5;
     setElem(ICE);
@@ -883,7 +883,7 @@
     yield* tween(b, { y: FLOOR }, 0.45, E.inCubic);
     G.fx.shake(8); G.audio.play('boom');
     G.fx.thud(b.x, FLOOR, 1.2);
-    G.ui.callout('SPENT', 'Strike now');
+    G.ui.callout(G.T('SPENT'), G.T('Strike now'));
     kick(0, 8, 0.3); b.sq = Math.max(b.sq || 0, 0.12);
     yield* wait(3.4);
     b.spent = false; b.exposed = false; b.homeY = GY; B.spin = 1;

@@ -132,7 +132,7 @@ kbd {
   background: rgba(0, 0, 0, 0.6); border: 1px solid rgba(150, 225, 255, 0.32);
 }
 #pfill { height: 100%; width: 0; background: linear-gradient(90deg, #4aa8d8, var(--star)); }
-.pbar span { position: absolute; left: 100%; top: -3px; margin-left: 9px; font-size: 9px; letter-spacing: 0.3em; color: var(--faint); }
+.pbar span { position: absolute; left: 100%; top: -3px; margin-left: 9px; white-space: nowrap; font-size: 9px; letter-spacing: 0.3em; color: var(--faint); }
 .pbar.broken { border-color: #fff; box-shadow: 0 0 12px var(--star); }
 .pbar.broken #pfill { background: #fff; }
 .pbar.broken span { color: var(--star-hot); }
@@ -687,3 +687,15 @@ ul.tips b { color: var(--ink); font-weight: 600; }
 .gface::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: linear-gradient(90deg, rgba(0,0,0,0.35), transparent 40%); opacity: 0; transition: opacity 0.6s; }
 .gleaf.go .gface::after { opacity: 1; }
 #guideL, .gleaf.back .gface.a .gpg, .gleaf.fwd .gface.b .gpg { display: flex; flex-direction: column; justify-content: center; padding-bottom: 52px; }
+
+/* (v3.1a) the language toggle on the title screen, and Japanese type */
+#langItem { font-size: 14px; letter-spacing: 0.08em; }
+#langItem .lang-sep { opacity: 0.35; }
+html[lang=en] #langItem .lang-ja, html[lang=ja] #langItem .lang-en { opacity: 0.4; }
+html[lang=en] #langItem .lang-en, html[lang=ja] #langItem .lang-ja { color: var(--gold); }
+html[lang=ja] { --ui: "Yu Gothic UI", "Yu Gothic", "Hiragino Sans", "Hiragino Kaku Gothic ProN", Meiryo, "Noto Sans JP", sans-serif;
+  --display: "Yu Mincho", "Hiragino Mincho ProN", "Noto Serif JP", "MS PMincho", serif; }
+/* wide tracking suits capitals, not kana: tighten it everywhere in Japanese */
+html[lang=ja] body * { letter-spacing: 0.04em !important; }
+html[lang=ja] h1, html[lang=ja] h2, html[lang=ja] .over, html[lang=ja] #card .title { padding-left: 0 !important; }
+html[lang=ja] .titleblock h1 { letter-spacing: 0.4em !important; padding-left: 0.4em !important; }
