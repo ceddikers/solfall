@@ -2,7 +2,7 @@
 
 A side-on boss rush for the browser: four heroes, seven three-phase bosses, played as a run of
 ever-harder trials. You pick a hero and a relic before the run and win a boon after each victory.
-Version 3.1b.
+Version 3.1c.
 
 This is an early slice of a planned boss-rush roguelite (short runs, a boon after each boss,
 bosses drawn from a pool). A run is seven trials, one for each boss, each harder than the last: the first boss
@@ -116,6 +116,14 @@ hero (`tools/feel-check.js`).
 - Settings, Reset progress erases Sunshards, upgrades, trophies and records (it has to be chosen twice).
 
 Not done: touch controls, a colour-blind alternative to red-orange warnings, gamepad rebinding.
+
+## Tabs change on a click, not a hover (v3.1c)
+
+In the Journal, the Tally and Help, moving the mouse over a tab only highlights it; the page changes when you click
+it. With the keyboard or a pad, the page still follows the highlight as you move.
+
+Playtest checklist:
+- Journal, Tally, Help: sweep the mouse down the tabs. Does the page stay put until you click?
 
 ## A polish pass over every screen, in English and Japanese (v3.1b)
 

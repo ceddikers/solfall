@@ -64,7 +64,7 @@
       it.addEventListener('mouseenter', () => {
         const items = U.items();
         const i = items.indexOf(it);
-        if (i >= 0 && i !== U.focus) { U.setFocus(i); G.audio.play('uiMove'); }
+        if (i >= 0 && i !== U.focus) { U.setFocus(i, true); G.audio.play('uiMove'); }
       });
       it.addEventListener('click', (e) => {
         const items = U.items();
@@ -93,12 +93,15 @@
   // open on their first item)
   const REMEMBER = ['title', 'pause', 'settings', 'help', 'keys', 'practice', 'shrine', 'how', 'feats', 'moves', 'journal'];
   U.mem = {};
-  U.setFocus = function (i) {
+  // (v3.1c) hover moves the highlight only; a tab's page (Help, Journal, Tally) changes on a click, or as keys or
+  // a pad move the focus
+  U.setFocus = function (i, hover) {
     document.body.classList.toggle('pad', G.input.device === 'gamepad');
     const items = U.items();
     U.focus = G.clamp(i, 0, items.length - 1);
     if (REMEMBER.includes(U.current)) U.mem[U.current] = U.focus;
     items.forEach((it, k) => it.classList.toggle('focus', k === U.focus));
+    if (hover) return;
     const act = U.current === 'help' && items[U.focus] ? items[U.focus].dataset.act || '' : '';
     if (/^help\d$/.test(act)) U.fillHelp(Number(act.slice(4)));
     const ta = U.current === 'feats' && items[U.focus] ? items[U.focus].dataset.act || '' : '';
