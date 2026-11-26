@@ -344,7 +344,7 @@
     if (!tg) return false;
     aimAt(tg.cx, G.clamp(P.y - 36, tg.cy - (tg.hh || tg.r || 0) * 0.7, tg.cy + (tg.hh || tg.r || 0) * 0.7));
     I.aim.attack = true;
-    const full = (P.sheath || 0) >= C.SHEATH_COMBOS;
+    const full = (P.sheath || 0) >= C.SHEATH_COMBOS; // (v3.1e: six notches; the bot draws only from a full sheath)
     if (!full) {
       if (!inReach) return false;
       if (st.tap) lift('attack'); else press('attack');

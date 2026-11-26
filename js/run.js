@@ -88,9 +88,9 @@
       ],
       down: 11, special: 'guard', specialName: 'Still Point', verb: 'guard',
       blurb: 'Patient and exact. One cut, when it counts.',
-      lines: ['Sheathed blade: land two strings to fill the sheath, then hold attack to charge the draw', 'The draw blinks him through the foe; dash to get out of the way', 'Still Point: turn a blow aside and the sheath is full'],
+      lines: ['Notched blade: every cut that lands notches the sheath, up to six', 'Hold attack and let go to draw through the foe: each notch makes it harder', 'Still Point: turn a blow aside and the sheath is full'],
       how: {
-        attack: 'Sheathed blade: cut (11), cut (13), finisher (27). Each string whose finisher lands puts one in the sheath; two fill it (it glows gold). Then hold attack until three marks light, and let go to draw: he blinks through the foe for 80.',
+        attack: 'Notched blade: cut (11), cut (13), finisher (27). Every cut that lands notches the sheath, up to six (all six, it glows gold). Hold attack a moment and let go to draw: he blinks through the foe for 25, and 12 more for every notch it spends (97 at six).',
         aim: 'The draw goes where you aim. Down in the air strikes below and bounces.',
         dash: 'The draw is a cut, not a dodge: it does not pass through attacks.',
         special: 'Still Point: brace for two thirds of a second. A blow that lands is turned, does no harm, and fills the sheath. If nothing lands, half the Starlight comes back.',
@@ -191,7 +191,7 @@
     { id: 'harvest', name: 'Harvest Moon', tag: 'Signature', max: 1, heroes: ['lune'], asc: 4, desc: 'Every third Moon Volley costs no Starlight.' },
     { id: 'patient', name: 'Patient Blade', tag: 'Signature', max: 1, heroes: ['eos'], asc: 4, desc: 'Still Point braces half again as long.' },
     { id: 'hanging', name: 'Hanging Cut', tag: 'Signature', max: 1, heroes: ['eos'], desc: 'The cut of a draw hangs in the air, and a second later cuts again for half.' },
-    { id: 'secondsun', name: 'Second Sun', tag: 'Signature', max: 1, heroes: ['eos'], desc: 'A draw leaves one in the sheath, so the next needs only one more finisher.' },
+    { id: 'secondsun', name: 'Second Sun', tag: 'Signature', max: 1, heroes: ['eos'], desc: 'A full draw leaves three notches on the sheath.' },
   ];
   // Sets (v2.3a): four kinds of boon, each leaving its own mark on the foe. A set boon fits one of five
   // slots (Strike, Special, Dash, Mend, and since v2.6c Jump), one boon to a slot: a new one for a full slot replaces the

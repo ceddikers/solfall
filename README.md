@@ -2,7 +2,7 @@
 
 A side-on boss rush for the browser: four heroes, seven three-phase bosses, played as a run of
 ever-harder trials. You pick a hero and a relic before the run and win a boon after each victory.
-Version 3.1d.
+Version 3.1e.
 
 This is an early slice of a planned boss-rush roguelite (short runs, a boon after each boss,
 bosses drawn from a pool). A run is seven trials, one for each boss, each harder than the last: the first boss
@@ -116,6 +116,26 @@ hero (`tools/feel-check.js`).
 - Settings, Reset progress erases Sunshards, upgrades, trophies and records (it has to be chosen twice).
 
 Not done: touch controls, a colour-blind alternative to red-orange warnings, gamepad rebinding.
+
+## Eos: the Notched Blade (v3.1e)
+
+Eos "feels weird"; of three drafts the user picked the Notched Blade: every hit feeds the draw, with no gate.
+
+- **Every cut of the string that lands notches the sheath**, up to six (six bands down the sheath; all six and it is
+  traced in gold).
+- **Hold attack a moment (about a quarter second) and let go to draw**, with any number of notches. The draw spends
+  them all: 25 damage and 12 more per notch (37 with one, 97 with six). Six notches also carry it furthest and count
+  as a full draw (the Dawn Scabbard, Second Sun). Let go before it arms and nothing is spent.
+- So a quick one- or two-notch draw is a way out or a reposition; six after a stagger is the payoff.
+- **Still Point:** a turned blow fills all six. **Second Sun** (his boon): a full draw leaves three notches.
+
+Tested frame by frame (one cut, one notch; a short hold spends nothing; 37 from one notch, 97 from six; a seventh
+cut does not overfill). Bot, Eos against the seven bosses at Standard trial V, four runs of 21 fights: 40 of 84 won,
+kills about 152 s, level with v3.1d (about 50%, 164 s) and v3.1c (52%, 157 s). The bot only draws from six.
+
+Playtest checklist:
+- Does the string flow into the draw now? Is the quarter-second hold right?
+- Are small draws useful (a two-notch draw to get out), or is it always best to wait for six?
 
 ## Eos: the draw is a charge (v3.1d)
 

@@ -22,7 +22,7 @@
     CHARGE_T: 0.9,   // how long Aster's smash takes to charge fully
     CHARGE_DMG: 0.8, // how much a full charge adds to the smash (0.8 = 36 becomes 65; v2.4c trimmed the smash, not the charge)
     // Eos keeps her blade in its sheath. Holding the attack gathers Focus; letting go is the draw.
-    FOCUS: [0.16, 0.32, 0.48],    // seconds of stance for the first, second and third mark (v3.1d: the draw's charge, from 0.3, 0.65, 1.05)
+    FOCUS: [0.07, 0.14, 0.22],    // the three ticks of the short hold that arms the draw (v3.1e; v3.1d 0.16/0.32/0.48; v2.1b 0.3/0.65/1.05)
     DRAW_DMG: [18, 46, 80],       // (v3.1d: 80, from 60, now that it is charged; v2.9c: only the full draw is used)
     DRAW_STEP: [170, 230, 300],   // how far it carries her
     DRAW_T: 0.1,                  // how long that takes
@@ -35,7 +35,8 @@
     AIR_REACH: 1.25,              // a draw from the air carries this much further (what flies is further away)
     ARC_DMG: 40, ARC_SPEED: 1500, // the crescent of light (Second Light throws one when a blow is turned)
     BANK_HOLD: 0.17,              // (until v2.9a: how long the button stayed down after a press before the cuts that landed lit marks)
-    SHEATH_COMBOS: 2,             // (v2.9a) strings to fill the sheath (v2.9e: each one whose finisher lands)
+    SHEATH_COMBOS: 6,             // (v3.1e) notches the sheath holds: one for every cut of the string that lands
+    NOTCH_DMG: [25, 12],          // (v3.1e) a draw deals 25 and 12 more for every notch it spends (37 to 97)
     DRAW_DODGE: false,            // (v2.9c) the draw no longer passes through attacks: a full sheath is a cut kept ready, not a dodge kept ready
     GUARD_T: 0.65,                // how long Still Point waits for a blow (v2.1b: from 0.45; half its Starlight back if none comes)
     EDGE_T: 2.5,                  // how long a turned blow keeps all three marks lit without the button held
@@ -815,7 +816,7 @@
         if (res) {
           P.gain(a.heavy ? C.GAIN_HEAVY : C.GAIN_HIT);
           G.sets.hit(a.heavy ? 'finisher' : 'light', t, c.x, c.y);
-          if (a.flick && !a.banked) { a.banked = true; P.strung = Math.min(3, (P.strung || 0) + 1); if (a.idx === 2) sheathUp(); } // Eos: (v2.9e) a string whose finisher lands puts one in the sheath
+          if (a.flick && !a.banked) { a.banked = true; P.strung = Math.min(3, (P.strung || 0) + 1); sheathUp(); } // (v3.1e: every cut that lands is a notch) // Eos: (v2.9e) a string whose finisher lands puts one in the sheath
           if (a.heavy && !a.thrust && (G.boon('pinlance') || G.boon('stars'))) finisherLanded(t, c);
           // the freeze, the shake and the kick all scale with the blow; the maul's are heavier
           G.fx.stop((a.heavy ? 0.11 : a.thrust ? 0.06 : 0.032 * H.thick) + 0.07 * (a.charge || 0) + (a.sweep ? 0.02 : 0));
@@ -1050,10 +1051,13 @@
   // marks lighting one by one; let go with all three lit and she draws, emptying the sheath. Let go sooner and she
   // only settles: the sheath stays full. (v2.9c-v3.1c: the next press with a full sheath was the draw itself, which
   // swallowed the string.)
+  // (v3.1e) The Notched Blade: every cut that lands notches the sheath, up to six. With one or more, a short hold
+  // (the three ticks of FOCUS) arms the draw, and letting go spends every notch on it: the more, the harder and
+  // the further it cuts. Let go before it is armed and nothing is spent.
   function stance(dt, ctl, mx, up, down, free) {
     if (!ctl || P.stun > 0) { P.hold = null; P.focus = 0; P.edge = 0; return; }
     P.edge = 0;
-    const I = G.input, can = free && P.healT === 0 && P.flT === 0, full = (P.sheath || 0) >= C.SHEATH_COMBOS;
+    const I = G.input, can = free && P.healT === 0 && P.flT === 0, full = (P.sheath || 0) >= 1;
     if (P.hold) {
       if (!full || !can || P.dashT > 0 || P.atk) { P.hold = null; P.focus = 0; }
       else if (I.down.attack) {
@@ -1069,9 +1073,9 @@
         P.atkBuf = 0;
         return;
       } else {
-        const ready = P.focus >= C.FOCUS[2];
+        const ready = P.focus >= C.FOCUS[2], n = P.sheath || 0;
         P.hold = null; P.focus = 0; P.atkBuf = 0;
-        if (ready) { P.cast = null; P.sheath = 0; drawCut(3, mx, up, down); }
+        if (ready) { P.cast = null; P.sheath = 0; drawCut(n >= C.SHEATH_COMBOS ? 3 : n >= 3 ? 2 : 1, mx, up, down, n); }
         return;
       }
     }
@@ -1090,12 +1094,12 @@
     if (was >= C.SHEATH_COMBOS) return;
     P.sheath = all ? C.SHEATH_COMBOS : was + 1;
     const hx = mouthX(), hy = mouthY(), full = P.sheath >= C.SHEATH_COMBOS;
-    G.fx.glint(hx, hy, full ? 34 : 16, full ? GOLD : HOT, full ? 0.3 : 0.18);
+    G.fx.glint(hx, hy, full ? 34 : 10 + 2 * P.sheath, full ? GOLD : HOT, full ? 0.3 : 0.14);
     if (full) {
       G.audio.play('focus', { n: 3 });
       G.fx.ring(hx, hy, { r0: 8, r1: 54, life: 0.3, color: GOLD, width: 3 });
       G.fx.light(hx, hy, 120, GOLD, 0.25, 0.4);
-    } else G.audio.play('focus', { n: 1 });
+    } else if (P.sheath % 3 === 0 || all) G.audio.play('focus', { n: 2 }); // (a quiet tick at three; every notch would be noise)
   }
 
   // The string (v2.1b): a press is a cut from the sheath, rising; the next, if it comes in time, falls
@@ -1125,7 +1129,7 @@
   }
 
   // The draw.
-  function drawCut(lvl, mx, up, down) {
+  function drawCut(lvl, mx, up, down, notches) {
     const d = aim(mx, up, down, G.input.aim.attack), k = lvl - 1, heavy = lvl >= 3;
     // from the ground, a line that is nearly level is level
     if (P.onGround && Math.abs(d.y) < 0.26) { d.x = G.sign(d.x) || P.facing; d.y = 0; }
@@ -1133,7 +1137,7 @@
     if (P.dashT > 0) { P.dashT = 0; P.dashCd = P.dashCdMax; P.sinceDash = 0; } // straight out of a dash
     const owe = {
       t: C.DRAW_T + C.DRAW_WAIT[k], lvl, heavy, cuts: [], dir: G.sign(d.x) || P.facing, ang: Math.atan2(d.y, d.x),
-      dmg: Math.round(C.DRAW_DMG[k] * weaponMult(heavy)),
+      dmg: Math.round((notches ? C.NOTCH_DMG[0] + C.NOTCH_DMG[1] * notches : C.DRAW_DMG[k]) * weaponMult(heavy)),
     };
     P.owed.push(owe);
     P.atk = {
@@ -1151,7 +1155,7 @@
     }
     P.atkCd = C.DRAW_T + C.DRAW_WAIT[k] + 0.03;
     P.cast = null; P.recov = null; P.healT = 0; P.squash = -0.07; P.dashHit.clear(); P.edge = 0; P.strung = 0;
-    if (heavy && G.boon('secondsun')) P.sheath = 1; // (Second Sun, v2.9c: a full draw leaves one string in the sheath)
+    if (heavy && G.boon('secondsun')) P.sheath = 3; // (Second Sun, v3.1e: a full draw leaves three notches; v2.9c one string)
     if (heavy) G.relics.drew(); // (v3.0d: the Dawn Scabbard)
     G.audio.play('draw');
     G.fx.kick(d.x * (3 + 2 * lvl), d.y * (3 + 2 * lvl));
@@ -2632,21 +2636,17 @@
     ctx.strokeStyle = G.rgba(h.col, 0.55); ctx.lineWidth = 0.7; ctx.stroke();
     ctx.fillStyle = st.hi; ctx.fillRect(-0.8, -2.5, 2.6, 5);                                   // the collar at its mouth
     ctx.fillStyle = G.rgba(h.col, 0.95); poly(ctx, [L - 2.4, -3.3, L + 1.7, -2.4, L + 0.3, -0.7, L - 2.8, -0.5]); ctx.fill(); // end cap
-    for (let i = 0; i < 3; i++) {
-      const bx = 9.5 + i * 7.5, by = -2.3 - 0.2 * i, on = marks > i;
-      ctx.fillStyle = on ? G.rgba(lit, 1) : G.rgba(h.col, 0.16);
-      ctx.fillRect(bx, by, 1.8, 4.2);
-      if (on) glowAt(ctx, marks >= 3 ? GOLD : h.col, bx + 0.9, 0, 8, 0.95);
+    // (v3.1e) six notches down the sheath, one for every cut that landed; all six, and it is traced in gold
+    const N = C.SHEATH_COMBOS, full = fill >= N, pulse = 0.7 + 0.3 * Math.sin(G.t * 6);
+    for (let i = 0; i < N; i++) {
+      const bx = 5 + i * ((L - 9) / (N - 1)), by = -2.2 - 0.12 * i, on = fill > i;
+      ctx.fillStyle = on ? G.rgba(full ? GOLD : h.hot, 1) : G.rgba(h.col, 0.16);
+      ctx.fillRect(bx, by, 1.4, 4.1);
+      if (on) glowAt(ctx, full ? GOLD : h.col, bx + 0.7, 0, 6, 0.8);
     }
-    // (v2.9a) two small lights at the collar, one for each full string; both lit, the mouth glows: the
-    // stance is open
+    // the short hold that arms the draw: light gathering at the mouth, three ticks
+    if (marks) glowAt(ctx, marks >= 3 ? GOLD : h.hot, 0, 0, 8 + 4 * marks, 0.5 + 0.15 * marks);
     if (fill) {
-      const full = fill >= C.SHEATH_COMBOS, pulse = 0.7 + 0.3 * Math.sin(G.t * 6);
-      for (let i = 0; i < C.SHEATH_COMBOS; i++) {
-        const on = fill > i;
-        ctx.fillStyle = on ? G.rgba(full ? GOLD : h.hot, 1) : G.rgba(h.col, 0.2);
-        ctx.beginPath(); ctx.arc(3.8 + i * 3.6, 0, 1.5, 0, Math.PI * 2); ctx.fill();
-      }
       if (full) {
         glowAt(ctx, GOLD, 0, 0, 14, 0.8 * pulse);
         // the whole sheath traced in gold, breathing
@@ -3211,7 +3211,7 @@
       else if (h.weapon === 'crossbow') drawCrossbow(ctx, W, h, a, st, gold);
       else if (wk(h) === 'sword') drawSword(ctx, W, h, gold);
       else if (wk(h) === 'maul') drawMaul(ctx, W, h, st, gold);
-      else if (wk(h) === 'blade') { drawScabbard(ctx, W, h, st, (s.sheath || 0) >= C.SHEATH_COMBOS ? 3 : 0, s.sheath || 0); drawKatana(ctx, W, h, gold); }
+      else if (wk(h) === 'blade') { drawScabbard(ctx, W, h, st, s.hold ? focusMark(s.focus || 0) : 0, s.sheath || 0); drawKatana(ctx, W, h, gold); }
       else drawBow(ctx, W, h, a, gold);
     };
 
