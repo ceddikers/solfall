@@ -2,7 +2,7 @@
 
 A side-on boss rush for the browser: four heroes, seven three-phase bosses, played as a run of
 ever-harder trials. You pick a hero and a relic before the run and win a boon after each victory.
-Version 3.0c.
+Version 3.0d.
 
 This is an early slice of a planned boss-rush roguelite (short runs, a boon after each boss,
 bosses drawn from a pool). A run is seven trials, one for each boss, each harder than the last: the first boss
@@ -116,6 +116,57 @@ hero (`tools/feel-check.js`).
 - Settings, Reset progress erases Sunshards, upgrades, trophies and records (it has to be chosen twice).
 
 Not done: touch controls, a colour-blind alternative to red-orange warnings, gamepad rebinding.
+
+## Ascension unlocks: what each step gives a hero (v3.0d)
+
+Part 3 of the plan. Beating Sol on an Ascension step for the first time with a hero unlocks that step's reward for
+that hero. The end screen says what you got.
+
+| Step beaten | Unlock |
+|---|---|
+| +1 | **Ascendant costume**: pale violet and gold, a crown of rays over the head, and rising motes of light on every blow. Wear it from the Wardrobe. |
+| +2 | **The hero's own relic**, offered at the reliquary only to that hero (below). |
+| +3 | **A third item slot** (key 3; Back on a gamepad, which then uses the item instead of a flourish in fights). |
+| +4 | **The hero's own boon**, which can then be offered like any other (below). |
+| +5 | **The Unfallen**: a golden aura, the title "The Unfallen" in place of the hero's own, and a gold star over their alcove in the Hall. |
+
+**The heroes' own relics** (each awakens at II, IV and VI like the others):
+- **Vesper, North Star:** every third finisher that lands throws a free Star Lance at the foe.
+  - Kindled: every second finisher.
+  - Awakened: a perfect dodge throws one too.
+  - Ascendant: the free lances deal double.
+- **Aster, Meteor Heart:** every second finisher that lands lets out a Starfall around you at half strength.
+  - Kindled: 40% wider.
+  - Awakened: each one fills a quarter of a segment of Starlight.
+  - Ascendant: every finisher.
+- **Lune, Moonlit Quiver:** a perfect dodge looses three arrows at the foe.
+  - Kindled: five arrows.
+  - Awakened: it also fills half a segment of Starlight.
+  - Ascendant: the arrows deal double.
+- **Eos, Dawn Scabbard:** a full draw also throws a crescent of light at the foe.
+  - Kindled: as strong as Second Light's.
+  - Awakened: a full draw fills a quarter of a segment of Starlight.
+  - Ascendant: a second crescent follows the first.
+
+**The heroes' own boons:**
+- **Vesper, Twin Stars:** a second Star Lance trails the first, at half strength.
+- **Aster, Starborn:** Starfall reaches 30% further, and one that strikes gives back half a segment of Starlight.
+- **Lune, Harvest Moon:** every third Moon Volley costs no Starlight.
+- **Eos, Patient Blade:** Still Point braces half again as long.
+
+Checked in the preview, for each hero with every step beaten:
+- The costume is in the Wardrobe and the title reads The Unfallen.
+- Only that hero is offered their own relic, and their own boon is open.
+- There are three item slots, and the HUD shows the third.
+- Each relic fires as described: lances, a Starfall, arrows, and the crescents.
+- The Hall shows the crowns, the step marks and the stars.
+
+No errors.
+
+Playtest checklist:
+- Are the hero relics and boons worth taking over the others? Too strong?
+- The Ascendant costumes and the golden aura: cool enough for a reward?
+- Is Back for the third item fine on a gamepad?
 
 ## Ascension: five steps above Merciless, one ladder per hero (v3.0c)
 

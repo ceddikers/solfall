@@ -68,7 +68,7 @@
   const itemById = {};
   for (const it of G.ITEMS) itemById[it.id] = it;
   MO.item = (id) => itemById[id] || null;
-  MO.items = () => { const r = R(); if (!Array.isArray(r.items)) r.items = [null, null]; return r.items; };
+  MO.items = () => { const r = R(); if (!Array.isArray(r.items)) r.items = [null, null]; if (r.items.length < 3 && G.ascBest(r.hero) >= 3) r.items.push(null); return r.items; }; // (v3.0d: a third slot)
   MO.free = () => MO.items().indexOf(null);
   MO.give = function (id) {
     const it = MO.items(), i = it.indexOf(null);
@@ -209,7 +209,7 @@
   MO.mendCost = () => 60 + 30 * (R().mendsBought || 0);
   MO.rollStock = function () {
     const r = R(), ids = (r.offer || []).map((b) => b.id);
-    const pool = G.BOONS.filter((b) => G.boon(b.id) < b.max && !ids.includes(b.id) && (!b.heroes || b.heroes.includes(r.hero))
+    const pool = G.BOONS.filter((b) => G.boon(b.id) < b.max && !ids.includes(b.id) && (!b.heroes || b.heroes.includes(r.hero)) && G.boonOpen(b)
       && b.id !== 'glass' && !b.cursed && !b.pair && !(r.banned || []).includes(b.id));
     const boons = G.shuffle(pool.slice()).slice(0, 2).map((b) => b.id);
     const items = G.shuffle(G.ITEMS.map((i) => i.id)).slice(0, 2);

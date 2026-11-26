@@ -95,7 +95,7 @@
   // Your difficulty is your own. The best of the day is kept: trials won, and whether the run was won.
   G.dailyPlan = function () {
     const R = G.run, key = R.dayKey(), hero = G.HEROES[R.hashSeed(key + '|hero') % G.HEROES.length];
-    const pool = G.RELICS.filter((r) => !r.boss && r.id !== 'crown').sort((a, b) => (a.id < b.id ? -1 : 1));
+    const pool = G.RELICS.filter((r) => !r.boss && !r.hero && r.id !== 'crown').sort((a, b) => (a.id < b.id ? -1 : 1));
     return { key, hero, relic: pool[R.hashSeed(key + '|relic') % pool.length] };
   };
   G.startDaily = function () {

@@ -332,7 +332,7 @@
     }
     if (s.id === 'echo') {
       const h = G.HEROES[s.hero];
-      return [h.name + ', ' + h.title, h.blurb, 'take up ' + h.name + '’s ' + h.weapon];
+      return [h.name + ', ' + G.heroTitle(h), h.blurb, 'take up ' + h.name + '’s ' + h.weapon];
     }
     if (s.id === 'journal') {
       const J = G.JOURNAL || {}, rec = G.meta.journal || {};
@@ -854,6 +854,7 @@
         diamond(ctx, cx, FLOOR - 84 + bob, 8, 14, G.rgba(h.col, 0.9)); diamond(ctx, cx, FLOOR - 84 + bob, 3.5, 7, 'rgba(255,255,255,0.9)');
         ctx.globalCompositeOperation = 'source-over';
       } else {
+        if (((ascW[h.id] || {}).best || 0) >= 5) G.drawAura(ctx, cx, FLOOR - 21, t); // (v3.0d: the Unfallen)
         ctx.globalAlpha = on ? 0.97 : 0.66;
         still.x = cx; still.y = FLOOR - 21; still.facing = 1;
         G.drawHero(ctx, G.costumed(h), still); // (v2.8a: in the costume they wear)
@@ -892,6 +893,16 @@
     poly(ctx, [300, FLOOR - 226, 300, FLOOR - 254, 880, FLOOR - 254, 880, FLOOR - 226], STONE2);
     poly(ctx, [312, FLOOR - 254, 420, FLOOR - 318, 560, FLOOR - 300, 600, FLOOR - 334, 668, FLOOR - 286, 720, FLOOR - 296, 742, FLOOR - 254], STONE);
     ctx.fillStyle = G.rgba(RIM, 0.55); ctx.fillRect(300, FLOOR - 254, 580, 2);
+    // (v3.0d) the Unfallen: a gold star over the arch, in front of the roof
+    for (let i = 0; i < NH; i++) {
+      const h = G.HEROES[i], cx = ECHO_X[i] - HALL_DX;
+      if (((ascW[h.id] || {}).best || 0) < 5) continue;
+      const sy = FLOOR - 278 + Math.sin(t * 1.6 + i) * 2, sr = 9 + Math.sin(t * 3 + i) * 0.8;
+      glow(ctx, GOLD, cx, sy, 40, 0.55);
+      ctx.fillStyle = 'rgba(255,226,140,0.98)'; ctx.beginPath();
+      for (let j = 0; j < 10; j++) { const a = -Math.PI / 2 + j * Math.PI / 5, rr = j % 2 ? sr * 0.42 : sr; ctx.lineTo(cx + Math.cos(a) * rr, sy + Math.sin(a) * rr); }
+      ctx.closePath(); ctx.fill();
+    }
     ctx.restore();
   }
 

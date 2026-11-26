@@ -42,12 +42,28 @@
     lantern: ['A segment every 7 seconds.', 'A segment every 5 seconds.', 'When your Starlight is full, it overflows into Dawnbreak.'],
   };
 
+  // (v3.0d) Each hero's own relic, from Ascension +2 beaten with them; offered only to that hero.
+  G.HERO_RELICS = [
+    { id: 'northstar', hero: 'vesper', name: 'North Star', desc: 'Every third finisher that lands throws a free Star Lance at the foe.' },
+    { id: 'meteor', hero: 'aster', name: 'Meteor Heart', desc: 'Every second finisher that lands lets out a Starfall around you, at half strength.' },
+    { id: 'moonquiver', hero: 'lune', name: 'Moonlit Quiver', desc: 'A perfect dodge looses three arrows at the foe.' },
+    { id: 'scabbard', hero: 'eos', name: 'Dawn Scabbard', desc: 'A full draw also throws a crescent of light at the foe.' },
+  ];
+  for (const r of G.HERO_RELICS) G.RELICS.push(r);
+  Object.assign(RL.AWAKE, {
+    northstar: ['Every second finisher.', 'A perfect dodge throws one too.', 'The free lances deal double.'],
+    meteor: ['The Starfall is 40% wider.', 'Each one fills a quarter of a segment of Starlight.', 'Every finisher.'],
+    moonquiver: ['Five arrows.', 'A perfect dodge also fills half a segment of Starlight.', 'The arrows deal double.'],
+    scabbard: ['The crescent is as strong as Second Light\u2019s.', 'A full draw fills a quarter of a segment of Starlight.', 'A second crescent follows the first.'],
+  });
+
   // Each relic's light (the reliquary, the fire, the cards and what it strikes with).
   const COL = {
     chalice: '255,150,120', shard: '150,225,255', moons: '214,170,255', crown: '255,96,56', ward: '255,226,170', cloak: '140,245,185',
     storm: '255,250,160', phoenix: '255,170,90', sunstone: '255,214,140', eye: '255,186,92', prism: '150,170,255', shroud: '190,135,255', oath: '130,195,255',
     pelt: '255,130,60', pearl: '120,230,220', wraps: '255,200,150', hilt: '255,226,186',
     hourglass: '170,210,255', anvil: '200,190,180', sun: '255,200,90', quicksilver: '210,230,240', lantern: '255,214,120',
+    northstar: '160,225,255', meteor: '150,250,190', moonquiver: '220,180,255', scabbard: '255,170,190', // (v3.0d)
   };
   RL.col = (id) => COL[id] || '255,214,140';
 
@@ -91,7 +107,7 @@
   // ------------------------------------------------------------------ what lasts a fight
   let st = null;
   RL.reset = function () {
-    st = { slowT: 0, blazeT: 0, anvilT: 0, wardRe: 0, pearlUsed: false, hiltUses: 0, crownN: 0, qs: false, pend: [], risen: false };
+    st = { slowT: 0, blazeT: 0, anvilT: 0, wardRe: 0, pearlUsed: false, hiltUses: 0, crownN: 0, qs: false, pend: [], risen: false, finN: 0, arcT: 0 };
     if (lv('sun') < 3) R().sun = 0; // (Ascendant, it carries over)
   };
   RL.reset();
@@ -189,6 +205,18 @@
   // a blow landed (sets.js S.hit: 'light', 'finisher', or 'special' once a cast)
   RL.hit = function (kind) {
     if (!fighting()) return;
+    // (v3.0d) the heroes' own relics: a free lance (North Star), a Starfall (Meteor Heart)
+    if (kind === 'finisher' && (G.relic('northstar') || G.relic('meteor'))) {
+      st.finN++;
+      const P = G.player;
+      if (G.relic('northstar') && st.finN >= (lv('northstar') >= 1 ? 2 : 3)) { st.finN = 0; if (P.relicLance) P.relicLance(lv('northstar') >= 3 ? 2 : 1); }
+      if (G.relic('meteor') && st.finN >= (lv('meteor') >= 3 ? 1 : 2)) {
+        st.finN = 0;
+        const w = lv('meteor') >= 1 ? 1.4 : 1;
+        if (P.relicStarfall) P.relicStarfall(w, 0.5 / w);
+        if (lv('meteor') >= 2) seg(0.25);
+      }
+    }
     if (kind === 'finisher' && lv('shard') >= 2) later(0.32, lv('shard') >= 3 ? 45 : 20, RL.col('shard'), 'comet');
     if (kind === 'special' && lv('prism') >= 2) {
       seg(0.25);
@@ -236,6 +264,8 @@
   RL.perfect = function () {
     if (!fighting()) return;
     const P = G.player;
+    if (lv('northstar') >= 2 && P.relicLance) P.relicLance(lv('northstar') >= 3 ? 2 : 1); // (v3.0d)
+    if (G.relic('moonquiver') && P.relicArrows) { P.relicArrows(lv('moonquiver') >= 1 ? 5 : 3, lv('moonquiver') >= 3 ? 2 : 1); if (lv('moonquiver') >= 2) seg(0.5); }
     if (lv('storm') >= 3) bolt();
     if (lv('quicksilver') >= 1) seg(0.25);
     if (G.relic('hourglass')) {
@@ -266,6 +296,14 @@
     if (G.relic('pelt')) P.gain(c.GAIN_HIT * (lv('pelt') >= 3 ? 2 : 1)); // Cinder Pelt (the wolf's trophy)
     st.qs = false;
     if (G.relic('quicksilver') && P.ember >= c.SEG / 8) { P.ember -= c.SEG / 8; st.qs = true; }
+  };
+  // (v3.0d) a full draw (player.js drawCut): the Dawn Scabbard's crescent
+  RL.drew = function () {
+    if (!fighting() || !G.relic('scabbard')) return;
+    const P = G.player;
+    if (P.relicArc) P.relicArc(lv('scabbard') >= 1 ? 1 : 0.6);
+    if (lv('scabbard') >= 2) seg(0.25);
+    if (lv('scabbard') >= 3) st.arcT = 0.18;
   };
   // the wait after a dash (Quicksilver halves it when the dash was paid for)
   RL.dashEndK = function () { const k = st.qs ? 0.5 : 1; st.qs = false; return k; };
@@ -315,7 +353,8 @@
       if (Math.random() < dt * 30) F.spawn({ kind: 'spark', x: P.x + G.rand(-14, 14), y: P.y - G.rand(0, 50), vx: G.rand(-30, 30), vy: -G.rand(120, 300), life: G.rand(0.2, 0.4), size: G.rand(1.4, 2.4), color: RL.col('phoenix'), len: 0.05 });
     }
     if (st.anvilT > 0) st.anvilT -= dt;
-    if (!fighting()) { st.pend.length = 0; return; }
+    if (!fighting()) { st.pend.length = 0; st.arcT = 0; return; }
+    if (st.arcT > 0) { st.arcT -= dt; if (st.arcT <= 0 && P.relicArc) P.relicArc(1); } // (the Dawn Scabbard's second crescent)
     // the ward grows back
     if (st.wardRe > 0) {
       st.wardRe -= dt;

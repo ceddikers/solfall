@@ -15,6 +15,7 @@
     crown: ['KeyU'], // a set's crown (v2.3a)
     item1: ['Digit1', 'Numpad1'], // (v2.9k) the two consumables (motes.js)
     item2: ['Digit2', 'Numpad2'],
+    item3: ['Digit3', 'Numpad3'], // (v3.0d) the third slot, from Ascension +3
     taunt: ['KeyT', 'KeyG'],
     pause: ['Escape', 'KeyP'],
     moves: ['Tab'],
@@ -82,7 +83,7 @@
   window.addEventListener('blur', releaseAll);
 
   // ---- rebinding (Settings, Controls)
-  I.REBIND = ['left', 'right', 'up', 'down', 'jump', 'attack', 'dash', 'flare', 'heal', 'ult', 'crown', 'item1', 'item2'];
+  I.REBIND = ['left', 'right', 'up', 'down', 'jump', 'attack', 'dash', 'flare', 'heal', 'ult', 'crown', 'item1', 'item2', 'item3'];
   const FIXED = ['Escape', 'Enter', 'NumpadEnter'];
   // Make `code` the first key for an action. A key does one thing, so it is taken from whatever had it.
   I.bind = function (action, code) {
@@ -154,6 +155,7 @@
     taunt: (g) => btn(g, 8),
     item1: (g) => btn(g, 10), // (v2.9k) the stick clicks: L3 and R3 (R3 was a second flourish)
     item2: (g) => btn(g, 11),
+    item3: (g) => btn(g, 8), // (v3.0d) Back: in a fight with a third slot it uses the item, not a flourish
     flare: (g) => btn(g, 3),
     heal: (g) => btn(g, 4),
     crown: (g) => btn(g, 6), // LT (mend keeps LB)

@@ -237,7 +237,7 @@
       }
       if (!P.onGround || P.stun > 0) P.flT = 0;
       else if (P.flT >= C.FLOURISH_T) flourished();
-    } else if (ctl && I.pressed.taunt && free && P.onGround && P.dashT <= 0 && !P.atk && !P.hold && P.stun <= 0 && P.healT === 0) {
+    } else if (ctl && I.pressed.taunt && !(G.state === 'fight' && I.device === 'gamepad' && G.motes.items().length > 2) && free && P.onGround && P.dashT <= 0 && !P.atk && !P.hold && P.stun <= 0 && P.healT === 0) {
       if (P.flCd > 0) { G.audio.play('empty'); }
       else {
         P.flT = 0.0001; P.flBrazen = false; mx = 0;
@@ -514,7 +514,7 @@
     // --- the crown: a set's own move, once three of its boons are held (sets.js)
     if (ctl && I.pressed.crown && free && P.stun <= 0 && P.dashT <= 0) G.sets.tryCrown();
     // --- (v2.9k) the two consumables, on 1 and 2 (motes.js); not mid-dash or reeling
-    if (ctl && P.stun <= 0 && P.dashT <= 0) { if (I.pressed.item1) G.motes.use(0); if (I.pressed.item2) G.motes.use(1); }
+    if (ctl && P.stun <= 0 && P.dashT <= 0) { if (I.pressed.item1) G.motes.use(0); if (I.pressed.item2) G.motes.use(1); if (I.pressed.item3 && G.motes.items().length > 2) G.motes.use(2); } // (v3.0d: a third, from Ascension +3)
 
     // --- special: costs one segment of Starlight
     if (P.flareBuf > 0 && free && P.dashT <= 0 && P.stun <= 0 && P.healT === 0) {
@@ -527,7 +527,10 @@
         else if (H.special === 'starfall') castStarfall();
         else if (H.special === 'arc') castArc(d.x, d.y);
         else if (H.special === 'guard') castGuard();
-        else castVolley(d.x, d.y);
+        else {
+          castVolley(d.x, d.y);
+          if (G.boon('harvest') && (P.harvestN = (P.harvestN || 0) + 1) % 3 === 0) { P.ember += C.SEG; P.emberFlash = 1; G.audio.play('segment'); } // (v3.0d: Harvest Moon)
+        }
       } else {
         G.audio.play('empty'); P.emberFlash = -1;
       }
@@ -899,17 +902,37 @@
 
   // ---------------------------------------------------------------- specials
   // Fire one Star Lance (or three with Split Lance) along a unit direction.
-  function fireLance(dx, dy) {
+  function fireLance(dx, dy, k) {
     G.costumeFx('shot', P.x + dx * 24, P.y - 36 + dy * 24, Math.atan2(dy, dx));
     const split = G.boon('split');
     const angles = split ? [-0.2, 0, 0.2] : [0];
-    const dmg = Math.round(C.LANCE_DMG * (split ? 0.6 : 1) * G.dmgMult() * spec());
+    const dmg = Math.round(C.LANCE_DMG * (split ? 0.6 : 1) * (k || 1) * G.dmgMult() * spec());
     for (const a of angles) {
       const c = Math.cos(a), s = Math.sin(a);
       const vx = dx * c - dy * s, vy = dx * s + dy * c;
       G.shots.push({ lance: true, x: P.x + vx * 18, y: P.y - 36 + vy * 18, vx: vx * C.LANCE_SPEED, vy: vy * C.LANCE_SPEED, t: 0, hit: new Set(), dmg });
+      // (v3.0d) Twin Stars: a second lance trails the first, slower, at half strength
+      if (G.boon('twinstar')) G.shots.push({ lance: true, x: P.x + vx * 4, y: P.y - 36 + vy * 4, vx: vx * C.LANCE_SPEED * 0.8, vy: vy * C.LANCE_SPEED * 0.8, t: 0, hit: new Set(), dmg: Math.round(dmg * 0.5) });
     }
   }
+  // (v3.0d) what the heroes' own relics throw (relics.js): aimed at the foe's body
+  function aimFoe() {
+    const B = G.boss, c = B && B.core;
+    if (!c) return { x: P.facing, y: 0 };
+    const ax = c.x - P.x, ay = c.y - (P.y - 36), d = Math.hypot(ax, ay) || 1;
+    return { x: ax / d, y: ay / d };
+  }
+  P.relicLance = function (k) { const d = aimFoe(), n = G.shots.length; fireLance(d.x, d.y, k); for (let i = n; i < G.shots.length; i++) G.shots[i].cast = -1; G.audio.play('flare'); muzzle(d.x, d.y); };
+  P.relicStarfall = function (scale, k) { starfallBlast(scale, k); };
+  P.relicArrows = function (n, k) {
+    const d = aimFoe(), dmg = Math.round(C.VOLLEY_DMG * (k || 1) * G.dmgMult() * spec()), spread = 0.16 * (n - 1);
+    for (let i = 0; i < n; i++) {
+      const a = n > 1 ? (i / (n - 1) - 0.5) * spread : 0, c = Math.cos(a), s = Math.sin(a);
+      arrow(d.x * c - d.y * s, d.x * s + d.y * c, dmg, false, 0.6, true);
+    }
+    G.audio.play('arrow');
+  };
+  P.relicArc = function (k) { const d = aimFoe(); arcShot(d.x, d.y, k); G.audio.play('draw'); };
 
   function muzzle(dx, dy) {
     G.fx.shake(6);
@@ -973,14 +996,16 @@
 
   // The blast around Aster's feet. scale grows the radius and damage; k is the damage share (Aftershock uses 0.5).
   function starfallBlast(scale, k) {
-    const R = C.STARFALL_R * scale, cx = P.x, cy = P.y - 20;
+    const R = C.STARFALL_R * scale * (G.boon('starborn') ? 1.3 : 1), cx = P.x, cy = P.y - 20; // (v3.0d: Starborn reaches further)
+    let struck = false;
     const dmg = Math.round(C.STARFALL_DMG * scale * k * G.dmgMult() * spec());
     for (const t of G.boss.targets()) {
       const inside = t.r ? G.dist(cx, cy, t.cx, t.cy) < R + t.r : G.circleRect(cx, cy, R, t);
       if (!inside) continue;
       const hx = t.r ? t.cx : G.clamp(cx, t.cx - t.hw, t.cx + t.hw), hy = t.r ? t.cy + t.r * 0.6 : G.clamp(cy, t.cy - t.hh, t.cy + t.hh);
-      if (G.boss.damage(dmg, t, { x: hx, y: hy, heavy: true, finisher: k >= 1, lance: k >= 1, poise: H.poise, dir: G.sign(t.cx - cx) }) && k >= 1) G.sets.hit('special', t, hx, hy, P.castN);
+      if (G.boss.damage(dmg, t, { x: hx, y: hy, heavy: true, finisher: k >= 1, lance: k >= 1, poise: H.poise, dir: G.sign(t.cx - cx) }) && k >= 1) { G.sets.hit('special', t, hx, hy, P.castN); struck = true; }
     }
+    if (struck && G.boon('starborn')) { P.ember = Math.min(C.SEG * P.segs, P.ember + C.SEG * 0.5); P.emberFlash = 1; } // (v3.0d)
     for (const o of G.hazards.slashables()) if (G.dist(o.x, o.y, cx, cy) < R + o.r) o.slash();
     G.audio.play('slam');
     G.fx.stop(0.08 * k); G.fx.shake(15 * k); G.fx.punch(0.02 * k); G.fx.flash(STAR, 0.16 * k, 0.25);
@@ -1093,6 +1118,7 @@
     P.atkCd = C.DRAW_T + C.DRAW_WAIT[k] + 0.03;
     P.cast = null; P.recov = null; P.healT = 0; P.squash = -0.07; P.dashHit.clear(); P.edge = 0; P.strung = 0;
     if (heavy && G.boon('secondsun')) P.sheath = 1; // (Second Sun, v2.9c: a full draw leaves one string in the sheath)
+    if (heavy) G.relics.drew(); // (v3.0d: the Dawn Scabbard)
     G.audio.play('draw');
     G.fx.kick(d.x * (3 + 2 * lvl), d.y * (3 + 2 * lvl));
     const hx = mouthX(), hy = mouthY();
@@ -1388,10 +1414,11 @@
   // to play him: do not wait for an opening, ask for the blow.
   function castGuard() {
     P.atk = null; P.recov = null;
-    P.cast = { kind: 'guard', t: 0, wind: C.GUARD_T, dur: C.GUARD_T + 0.2, thrown: false };
+    const gt = C.GUARD_T * (G.boon('patient') ? 1.5 : 1); // (v3.0d: Patient Blade)
+    P.cast = { kind: 'guard', t: 0, wind: gt, dur: gt + 0.2, thrown: false };
     P.vx *= 0.3;
     G.audio.play('glint');
-    G.fx.ring(P.x + P.facing * 12, P.y - 34, { r0: 46, r1: 12, life: C.GUARD_T, color: STAR, width: 2, alpha: 0.7 });
+    G.fx.ring(P.x + P.facing * 12, P.y - 34, { r0: 46, r1: 12, life: gt, color: STAR, width: 2, alpha: 0.7 });
     G.fx.glint(P.x + P.facing * 12, P.y - 44, 20, HOT, 0.2);
   }
   function turned(srcX, src) {
@@ -3131,6 +3158,7 @@
 
   P.draw = function (ctx) {
     if (P.hidden) return;
+    if (G.ascBest(H.id) >= 5) G.drawAura(ctx, P.x, P.y, G.t); // (v3.0d: the Unfallen)
     // dash afterimages: fading copies of the hero in the dash pose
     for (const gh of P.ghosts) {
       const k = gh.life / 0.26;

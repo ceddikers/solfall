@@ -155,6 +155,11 @@
     { id: 'unbroken', name: 'Unbroken', tag: 'Signature', max: 1, heroes: ['aster'], desc: 'A blow taken while you charge the smash fills the charge at once, and the smash comes.' },
     { id: 'splitarrow', name: 'Splitting Arrow', tag: 'Signature', max: 1, heroes: ['lune'], desc: 'The heavy arrow splits into three where it first strikes.' },
     { id: 'glide', name: 'Moonglide', tag: 'Signature', max: 1, heroes: ['lune'], desc: 'Hold the attack in the air and you fall slowly while you fire.' },
+    // (v3.0d) each hero's own boon, from Ascension +4 beaten with them
+    { id: 'twinstar', name: 'Twin Stars', tag: 'Signature', max: 1, heroes: ['vesper'], asc: 4, desc: 'A second Star Lance trails the first, at half strength.' },
+    { id: 'starborn', name: 'Starborn', tag: 'Signature', max: 1, heroes: ['aster'], asc: 4, desc: 'Starfall reaches 30% further, and one that strikes gives back half a segment of Starlight.' },
+    { id: 'harvest', name: 'Harvest Moon', tag: 'Signature', max: 1, heroes: ['lune'], asc: 4, desc: 'Every third Moon Volley costs no Starlight.' },
+    { id: 'patient', name: 'Patient Blade', tag: 'Signature', max: 1, heroes: ['eos'], asc: 4, desc: 'Still Point braces half again as long.' },
     { id: 'hanging', name: 'Hanging Cut', tag: 'Signature', max: 1, heroes: ['eos'], desc: 'The cut of a draw hangs in the air, and a second later cuts again for half.' },
     { id: 'secondsun', name: 'Second Sun', tag: 'Signature', max: 1, heroes: ['eos'], desc: 'A draw leaves one in the sheath, so the next needs only one more finisher.' },
   ];
@@ -292,7 +297,7 @@
     R.daily = null; R.dn = {}; // (v2.8a) the day of a daily trial, and how often each of its picks has been drawn
     // (v2.9k) Motes, the run's own currency, the two consumables held, the road merchant's stock, and
     // what was bought from it (motes.js)
-    R.motes = 0; R.motesEarned = 0; R.items = [null, null]; R.merch = null; R.mendsBought = 0; R.bonusHp = 0;
+    R.motes = 0; R.motesEarned = 0; R.items = G.ascBest(R.hero) >= 3 ? [null, null, null] : [null, null]; // (v3.0d: a third slot from Ascension +3) R.merch = null; R.mendsBought = 0; R.bonusHp = 0;
     R.sum = { t: 0, hits: 0, perfect: 0, shards: 0 }; R.champWon = false; R.lastWarned = false; // (v3.0a) the run's totals, for the end screen
     if (typeof document !== 'undefined') document.documentElement.style.setProperty('--herocol', G.hero().css); // (a hero's own boons wear the hero's colour)
   };
@@ -403,7 +408,7 @@
   };
   // Three boons to choose from after a victory.
   // what may be offered: not held to its limit, the hero's own, not banished this run
-  const offerable = (b) => G.boon(b.id) < b.max && (!b.heroes || b.heroes.includes(R.hero))
+  const offerable = (b) => G.boon(b.id) < b.max && (!b.heroes || b.heroes.includes(R.hero)) && G.boonOpen(b)
     && (b.id !== 'glass' || baseHp() - G.boon('glass') >= 3) && !(R.banned || []).includes(b.id);
   R.rollOffer = function (avoid) {
     let pool = G.BOONS.filter((b) => offerable(b) && G.boon(b.id) < b.max
@@ -469,7 +474,7 @@
   // The fortune-teller's cards (rest.js): a boon not on the offering, or a corrupted one not held.
   R.freeBoon = function () {
     const ids = (R.offer || []).map((b) => b.id);
-    const pool = G.BOONS.filter((b) => G.boon(b.id) < b.max && !ids.includes(b.id) && (!b.heroes || b.heroes.includes(R.hero)) && b.id !== 'glass' && !(R.banned || []).includes(b.id));
+    const pool = G.BOONS.filter((b) => G.boon(b.id) < b.max && !ids.includes(b.id) && (!b.heroes || b.heroes.includes(R.hero)) && G.boonOpen(b) && b.id !== 'glass' && !(R.banned || []).includes(b.id));
     if (!pool.length) return null;
     const b = G.pick(pool);
     R.grant(b);

@@ -50,13 +50,25 @@
     ],
   };
 
+  // (v3.0d) The Ascendant costume, one for each hero: Ascension +1 beaten with them. Pale violet and gold
+  // under a crown of rays; every blow sheds rising motes of light. Each keeps its hero's own build.
+  const ASC_STYLE = { vesper: ['#100c1c', '#2a2244', '#dcd2f2', '#ffe2a0'], aster: ['#120c18', '#30243e', '#d2c4ea', '#ffd88e'],
+    lune: ['#140c1e', '#382a52', '#eadcfa', '#fff0c0'], eos: ['#0e0a18', '#262040', '#e2d6f4', '#ffd890'] };
+  G.ASC_COSTUME = {};
+  for (const id in ASC_STYLE) {
+    const s = ASC_STYLE[id];
+    G.ASC_COSTUME[id] = { id: 'ascendant-' + id, name: 'Ascendant', ascendant: true, note: 'Pale violet and gold under a crown of rays; every blow sheds rising light. From Ascension +1.',
+      col: '226,200,255', hot: '255,250,240', css: '#e2c8ff', style: { dark: s[0], mid: s[1], plate: s[2], hi: s[3] },
+      fx: 'motes', fxCol: '255,226,160', acc: 'sunrays', accCol: '255,222,150' };
+  }
+
   // ------------------------------------------------------------------ mastery
   const MA = G.mastery = {};
   MA.LEVELS = LEVELS;
   MA.xp = (hero) => M.mastery[hero] || 0;
   MA.level = (hero) => LEVELS.filter((x) => MA.xp(hero) >= x).length;
   MA.next = (hero) => LEVELS.find((x) => MA.xp(hero) < x) || null; // xp for the next level, or null at the top
-  MA.unlocked = (hero) => (G.COSTUMES[hero] || []).slice(0, MA.level(hero));
+  MA.unlocked = (hero) => (G.COSTUMES[hero] || []).slice(0, MA.level(hero)).concat(G.ascBest(hero) >= 1 && G.ASC_COSTUME[hero] ? [G.ASC_COSTUME[hero]] : []);
   // win with a hero: returns the costume this unlocks, if any (earning() is the same rule as Sunshards)
   MA.gain = function (hero, n) {
     if (!M.earning() || !hero || !(n > 0)) return null;
@@ -124,12 +136,30 @@
           if (i % 2) break;
           F.spawn({ kind: 'bolt', x: jx, y: jy, vx: 0, vy: 0, rot: a, size: r(16, 30) * big, life: r(0.1, 0.18), color: col, seed: Math.random() * 1000 });
           break;
+        case 'motes':
+          F.spawn({ x: jx, y: jy, vx: vx * 0.3, vy: -r(60, 170), grav: -50, drag: 2, wob: 60, size: r(1.6, 3.2) * big, life: r(0.5, 1.1), color: i % 3 ? col : '226,200,255' });
+          break;
         case 'ink':
           F.spawn({ kind: 'smoke', x: jx, y: jy, vx: vx * 0.4, vy: vy * 0.4, drag: 3, size: r(3, 6) * big, grow: 10, life: r(0.3, 0.6), color: '14,12,18', a: 0.55 });
           F.spawn({ kind: 'chunk', x: jx, y: jy, vx: vx * 0.8, vy: vy * 0.8 - 60, grav: 900, size: r(1.4, 2.6), life: r(0.3, 0.6), color: '10,10,14', rot: 0, vr: 0 });
           break;
       }
     }
+  };
+
+  // (v3.0d) The Unfallen's golden aura (Ascension +5): a soft glow round the body and motes of gold rising
+  // through it. Drawn under the hero (player.js) and under their echo in the Hall (hub.js).
+  G.drawAura = function (ctx, x, y, t) {
+    ctx.save(); ctx.globalCompositeOperation = 'lighter';
+    const p = 0.85 + 0.15 * Math.sin(t * 2.2);
+    ctx.globalAlpha = 0.24 * p; ctx.drawImage(G.fx.glow('255,214,120'), x - 62, y - 100, 124, 124);
+    ctx.globalAlpha = 0.28 * p; ctx.drawImage(G.fx.glow('255,240,200'), x - 30, y - 66, 60, 60);
+    const img = G.fx.glow('255,224,140');
+    for (let i = 0; i < 7; i++) {
+      const k = (t * 0.45 + i / 7) % 1, mx = x + Math.sin(i * 2.4 + t * 1.3) * 18, my = y - 6 - k * 92;
+      ctx.globalAlpha = Math.sin(Math.PI * k) * 0.8; ctx.drawImage(img, mx - 4, my - 4, 8, 8);
+    }
+    ctx.restore();
   };
 
   // ------------------------------------------------------------------ what is worn on the head
@@ -206,6 +236,19 @@
         // a lightning bolt fixed to the crown of the hat
         ctx.globalCompositeOperation = 'lighter';
         fill(0.95); poly([1, -10.5, -2.2, -15.6, 0.4, -15.4, -1.6, -20.6, 3.6, -14.2, 1, -14.4, 3.6, -10.5]); ctx.fill();
+        break;
+      }
+      case 'sunrays': {
+        // a crown of short rays standing over the head, breathing
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.strokeStyle = G.rgba(col, 0.9); ctx.lineWidth = 1.1; ctx.lineCap = 'round';
+        for (let i = 0; i < 7; i++) {
+          const a = -Math.PI * (0.84 - i * 0.113), r0 = 9.5, r1 = r0 + (i % 2 ? 3.2 : 5.4) + Math.sin(t * 3 + i) * 0.7;
+          ctx.beginPath(); ctx.moveTo(Math.cos(a) * r0, -4 + Math.sin(a) * r0); ctx.lineTo(Math.cos(a) * r1, -4 + Math.sin(a) * r1); ctx.stroke();
+        }
+        ctx.strokeStyle = G.rgba(col, 0.25); ctx.lineWidth = 3.5;
+        ctx.beginPath(); ctx.arc(0, -4, 11, -Math.PI * 0.86, -Math.PI * 0.14); ctx.stroke();
+        ctx.lineCap = 'butt';
         break;
       }
       case 'tassel': {

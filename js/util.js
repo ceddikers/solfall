@@ -3,7 +3,7 @@
 
 const G = window.G = {};
 
-G.VERSION = '3.0c';
+G.VERSION = '3.0d';
 G.bgK = 1; // how many pixels per unit the painted backdrops are kept at (set in game.js, resize)
 G.W = 1280;          // logical view size
 G.H = 720;
@@ -146,6 +146,7 @@ G.store = {
     } catch (e) { return fallback; }
   },
   save(key, value) {
+    if (key === 'asc') G.ascMemo = null; // (v3.0d: the Ascension ladders are read every frame from a copy)
     try { localStorage.setItem('solfall.' + key, JSON.stringify(value)); } catch (e) { /* private mode */ }
   },
 };
@@ -191,7 +192,15 @@ for (let n = 1; n <= 5; n++) {
 G.ascLevel = (d) => (G.DIFFS[d == null ? G.settings.difficulty : d] || {}).asc || 0;
 G.twist = () => G.ascLevel() >= 3;
 // each hero's ladder: { open: the highest step open (0: none yet), best: the highest step beaten }
-G.ascOf = (hero) => G.store.load('asc', {})[hero || G.settings.hero] || { open: 0, best: 0 };
+G.ascOf = (hero) => (G.ascMemo || (G.ascMemo = G.store.load('asc', {}) || {}))[hero || G.settings.hero] || { open: 0, best: 0 };
+// (v3.0d) What each step beaten unlocks for that hero (the first time):
+//   +1 the Ascendant costume (costumes.js)      +2 their own relic (relics.js)
+//   +3 a third item slot (motes.js)             +4 their own boon (run.js)
+//   +5 a golden aura, the title "The Unfallen", and a star over their alcove in the Hall
+G.ASC_UNLOCKS = [null, 'costume', 'relic', 'slot', 'boon', 'aura'];
+G.ascBest = (hero) => G.ascOf(hero).best || 0;
+G.boonOpen = (b) => !b.asc || G.ascBest(G.run.hero) >= b.asc;
+G.heroTitle = (h) => (G.ascBest(h.id) >= 5 ? 'The Unfallen' : h.title);
 // the difficulties this hero can choose (the Brazier steps through them)
 G.diffChoices = (hero) => { const out = [0, 1, 2], o = G.ascOf(hero).open; for (let n = 1; n <= o; n++) out.push(2 + n); return out; };
 // a hero without that step open drops to the highest they have

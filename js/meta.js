@@ -73,7 +73,7 @@
   ];
   for (const t of TROPHIES) { G.RELICS.push(t); }
   G.TROPHIES = TROPHIES;
-  M.unlocked = (r) => !r.boss || !!M.trophy[r.boss];
+  M.unlocked = (r) => (r.hero ? r.hero === G.run.hero && G.ascBest(r.hero) >= 2 : !r.boss || !!M.trophy[r.boss]); // (v3.0d: a hero's own, from Ascension +2)
   M.trophies = () => TROPHIES.filter((t) => M.trophy[t.boss]).length;
   // (v2.6b) A boss's trophy is won by beating it as the run's last trial before the final door (trial
   // VI, where it is at its strongest), not by beating it once anywhere: a full run wins one trophy, not

@@ -42,7 +42,7 @@
       'hint', 'lowhp', 'lbTop', 'lbBot', 'diffNote', 'bestLine', 'ver', 'deadLead', 'deadFill', 'deadStats',
       'pauseBoons', 'boons', 'trial', 'winOver', 'winPick', 'winCards', 'heroName', 'heroCards', 'relicCards', 'relicOver',
       'deadTip', 'winStats', 'winBest', 'gradeLetter', 'gradeTitle', 'gradeSub', 'stage',
-      'practiceOver', 'keyList', 'resetItem', 'movesOver', 'movesTitle', 'movesBody', 'movesFoot', 'ult', 'ultFill', 'ultKey', 'crown', 'crownFill', 'crownName', 'crownKey', 'flow', 'flowRank', 'flowFill', 'omen', 'shardCount', 'shrineLead', 'shrineList', 'shrineTrophies', 'rerollItem', 'featsLead', 'featsBody', 'featsTabs', 'helpBody', 'helpTabs', 'fountainLead', 'fountainList', 'smithLead', 'smithList', 'merchLead', 'merchList', 'items', 'item0', 'item1', 'motes', 'moteCount', 'continueItem', 'quickItem', 'deadRecap', 'winRecap', 'dailyItem', 'journalTabs', 'journalBody']) el[id] = $(id);
+      'practiceOver', 'keyList', 'resetItem', 'movesOver', 'movesTitle', 'movesBody', 'movesFoot', 'ult', 'ultFill', 'ultKey', 'crown', 'crownFill', 'crownName', 'crownKey', 'flow', 'flowRank', 'flowFill', 'omen', 'shardCount', 'shrineLead', 'shrineList', 'shrineTrophies', 'rerollItem', 'featsLead', 'featsBody', 'featsTabs', 'helpBody', 'helpTabs', 'fountainLead', 'fountainList', 'smithLead', 'smithList', 'merchLead', 'merchList', 'items', 'item0', 'item1', 'item2', 'motes', 'moteCount', 'continueItem', 'quickItem', 'deadRecap', 'winRecap', 'dailyItem', 'journalTabs', 'journalBody']) el[id] = $(id);
     el.segs = Array.from(document.querySelectorAll('#ember .seg'));
     el.bbar = document.querySelector('.bbar');
     el.bname = document.getElementById('bname');
@@ -226,7 +226,7 @@
       const h = G.HEROES[i];
       c.style.setProperty('--tagc', h.css);
       c.querySelector('.cname').textContent = h.name;
-      c.querySelector('.ctag').textContent = h.title;
+      c.querySelector('.ctag').textContent = G.heroTitle(h);
       c.querySelector('.cdesc').textContent = h.blurb;
       c.querySelector('.hhp').textContent = 'Health ' + ((G.DIFFS[G.settings.difficulty] || G.DIFFS[1]).hp + h.hp) + ' \u00b7 ' + h.specialName;
       c.querySelector('.hlines').innerHTML = h.lines.map((l) => '<li>' + l + '</li>').join('');
@@ -237,7 +237,7 @@
   };
   U.showRelics = function (offer) {
     const h = G.hero();
-    el.relicOver.textContent = h.name + ' \u00b7 ' + h.title;
+    el.relicOver.textContent = h.name + ' \u00b7 ' + G.heroTitle(h);
     el.relicOver.style.color = h.css;
     Array.from(el.relicCards.children).forEach((c, i) => {
       const r = offer[i];
@@ -524,7 +524,7 @@
       ['Flourish', k('taunt'), 'A short salute that raises Flow and Dawnbreak, three times as much during a boss attack. Getting hit ends it.'],
       ['Items', k('item1') + ' ' + k('item2'), 'Use what you hold. Bought from the road merchant with Motes.'],
     ];
-    el.movesOver.textContent = h.title; el.movesOver.style.color = h.css;
+    el.movesOver.textContent = G.heroTitle(h); el.movesOver.style.color = h.css;
     el.movesTitle.textContent = h.name + '\u2019s moves';
     el.movesBody.innerHTML = rows.map((r) => '<tr><td class="mname">' + r[0] + '</td><td class="mkeys">' + r[1] + '</td><td>' + r[2] + '</td></tr>').join('');
     el.movesFoot.textContent = fromMenu ? '' : 'Let go of Tab to carry on';
@@ -537,7 +537,7 @@
     U.show('practice', true);
   };
   // ---- Settings, Controls: choose a row, then press the key it should use
-  const ACTIONS = { left: 'Move left', right: 'Move right', up: 'Aim up', down: 'Aim down, drop', jump: 'Jump', attack: 'Attack', dash: 'Dash', flare: 'Special', heal: 'Mend, use', ult: 'Dawnbreak', crown: 'Crown', taunt: 'Flourish', item1: 'Item 1', item2: 'Item 2' };
+  const ACTIONS = { left: 'Move left', right: 'Move right', up: 'Aim up', down: 'Aim down, drop', jump: 'Jump', attack: 'Attack', dash: 'Dash', flare: 'Special', heal: 'Mend, use', ult: 'Dawnbreak', crown: 'Crown', taunt: 'Flourish', item1: 'Item 1', item2: 'Item 2', item3: 'Item 3' };
   U.fillKeys = function () {
     Array.from(el.keyList.children).forEach((row) => {
       const a = (row.dataset.act || '').slice(4);
@@ -573,7 +573,7 @@
     const pad = G.input.device === 'gamepad';
     if (el.ultKey) el.ultKey.innerHTML = pad ? '<kbd>RT</kbd>' : '<kbd>' + G.input.label('ult') + '</kbd>';
     if (el.crownKey) el.crownKey.innerHTML = pad ? '<kbd>LT</kbd>' : '<kbd>' + G.input.label('crown') + '</kbd>';
-    if (el.item0) { el.item0.querySelector('kbd').textContent = pad ? 'L3' : G.input.label('item1'); el.item1.querySelector('kbd').textContent = pad ? 'R3' : G.input.label('item2'); } // (v2.9k)
+    if (el.item0) { el.item0.querySelector('kbd').textContent = pad ? 'L3' : G.input.label('item1'); el.item1.querySelector('kbd').textContent = pad ? 'R3' : G.input.label('item2'); el.item2.querySelector('kbd').textContent = pad ? 'Back' : G.input.label('item3'); } // (v2.9k; v3.0d: a third)
   };
   function buy(i) {
     if (G.meta.buy(i)) {
@@ -767,6 +767,7 @@
     const its = G.motes.items(), ik = its.join(',') + (P.charm ? '+c' : '');
     if (ik !== H.items) {
       H.items = ik;
+      el.item2.style.display = its.length > 2 ? '' : 'none'; // (v3.0d)
       its.forEach((id, i) => {
         const slot = el['item' + i], def = id && G.motes.item(id);
         slot.classList.toggle('empty', !def);
@@ -1110,7 +1111,16 @@
     const un = [];
     if (res.solFirst) un.push('Dawn at the Vigil: the camp wakes up to morning.');
     if (res.solHeroFirst) un.push('A sun crown over ' + H.name + ' in the Hall of Echoes.');
-    if (res.ascBeat) un.push('Ascension +' + res.ascBeat + ' beaten with ' + H.name + '.');
+    if (res.ascBeat) {
+      un.push('Ascension +' + res.ascBeat + ' beaten with ' + H.name + '.');
+      // (v3.0d) what that step gives the hero
+      const rel = G.HERO_RELICS.find((r) => r.hero === H.id), bn = G.BOONS.find((b) => b.asc && b.heroes && b.heroes[0] === H.id);
+      un.push(['', 'The Ascendant costume for ' + H.name + ' (the Wardrobe, in the Hall of Echoes).',
+        H.name + '\u2019s own relic, ' + (rel ? rel.name : '') + ', can be offered at the reliquary.',
+        'A third item slot for ' + H.name + ' (key ' + G.input.label('item3') + ').',
+        H.name + '\u2019s own boon, ' + (bn ? bn.name : '') + ', can be offered.',
+        H.name + ' is The Unfallen: a golden aura, and a star over their alcove in the Hall.'][res.ascBeat]);
+    }
     if (res.ascOpened) un.push('Ascension +' + res.ascOpened + ' for ' + H.name + ': choose it at the Brazier.');
     if (res.costume) un.push('The ' + res.costume.name + ' costume (the Wardrobe, in the Hall of Echoes).');
     if (res.meta.relic) un.push('Trophy: ' + res.meta.relic.name + ' joins the relics you can be offered.');
