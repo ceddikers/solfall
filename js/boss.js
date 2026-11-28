@@ -448,15 +448,15 @@
   // (v3.1g) Its attack is cut short from outside (Eos's Still Point, a blow turned at the last instant).
   // Not a stagger: the attack stops, what it had out is gone, and its eye half shuts for a moment.
   // Not during a phase change, a ward or a stagger, and not again for a few seconds. True if it broke.
-  B.breakPattern = function () {
+  B.breakPattern = function (dir, quiet) {
     if (!B.active || B.dead || B.dying || B.invuln || B.staggered || B.ward || B.toppled) return false;
     if (B.t < (B.breakAt || 0)) return false;
     interrupt();
     B.breakAt = B.t + 7;
     const c = B.core;
-    c.flash = 1; c.kick = 1;
+    c.kick = 1;
     G.fx.shards(c.x, c.y, 8, G.pal().boss, { speed: [140, 460], size: [2, 4.5] });
-    G.fx.ring(c.x, c.y, { r0: 40, r1: 200, life: 0.3, color: G.pal().hot, width: 5 });
+    if (!quiet) { c.flash = 1; G.fx.ring(c.x, c.y, { r0: 40, r1: 200, life: 0.3, color: G.pal().hot, width: 5 }); } // (quiet: Eos's Still Moment)
     B.script = flinch(0.65);
     return true;
   };

@@ -91,7 +91,7 @@
       atk: null, atkCd: 0, combo: -1, comboT: 0, sinceDash: 9,
       dead: false, deadT: 0, hidden: false,
       squash: 0, runT: 0, stepN: 0, skidT: 0, hurtFlash: 0, emberFlash: 0,
-      ult: 0, ulting: false, vanish: false, shroudT: 0,
+      ult: 0, ulting: false, vanish: false, seq: null, shroudT: 0,
       flT: 0, flCd: 0, flBrazen: false, lifts: 0,
       cast: null, // a special's body motion: Vesper's throw, Lune's release, Aster's slam (see castPose)
       recov: null, // how the weapon comes back to rest after the last attack (see recoverPose)
@@ -166,6 +166,8 @@
     sigStep(dt); // (the signature boons that keep time: see below)
     // a Dawnbreak takes the hero over until it is done
     if (P.ulting) { G.flow.ultStep(dt); return; }
+    // (v3.1h) and so does the Still Moment, on the clock on the wall
+    if (P.seq) { momentStep(G.rdt || dt); return; }
     // and so does the finishing blow at the end of a fight (finish.js)
     if (P.finishing) { G.finish.step(dt); return; }
     // held (v2.4a, kairo.js: the spin throw's grip, the Last Wave's struggle): carried where the hold
@@ -1620,35 +1622,125 @@
     if (Math.abs(x - ax) < hw + 14) x = G.clamp(ax - d * (hw + 44), bl, br); // no room behind it: he comes out in front
     if (G.arena.inPit(x)) x = G.arena.solidNear(x);
     // something cast from high up: he arrives in the air beside it
-    let y = P.y;
-    if (!melee && t.cy < P.y - 150) { y = Math.min(P.y, t.cy + 40); P.onGround = false; P.plat = null; P.coyote = 0; P.vy = -150; P.jumpHeld = false; }
+    const air = !melee && t.cy < P.y - 150, y = air ? Math.min(P.y, t.cy + 40) : P.y;
+    // met at the last instant: the Still Moment, which does all of this in its own time (below)
+    if (perfect) { startMoment({ x0, y0, x, y, d, air, ax, ay: (y0 + y) / 2 - 32, hw, id: t ? t.id : null }); return true; }
+    if (air) { P.onGround = false; P.plat = null; P.coyote = 0; P.vy = -150; P.jumpHeld = false; }
     for (let i = 0; i < 4; i++) P.ghosts.push({ x: G.lerp(x0, x, i / 4), y: G.lerp(y0, y, i / 4), f: d, life: 0.16 + 0.05 * i });
     P.x = x; P.y = y; P.vx = d * 60; P.facing = G.sign(ax - x) || -d;
     const ang = Math.atan2(y - y0, x - x0), len = G.dist(x0, y0, x, y), mx = (x0 + x) / 2, my = (y0 + y) / 2 - 32;
-    G.fx.cut(mx, my, ang, len + 120, perfect ? 13 : 7, perfect ? GOLD : STAR, HOT, perfect ? 0.36 : 0.22);
-    G.fx.cut(mx, my, ang, len + 180, perfect ? 2.6 : 1.4, HOT, HOT, perfect ? 0.5 : 0.3);
+    G.fx.cut(mx, my, ang, len + 120, 7, STAR, HOT, 0.22);
+    G.fx.cut(mx, my, ang, len + 180, 1.4, HOT, HOT, 0.3);
     G.fx.burst(x0, y0 - 24, { n: 8, color: STAR, speed: [60, 240], life: [0.15, 0.35], kind: 'spark', size: [1.5, 3] });
     G.audio.play(melee ? 'draw' : 'blink');
     if (t) {
       const hx = t.cx, hy = t.r ? t.cy : G.clamp(my, t.cy - t.hh + 6, t.cy + t.hh - 6);
-      const dmg = Math.round(C.ANSWER_DMG[perfect ? 1 : 0] * G.dmgMult() * spec());
-      if (B.damage(dmg, t, { x: hx, y: hy, heavy: true, finisher: perfect, dir: d, poise: H.poise })) {
-        G.fx.hit(hx, hy, ang, { heavy: perfect, thrust: !perfect, power: perfect ? 1.3 : 0.9, col: perfect ? GOLD : STAR, hot: HOT });
-        G.audio.play(perfect ? 'hitHeavy' : 'hit', { pitch: hitPitch() });
+      const dmg = Math.round(C.ANSWER_DMG[0] * G.dmgMult() * spec());
+      if (B.damage(dmg, t, { x: hx, y: hy, heavy: true, dir: d, poise: H.poise })) {
+        G.fx.hit(hx, hy, ang, { thrust: true, power: 0.9, col: STAR, hot: HOT });
+        G.audio.play('hit', { pitch: hitPitch() });
         struck(t, hx, hy);
       } else { G.audio.play('tink'); G.fx.tink(hx, hy, ang); }
     }
-    if (perfect) {
-      // met at the last instant: the world catches, and whatever the foe was doing is over
-      const broke = B.breakPattern ? B.breakPattern(d) : false;
-      G.audio.play('iai');
-      G.fx.slow(0.3, 0.32); G.fx.flash(GOLD, 0.14, 0.28); G.fx.impact(ax, my, 0.09);
-      G.fx.ring(ax, my, { r0: 20, r1: broke ? 240 : 150, life: 0.4, color: GOLD, width: 7 });
-      G.fx.text(P.x, P.y - 78, G.T('PERFECT'), { color: GOLD, size: 17, life: 0.9 });
-    }
     // the blade is already going home (the katana; the naginata is brought round by its own sweep)
-    if (H.draw) { P.cast = null; P.recov = { kind: 'noto', t: 0, dur: 0.34, at: 0.6, ang: 0, lvl: perfect ? 3 : 1 }; }
+    if (H.draw) { P.cast = null; P.recov = { kind: 'noto', t: 0, dur: 0.34, at: 0.6, ang: 0, lvl: 1 }; }
     return true;
+  }
+
+  // (v3.1h) The Still Moment: what a blow met at the last instant is answered with. Asked: "slowmo the
+  // game and have a biiiit longer animation for the slash, make it epic, different from dawnbreak".
+  // Dawnbreak is one line across the whole arena, with its name over it. This is close and quiet:
+  //  - the world all but stops and goes dark at its edges, and the view leans in. Whatever the foe was
+  //    doing is over (B.breakPattern), and it hangs where it was;
+  //  - he is gone, and five cuts cross the foe one after another, each from another side, each a thin
+  //    line left hanging, a shade of him at the end of each;
+  //  - he is standing behind it with his back to it, and the blade goes home slowly;
+  //  - at the click every line lights at once and the blow lands as one, and time comes back.
+  // It runs on the clock on the wall (G.rdt), not the slowed one, and nothing can touch him in it.
+  const MOMENT = { hold: 0.22, gap: 0.075, sheath: 0.44, scale: 0.05 };
+  const MOMENT_ANG = [-0.42, 0.55, -0.1, 1.0, -0.85]; // (the cuts, for a foe on his right)
+  function startMoment(q) {
+    const B = G.boss;
+    q.t = 0; q.n = 0; q.lines = []; q.shades = []; q.back = false;
+    q.broke = B.breakPattern ? B.breakPattern(q.d, true) : false; // its move stops now, not at the click (quietly: its light would hang)
+    P.seq = q;
+    P.atk = null; P.recov = null; P.hold = null; P.focus = 0; P.vx = 0; P.vy = 0; P.dashT = 0;
+    G.audio.play('pulse', { k: 0.6 });
+    G.fx.ring(q.x0 + q.d * 16, q.y0 - 34, { r0: 120, r1: 6, life: MOMENT.hold * MOMENT.scale + 0.004, color: HOT, width: 2 });
+    const c = G.fx.cine;
+    if (!(c.to > 0)) { c.x = q.ax; c.y = q.ay; c.z = 0.13; c.to = 1; G.fx.cineEase(7); q.cine = true; }
+  }
+  function momentAim(q) {
+    const t = q.id != null ? G.boss.targets().find((v) => v.id === q.id) : null;
+    return t ? { t, x: t.cx, y: t.r ? t.cy : G.clamp(q.ay, t.cy - t.hh + 6, t.cy + t.hh - 6) } : { t: null, x: q.ax, y: q.ay };
+  }
+  function momentStep(dt) {
+    const q = P.seq, M = MOMENT, B = G.boss;
+    if (G.state !== 'fight' || B.dead) { endMoment(false); return; }
+    q.t += dt;
+    G.slowScale = M.scale; G.slowT = 0.4; // (held there: it is let go at the click)
+    G.fx.vig('6,8,22', 0.6, 0.25);
+    P.iframes = Math.max(P.iframes, 0.3); P.pdDone = true; P.vx = 0; P.vy = 0;
+    const n = MOMENT_ANG.length, tBack = M.hold + n * M.gap, tEnd = tBack + M.sheath;
+    while (q.n < n && q.t >= M.hold + q.n * M.gap) {
+      const i = q.n++, a = momentAim(q);
+      if (i === 0) {
+        P.cast = null; P.vanish = true;
+        G.fx.burst(P.x, P.y - 24, { n: 8, color: STAR, speed: [60, 240], life: [0.01, 0.03], kind: 'spark', size: [1.5, 3] });
+      }
+      const ang = (q.d > 0 ? MOMENT_ANG[i] : Math.PI - MOMENT_ANG[i]) + (i % 2 ? Math.PI : 0), cs = Math.cos(ang), sn = Math.sin(ang), L = 120 + q.hw; // (from one side, then the other)
+      const left = (tEnd - q.t) * M.scale + 0.02; // (a line's life runs on the slowed clock: this is until the click)
+      q.lines.push({ x: a.x, y: a.y, ang });
+      G.fx.cut(a.x, a.y, ang, L * 2, 1.5, HOT, HOT, left * 1.6);
+      G.fx.cut(a.x, a.y, ang, L * 2 + 60, 8, STAR, HOT, 0.1 * M.scale);
+      G.fx.glint(a.x, a.y, 22 + 4 * i, HOT, 0.14 * M.scale);
+      q.shades.push({ x: a.x + cs * L, y: Math.min(G.FLOOR, a.y + sn * L + 30), f: G.sign(cs) || q.d, dx: cs, dy: sn, t: q.t });
+      G.audio.play('slash', { pitch: 1 + 0.13 * i });
+      G.fx.kick(cs * 4, sn * 4);
+    }
+    if (q.t >= tBack && !q.back) {
+      // behind it, his back to it, the blade still out
+      q.back = true; P.vanish = false;
+      P.x = q.x; P.y = q.y; P.facing = q.d;
+      if (q.air) { P.onGround = false; P.plat = null; P.coyote = 0; P.jumpHeld = false; }
+      if (H.draw) P.recov = { kind: 'noto', t: 0, dur: 1, at: 0.8, ang: 0, lvl: 3 };
+      G.audio.play('glint');
+      if (P.onGround) G.fx.dust(P.x, P.y, 4, { dir: -q.d, speed: [60, 220], size: [5, 10], life: [0.02, 0.05] });
+    }
+    if (q.back && P.recov) P.recov.t = Math.min(0.8, (q.t - tBack) / M.sheath * 0.8); // home exactly at the click
+    if (q.t >= tEnd) endMoment(true);
+  }
+  function endMoment(land) {
+    const q = P.seq, B = G.boss;
+    P.seq = null; P.vanish = false; P.cast = null;
+    if (!q.back) { P.x = q.x; P.y = q.y; P.facing = q.d; }
+    if (q.air) P.vy = -150;
+    P.iframes = Math.max(P.iframes, 0.5); P.pdDone = true;
+    P.recov = H.draw ? { kind: 'noto', t: 0.16, dur: 0.36, at: 0.44, ang: 0, lvl: 3, fx: true } : null;
+    G.slowT = Math.min(G.slowT, 0.14); // time comes back over a few frames
+    if (q.cine) { G.fx.cine.to = 0; G.fx.cineEase(5); }
+    sheathUp(true);
+    if (!land) return;
+    // the click: every line at once, and the one blow
+    G.audio.play('sheath'); G.audio.play('iai');
+    for (const l of q.lines) G.fx.cut(l.x, l.y, l.ang, 560, 10, GOLD, HOT, 0.42);
+    const a = momentAim(q);
+    if (a.t) {
+      const dmg = Math.round(C.ANSWER_DMG[1] * G.dmgMult() * spec());
+      if (B.damage(dmg, a.t, { x: a.x, y: a.y, heavy: true, finisher: true, dir: q.d, poise: H.poise })) {
+        G.fx.hit(a.x, a.y, q.d > 0 ? 0 : Math.PI, { heavy: true, power: 1.4, col: GOLD, hot: HOT });
+        G.audio.play('hitHeavy', { pitch: hitPitch() });
+        struck(a.t, a.x, a.y);
+      } else { G.audio.play('tink'); G.fx.tink(a.x, a.y, 0); }
+    }
+    G.fx.stop(0.11); G.fx.shake(15); G.fx.punch(0.035); G.fx.flash(GOLD, 0.16, 0.3); G.fx.impact(a.x, a.y, 0.09);
+    G.fx.ring(a.x, a.y, { r0: 20, r1: q.broke ? 260 : 170, life: 0.42, color: GOLD, width: 8 });
+    G.fx.lines(a.x, a.y, 16, HOT, { r0: 24, speed: [700, 1400] });
+    G.fx.burst(a.x, a.y, { n: 16, color: GOLD, speed: [200, 820], life: [0.15, 0.5], kind: 'spark', size: [2.5, 4.5] });
+    G.fx.burst(a.x, a.y, { n: 14, color: STAR, speed: [30, 210], life: [0.7, 1.5], size: [1.6, 3.2], grav: 90, wob: 110, drag: 1.4, jitter: 18 });
+    G.fx.light(a.x, a.y, 240, GOLD, 0.25, 0.5);
+    G.fx.text(P.x, P.y - 78, G.T('PERFECT'), { color: GOLD, size: 17, life: 0.9 });
+    if (H.weapon === 'naginata') counterSweep();
   }
   function turned(srcX, src) {
     const c = P.cast, dir = G.sign(srcX - P.x) || P.facing, gx = P.x + dir * 16, gy = P.y - 34;
@@ -1656,7 +1748,6 @@
     c.thrown = true; c.hit = true; c.t = c.wind; c.dur = c.wind + 0.34;
     P.facing = dir;
     P.iframes = Math.max(P.iframes, 0.6); P.pdDone = true; // (v3.1g: 0.6 s, from 0.5)
-    sheathUp(true); // (v2.9c: a turned blow fills the sheath: the next press is the full draw)
     P.vx = -dir * 150;
     // the swing that was turned is stopped, and whoever swung it is rocked
     if (src && src.kind === 'arc' && src.owner) {
@@ -1669,12 +1760,19 @@
     G.sets.hit('special', null, gx, gy, P.castN); // (a turned blow is Still Point landing)
     G.audio.play('clash'); G.audio.play('focus', { n: 3 });
     G.fx.stop(0.14); G.fx.shake(10); G.fx.punch(0.03); G.fx.kick(-dir * 6, 0);
-    G.fx.ripple(gx, gy, 260, 0.36, 1.1);
-    G.fx.glint(gx, gy, 56, GOLD, 0.3);
-    G.fx.ring(gx, gy, { r0: 10, r1: 130, life: 0.3, color: GOLD, width: 5 });
+    const px = P.x;
+    answer(srcX, src, dir, perfect); // (v3.1g: the Answering Cut. The blow is stopped by now)
+    if (!P.seq) sheathUp(true); // (v2.9c: a turned blow fills the sheath. In the Still Moment it fills at the click)
+    // (v3.1h) in the Still Moment the turn's own flash is left out: on the slowed clock it would hang over
+    // the foe for the whole of it. The sparks stay, and hang in the air
+    if (!P.seq) {
+      G.fx.ripple(gx, gy, 260, 0.36, 1.1);
+      G.fx.glint(gx, gy, 56, GOLD, 0.3);
+      G.fx.ring(gx, gy, { r0: 10, r1: 130, life: 0.3, color: GOLD, width: 5 });
+    }
     G.fx.lines(gx, gy, 14, HOT, { r0: 18, speed: [600, 1200] });
     G.fx.burst(gx, gy, { n: 18, color: GOLD, speed: [200, 800], life: [0.15, 0.45], kind: 'spark', size: [2, 4], grav: 500, angle: dir > 0 ? Math.PI : 0, spread: 2.4 });
-    if (P.onGround) G.fx.dust(P.x, P.y, 5, { dir: -dir, speed: [80, 280], size: [5, 10] });
+    if (P.onGround) G.fx.dust(px, P.y, 5, { dir: -dir, speed: [80, 280], size: [5, 10] });
     // Second Light: the turned blow is answered with a crescent of light
     if (G.boon('second')) {
       const B = G.boss;
@@ -1683,8 +1781,7 @@
       arcShot(dx, dy, 1); G.audio.play('draw');
     }
     G.feats.bump('turned');
-    answer(srcX, src, dir, perfect); // (v3.1g: the Answering Cut. Last: by now the blow is stopped and the fx of the turn are where he stood)
-    if (H.weapon === 'naginata') counterSweep(); // (v3.0e)
+    if (H.weapon === 'naginata' && !P.seq) counterSweep(); // (v3.0e; in the Still Moment it comes at the click)
   }
 
   // (v3.0e) Aster's Meteor Fist: a lunge, and a short wide burst of light punched out in front
@@ -1837,7 +1934,7 @@
   }
 
   P.tryHit = function (dmg, srcX, src) {
-    if (P.dead || P.hidden || P.ulting || !G.canHurt()) return false;
+    if (P.dead || P.hidden || P.ulting || P.seq || !G.canHurt()) return false;
     if (P.cast && P.cast.kind === 'guard' && !P.cast.thrown) { turned(srcX, src); return false; } // Eos was waiting for it
     if (P.iframes > 0) {
       if (!P.pdDone) { P.pdDone = true; perfect(); }
@@ -3504,6 +3601,15 @@
       glowAt(ctx, STAR, gh.x, gh.y - 34, 38, 0.3 * k);
       ctx.globalAlpha = 0.34 * k;
       drawBody(ctx, H, { x: gh.x, y: gh.y, facing: gh.f, vx: gh.f * C.DASH_SPEED, vy: 0, onGround: false, squash: 0, runT: 0, atk: gh.atk || null, primed: false, hurtFlash: 0, dash: !gh.atk });
+      ctx.globalAlpha = 1;
+    }
+    // (v3.1h) the Still Moment: a shade of him at the end of each cut, fading on the clock on the wall
+    if (P.seq) for (const sh of P.seq.shades) {
+      const k = 1 - (P.seq.t - sh.t) / 0.34;
+      if (k <= 0) continue;
+      glowAt(ctx, STAR, sh.x, sh.y - 34, 38, 0.3 * k);
+      ctx.globalAlpha = 0.5 * k;
+      drawBody(ctx, H, { x: sh.x, y: sh.y, facing: sh.f, vx: 0, vy: 0, onGround: false, squash: 0, runT: 0, atk: { kind: 'draw', t: 0.09, a0: 0, a1: 0.1, dx: sh.dx, dy: sh.dy, lvl: 3, heavy: true }, primed: false, hurtFlash: 0, dash: false });
       ctx.globalAlpha = 1;
     }
     // Stormcaller's lightning

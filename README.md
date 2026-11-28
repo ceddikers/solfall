@@ -2,7 +2,7 @@
 
 A side-on boss rush for the browser: four heroes, seven three-phase bosses, played as a run of
 ever-harder trials. You pick a hero and a relic before the run and win a boon after each victory.
-Version 3.1g.
+Version 3.1h.
 
 This is an early slice of a planned boss-rush roguelite (short runs, a boon after each boss,
 bosses drawn from a pool). A run is seven trials, one for each boss, each harder than the last: the first boss
@@ -116,6 +116,34 @@ hero (`tools/feel-check.js`).
 - Settings, Reset progress erases Sunshards, upgrades, trophies and records (it has to be chosen twice).
 
 Not done: touch controls, a colour-blind alternative to red-orange warnings, gamepad rebinding.
+
+## Eos: the Still Moment (v3.1h)
+
+Asked: "i want the right click on a perfect block to slowmo the game and have a biiiit longer animation for the
+slash, make it epic, different from dawnbreak tho".
+
+A perfect block (Still Point raised within 0.18 s of the blow) now plays a sequence of about a second:
+
+1. **The world all but stops** (5% speed), the edges of the screen go dark and the view leans in a little. The
+   boss's move is already over, and it hangs where it was. The sparks of the block hang in the air.
+2. **Eos is gone, and five cuts cross the boss**, one after another from alternating sides, each a thin line left
+   hanging with a shade of him at its end. Each cut sounds a little higher than the last.
+3. **He is standing behind it with his back to it**, and the blade goes home slowly.
+4. **At the click** every line lights gold at once, the 44 lands as one blow, the sheath fills, and time comes back.
+
+How it differs from Dawnbreak (Horizon): no name banner, no cut across the whole arena, no split picture. It
+stays close on the two of them, and it is many small cuts that land together, not one.
+
+- Nothing can hurt him during it, and he cannot act until the click. He has half a second of safety after it.
+- If the boss's move cannot be stopped (the 7 s cooldown, Noon, a ward), the sequence still plays and the boss
+  only moves at 5% speed through it.
+- A blocked shot plays the same sequence, ending in the air beside a high caster.
+- A plain block (raised early) is unchanged: the quick step-through for 16.
+- The naginata's sweep and the sheath's chime now come at the click.
+
+Checked frame by frame against the Knight and the Warden, with a refused break, and `tools/break-tests.js` again
+on the Knight, Kairo, the Warden and Sol: clean. Not played by a person, and not heard: the sounds were chosen from
+the ones he already has.
 
 ## Eos: Still Point answers back (v3.1g)
 

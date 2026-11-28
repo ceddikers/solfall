@@ -319,21 +319,22 @@
     // stands for a moment before it thinks again. No blow stops a phase change, a ward, a stagger
     // already on, or a working that nothing stops (B.steadfast; B.unbreakable() for a boss's own),
     // and it cannot be done again for a few seconds. True if it broke.
-    B.breakPattern = function (dir) {
+    B.breakPattern = function (dir, quiet) {
       if (!B.active || B.dead || B.dying || B.invuln || B.staggered || B.ward || B.steadfast || B.toppled) return false;
       if (B.t < (B.breakAt || 0) || (B.unbreakable && B.unbreakable())) return false;
       interrupt();
       B.breakAt = B.t + 7;
-      B.script = reelScript(dir || 1);
+      B.script = reelScript(dir || 1, quiet);
       return true;
     };
-    function* reelScript(dir) {
+    function* reelScript(dir, quiet) {
       const b = B.body, cy = b.y - B.h / 2;
       b.ctrl = true; b.hidden = false;
       if (B.onBreak) B.onBreak(dir); // (its own pose for it)
-      b.flash = 1; b.kx = G.clamp(dir * 18, -18, 18); b.recV = G.clamp((b.recV || 0) + dir * 5, -6, 6); b.sq = Math.max(b.sq || 0, 0.1);
+      b.kx = G.clamp(dir * 18, -18, 18); b.recV = G.clamp((b.recV || 0) + dir * 5, -6, 6); b.sq = Math.max(b.sq || 0, 0.1);
       G.fx.shards(b.x, cy, 7, G.pal().boss, { speed: [140, 460], size: [2, 4.5] });
-      G.fx.ring(b.x, cy, { r0: 30, r1: 170, life: 0.3, color: G.pal().hot, width: 5 });
+      // (quiet: Eos's Still Moment, where time has all but stopped and a flash or a ring would hang over it)
+      if (!quiet) { b.flash = 1; G.fx.ring(b.x, cy, { r0: 30, r1: 170, life: 0.3, color: G.pal().hot, width: 5 }); }
       const ground = () => (B.groundY ? B.groundY(b.x) : FLOOR);
       let e = 0, vy = 500;
       while (e < 0.65) {

@@ -398,6 +398,7 @@
     // (v3.0a) the dawn after Sol is a picture of its own: nothing else runs under it
     if (G.epilogue.on) { G.t += dt; G.epilogue.update(dt); G.input.endStep(); return; }
     F.updateScreen(dt);
+    G.rdt = dt; // (the clock on the wall, for what must not slow with the fight: Eos's Still Moment)
     if (G.hitstop > 0) { G.hitstop -= dt; return; }
     let ts = 1;
     if (G.slowT > 0) {
