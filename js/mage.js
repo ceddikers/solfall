@@ -165,6 +165,7 @@
   B.reckonName = G.T('CONVERGENCE'); B.reckonY = GY;
   B.onReckon = function (on) { const b = B.body; b.want = on ? 1 : 0; B.spin = on ? 6 : 1; b.alpha = 1; };
   B.onRecover = function () { B.body.homeY = GY; };
+  B.floats = true; // (v3.1g: cut short, it stays in the air)
   B.dying0 = function () { B.crystals.length = 0; B.body.elem = null; };
 
   function puff(x, y, col) {

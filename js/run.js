@@ -88,12 +88,12 @@
       ],
       down: 11, special: 'guard', specialName: 'Still Point', verb: 'guard',
       blurb: 'Patient and exact. One cut, when it counts.',
-      lines: ['Notched blade: every cut that lands notches the sheath, up to six', 'Hold attack and let go to draw through the foe: each notch makes it harder', 'Still Point: turn a blow aside and the sheath is full'],
+      lines: ['Notched blade: every cut that lands notches the sheath, up to six', 'Hold attack and let go to draw through the foe: each notch makes it harder', 'Still Point: turn a blow and he cuts through the foe. Turn it late to stop its move'],
       how: {
         attack: 'Notched blade: cut (11), cut (13), finisher (27). Every cut that lands notches the sheath, up to six (all six, it glows gold). Hold attack a moment and let go to draw: he blinks through the foe for 22, and 11 more for every notch it spends (88 at six).',
         aim: 'The draw goes where you aim. Down in the air strikes below and bounces.',
         dash: 'The draw is a cut, not a dodge: it does not pass through attacks.',
-        special: 'Still Point: brace for two thirds of a second. A blow that lands is turned, does no harm, and fills the sheath. If nothing lands, half the Starlight comes back.',
+        special: 'Still Point: brace for two thirds of a second. A blow that lands is turned and fills the sheath, and he cuts through the foe for 16. A shot takes him to its caster. Brace just as it lands: the cut deals 44 and stops the foe mid-move. If nothing lands, half the Starlight comes back.',
         ult: 'Horizon: one cut across the whole arena for 250.',
       },
     },
@@ -122,7 +122,7 @@
       combo: [{ dmg: 15, cd: 0.33, dur: 0.3, wind: 0.07, act: 0.12 }, { dmg: 17, cd: 0.35, dur: 0.3, wind: 0.07, act: 0.12 }, { dmg: 40, cd: 0.6, dur: 0.44, wind: 0.12, act: 0.16 }], // (bot test: 13/15/35 fell well short of his sheathed blade)
       blurb: 'A long blade on a pole. The longest reach there is.',
       lines: ['Naginata: two wide sweeps and a finisher, from far off', 'Still Point: a turned blow is answered with a sweep all around', 'The longest reach of any weapon'],
-      how: { attack: 'Naginata: sweep (15), sweep (17), finisher (40), which sends a short crescent of light on for 20. The longest reach of any weapon.', aim: 'Up sweeps overhead. Down in the air strikes below and bounces.', dash: 'A sweep straight out of a dash becomes a thrust: 40% more damage and reach.', special: 'Still Point: brace for two thirds of a second. A blow that lands is turned, does no harm, and is answered with a sweep all around you for 60. If nothing lands, half the Starlight comes back.' } },
+      how: { attack: 'Naginata: sweep (15), sweep (17), finisher (40), which sends a short crescent of light on for 20. The longest reach of any weapon.', aim: 'Up sweeps overhead. Down in the air strikes below and bounces.', dash: 'A sweep straight out of a dash becomes a thrust: 40% more damage and reach.', special: 'Still Point: brace for two thirds of a second. A blow that lands is turned, does no harm, and is answered with a cut through the foe for 16 and a sweep all around you for 60. Brace just as it lands: the cut deals 44 and stops the foe mid-move. If nothing lands, half the Starlight comes back.' } },
   };
   const heroById = {};
   for (const h of G.HEROES) heroById[h.id] = h;

@@ -43,6 +43,8 @@
     NOTCH_DMG: [22, 11],          // (v3.1f: 25, 12; he won most and killed fastest) a draw deals 22 and 11 more for every notch it spends (33 to 88)
     DRAW_DODGE: false,            // (v2.9c) the draw no longer passes through attacks: a full sheath is a cut kept ready, not a dodge kept ready
     GUARD_T: 0.65,                // how long Still Point waits for a blow (v2.1b: from 0.45; half its Starlight back if none comes)
+    GUARD_PERFECT: 0.18,          // (v3.1g) a blow turned this soon after the guard went up was met at the last instant: the foe's move is cut short
+    ANSWER_DMG: [16, 44],         // (v3.1g) the cut that answers a turned blow, and the one that answers a blow met at the last instant
     EDGE_T: 2.5,                  // how long a turned blow keeps all three marks lit without the button held
   };
   const GOLD = '255,214,140'; // the finisher's colour
@@ -1584,11 +1586,76 @@
     G.fx.ring(P.x + P.facing * 12, P.y - 34, { r0: 46, r1: 12, life: gt, color: STAR, width: 2, alpha: 0.7 });
     G.fx.glint(P.x + P.facing * 12, P.y - 44, 20, HOT, 0.2);
   }
+  // (v3.1g) What a turned blow is answered with.
+  //  - A blow from a body or a blade: he steps through whoever swung it and cuts on the way.
+  //  - Something thrown or cast: he is gone, and past whoever cast it, cutting as he goes (up in the
+  //    air beside it, if that is where it is).
+  //  - Either, met at the last instant (the guard raised as the blow came, not before, GUARD_PERFECT):
+  //    the cut is far heavier, and the foe's move is cut short (B.breakPattern: bosskit.js, boss.js).
+  //  - Anything else (a pit, a wire, a storm, ground that burns): only turned, as before.
+  const STILL = { pool: 1, snare: 1, moonwall: 1, mark: 1 }; // (hazards that are a place, not a thing thrown)
+  function answer(srcX, src, dir, perfect) {
+    const B = G.boss;
+    if (!src || !B.active || B.dead || B.dying || B.toppled || !B.targets) return false;
+    const hz = typeof src.update === 'function';
+    const melee = src.kind === 'arc' || (!hz && src.x != null);
+    if (!melee && !(hz && !STILL[src.kind])) return false;
+    const ts = B.targets();
+    let t = null, ax, hw = 26;
+    if (melee) {
+      // whoever swung it (a blade's owner, or the body that struck), and whatever of the foe stands there
+      const o = src.kind === 'arc' ? src.owner : src;
+      ax = o && o.x != null ? o.x : srcX;
+      let bd = 150;
+      for (const q of ts) { const d = Math.abs(q.cx - ax); if (d < bd) { bd = d; t = q; } }
+    } else {
+      t = ts.find((q) => q.kind === 'body' || q.kind === 'core') || null;
+      if (!t) { let bd = 1e9; for (const q of ts) { const d = Math.abs(q.cx - P.x); if (d < bd) { bd = d; t = q; } } }
+      if (!t) return false; // (nobody to go to: it is hidden)
+    }
+    if (t) { ax = t.cx; hw = t.r || t.hw || 26; }
+    const d = G.sign(ax - P.x) || dir, x0 = P.x, y0 = P.y;
+    const bl = (G.bounds ? G.bounds.l : G.WALL_L + 13) + 12, br = (G.bounds ? G.bounds.r : G.WALL_R - 13) - 12;
+    let x = G.clamp(ax + d * (hw + 44), bl, br);
+    if (Math.abs(x - ax) < hw + 14) x = G.clamp(ax - d * (hw + 44), bl, br); // no room behind it: he comes out in front
+    if (G.arena.inPit(x)) x = G.arena.solidNear(x);
+    // something cast from high up: he arrives in the air beside it
+    let y = P.y;
+    if (!melee && t.cy < P.y - 150) { y = Math.min(P.y, t.cy + 40); P.onGround = false; P.plat = null; P.coyote = 0; P.vy = -150; P.jumpHeld = false; }
+    for (let i = 0; i < 4; i++) P.ghosts.push({ x: G.lerp(x0, x, i / 4), y: G.lerp(y0, y, i / 4), f: d, life: 0.16 + 0.05 * i });
+    P.x = x; P.y = y; P.vx = d * 60; P.facing = G.sign(ax - x) || -d;
+    const ang = Math.atan2(y - y0, x - x0), len = G.dist(x0, y0, x, y), mx = (x0 + x) / 2, my = (y0 + y) / 2 - 32;
+    G.fx.cut(mx, my, ang, len + 120, perfect ? 13 : 7, perfect ? GOLD : STAR, HOT, perfect ? 0.36 : 0.22);
+    G.fx.cut(mx, my, ang, len + 180, perfect ? 2.6 : 1.4, HOT, HOT, perfect ? 0.5 : 0.3);
+    G.fx.burst(x0, y0 - 24, { n: 8, color: STAR, speed: [60, 240], life: [0.15, 0.35], kind: 'spark', size: [1.5, 3] });
+    G.audio.play(melee ? 'draw' : 'blink');
+    if (t) {
+      const hx = t.cx, hy = t.r ? t.cy : G.clamp(my, t.cy - t.hh + 6, t.cy + t.hh - 6);
+      const dmg = Math.round(C.ANSWER_DMG[perfect ? 1 : 0] * G.dmgMult() * spec());
+      if (B.damage(dmg, t, { x: hx, y: hy, heavy: true, finisher: perfect, dir: d, poise: H.poise })) {
+        G.fx.hit(hx, hy, ang, { heavy: perfect, thrust: !perfect, power: perfect ? 1.3 : 0.9, col: perfect ? GOLD : STAR, hot: HOT });
+        G.audio.play(perfect ? 'hitHeavy' : 'hit', { pitch: hitPitch() });
+        struck(t, hx, hy);
+      } else { G.audio.play('tink'); G.fx.tink(hx, hy, ang); }
+    }
+    if (perfect) {
+      // met at the last instant: the world catches, and whatever the foe was doing is over
+      const broke = B.breakPattern ? B.breakPattern(d) : false;
+      G.audio.play('iai');
+      G.fx.slow(0.3, 0.32); G.fx.flash(GOLD, 0.14, 0.28); G.fx.impact(ax, my, 0.09);
+      G.fx.ring(ax, my, { r0: 20, r1: broke ? 240 : 150, life: 0.4, color: GOLD, width: 7 });
+      G.fx.text(P.x, P.y - 78, G.T('PERFECT'), { color: GOLD, size: 17, life: 0.9 });
+    }
+    // the blade is already going home (the katana; the naginata is brought round by its own sweep)
+    if (H.draw) { P.cast = null; P.recov = { kind: 'noto', t: 0, dur: 0.34, at: 0.6, ang: 0, lvl: perfect ? 3 : 1 }; }
+    return true;
+  }
   function turned(srcX, src) {
     const c = P.cast, dir = G.sign(srcX - P.x) || P.facing, gx = P.x + dir * 16, gy = P.y - 34;
+    const perfect = c.t <= C.GUARD_PERFECT;
     c.thrown = true; c.hit = true; c.t = c.wind; c.dur = c.wind + 0.34;
     P.facing = dir;
-    P.iframes = Math.max(P.iframes, 0.5); P.pdDone = true;
+    P.iframes = Math.max(P.iframes, 0.6); P.pdDone = true; // (v3.1g: 0.6 s, from 0.5)
     sheathUp(true); // (v2.9c: a turned blow fills the sheath: the next press is the full draw)
     P.vx = -dir * 150;
     // the swing that was turned is stopped, and whoever swung it is rocked
@@ -1616,6 +1683,7 @@
       arcShot(dx, dy, 1); G.audio.play('draw');
     }
     G.feats.bump('turned');
+    answer(srcX, src, dir, perfect); // (v3.1g: the Answering Cut. Last: by now the blow is stopped and the fx of the turn are where he stood)
     if (H.weapon === 'naginata') counterSweep(); // (v3.0e)
   }
 

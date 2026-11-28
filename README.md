@@ -2,7 +2,7 @@
 
 A side-on boss rush for the browser: four heroes, seven three-phase bosses, played as a run of
 ever-harder trials. You pick a hero and a relic before the run and win a boon after each victory.
-Version 3.1e.
+Version 3.1g.
 
 This is an early slice of a planned boss-rush roguelite (short runs, a boon after each boss,
 bosses drawn from a pool). A run is seven trials, one for each boss, each harder than the last: the first boss
@@ -116,6 +116,33 @@ hero (`tools/feel-check.js`).
 - Settings, Reset progress erases Sunshards, upgrades, trophies and records (it has to be chosen twice).
 
 Not done: touch controls, a colour-blind alternative to red-orange warnings, gamepad rebinding.
+
+## Eos: Still Point answers back (v3.1g)
+
+Asked: "Eos right click should have a special attack when you land it, like small invul frames if you successfully
+block an attack and a unique dash through the boss attack/counter mechanic where it stops the boss mid pattern".
+Three ideas were picked from five: a cut on every block, a stronger one for a late block, and a blink for shots.
+
+- **Any blow turned by Still Point is answered.** Eos steps through whoever struck him and comes out behind it,
+  cutting on the way for **16**. He cannot be hurt for 0.6 s (from 0.5). The sheath still fills, so the draw is
+  the follow-up, and he can act at once: the blade is already going home.
+- **A blow turned late is a perfect block.** If the guard went up within **0.18 s** of the blow landing, the cut
+  deals **44** and the boss's move stops: what it had thrown is gone and it reels for 0.65 s before it thinks
+  again. In practice: brace on the glint of the blade, not before it.
+- **A shot or a spell that is turned takes him to its caster.** He is gone and past whoever cast it, cutting as
+  he goes; if the caster is high up (the Warden's eye, the Magus) he arrives in the air beside it. A late block
+  does the same as above.
+- A pit, a wire, the storm or burning ground is only turned, as before.
+- **Limits on stopping a move.** Once every 7 seconds per boss. Never during a phase change, a ward, a stagger,
+  Kairo's sun, Aurel's Black Dawn, Sol's Noon form or her last light. When it is refused the heavier cut still lands.
+- The naginata's sweep (60) and **Second Light** come on top, as before.
+- Every boss has the reel. Aurel and fallen Sol are rocked back in a pose of their own; the others rock and shake.
+
+Checked: `tools/break-tests.js` (new) starts every attack of every boss in each phase and cuts it short at three
+different moments (1,197 tries; 102 were refused as they should be, 90 of them Sol's Noon), then watches for errors, a boss that never attacks again, one left in the
+air, or a hero still held. All nine bosses came back clean. With real button presses against the Knight, Aurel and
+Kairo, a guard raised 0.2 s or more before the swing gave the plain cut and one raised later gave the perfect one.
+Not played by a person yet, and the numbers (16, 44, 0.18 s, 7 s) are first guesses.
 
 ## Lune's Moon Burst, and a Merciless balance pass (v3.1f)
 

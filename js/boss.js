@@ -235,7 +235,7 @@
     B.phase = 1; B.poise = 0; B.poiseMax = 440 * G.POISE * (G.diff().poise || 1); B.staggered = false;
     B.invuln = true; B.active = false; B.dead = false; B.dying = false; B.toppled = false; B.down = false;
     B.script = null; B.attackName = ''; B.bag = []; B.lastAtk = ''; B.forceNext = G.corrupt.opener(B, 1) || 'slam';
-    B.t = 0; B.spread = 318; B.rays = []; B.shardR = 900; B.shardsOut = false; B.hasShards = false;
+    B.t = 0; B.breakAt = 0; B.spread = 318; B.rays = []; B.shardR = 900; B.shardsOut = false; B.hasShards = false;
     B.core = {
       x: 640, y: -200, r: 84, ctrl: true, open: 1, charge: 0, flash: 0,
       lx: 0, ly: 0, pulse: 0, spinHint: 0, hurt: false, jit: 0, sun: 0, embedded: false,
@@ -392,9 +392,9 @@
     // if it broke in the middle of its own attack, that attack is cut short
     if (busy && !B.staggered) { interrupt(); B.script = flinch(); }
   }
-  function* flinch() {
+  function* flinch(t) {
     B.core.open = 0.3;
-    yield* wait(0.9);
+    yield* wait(t || 0.9);
     B.core.open = 1;
     release();
   }
@@ -443,6 +443,22 @@
   // thrown down from outside the fight (the Dying Light pair)
   B.forceStagger = function () {
     if (B.active && !B.dead && !B.dying && !B.invuln && !B.staggered && !B.ward) stagger();
+  };
+
+  // (v3.1g) Its attack is cut short from outside (Eos's Still Point, a blow turned at the last instant).
+  // Not a stagger: the attack stops, what it had out is gone, and its eye half shuts for a moment.
+  // Not during a phase change, a ward or a stagger, and not again for a few seconds. True if it broke.
+  B.breakPattern = function () {
+    if (!B.active || B.dead || B.dying || B.invuln || B.staggered || B.ward || B.toppled) return false;
+    if (B.t < (B.breakAt || 0)) return false;
+    interrupt();
+    B.breakAt = B.t + 7;
+    const c = B.core;
+    c.flash = 1; c.kick = 1;
+    G.fx.shards(c.x, c.y, 8, G.pal().boss, { speed: [140, 460], size: [2, 4.5] });
+    G.fx.ring(c.x, c.y, { r0: 40, r1: 200, life: 0.3, color: G.pal().hot, width: 5 });
+    B.script = flinch(0.65);
+    return true;
   };
 
   function* staggerScript() {

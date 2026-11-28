@@ -462,6 +462,8 @@
     b.pose = 'idle'; b.sputter = 0;
   };
   B.onRecover = function () { B.body.pose = 'land'; };
+  B.groundY = (x) => gy(x); // (v3.1g: where he comes down when a move is cut short in the air)
+  B.onBreak = function () { const b = B.body; b.pose = b.y < gy(b.x) - 1 ? 'hover' : 'land'; b.fast = true; };
   // blows from behind, and blows while he is open, count double towards knocking him down
   B.onHit = function (dmg) {
     const b = B.body, P = G.player;

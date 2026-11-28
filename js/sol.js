@@ -902,6 +902,12 @@
     B.flare = 0; B.faceS.eyes = Math.min(B.faceS.eyes, 0.3);
   };
 
+  // (v3.1g) a move of hers cut short by Still Point: fallen, she is rocked back, a hand to her eyes.
+  // (Noon is never cut short: B.steadfast. Nor is the last light.)
+  B.onBreak = function () { if (B.form !== 'noon') { const b = B.body; b.air = false; setPose('reel', true); } };
+  B.unbreakable = () => !!B.lastLightOn;
+  B.floats = () => B.form === 'noon';
+
   // ---------------------------------------------------------------- what can be struck
   const HAND_HP = () => B.maxHp * (K.hard() ? 0.075 : 0.065);
   B.vuln = function (t) {

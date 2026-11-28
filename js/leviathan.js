@@ -2706,6 +2706,7 @@
     yield* wait(0.3);
   };
   B.onRecover = function () { B.body.beached = false; };
+  B.floats = true; // (v3.1g: cut short, it is not dropped to the floor: its body is on its own springs)
 
   // ------------------------------------------------------------------ scenes
   // The sea goes still, a shadow passes under it, and it breaches in a wall of water.

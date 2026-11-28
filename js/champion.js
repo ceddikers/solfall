@@ -468,6 +468,9 @@
     b.pose = 'idle';
   };
   B.onRecover = function () { B.body.pose = 'land'; };
+  // (v3.1g) a move of his cut short by Still Point: he is rocked back on his heels. Not the Black Dawn.
+  B.onBreak = function () { const b = B.body; b.pose = 'reel'; b.fast = true; b.air = false; };
+  B.unbreakable = () => !!B.bd;
   // a clash (player.js) fills a fifth of his bar
   B.onClash = function () { if (!B.staggered) B.poise = Math.min(B.poiseMax - 1, B.poise + B.poiseMax * 0.2); };
   B.onHit = function (dmg) {

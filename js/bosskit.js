@@ -197,7 +197,7 @@
       B.phase = 1; B.poise = 0; B.poiseMax = B.poise0 * G.POISE * (G.diff().poise || 1); B.staggered = false;
       B.invuln = true; B.active = false; B.dead = false; B.dying = false; B.toppled = false; B.down = false;
       B.script = null; B.attackName = ''; B.bag = []; B.lastAtk = ''; B.forceNext = G.corrupt.opener(B, 1) || (B.first && B.first[1]) || '';
-      B.t = 0; B.lastStand = false; B.kite = 0; B.above = 0;
+      B.t = 0; B.lastStand = false; B.kite = 0; B.above = 0; B.breakAt = 0;
       B.body = { x: 900, y: FLOOR, face: -1, flash: 0, kick: 0, kx: 0, ctrl: true, hidden: false, exposed: false, jit: 0 };
       B.core = { x: 900, y: FLOOR - B.h * 0.55, r: B.w * 0.5 };
       G.bounds = null; G.wind = 0;
@@ -314,6 +314,38 @@
     B.forceStagger = function () {
       if (B.active && !B.dead && !B.dying && !B.invuln && !B.staggered && !B.ward) stagger();
     };
+    // (v3.1g) Its move is cut short from outside: Eos's Still Point, a blow turned at the last instant.
+    // Not a stagger: whatever it was doing stops, what it had thrown is gone, and it rocks back and
+    // stands for a moment before it thinks again. No blow stops a phase change, a ward, a stagger
+    // already on, or a working that nothing stops (B.steadfast; B.unbreakable() for a boss's own),
+    // and it cannot be done again for a few seconds. True if it broke.
+    B.breakPattern = function (dir) {
+      if (!B.active || B.dead || B.dying || B.invuln || B.staggered || B.ward || B.steadfast || B.toppled) return false;
+      if (B.t < (B.breakAt || 0) || (B.unbreakable && B.unbreakable())) return false;
+      interrupt();
+      B.breakAt = B.t + 7;
+      B.script = reelScript(dir || 1);
+      return true;
+    };
+    function* reelScript(dir) {
+      const b = B.body, cy = b.y - B.h / 2;
+      b.ctrl = true; b.hidden = false;
+      if (B.onBreak) B.onBreak(dir); // (its own pose for it)
+      b.flash = 1; b.kx = G.clamp(dir * 18, -18, 18); b.recV = G.clamp((b.recV || 0) + dir * 5, -6, 6); b.sq = Math.max(b.sq || 0, 0.1);
+      G.fx.shards(b.x, cy, 7, G.pal().boss, { speed: [140, 460], size: [2, 4.5] });
+      G.fx.ring(b.x, cy, { r0: 30, r1: 170, life: 0.3, color: G.pal().hot, width: 5 });
+      const ground = () => (B.groundY ? B.groundY(b.x) : FLOOR);
+      let e = 0, vy = 500;
+      while (e < 0.65) {
+        const dt = yield;
+        e += dt;
+        b.jit = 0.7 * (1 - e / 0.65);
+        // one caught in the air comes down, faster as it falls (not one that flies: B.floats)
+        if (!(typeof B.floats === 'function' ? B.floats() : B.floats) && b.y < ground()) { vy += 2800 * dt; b.y = Math.min(ground(), b.y + vy * dt); }
+      }
+      b.jit = 0; B.recT = 0;
+      release();
+    }
     // What a full stagger bar does is each boss's own: staggerIn (how it goes down), staggerOut (how
     // it gets up), staggerMult (damage taken while down, 1.4 unless given) and staggerDur (a scale on
     // how long it lasts). The Knight is disarmed, the Veil is thrown into a wall, the Magus is grounded.
