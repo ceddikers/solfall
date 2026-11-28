@@ -40,11 +40,11 @@
     ARC_DMG: 40, ARC_SPEED: 1500, // the crescent of light (Second Light throws one when a blow is turned)
     BANK_HOLD: 0.17,              // (until v2.9a: how long the button stayed down after a press before the cuts that landed lit marks)
     SHEATH_COMBOS: 6,             // (v3.1e) notches the sheath holds: one for every cut of the string that lands
-    NOTCH_DMG: [22, 11],          // (v3.1f: 25, 12; he won most and killed fastest) a draw deals 22 and 11 more for every notch it spends (33 to 88)
+    NOTCH_DMG: [20, 10],          // (v3.1i: 22, 11; v3.1f: 25, 12; he won most and killed fastest) a draw deals 20 and 10 more for every notch it spends (30 to 80)
     DRAW_DODGE: false,            // (v2.9c) the draw no longer passes through attacks: a full sheath is a cut kept ready, not a dodge kept ready
     GUARD_T: 0.65,                // how long Still Point waits for a blow (v2.1b: from 0.45; half its Starlight back if none comes)
     GUARD_PERFECT: 0.18,          // (v3.1g) a blow turned this soon after the guard went up was met at the last instant: the foe's move is cut short
-    ANSWER_DMG: [16, 44],         // (v3.1g) the cut that answers a turned blow, and the one that answers a blow met at the last instant
+    ANSWER_DMG: [14, 40],         // (v3.1i: 16, 44)         // (v3.1g) the cut that answers a turned blow, and the one that answers a blow met at the last instant
     EDGE_T: 2.5,                  // how long a turned blow keeps all three marks lit without the button held
   };
   const GOLD = '255,214,140'; // the finisher's colour

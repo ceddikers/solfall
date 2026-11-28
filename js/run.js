@@ -82,18 +82,18 @@
       // only the string of presses uses these; the draw is in G.PLAYER (DRAW_DMG, SHEATH_COMBOS and the rest)
       // (v2.1b: a string of three, from three flicks of 11 every 0.36 s)
       combo: [
-        { dmg: 11, cd: 0.27, dur: 0.22, wind: 0.04, act: 0.1 },  // out of the sheath, rising
-        { dmg: 13, cd: 0.29, dur: 0.24, wind: 0.05, act: 0.1 },  // back across, falling
-        { dmg: 27, cd: 0.5, dur: 0.36, wind: 0.08, act: 0.14 },  // the finisher, wide, stepping in
+        { dmg: 10, cd: 0.27, dur: 0.22, wind: 0.04, act: 0.1 },  // out of the sheath, rising (v3.1i: 11, 13, 27; he killed a sixth faster than the others)
+        { dmg: 12, cd: 0.29, dur: 0.24, wind: 0.05, act: 0.1 },  // back across, falling
+        { dmg: 25, cd: 0.5, dur: 0.36, wind: 0.08, act: 0.14 },  // the finisher, wide, stepping in
       ],
       down: 11, special: 'guard', specialName: 'Still Point', verb: 'guard',
       blurb: 'Patient and exact. One cut, when it counts.',
       lines: ['Notched blade: every cut that lands notches the sheath, up to six', 'Hold attack and let go to draw through the foe: each notch makes it harder', 'Still Point: turn a blow and he cuts through the foe. Turn it late to stop its move'],
       how: {
-        attack: 'Notched blade: cut (11), cut (13), finisher (27). Every cut that lands notches the sheath, up to six (all six, it glows gold). Hold attack a moment and let go to draw: he blinks through the foe for 22, and 11 more for every notch it spends (88 at six).',
+        attack: 'Notched blade: cut (10), cut (12), finisher (25). Every cut that lands notches the sheath, up to six (all six, it glows gold). Hold attack a moment and let go to draw: he blinks through the foe for 20, and 10 more for every notch it spends (80 at six).',
         aim: 'The draw goes where you aim. Down in the air strikes below and bounces.',
         dash: 'The draw is a cut, not a dodge: it does not pass through attacks.',
-        special: 'Still Point: brace for two thirds of a second. A blow that lands is turned and fills the sheath, and he cuts through the foe for 16. A shot takes him to its caster. Brace just as it lands: the cut deals 44 and stops the foe mid-move. If nothing lands, half the Starlight comes back.',
+        special: 'Still Point: brace for two thirds of a second. A blow that lands is turned and fills the sheath, and he cuts through the foe for 14. A shot takes him to its caster. Brace just as it lands: the cut deals 40 and stops the foe mid-move. If nothing lands, half the Starlight comes back.',
         ult: 'Horizon: one cut across the whole arena for 250.',
       },
     },
@@ -122,7 +122,7 @@
       combo: [{ dmg: 15, cd: 0.33, dur: 0.3, wind: 0.07, act: 0.12 }, { dmg: 17, cd: 0.35, dur: 0.3, wind: 0.07, act: 0.12 }, { dmg: 40, cd: 0.6, dur: 0.44, wind: 0.12, act: 0.16 }], // (bot test: 13/15/35 fell well short of his sheathed blade)
       blurb: 'A long blade on a pole. The longest reach there is.',
       lines: ['Naginata: two wide sweeps and a finisher, from far off', 'Still Point: a turned blow is answered with a sweep all around', 'The longest reach of any weapon'],
-      how: { attack: 'Naginata: sweep (15), sweep (17), finisher (40), which sends a short crescent of light on for 20. The longest reach of any weapon.', aim: 'Up sweeps overhead. Down in the air strikes below and bounces.', dash: 'A sweep straight out of a dash becomes a thrust: 40% more damage and reach.', special: 'Still Point: brace for two thirds of a second. A blow that lands is turned, does no harm, and is answered with a cut through the foe for 16 and a sweep all around you for 60. Brace just as it lands: the cut deals 44 and stops the foe mid-move. If nothing lands, half the Starlight comes back.' } },
+      how: { attack: 'Naginata: sweep (15), sweep (17), finisher (40), which sends a short crescent of light on for 20. The longest reach of any weapon.', aim: 'Up sweeps overhead. Down in the air strikes below and bounces.', dash: 'A sweep straight out of a dash becomes a thrust: 40% more damage and reach.', special: 'Still Point: brace for two thirds of a second. A blow that lands is turned, does no harm, and is answered with a cut through the foe for 14 and a sweep all around you for 60. Brace just as it lands: the cut deals 40 and stops the foe mid-move. If nothing lands, half the Starlight comes back.' } },
   };
   const heroById = {};
   for (const h of G.HEROES) heroById[h.id] = h;
@@ -474,15 +474,16 @@
     // a pair you have earned takes one card's place, on half the offers
     const open = openPairs().filter((p) => (!avoid || !avoid.includes(p)) && !(R.banned || []).includes(p.id));
     if (open.length && Math.random() < 0.5) R.offer[Math.min(R.offer.length, n - 1)] = G.pick(open);
-    // and once a boss has fallen, a corrupted boon takes the first card's place on two offers in five
+    // and once a boss has fallen, a corrupted boon takes the first card's place on one offer in five
+    // (v3.1i: from two in five; a run could hold three by trial V)
     const cursed = G.CURSED.filter((b) => !G.boon(b.id) && (!avoid || !avoid.includes(b)) && !(R.banned || []).includes(b.id));
     if (R.beaten.length && cursed.length && Math.random() < R.CURSED_CHANCE) R.offer[0] = G.pick(cursed);
     return R.offer;
   };
-  R.CURSED_CHANCE = 0.4;
+  R.CURSED_CHANCE = 0.2;
   // The Cleansing Fountain (rest.js): purge a corrupted boon's bane for Motes (v2.9k: was Sunshards).
   // The price doubles with each use in a run.
-  R.cleanseCost = () => 50 * Math.pow(2, R.cleanses);
+  R.cleanseCost = () => 80 * Math.pow(2, R.cleanses); // (v3.1i: 80, 160, 320; it was 50, 100, 200)
   R.banes = () => R.order.filter((id) => boonById[id] && boonById[id].cursed && G.bane(id));
   R.cleanse = function (id) {
     const cost = R.cleanseCost();

@@ -235,7 +235,7 @@
     B.phase = 1; B.poise = 0; B.poiseMax = 440 * G.POISE * (G.diff().poise || 1); B.staggered = false;
     B.invuln = true; B.active = false; B.dead = false; B.dying = false; B.toppled = false; B.down = false;
     B.script = null; B.attackName = ''; B.bag = []; B.lastAtk = ''; B.forceNext = G.corrupt.opener(B, 1) || 'slam';
-    B.t = 0; B.breakAt = 0; B.spread = 318; B.rays = []; B.shardR = 900; B.shardsOut = false; B.hasShards = false;
+    B.t = 0; B.breakAt = 0; B.graceAt = 0; B.spread = 318; B.rays = []; B.shardR = 900; B.shardsOut = false; B.hasShards = false;
     B.core = {
       x: 640, y: -200, r: 84, ctrl: true, open: 1, charge: 0, flash: 0,
       lx: 0, ly: 0, pulse: 0, spinHint: 0, hurt: false, jit: 0, sun: 0, embedded: false,
@@ -356,7 +356,7 @@
           size: info.finisher ? 28 : info.heavy ? 23 : 17, life: info.finisher ? 0.8 : 0.65, pop: true,
         });
       }
-      if (!B.staggered) {
+      if (!B.staggered && !(B.t < B.graceAt)) { // (v3.1i: nothing for four seconds after a stagger)
         // heroes differ in how hard they stagger (info.poise); the Sunstone relic speeds it for everyone
         B.poise += (amount * (t.kind === 'hand' ? 1.5 : (B.phase === 3 ? 1.35 : 0.9)) * (info.poise || 1) + (info.lance ? 60 : 0))
           * G.relics.poiseK();
@@ -480,6 +480,7 @@
       B.poise = B.poiseMax * (1 - e / dur);
     }
     B.staggered = false; B.poise = 0;
+    B.graceAt = B.t + 4; // (v3.1i: the bar takes nothing for four seconds after a stagger, as every boss's: bosskit.js)
     B.poiseMax = Math.min(900 * G.POISE * (G.diff().poise || 1), B.poiseMax * 1.25);
     G.fx.ring(c.x, c.y, { r0: 40, r1: 300, life: 0.45, color: G.pal().boss, width: 8 });
     G.audio.play('ring'); G.fx.shake(8);
@@ -3283,6 +3284,7 @@
   B.update = function (dt) {
     B.t += dt;
     const c = B.core, P = G.player;
+    if (B.t < B.graceAt && !B.staggered) B.poise = 0; // (v3.1i: the grace after a stagger)
     c.flash = Math.max(0, c.flash - dt * 6);
     for (const h of B.hands) { h.flash = Math.max(0, h.flash - dt * 6); h.kx = (h.kx || 0) * Math.exp(-13 * dt); }
     c.kick = (c.kick || 0) * Math.exp(-11 * dt);

@@ -2,7 +2,7 @@
 
 A side-on boss rush for the browser: four heroes, seven three-phase bosses, played as a run of
 ever-harder trials. You pick a hero and a relic before the run and win a boon after each victory.
-Version 3.1h.
+Version 3.1i.
 
 This is an early slice of a planned boss-rush roguelite (short runs, a boon after each boss,
 bosses drawn from a pool). A run is seven trials, one for each boss, each harder than the last: the first boss
@@ -116,6 +116,38 @@ hero (`tools/feel-check.js`).
 - Settings, Reset progress erases Sunshards, upgrades, trophies and records (it has to be chosen twice).
 
 Not done: touch controls, a colour-blind alternative to red-orange warnings, gamepad rebinding.
+
+## The Last Wave's scene, rarer corruption, a rest for the stagger bar, Eos down a little (v3.1i)
+
+After a trial V run that "felt kinda ridiculous" (the Monk at 3% in 57 seconds, then four health lost to the
+Last Wave), asked for four things.
+
+**"the last wave is a bit weird, i think it should have a cutscene that leads to it"**
+- When Kairo drops below 12% the fight stops: the bars come in and the hero is held where they stand (brought
+  down to the floor first). He is on a knee, spent; he stands and roars; he leaps to the far end. The view cuts
+  close to the hero, whose weapon lights. Then the gathering and the wave. About 2.7 s before the gathering.
+- Neither of you can be hurt from the start of the scene until the push is decided.
+- The push starts further from the hero (0.3 of the way, from 0.12), so it is no longer lost in half a second.
+- The key to press shows over where the two meet, as it does in Aurel's Black Dawn.
+- Not changed: what losing costs (2 health, 3 from trial V) and how fast the wave pushes.
+
+**"the corrupted boons should be less common and cost more to cleanse"**
+- A corrupted boon takes a card's place on **one offer in five** (from two in five).
+- The Fountain costs **80, 160, 320** Motes (from 50, 100, 200).
+
+**"the stagger bar for a boss should have a grace period after a stagger is done"**
+- For **4 seconds** after a boss gets up from a stagger its bar takes nothing, from any source, and shows dim.
+  Every boss. Forced staggers (winning the Last Wave, Dying Light) still work. Kairo's Gathered Sun bar is its own
+  and is not affected.
+
+**"eos feels very strong but fair enough - maybe lower numbers a bit?"**
+- Cuts 10, 12, 25 (from 11, 13, 27). The draw 20 and 10 a notch, 80 at six (from 22 and 11, 88).
+  Still Point's cut 14, and 40 on a perfect block (from 16 and 44).
+- The bot, unhurt and with no boons, against four bosses: Eos won in 131 s on average against 149 s for the other
+  three heroes, 12% faster. Before, 121 s against 145 s, 17% faster. Two fights a pairing, so a rough figure.
+
+Checked: the scene frame by frame, won and lost; the bar after a stagger on the Knight and the Warden. Not played
+by a person.
 
 ## Eos: the Still Moment (v3.1h)
 

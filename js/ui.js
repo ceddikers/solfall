@@ -888,6 +888,9 @@
     const po = Math.round(G.clamp(B.poise / B.poiseMax, 0, 1) * 100);
     if (po !== H.poise) { H.poise = po; el.pfill.style.width = po + '%'; }
     if (B.staggered !== H.broken) { H.broken = B.staggered; el.pbar.classList.toggle('broken', B.staggered); }
+    // (v3.1i) dim while it takes nothing, the few seconds after a stagger
+    const rest = !B.staggered && B.t < (B.graceAt || 0);
+    if (rest !== H.rest) { H.rest = rest; el.pbar.classList.toggle('rest', rest); }
 
     const ts = U.fmtTime(G.time);
     if (ts !== H.timer) { H.timer = ts; el.timer.textContent = ts; }

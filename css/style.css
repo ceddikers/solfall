@@ -140,6 +140,7 @@ kbd {
 .pbar.broken { border-color: #fff; box-shadow: 0 0 12px var(--star); }
 .pbar.broken #pfill { background: #fff; }
 .pbar.broken span { color: var(--star-hot); }
+.pbar.rest { opacity: 0.35; }
 
 #card { position: absolute; left: 0; right: 0; top: 356px; text-align: center; opacity: 0; }
 #card.show { animation: card 3.4s ease-out forwards; }

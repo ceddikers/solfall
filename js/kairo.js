@@ -435,6 +435,7 @@
   };
   B.onInterrupt = function () {
     const P = G.player;
+    lwEnd(); // (v3.1i: the Last Wave's scene, cut short)
     if (P.grabbed) { P.grabbed = null; P.vy = -200; }
     B.lw = null; B.thrown = null; B.counter = null; B.partnerOn = false; B.shade = null; B.steadfast = false; B.sunOn = false;
     if (B.sunBar) { B.poiseMax = B.sunBar.max; B.poise = 0; B.sunBar = null; }
@@ -1331,15 +1332,66 @@
   // wave, the full height of the screen. It cannot be dodged: the hero meets it, weapon raised, and the
   // two push. Each press of attack pushes it back; Dawnbreak, if ready, wins at once. Lose, and it is two
   // health (three when fierce) and a combo after. Win, and his own wave throws him down.
+  // (v3.1i) It has a scene of its own before it (asked: "it should have a cutscene that leads to it"):
+  // the fight stops, the bars come in, the hero is held where they stand. He is on a knee, spent; he
+  // looks up, stands and roars, and goes to the far end. The view cuts to the hero, whose weapon lights:
+  // they are going to meet it. Then the gathering, wide, and the wave. Nothing can hurt either of them
+  // until the two meet, and the push starts further from the hero than it did (0.3, from 0.12), so the
+  // scene does not end in half a second. Over where they meet, the key to press (as Aurel's Black Dawn).
+  function lwEnd() {
+    if (!B.lwScene) return;
+    B.lwScene = false; B.invuln = false;
+    G.ui.letterbox(false); G.fx.cine.to = 0;
+    if (G.player.grabbed && G.player.grabbed.scene) G.player.grabbed = null;
+  }
+  function* lwScene() {
+    const b = B.body, P = G.player;
+    while (P.ulting || P.seq) yield; // (a Dawnbreak or a Still Moment plays out first)
+    if (P.dead) return false;
+    B.lwScene = true; B.invuln = true;
+    H.clear(true);
+    G.ui.letterbox(true);
+    // the hero: held, brought down to the floor (and off a pit), turned to face him
+    const px = G.arena.inPit(P.x) ? G.arena.solidNear(P.x) : P.x;
+    const g = P.grabbed = { x: P.x, y: Math.min(P.y, FLOOR), face: G.sign(b.x - P.x) || 1, scene: true };
+    const settle = (dt) => { g.y = Math.min(FLOOR, g.y + 1100 * dt); g.x += (px - g.x) * Math.min(1, dt * 10); };
+    // spent: down on a knee where he is, the flame guttering
+    b.hurt = false; b.air = false; b.exposed = false; b.pose = 'kneel'; b.fast = true; b.sputter = 1;
+    b.face = G.sign(P.x - b.x) || b.face; faceNow();
+    G.audio.play('kBreath'); G.fx.slow(0.35, 0.5); G.fx.shake(8);
+    G.fx.dust(b.x, gy(b.x), 5, { speed: [30, 150], size: [6, 12], up: 40 });
+    G.fx.cineCut(b.x, b.y - 50, 0.55); G.fx.cineEase(1.4);
+    yield* during(0.8, (k, dt) => { if (b.y < gy(b.x)) b.y = Math.min(gy(b.x), b.y + 1100 * dt); settle(dt); G.fx.cine.z = 0.55 + 0.12 * k; });
+    // he looks up, and stands
+    b.fast = false; b.sputter = 0; b.pose = 'roar';
+    G.audio.play('kHeart', { vol: 1.1 }); G.audio.play('kRoar', { dur: 0.9 });
+    G.fx.ripple(b.x, b.y - 40, 260, 0.5, 1); G.fx.ring(b.x, b.y - 44, { r0: 20, r1: 320, life: 0.5, color: WAVE.hot, width: 6 });
+    for (const sl of B.slabs) if (Math.abs((sl.l + sl.r) / 2 - b.x) < 260) sl.quake = Math.max(sl.quake, 0.5);
+    yield* during(0.8, (k, dt) => { settle(dt); G.fx.shake(3 + 4 * k); K.aura(b.x, b.y, WAVE.boss, 22, 100, 3); G.fx.cine.z = 0.67 - 0.2 * k; });
+    // to the far end, and the view opens out with him
+    const far = P.x < 640 ? WR - 70 : WL + 70, x0 = b.x;
+    G.fx.cine.to = 0; G.fx.cineEase(5);
+    b.pose = 'leap'; b.air = true; G.audio.play('whoosh'); afterimage(b, 0.3, true);
+    yield* during(0.5, (k, dt) => { settle(dt); const q = E.inOutQuad(k); b.x = G.lerp(x0, far, q); b.y = gy(b.x) - 130 * Math.sin(Math.PI * k); });
+    b.x = far; b.y = gy(far); b.air = false; b.face = far > 640 ? -1 : 1; faceNow();
+    b.pose = 'cup'; b.orb = 0.2;
+    K.impact(far, false, G.pal().boss);
+    g.face = -b.face;
+    // the hero: close, their weapon lighting. They will meet it
+    const hc = G.hero();
+    G.fx.cineCut(g.x, g.y - 40, 0.6); G.fx.cineEase(1.2);
+    G.audio.play('focus', { n: 3 }); G.audio.play('glint');
+    G.fx.glint(g.x + g.face * 14, g.y - 40, 46, hc.hot, 0.5);
+    G.fx.ring(g.x, g.y - 30, { r0: 90, r1: 14, life: 0.5, color: hc.col, width: 3 });
+    G.fx.light(g.x, g.y - 30, 200, hc.col, 0.6, 0.5);
+    yield* during(0.6, (k, dt) => { settle(dt); G.fx.cine.z = 0.6 + 0.1 * k; if (Math.random() < dt * 30) G.fx.spawn({ kind: 'spark', x: g.x + G.rand(-30, 30), y: g.y - G.rand(0, 20), vx: G.rand(-20, 20), vy: -G.rand(120, 360), life: G.rand(0.2, 0.5), size: G.rand(1.5, 3), color: hc.hot }); });
+    G.fx.cine.to = 0; G.fx.cine.k = 0; G.fx.cineEase(2.6); G.fx.cine.z = 0.3;
+    return !P.dead;
+  }
   function* atkLastWave() {
     const b = B.body, P = G.player;
-    const far = P.x < 640 ? WR - 70 : WL + 70;
-    b.pose = 'leap'; b.air = true; G.audio.play('whoosh');
-    const x0 = b.x;
+    if (!(yield* lwScene())) { lwEnd(); return; }
     let e = 0;
-    while (e < 0.5) { const dt = yield; e += dt; const k = Math.min(1, e / 0.5); b.x = G.lerp(x0, far, E.inOutQuad(k)); b.y = gy(b.x) - 120 * Math.sin(Math.PI * k); }
-    b.x = far; b.y = gy(far); b.air = false; b.face = far > 640 ? -1 : 1; faceNow();
-    b.pose = 'cup'; b.orb = 0.3;
     G.fx.cine.x = b.x; G.fx.cine.y = b.y - 60; G.fx.cine.to = 0.7;
     G.audio.play('kCharge', { dur: 1.3 }); G.audio.play('kRoar', { dur: 1.3 });
     e = 0;
@@ -1347,11 +1399,11 @@
     G.fx.cine.to = 0;
     b.orb = 0; b.pose = 'push'; b.fast = true;
     G.audio.play('kWave', { dur: 1.6, vol: 1.2 }); G.fx.shake(16);
-    const dir = b.face, W = B.lw = { from: b.x + dir * 36, front: b.x + dir * 36, dir, m: 0.12, state: 'roll', t: 0 };
+    const dir = b.face, W = B.lw = { from: b.x + dir * 36, front: b.x + dir * 36, dir, m: 0.3, state: 'roll', t: 0 };
     while (W.state === 'roll') {
       const dt = yield;
       W.front += dir * 1400 * dt; W.t += dt;
-      if (P.dead) { B.lw = null; return; }
+      if (P.dead) { B.lw = null; lwEnd(); return; }
       if ((W.front - P.x) * dir >= -26) W.state = 'meet';
     }
     // the meeting: the hero is held where they stand, facing it
@@ -1367,7 +1419,7 @@
       W.m = G.clamp(W.m - push * dt + pr * 0.08, 0, 1);
       if (pr) { G.audio.play('kSnap', { vol: 0.6 }); G.fx.shake(4); }
       if (g.ult) { P.ult = 0; W.m = 1; G.audio.play('clash'); }
-      W.front = G.lerp(W.hx - dir * 18, b.x + dir * 40, W.m);
+      W.front += (G.lerp(W.hx - dir * 18, b.x + dir * 40, W.m) - W.front) * Math.min(1, dt * 9); // (v3.1i: eased, it starts further out than where they met)
       sparkT -= dt;
       if (sparkT <= 0) {
         sparkT = 0.03;
@@ -1376,6 +1428,7 @@
       if (W.m >= 1 || W.m <= 0 || P.dead) break;
     }
     P.grabbed = null;
+    lwEnd(); // (the bars go, and he can be hurt again)
     if (W.m >= 1) {
       // his own wave turns and throws him down
       W.state = 'back';
@@ -2521,6 +2574,20 @@
       ctx.beginPath(); for (let y = -80; y <= FLOOR; y += 12) (y === -80 ? ctx.moveTo(edge(y), y) : ctx.lineTo(edge(y), y)); ctx.stroke();
       D.glow(ctx, WAVE.hot, W.front, FLOOR - 150, 150, 0.35 * f);
       ctx.restore();
+      if (W.state === 'meet' && W.hx != null) {
+        // (v3.1i) the key to press, over where they meet (as the Black Dawn shows its own: champion.js)
+        const hc = G.hero(), label = G.input.device === 'gamepad' ? 'X' : G.input.label('attack');
+        const kx = G.clamp(W.front, 60, G.W - 60), ky = FLOOR - 268 - 4 * Math.sin(G.t * 12), w = Math.max(40, 18 + 13 * label.length), h = 40;
+        ctx.save();
+        G.roundRect(ctx, kx - w / 2, ky - h / 2, w, h, 8);
+        ctx.fillStyle = 'rgba(8,6,16,0.88)'; ctx.fill();
+        ctx.strokeStyle = G.rgba(Math.sin(G.t * 24) > 0 ? hc.hot : hc.col, 0.95); ctx.lineWidth = 2.5; ctx.stroke();
+        ctx.fillStyle = G.rgba(hc.hot, 1);
+        ctx.font = '700 21px Bahnschrift, "Segoe UI", sans-serif';
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText(label, kx, ky + 1);
+        ctx.restore();
+      }
     }
   };
 

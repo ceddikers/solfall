@@ -151,6 +151,7 @@
   // (v2.5e) A boss with snapTurn: true flips at once instead, frame to frame, as the quick fighters in
   // Hollow Knight do: the user wanted to try it on the bosses that are not heavy (the Magus, the Veil,
   // the Knight, Kairo, Aurel). The Warden keeps the turn; the Wolf and the Leviathan have their own.
+  K.STAGGER_GRACE = 4; // (v3.1i) seconds after a stagger in which the bar takes nothing
   const TURN_T = 0.16;
   K.turn = function (b, dt, snap) {
     if (b.tqf !== b.face) {
@@ -197,7 +198,7 @@
       B.phase = 1; B.poise = 0; B.poiseMax = B.poise0 * G.POISE * (G.diff().poise || 1); B.staggered = false;
       B.invuln = true; B.active = false; B.dead = false; B.dying = false; B.toppled = false; B.down = false;
       B.script = null; B.attackName = ''; B.bag = []; B.lastAtk = ''; B.forceNext = G.corrupt.opener(B, 1) || (B.first && B.first[1]) || '';
-      B.t = 0; B.lastStand = false; B.kite = 0; B.above = 0; B.breakAt = 0;
+      B.t = 0; B.lastStand = false; B.kite = 0; B.above = 0; B.breakAt = 0; B.graceAt = 0;
       B.body = { x: 900, y: FLOOR, face: -1, flash: 0, kick: 0, kx: 0, ctrl: true, hidden: false, exposed: false, jit: 0 };
       B.core = { x: 900, y: FLOOR - B.h * 0.55, r: B.w * 0.5 };
       G.bounds = null; G.wind = 0;
@@ -259,7 +260,7 @@
             size: info.finisher ? 28 : info.heavy ? 23 : 17, life: info.finisher ? 0.8 : 0.65, pop: true,
           });
         }
-        if (!B.staggered) {
+        if (!B.staggered && !(B.t < B.graceAt)) { // (v3.1i: nothing for a few seconds after a stagger, see staggerScript)
           B.poise += (amount * (B.poiseK || 1.15) * (info.poise || 1) + (info.lance ? 60 : 0)) * G.relics.poiseK();
         }
       }
@@ -367,6 +368,10 @@
         B.poise = B.poiseMax * (1 - e / dur);
       }
       B.staggered = false; B.poise = 0;
+      // (v3.1i) on its feet again, its bar takes nothing for four seconds: a hero who hits hard could
+      // otherwise have it half full again before it had done anything (asked: "a grace period after a
+      // stagger is done where it doesnt gain anything for like 3-5 seconds")
+      B.graceAt = B.t + K.STAGGER_GRACE;
       B.poiseMax = Math.min(900 * G.POISE * (G.diff().poise || 1), B.poiseMax * 1.25);
       G.fx.ring(b.x, b.y - B.h / 2, { r0: 40, r1: 280, life: 0.45, color: G.pal().boss, width: 8 });
       G.audio.play('ring'); G.fx.shake(8);
@@ -581,6 +586,9 @@
     B.update = function (dt) {
       B.t += dt;
       const b = B.body, P = G.player;
+      // (the grace after a stagger, for whatever fills the bar without a blow: a clash, a turned blow, a boon.
+      // Not a bar a boss is using for something of its own: Kairo's Gathered Sun)
+      if (B.t < B.graceAt && !B.staggered && !B.sunBar) B.poise = 0;
       b.flash = Math.max(0, b.flash - dt * 6);
       b.kx *= Math.exp(-13 * dt);
       // the rock is a spring, a little under-damped, so it comes back past upright once and settles
