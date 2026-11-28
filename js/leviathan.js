@@ -247,7 +247,7 @@
     teleK: 0.82, // its warnings, against the difficulty's (v2.4d: they were easy to read; v2.9g: 0.9)
     answer: 'volley',
     antiAir: 'breach', // (the kit: a hero riding over its head is answered by this)
-    gaps: [0, 0.76, 0.62, 0.5], // (v2.9g: 0.84, 0.7, 0.57; v2.4d: 0.95, 0.8, 0.65)
+    gaps: [0, 0.7, 0.57, 0.46], // (v3.1f: 0.76, 0.62, 0.5, the bot won 71% on Merciless; v2.9g: 0.84, 0.7, 0.57; v2.4d: 0.95, 0.8, 0.65)
     bags: {
       1: ['lunge', 'snap', 'slam', 'spouts', 'snap', 'volley', 'breaker', 'jet', 'barnacles', 'thrash', 'gyre'],
       2: ['lunge', 'snap', 'slam', 'spouts', 'sweep', 'volley', 'snap', 'breaker', 'jet', 'barnacles', 'thrash', 'gyre'],

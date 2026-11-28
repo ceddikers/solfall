@@ -7,7 +7,8 @@
   const WL = G.WALL_L, WR = G.WALL_R;
 
   const B = G.boss = {
-    BASE_HP: 5400, id: 'warden', reckonName: G.T('ECLIPSE'), name: G.T('THE ECLIPSED WARDEN'), short: G.T('The Warden'), theme: 'warden',
+    BASE_HP: 4700, id: 'warden', // (v3.1f: 5400; slowest to kill, and the bot won 17% on Merciless)
+    reckonName: G.T('ECLIPSE'), name: G.T('THE ECLIPSED WARDEN'), short: G.T('The Warden'), theme: 'warden',
     blurb: G.T('A dimmed sun and its two hands'),
     tips: [
       G.T('Slash downward in the air to bounce off a hand and stay above the shockwaves.'),
@@ -744,7 +745,7 @@
   const ABOVE_T = 1.4; // (as the other bosses, js/bosskit.js)
   function* think() {
     const low = B.phase === 3 && B.hp < B.maxHp * 0.12;
-    const gap = [0, 0.95, 0.75, hard() ? 0.6 : 0.68][B.phase] * G.diff().pace * (low ? 0.55 : 1); // (v2.9g: phase III rests longer before trial V)
+    const gap = [0, 1.05, 0.84, hard() ? 0.72 : 0.76][B.phase] * G.diff().pace * (low ? 0.55 : 1); // (v2.9g: phase III rests longer before trial V; v3.1f: 0.95, 0.75, 0.6 / 0.68 -> 1.05, 0.84, 0.72 / 0.76, the bot won 8-17% on Merciless)
     yield* wait(gap);
     let name = G.debug.forceAttack || '';
     // the last stand: once, when the Warden is nearly spent

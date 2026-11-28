@@ -31,7 +31,7 @@ Every Japanese string in the game follows this file, so names and terms read the
 | The Unfallen | 不墜の者 |
 | Twin Blades / Star Gauntlets / Moon Crossbow / Dawn Naginata | 双刃／星の籠手／月の弩／暁の薙刀 |
 | sword / maul / bow / blade (the weapon nouns) | 剣／大槌／弓／刀 |
-| Star Lance / Starfall / Moon Volley / Still Point | 星槍／星落とし／月の斉射／止水の構え |
+| Star Lance / Starfall / Moon Burst / Still Point | 星槍／星落とし／月の炸裂／止水の構え |
 | Crossing Stars / Meteor Fist / Triple Bolt | 交差星／流星拳／三連矢 |
 | Thousand Stars / Worldbreaker / Moonfall / Horizon (each hero's Dawnbreak) | 千星／天地砕き／月落とし／地平斬 |
 | THE ECLIPSED WARDEN / The Warden | 蝕の番人／番人 |

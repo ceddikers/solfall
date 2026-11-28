@@ -190,7 +190,7 @@
     hudCols: [null, ['#ffe0a0', '#fffcee'], ['#ffb054', '#fff4d6'], ['#ff7c34', '#ffe2c4']],
     BASE_HP: 3900, poise0: 400, w: 40, h: 104,
     answer: 'answer', antiAir: 'antiair', finale: 'lastlight',
-    gaps: [0, 1.0, 0.78, 0.66],
+    gaps: [0, 1.05, 0.85, 0.72], // (v3.1f: 1.0, 0.78, 0.66; the bot won 0 of 24 on Merciless, a light touch)
     bags: { 1: [], 2: [], 3: [] },
     cards: { 2: [G.T('THE FALL'), G.T('She comes down to fight you')], 3: [G.T('ECLIPSE'), G.T('The light goes out')] },
     first: { 1: 'noonray', 2: 'meridian', 3: 'umbra' },

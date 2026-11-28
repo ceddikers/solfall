@@ -14,6 +14,10 @@
     LANCE_DMG: 42, LANCE_SPEED: 1700,
     LANCE_WIND: 0.09, // Vesper draws her arm back with the lance before it flies
     ARROW_SPEED: 1350, ARROW_LIFE: 0.4, VOLLEY_DMG: 10,
+    // (v3.1f) Lune's Moon Burst: every arrow that lands stays in the foe, and the special sets them all off
+    STUCK_MAX: 12, STUCK_LIFE: 6,  // how many can stay in at once, and for how long (Full Quiver: 20, twice as long)
+    BURST_DMG: [6, 12],            // what each one bursts for: an arrow, a piercing arrow
+    BURST_GAP: 0.05,               // the bursts run along the arrows in the order they went in
     ARROW_GAIN: 6, ARROW_GAIN_HEAVY: 12, // Starlight per arrow hit: less than a melee hit
     BOW_SLOW: 0.6,                       // Lune's speed while she is drawing and loosing
     STARFALL_DMG: 42, STARFALL_R: 165, // (v2.4c: 46)
@@ -36,7 +40,7 @@
     ARC_DMG: 40, ARC_SPEED: 1500, // the crescent of light (Second Light throws one when a blow is turned)
     BANK_HOLD: 0.17,              // (until v2.9a: how long the button stayed down after a press before the cuts that landed lit marks)
     SHEATH_COMBOS: 6,             // (v3.1e) notches the sheath holds: one for every cut of the string that lands
-    NOTCH_DMG: [25, 12],          // (v3.1e) a draw deals 25 and 12 more for every notch it spends (37 to 97)
+    NOTCH_DMG: [22, 11],          // (v3.1f: 25, 12; he won most and killed fastest) a draw deals 22 and 11 more for every notch it spends (33 to 88)
     DRAW_DODGE: false,            // (v2.9c) the draw no longer passes through attacks: a full sheath is a cut kept ready, not a dodge kept ready
     GUARD_T: 0.65,                // how long Still Point waits for a blow (v2.1b: from 0.45; half its Starlight back if none comes)
     EDGE_T: 2.5,                  // how long a turned blow keeps all three marks lit without the button held
@@ -51,6 +55,7 @@
 
   const P = G.player = {};
   G.shots = [];
+  G.stuck = []; // (v3.1f) Lune's arrows standing in the foe, waiting for the Moon Burst
   G.wind = 0;
   G.slick = 0; // how frozen the floor is (the Magus's second phase)
 
@@ -99,7 +104,7 @@
       stats: { dmg: 0, hits: 0, perfect: 0, heals: 0, lances: 0 },
     });
     for (let i = 0; i < STYLE[H.id].tail.n; i++) P.scarf.push({ x: P.x, y: P.y - 40 });
-    G.shots.length = 0;
+    G.shots.length = 0; G.stuck.length = 0; P.burst = null;
     G.wind = 0; G.slick = 0;
   };
 
@@ -524,7 +529,7 @@
     // --- special: costs one segment of Starlight
     if (P.flareBuf > 0 && free && P.dashT <= 0 && P.stun <= 0 && P.healT === 0) {
       P.flareBuf = 0;
-      if (P.ember >= C.SEG) {
+      if (P.ember >= C.SEG && (H.special !== 'burst' || (!P.burst && P.stuckN()))) {
         P.ember -= C.SEG; P.stats.lances++; P.castN++; // (castN tells one special from the next: sets.js)
         G.costumeFx('special', P.x, P.y - 34);
         const d = aim(mx, up, down, I.aim.flare);
@@ -536,9 +541,11 @@
         else if (H.special === 'fist') { castArc(d.x, d.y); P.cast.fist = true; P.cast.wind = 0.1; } // (v3.0e: Meteor Fist)
         else if (H.special === 'bolts') castBolts(d.x, d.y); // (v3.0e: Triple Bolt)
         else {
-          castVolley(d.x, d.y);
+          castBurst();
           if (G.boon('harvest') && (P.harvestN = (P.harvestN || 0) + 1) % 3 === 0) { P.ember += C.SEG; P.emberFlash = 1; G.audio.play('segment'); } // (v3.0d: Harvest Moon)
         }
+      } else if (H.special === 'burst' && P.ember >= C.SEG) {
+        G.audio.play('tink'); // (v3.1f) nothing stands in the foe (or a burst is still running): not spent
       } else {
         G.audio.play('empty'); P.emberFlash = -1;
       }
@@ -980,6 +987,124 @@
     if (dy > 0) P.vy = Math.min(P.vy, -420);
     G.audio.play('flare');
     muzzle(dx, dy);
+  }
+
+  // ---------------------------------------------------------------- (v3.1f) Lune's Moon Burst
+  // Every arrow of hers that lands stays in the foe where it struck (STUCK_MAX at once, each for
+  // STUCK_LIFE seconds). The special sets them all off, one after another in the order they went in, and
+  // she springs back. With none standing in the foe it is not spent.
+  // A stuck arrow is kept as a place on the part it struck (its id), as a fraction of that part's size,
+  // turned with the body when it faces about, so it rides the foe as it moves.
+  function stuckCap() { return G.boon('quiver') ? 20 : C.STUCK_MAX; }
+  function stick(s, t) {
+    const L = G.stuck, life = C.STUCK_LIFE * (G.boon('quiver') ? 2 : 1);
+    if (L.length >= stuckCap()) { const k = L.findIndex((a) => !a.going); if (k >= 0) L.splice(k, 1); else return; }
+    const face = (t.ref && t.ref.face) || 1, w = t.r || t.hw || 20, h = t.r || t.hh || 20;
+    // (each lands a little apart from the last and at its own slant, so a full load reads as many arrows)
+    const ang = Math.atan2(s.vy, s.vx) + G.rand(-0.3, 0.3);
+    L.push({
+      id: t.id, heavy: !!s.heavy, t: 0, life,
+      lx: G.clamp((s.x - t.cx) / w * 0.75, -0.7, 0.7) * face, ly: G.clamp((s.y - t.cy) / h + G.rand(-0.3, 0.3), -0.75, 0.75),
+      ang: face < 0 ? Math.PI - ang : ang, wob: 1, seed: Math.random() * 6,
+    });
+  }
+  // where a stuck arrow is now (null while the part it struck cannot be reached)
+  function stuckAt(a, ts) {
+    const t = ts.find((q) => q.id === a.id);
+    if (!t) return null;
+    const face = (t.ref && t.ref.face) || 1, w = t.r || t.hw || 20, h = t.r || t.hh || 20;
+    return { t, x: t.cx + a.lx * face * w, y: t.cy + a.ly * h, ang: face < 0 ? Math.PI - a.ang : a.ang };
+  }
+  P.stuckN = function () {
+    const ts = G.boss && G.boss.targets ? G.boss.targets() : [];
+    return G.stuck.filter((a) => !a.going && stuckAt(a, ts)).length;
+  };
+  function tickStuck(dt) {
+    const L = G.stuck;
+    for (let i = L.length - 1; i >= 0; i--) {
+      const a = L[i];
+      a.t += dt; a.wob = Math.max(0, a.wob - dt * 5);
+      if (a.t >= a.life && !a.going) L.splice(i, 1);
+    }
+    // the bursts, one by one
+    const b = P.burst;
+    if (!b) return;
+    b.t -= dt;
+    while (b.t <= 0 && b.list.length) {
+      const a = b.list.shift(), i = L.indexOf(a);
+      if (i >= 0) L.splice(i, 1);
+      burstOne(a, !b.list.length, b);
+      b.t += C.BURST_GAP * (b.list.length > 6 ? 0.8 : 1);
+    }
+    if (!b.list.length) P.burst = null;
+  }
+  function burstOne(a, last, b) {
+    const ts = G.boss.targets(), at = stuckAt(a, ts);
+    b.n++;
+    if (!at) return;
+    const dmg = Math.round(C.BURST_DMG[a.heavy ? 1 : 0] * G.dmgMult() * spec());
+    const res = G.boss.damage(dmg, at.t, { x: at.x, y: at.y, heavy: a.heavy || last, finisher: last, dir: G.sign(at.x - P.x) || P.facing, poise: H.poise });
+    if (!res) { G.fx.burst(at.x, at.y, { n: 3, color: STAR, speed: [40, 160], life: [0.1, 0.2], kind: 'spark', size: [1.2, 2] }); return; }
+    G.flow.hit(C.ARROW_GAIN);
+    G.sets.hit('special', at.t, at.x, at.y, b.cast);
+    struck(at.t, at.x, at.y);
+    const pitch = Math.pow(2, Math.min(b.n, 14) / 14); // the pops climb as the run of them goes on
+    G.audio.play('moonPop', { pitch, heavy: a.heavy });
+    const back = at.ang + Math.PI; // the light bursts out the way the arrow went in
+    G.fx.burst(at.x, at.y, { n: a.heavy ? 9 : 5, color: a.heavy ? GOLD : STAR, angle: back, spread: 1.6, speed: [120, 420], life: [0.12, 0.3], kind: 'spark', size: [1.4, 2.6] });
+    G.fx.ring(at.x, at.y, { r0: 3, r1: a.heavy ? 34 : 22, life: 0.18, color: a.heavy ? GOLD : HOT, width: a.heavy ? 3.5 : 2.5 });
+    G.fx.stop(a.heavy ? 0.03 : 0.012); G.fx.shake(a.heavy ? 3.5 : 1.6);
+    if (last) {
+      // the last one: a held beat, the air pushed out, and the crack of it (motion, not more light)
+      G.fx.stop(0.08); G.fx.shake(8); G.fx.kick(G.sign(at.x - P.x) * 5, -2);
+      G.fx.ripple(at.x, at.y, 170 + 9 * b.n, 0.36, 0.9);
+      G.fx.hit(at.x, at.y, back, { heavy: true, power: 1.05, col: STAR, hot: HOT });
+      G.fx.shatter(at.x, at.y, STAR, 8 + b.n, { hot: HOT, r: 90 + 6 * b.n });
+      G.audio.play('moonBurst', { n: b.n });
+    }
+  }
+  function castBurst() {
+    const B = G.boss, ts = B.targets(), list = G.stuck.filter((a) => !a.going && stuckAt(a, ts));
+    list.sort((p, q) => q.t - p.t); // the first in, the first off
+    for (const a of list) a.going = true;
+    P.burst = { list, t: 0.06, n: 0, cast: P.castN };
+    // she draws the string to her ear and lets it snap on nothing, and springs back from the foe
+    const c = B.core || (ts[0] ? { x: ts[0].cx } : null), dir = c ? (G.sign(c.x - P.x) || P.facing) : P.facing;
+    P.facing = dir;
+    P.vx = -dir * 360;
+    if (P.onGround) { P.vy = Math.min(P.vy, -300); P.onGround = false; P.plat = null; }
+    P.atk = null;
+    P.cast = { kind: 'volley', t: 0, wind: 0, dur: 0.34, dx: dir, dy: -0.25, thrown: true };
+    G.audio.play('moonSnap');
+    G.fx.lines(P.x + dir * 16, P.y - 38, 6, HOT, { r0: 10, speed: [300, 600] });
+    G.fx.ring(P.x + dir * 16, P.y - 38, { r0: 4, r1: 40, life: 0.22, color: HOT, width: 3 });
+  }
+  // drawn standing in the foe: a short dark shaft and its fletching, a point of moonlight at the nock that
+  // breathes faster as the arrow's time runs out
+  function drawStuck(ctx) {
+    if (!G.stuck.length || !G.boss || !G.boss.targets) return;
+    const ts = G.boss.targets(), now = G.time || 0;
+    for (const a of G.stuck) {
+      const at = stuckAt(a, ts);
+      if (!at) continue;
+      const left = a.life - a.t, fade = G.clamp(left / 0.6, 0, 1) * G.clamp(a.t / 0.05, 0, 1);
+      const len = a.heavy ? 22 : 16, wob = Math.sin(a.t * 60) * 0.12 * a.wob;
+      const ang = at.ang + wob, cx = Math.cos(ang), sy = Math.sin(ang);
+      const nx = at.x - cx * len, ny = at.y - sy * len;
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.strokeStyle = G.rgba('18,10,30', 0.9 * fade); ctx.lineWidth = a.heavy ? 3.2 : 2.4;
+      ctx.beginPath(); ctx.moveTo(at.x + cx * 3, at.y + sy * 3); ctx.lineTo(nx, ny); ctx.stroke();
+      ctx.strokeStyle = G.rgba(a.heavy ? GOLD : STAR, 0.75 * fade); ctx.lineWidth = 1.1;
+      ctx.beginPath(); ctx.moveTo(at.x, at.y); ctx.lineTo(nx, ny); ctx.stroke();
+      // the fletching
+      const px = -sy, py = cx;
+      ctx.fillStyle = G.rgba(a.heavy ? GOLD : STAR, 0.55 * fade);
+      ctx.beginPath(); ctx.moveTo(nx, ny); ctx.lineTo(nx - cx * 6 + px * 4, ny - sy * 6 + py * 4); ctx.lineTo(nx + cx * 3, ny + sy * 3); ctx.lineTo(nx - cx * 6 - px * 4, ny - sy * 6 - py * 4); ctx.closePath(); ctx.fill();
+      ctx.globalCompositeOperation = 'lighter';
+      const beat = 0.55 + 0.45 * Math.sin(now * (left < 1.5 ? 16 : 5) + a.seed);
+      ctx.fillStyle = G.rgba(a.going ? HOT : STAR, (a.going ? 0.8 : 0.35 * beat) * fade);
+      ctx.beginPath(); ctx.arc(nx, ny, a.going ? 3.2 : 2, 0, G.TAU); ctx.fill();
+    }
   }
 
   // Lune: a fan of arrows, and a leap away from where she aimed.
@@ -1752,6 +1877,7 @@
 
   // ---------------------------------------------------------------- shots: lances, arrows, waves
   G.updateShots = function (dt) {
+    tickStuck(dt);
     for (let i = G.shots.length - 1; i >= 0; i--) {
       const s = G.shots[i];
       s.t += dt;
@@ -1782,6 +1908,7 @@
               struck(t, s.x, s.y);
               G.moments.landed(em, s.x, s.y, Math.atan2(s.vy, s.vx), s.heavy);
               if (s.heavy && !s.split && G.boon('splitarrow')) splitArrow(s);
+              if (H.special === 'burst') stick(s, t);
             } else G.audio.play('tink');
             if (!s.heavy) s.dead = true; // only the heavy arrow pierces
             continue;
@@ -1876,6 +2003,7 @@
       ctx.drawImage(G.fx.glow(STAR), x - 34, y - 34, 68, 68);
     }
     drawSigs(ctx);
+    drawStuck(ctx); // (v3.1f)
     ctx.globalCompositeOperation = 'source-over';
   };
 

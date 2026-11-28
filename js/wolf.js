@@ -30,7 +30,7 @@
     answer: 'breath',
     antiAir: 'skysnap', // (cast at a hero who rides over its head: see bosskit.js)
     finale: 'emberfall',
-    gaps: [0, 0.95, 0.78, 0.62],
+    gaps: [0, 1.0, 0.84, 0.7], // (v3.1f: 0.95, 0.78, 0.62; the bot won 15% on Merciless)
     bags: {
       1: ['pounce', 'bite', 'sweep', 'howl', 'rake', 'breath', 'prowl', 'shake', 'harry', 'cinders', 'blaze'],
       2: ['pounce', 'bite', 'sweep', 'howl', 'rake', 'wallrun', 'breath', 'prowl', 'shake', 'harry', 'cinders', 'blaze'],

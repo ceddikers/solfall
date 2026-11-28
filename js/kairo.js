@@ -187,9 +187,10 @@
       G.T('Eyes shut and nothing moving: do not touch him. Be ready to dash when they open.'),
     ],
     hudCols: [null, ['#ff9a56', '#ffe0b8'], ['#ffd040', '#fff4c4'], ['#c8dcff', '#ffffff']],
-    BASE_HP: 2700, poise0: 330, w: 40, h: 88,
+    BASE_HP: 2500, poise0: 330, // (v3.1f: 2700)
+    w: 40, h: 88,
     answer: 'knee', antiAir: 'palm', finale: 'lastwave',
-    gaps: [0, 1.0, 0.8, 0.72], // (v2.4c: phase III 0.64 -> 0.72)
+    gaps: [0, 1.05, 0.9, 0.82], // (v3.1f: 1.0, 0.8, 0.72, the bot won 4% on Merciless; v2.4c: phase III 0.64 -> 0.72)
     bags: {
       1: ['combo', 'combo', 'combo', 'combo', 'throw', 'throw', 'wave', 'wave', 'hailfire'],
       2: ['combo', 'combo', 'combo', 'combo', 'throw', 'throw', 'wave', 'wave', 'hailfire', 'flare', 'meteor', 'comets'],

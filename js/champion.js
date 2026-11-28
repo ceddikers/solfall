@@ -163,7 +163,7 @@
     hudCols: [null, ['#d6ba80', '#fff0d0'], ['#ffd68c', '#fffae8'], ['#eb1e50', '#ffd6e2']],
     BASE_HP: 3800, poise0: 380, w: 34, h: 86,
     answer: 'lunge', antiAir: 'rise', finale: 'blackdawn',
-    gaps: [0, 0.95, 0.75, 0.58],
+    gaps: [0, 1.0, 0.82, 0.66], // (v3.1f: 0.95, 0.75, 0.58; the bot won 6% on Merciless)
     bags: { 1: [], 2: [], 3: [] }, // (filled in setup: phase II and III carry a move for each boss beaten this run)
     cards: { 2: [G.T('THE TROPHIES'), G.T('Then you have earned them')], 3: [G.T('THE OTHER SIDE'), G.T('What the last door keeps')] },
     first: { 1: 'string', 2: '', 3: 'fourfold' },

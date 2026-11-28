@@ -100,6 +100,28 @@
       tone({ type: 'triangle', f0: 760, f1: 300, dur: 0.14, vol: 0.18 });
       noise({ dur: 0.14, vol: 0.24, f0: 1400, f1: 5200, q: 0.8 });
     },
+    // (v3.1f) Lune's Moon Burst, her own: the string snapped on nothing, a glassy pop for each arrow set
+    // off (climbing in pitch as they run: play's pitch), and a hollow, airy crack under the last
+    moonSnap() {
+      tone({ type: 'triangle', f0: 1250, f1: 2100, dur: 0.09, vol: 0.12 });
+      noise({ dur: 0.08, vol: 0.18, type: 'highpass', f0: 4200 });
+      tone({ type: 'sine', f0: 620, f1: 900, dur: 0.18, vol: 0.05, delay: 0.02 });
+    },
+    moonPop(o) {
+      const h = o && o.heavy ? 1 : 0;
+      tone({ type: 'sine', f0: 1480 - 360 * h, f1: 2200 - 500 * h, dur: 0.09 + 0.04 * h, vol: 0.1 + 0.05 * h });
+      tone({ type: 'triangle', f0: 2960, f1: 2700, dur: 0.05, vol: 0.035 });
+      noise({ dur: 0.05 + 0.03 * h, vol: 0.14 + 0.08 * h, f0: 2400, f1: 900, q: 1.6 });
+      if (h) tone({ type: 'sine', f0: 240, f1: 120, dur: 0.12, vol: 0.18 });
+    },
+    moonBurst(o) {
+      const n = Math.min(14, (o && o.n) || 1), k = 0.6 + 0.4 * n / 14;
+      tone({ type: 'sine', f0: 150, f1: 46, dur: 0.42, vol: 0.42 * k });
+      noise({ dur: 0.5, vol: 0.2 * k, type: 'lowpass', f0: 1600, f1: 200, q: 0.7 });
+      noise({ dur: 0.3, vol: 0.12 * k, f0: 6400, f1: 2600, q: 2, delay: 0.03 });
+      tone({ type: 'triangle', f0: 1860, f1: 1760, dur: 0.6, vol: 0.04, delay: 0.05 });
+      tone({ type: 'sine', f0: 2790, f1: 2640, dur: 0.5, vol: 0.025, delay: 0.07 });
+    },
     hit() {
       noise({ dur: 0.07, vol: 0.38, type: 'highpass', f0: 1800, q: 0.5 });
       tone({ type: 'triangle', f0: 210, f1: 90, dur: 0.1, vol: 0.34 });

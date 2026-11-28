@@ -31,7 +31,8 @@
       G.T('One mote burning in the staff is an ordinary fireball. All three flying into it is the great one: two health, and a wide blast.'),
     ],
     hudCols: [null, ['#7ea0ff', '#d8e4ff'], ['#ff7ea8', '#ffd4dc'], ['#ffe08a', '#ffffff']],
-    BASE_HP: 3900, poise0: 380, w: 52, h: 112, platformsFrom: 1,
+    BASE_HP: 3500, poise0: 380, // (v3.1f: 3900; its wins took 200 s, the longest)
+    w: 52, h: 112, platformsFrom: 1,
     teleK: 0.9, // its warnings, against the difficulty's (v2.4d: they were easy to read)
     // its spells already reach anywhere; what it answers is a hero who will not come down out of the air
     answer: 'shards', kiting: (P) => !P.onGround && P.y < FLOOR - 150,

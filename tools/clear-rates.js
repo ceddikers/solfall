@@ -144,7 +144,13 @@
         if (h.started && dx * h.dir > 0 && Math.abs(dx) < 120) { jump = true; high = true; }
       } else if (h.kind === 'flycut') {
         const dx = P.x - h.x;
-        if (dx * h.vx > 0 && Math.abs(dx) < 210 && Math.abs(h.y - (P.y - 22)) < 90) jump = true;
+        // (v3.1f) a cut aimed at the hero (the Knight's Sever: it comes down at a slant, wherever they are)
+        // can't be jumped, since it was aimed there: dash through it as it arrives
+        if (Math.abs(h.vy || 0) > 0.25 * Math.hypot(h.vx || 0, h.vy || 0)) {
+          const sp = Math.hypot(h.vx, h.vy), dy = (P.y - 22) - h.y, along = (dx * h.vx + dy * h.vy) / sp;
+          const off = Math.abs(dx * h.vy - dy * h.vx) / sp;
+          if (along > 0 && off < 60 && along / sp < 0.16) st.dashDir = G.sign(-h.vx) || 1;
+        } else if (dx * h.vx > 0 && Math.abs(dx) < 210 && Math.abs(h.y - (P.y - 22)) < 90) jump = true;
       } else if (h.kind === 'crescent') {
         if ((P.x - h.x) * h.dir > -40 && Math.abs(P.x - h.x) < 230) stayDown = true;
       } else if (h.kind === 'beam') {
@@ -185,6 +191,21 @@
     for (const h of list) if (h.kind === 'clap' && !h.dead) { const c = h.t - h.follow - h.hold; if (c > -0.2 && c < 0.1 && Math.abs(P.x - h.cx) < h.gap + 20) { jump = true; high = true; } }
     if (charging) { jump = true; if (B.h > 100) high = true; }
     for (const c of (B.clones || [])) if (c.hurt && !c.echo && Math.abs(c.x - P.x) < 330 && Math.abs(c.y - P.y) < 30) jump = true;
+    // (v3.1f) the Warden's charge: once its aim holds (the core trembles), step out of the line with a dash,
+    // away from where the line meets the hero's height. The core itself is the danger, not a hazard.
+    if (B.id === 'warden' && B.attackName === 'charge' && B.core) {
+      const c = B.core;
+      if (c.jit > 0 && !st.wDodge) {
+        const ax = -Math.cos(c.flA), ay = -Math.sin(c.flA), py = P.y - 22;
+        const off = Math.abs((P.x - c.x) * ay - (py - c.y) * ax);
+        if (off < c.r + 40) {
+          const cross = Math.abs(ay) > 0.15 ? c.x + ax * (py - c.y) / ay : c.x;
+          st.dashDir = G.sign(P.x - cross) || -G.sign(c.x - P.x) || 1;
+          if ((st.dashDir < 0 && P.x < WL + 160) || (st.dashDir > 0 && P.x > WR - 160)) st.dashDir = -st.dashDir; // (not into a wall)
+          st.wDodge = true;
+        }
+      } else if (!(c.jit > 0)) st.wDodge = false;
+    }
     // Kairo's spin throw: he leaps low with open hands; dashing does not save you, jumping over him does
     // (the crouch before it is the moment: a double jump started then clears him every time)
     if (B.id === 'kairo' && B.attackName === 'throw' && Math.abs(P.x - b.x) < 470) {
@@ -328,7 +349,9 @@
     // (v2.6f) with Gloam, the special waits for the dark mark (it deals double), and goes at once when it is up
     const gl = G.run.setCount && G.run.setCount('gloam') > 0, markUp = gl && !!sst.mark;
     if (tg && !danger && segs >= (markUp ? 1 : P.hp < P.maxHp || gl ? 2 : 1) && H.special !== 'guard') {
-      const ok = H.special === 'lance' ? vgap < 200 : H.special === 'starfall' ? edge < 60 && vgap < 60 : edge < 140 && vgap < 120;
+      // (v3.1f) Lune's Moon Burst: at any range, once eight arrows stand in the foe (or some are about to fall out)
+      const ok = H.special === 'burst' ? P.stuckN() >= 8 || (P.stuckN() >= 3 && G.stuck.some((a) => a.life - a.t < 0.5))
+        : H.special === 'lance' ? vgap < 200 : H.special === 'starfall' ? edge < 60 && vgap < 60 : edge < 140 && vgap < 120;
       if (ok && (st.flareCd || 0) <= 0) { aimAt(tg.cx, tg.cy); I.aim.flare = true; I.pressed.flare = true; st.flareCd = 0.8; }
     }
     st.flareCd = (st.flareCd || 0) - D;

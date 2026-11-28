@@ -117,6 +117,66 @@ hero (`tools/feel-check.js`).
 
 Not done: touch controls, a colour-blind alternative to red-orange warnings, gamepad rebinding.
 
+## Lune's Moon Burst, and a Merciless balance pass (v3.1f)
+
+Asked: "run a full boss balance check across merciless on each boss", then that Lune's right click could be
+"detonating arrows that are stuck on a boss" ("feels weak"), and "boss tuning probably needs it".
+
+**Lune: the Moon Burst replaces the Moon Volley** (the bow only; the crossbow keeps Triple Bolt).
+- Every arrow that hits stays in the foe where it struck: up to 12 at once, each for 6 seconds. They ride the
+  foe as it moves and turns, and the point of light at the nock beats faster in an arrow's last second and a half.
+- Right click sets them all off, one after another in the order they went in: 6 each, 12 for a piercing arrow.
+  The pops climb in pitch, and the last one lands with a held beat and a push of air. She springs back from the foe
+  as it starts.
+- With no arrows in the foe, right click does nothing and costs nothing.
+- A full load (12, four of them piercing) burst for about 130 on Standard; the Volley did 50 to 80.
+- **Full Quiver** now lets 20 arrows stay in, for twice as long. **Harvest Moon**: every third Moon Burst is free.
+- Her own sounds (the string snapped on nothing, the pops, the last crack): none of them is a boss's.
+
+**What the Merciless check found** (the bot, `tools/clear-rates.js`: every boss with every hero at trials I, IV
+and VII, 4 runs, with boons; Aurel at III and V; Sol at VII):
+
+| | Before | After |
+|---|---|---|
+| Leviathan | 71% | 67% |
+| Assassin | 48% | 56% (not changed) |
+| Mage | 52%, wins in 200 s | 58%, 213 s |
+| Knight | 10% → 31% once the bot could dodge Sever | 27% (not changed) |
+| Wolf | 15% | 19% |
+| Warden | 17% | 13% |
+| Aurel | 6% | 19% |
+| Kairo | 4% | 8% |
+| Sol | 0 of 24 | 0 of 24 |
+| All seven trials | 31% | 35% |
+
+By hero, before → after: Eos 46% → 44%, Vesper 35% → 37%, Aster 30% → 43%, Lune 13% → 17%. With 48 fights a
+boss, a number can be off by about 13 points either way.
+
+What changed:
+- **Warden:** health 5400 → 4700 (it took longest to kill), and more rest between attacks in every phase
+  (0.95 / 0.75 / 0.6 → 1.05 / 0.84 / 0.72; before trial V, phase III 0.76).
+- **Kairo:** health 2700 → 2500, rests 1.0 / 0.8 / 0.72 → 1.05 / 0.9 / 0.82.
+- **Wolf:** rests 0.95 / 0.78 / 0.62 → 1.0 / 0.84 / 0.7.
+- **Aurel:** rests 0.95 / 0.75 / 0.58 → 1.0 / 0.82 / 0.66.
+- **Sol**, a light touch: rests 1.0 / 0.78 / 0.66 → 1.05 / 0.85 / 0.72.
+- **Leviathan** a little harder: rests 0.76 / 0.62 / 0.5 → 0.7 / 0.57 / 0.46.
+- **Mage:** health 3900 → 3500, as its fights ran longest.
+- **Eos** (won most and killed fastest): a draw is 22 and 11 more per notch (88 at six), was 25 and 12 (97).
+
+These are base numbers, so Gentle and Standard move the same way.
+
+The bot itself was taught two things it got wrong: it jumped the Knight's Sever cuts, which are aimed at you
+(it now dashes through them), and it never answered the Warden's charge (it now dashes out of the line once the
+core trembles). The Warden is still the bot's hardest after Kairo; its damage comes from a dozen moves at once,
+not one. The Leviathan barely moved: as in v2.9g, it needs a harder move, not numbers. The bot cannot beat Sol on
+Merciless at all, so her numbers need a person's run.
+
+Playtest checklist:
+- Lune: does the Moon Burst feel like a payoff? Can you see how many arrows are in? Is 6 seconds long enough?
+- Is the Warden fair on Merciless now? Kairo?
+- Does the Leviathan still feel easy?
+- Eos: still strong enough at 88?
+
 ## Eos: the Notched Blade (v3.1e)
 
 Eos "feels weird"; of three drafts the user picked the Notched Blade: every hit feeds the draw, with no gate.

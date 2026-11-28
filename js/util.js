@@ -3,7 +3,7 @@
 
 const G = window.G = {};
 
-G.VERSION = '3.1e';
+G.VERSION = '3.1f';
 G.bgK = 1; // how many pixels per unit the painted backdrops are kept at (set in game.js, resize)
 G.W = 1280;          // logical view size
 G.H = 720;
@@ -201,7 +201,7 @@ G.ascOf = (hero) => (G.ascMemo || (G.ascMemo = G.store.load('asc', {}) || {}))[h
 G.ASC_UNLOCKS = [null, 'costume', 'relic', 'slot', 'boon', 'aura'];
 G.ascBest = (hero) => G.ascOf(hero).best || 0;
 // (v3.0e) boons built on a weapon or special a hero's second form does not have are not offered with it
-G.BOON_NEED = { split: 'lance', pinlance: 'lance', twinstar: 'lance', aftershock: 'starfall', starborn: 'starfall', quiver: 'volley', harvest: 'volley', hanging: 'draw', secondsun: 'draw', fault: 'charge', unbroken: 'charge' };
+G.BOON_NEED = { split: 'lance', pinlance: 'lance', twinstar: 'lance', aftershock: 'starfall', starborn: 'starfall', quiver: 'burst', harvest: 'burst', hanging: 'draw', secondsun: 'draw', fault: 'charge', unbroken: 'charge' };
 G.heroCan = (need) => { const h = G.hero(); return need === 'draw' ? !!h.draw : need === 'charge' ? !!h.heavy : h.special === need; };
 G.boonOpen = (b) => (!b.asc || G.ascBest(G.run.hero) >= b.asc) && (!G.BOON_NEED[b.id] || G.heroCan(G.BOON_NEED[b.id]));
 G.heroTitle = (h) => (G.ascBest(h.id) >= 5 ? G.T('The Unfallen') : h.title);
