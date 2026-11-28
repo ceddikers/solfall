@@ -2,7 +2,7 @@
 
 A side-on boss rush for the browser: four heroes, seven three-phase bosses, played as a run of
 ever-harder trials. You pick a hero and a relic before the run and win a boon after each victory.
-Version 3.1i.
+Version 3.1j.
 
 This is an early slice of a planned boss-rush roguelite (short runs, a boon after each boss,
 bosses drawn from a pool). A run is seven trials, one for each boss, each harder than the last: the first boss
@@ -116,6 +116,26 @@ hero (`tools/feel-check.js`).
 - Settings, Reset progress erases Sunshards, upgrades, trophies and records (it has to be chosen twice).
 
 Not done: touch controls, a colour-blind alternative to red-orange warnings, gamepad rebinding.
+
+## Eos: Still Point blocks everything, and answers only the boss itself (v3.1j)
+
+Asked: the right click "should also be more like a, block the move and then if it makes sense, do the damaging
+portion. like for veils clones, it attacks the clone when in reality it shouldnt attack anything ... the counter
+when the enemy is using its own body for the move, projectiles can be blocked but no counter". And: "the move
+would damage me and then i press and then it still counters".
+
+- **Every blow is still blocked** as before: no harm, 0.6 s of safety, the sheath fills.
+- **The counter only comes when the boss struck with its own body:** its own swing, or its body running into him
+  (for the Warden, its eye and its hands). That goes for the step-through cut and for the Still Moment.
+- **Blocked and nothing more:** a clone's or a shade's cut (the Veil's clones, the Knight's ghosts, Aurel's
+  shades), anything thrown or cast, pits, wires, the storm. The blink to a shot's caster from v3.1g is gone.
+- **A late press no longer counters.** While he cannot be hurt because he was just struck (1.15 s), raising the
+  guard turns nothing. Before, a guard raised after the first hit of a string turned the next swing of the same
+  string and answered it. The Starlight for a guard that turns nothing still comes half back.
+
+Checked: each kind of blow fed to the guard directly (own swing, own body, clone swing, clone body, shot, the
+Warden's hand, each early and late). The late press was reproduced on v3.1i against Aurel's string (a guard raised
+0.25 s or 0.5 s after being hit countered) and no longer happens against him, the Knight, Kairo or the Wolf.
 
 ## The Last Wave's scene, rarer corruption, a rest for the stagger bar, Eos down a little (v3.1i)
 

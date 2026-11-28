@@ -1589,50 +1589,39 @@
     G.fx.glint(P.x + P.facing * 12, P.y - 44, 20, HOT, 0.2);
   }
   // (v3.1g) What a turned blow is answered with.
-  //  - A blow from a body or a blade: he steps through whoever swung it and cuts on the way.
-  //  - Something thrown or cast: he is gone, and past whoever cast it, cutting as he goes (up in the
-  //    air beside it, if that is where it is).
-  //  - Either, met at the last instant (the guard raised as the blow came, not before, GUARD_PERFECT):
-  //    the cut is far heavier, and the foe's move is cut short (B.breakPattern: bosskit.js, boss.js).
-  //  - Anything else (a pit, a wire, a storm, ground that burns): only turned, as before.
-  const STILL = { pool: 1, snare: 1, moonwall: 1, mark: 1 }; // (hazards that are a place, not a thing thrown)
+  // (v3.1j) Only a blow the foe struck with its own body is answered (asked: "block the move and then
+  // if it makes sense, do the damaging portion ... the counter when the enemy is using its own body
+  // for the move, projectiles can be blocked but no counter"). Its own body: the swing of the boss
+  // itself (a blade's owner) or the body that ran into him; for the Warden, its eye and its hands.
+  // A clone's or a shade's cut, anything thrown or cast, a pit, a wire, a storm: turned, and no more.
+  // Until v3.1j a clone's cut sent him through the clone at nothing, and a shot took him to its caster.
+  //  - Answered: he steps through the foe and cuts on the way.
+  //  - Met at the last instant (the guard raised as the blow came, not before, GUARD_PERFECT): the
+  //    Still Moment, and the foe's move is cut short (B.breakPattern: bosskit.js, boss.js).
   function answer(srcX, src, dir, perfect) {
     const B = G.boss;
     if (!src || !B.active || B.dead || B.dying || B.toppled || !B.targets) return false;
-    const hz = typeof src.update === 'function';
-    const melee = src.kind === 'arc' || (!hz && src.x != null);
-    if (!melee && !(hz && !STILL[src.kind])) return false;
-    const ts = B.targets();
-    let t = null, ax, hw = 26;
-    if (melee) {
-      // whoever swung it (a blade's owner, or the body that struck), and whatever of the foe stands there
-      const o = src.kind === 'arc' ? src.owner : src;
-      ax = o && o.x != null ? o.x : srcX;
-      let bd = 150;
-      for (const q of ts) { const d = Math.abs(q.cx - ax); if (d < bd) { bd = d; t = q; } }
-    } else {
-      t = ts.find((q) => q.kind === 'body' || q.kind === 'core') || null;
-      if (!t) { let bd = 1e9; for (const q of ts) { const d = Math.abs(q.cx - P.x); if (d < bd) { bd = d; t = q; } } }
-      if (!t) return false; // (nobody to go to: it is hidden)
-    }
+    const o = src.kind === 'arc' ? src.owner : src;
+    if (!o || !(o === B.body || o === B.core || (B.hands && B.hands.indexOf(o) >= 0))) return false;
+    // whatever of the foe stands where the blow came from
+    let t = null, ax = o.x != null ? o.x : srcX, hw = 26, bd = 150;
+    for (const q of B.targets()) { const d = Math.abs(q.cx - ax); if (d < bd) { bd = d; t = q; } }
     if (t) { ax = t.cx; hw = t.r || t.hw || 26; }
     const d = G.sign(ax - P.x) || dir, x0 = P.x, y0 = P.y;
     const bl = (G.bounds ? G.bounds.l : G.WALL_L + 13) + 12, br = (G.bounds ? G.bounds.r : G.WALL_R - 13) - 12;
     let x = G.clamp(ax + d * (hw + 44), bl, br);
     if (Math.abs(x - ax) < hw + 14) x = G.clamp(ax - d * (hw + 44), bl, br); // no room behind it: he comes out in front
     if (G.arena.inPit(x)) x = G.arena.solidNear(x);
-    // something cast from high up: he arrives in the air beside it
-    const air = !melee && t.cy < P.y - 150, y = air ? Math.min(P.y, t.cy + 40) : P.y;
+    const y = P.y;
     // met at the last instant: the Still Moment, which does all of this in its own time (below)
-    if (perfect) { startMoment({ x0, y0, x, y, d, air, ax, ay: (y0 + y) / 2 - 32, hw, id: t ? t.id : null }); return true; }
-    if (air) { P.onGround = false; P.plat = null; P.coyote = 0; P.vy = -150; P.jumpHeld = false; }
+    if (perfect) { startMoment({ x0, y0, x, y, d, ax, ay: (y0 + y) / 2 - 32, hw, id: t ? t.id : null }); return true; }
     for (let i = 0; i < 4; i++) P.ghosts.push({ x: G.lerp(x0, x, i / 4), y: G.lerp(y0, y, i / 4), f: d, life: 0.16 + 0.05 * i });
     P.x = x; P.y = y; P.vx = d * 60; P.facing = G.sign(ax - x) || -d;
     const ang = Math.atan2(y - y0, x - x0), len = G.dist(x0, y0, x, y), mx = (x0 + x) / 2, my = (y0 + y) / 2 - 32;
     G.fx.cut(mx, my, ang, len + 120, 7, STAR, HOT, 0.22);
     G.fx.cut(mx, my, ang, len + 180, 1.4, HOT, HOT, 0.3);
     G.fx.burst(x0, y0 - 24, { n: 8, color: STAR, speed: [60, 240], life: [0.15, 0.35], kind: 'spark', size: [1.5, 3] });
-    G.audio.play(melee ? 'draw' : 'blink');
+    G.audio.play('draw');
     if (t) {
       const hx = t.cx, hy = t.r ? t.cy : G.clamp(my, t.cy - t.hh + 6, t.cy + t.hh - 6);
       const dmg = Math.round(C.ANSWER_DMG[0] * G.dmgMult() * spec());
@@ -1702,7 +1691,6 @@
       // behind it, his back to it, the blade still out
       q.back = true; P.vanish = false;
       P.x = q.x; P.y = q.y; P.facing = q.d;
-      if (q.air) { P.onGround = false; P.plat = null; P.coyote = 0; P.jumpHeld = false; }
       if (H.draw) P.recov = { kind: 'noto', t: 0, dur: 1, at: 0.8, ang: 0, lvl: 3 };
       G.audio.play('glint');
       if (P.onGround) G.fx.dust(P.x, P.y, 4, { dir: -q.d, speed: [60, 220], size: [5, 10], life: [0.02, 0.05] });
@@ -1714,7 +1702,6 @@
     const q = P.seq, B = G.boss;
     P.seq = null; P.vanish = false; P.cast = null;
     if (!q.back) { P.x = q.x; P.y = q.y; P.facing = q.d; }
-    if (q.air) P.vy = -150;
     P.iframes = Math.max(P.iframes, 0.5); P.pdDone = true;
     P.recov = H.draw ? { kind: 'noto', t: 0.16, dur: 0.36, at: 0.44, ang: 0, lvl: 3, fx: true } : null;
     G.slowT = Math.min(G.slowT, 0.14); // time comes back over a few frames
@@ -1935,7 +1922,9 @@
 
   P.tryHit = function (dmg, srcX, src) {
     if (P.dead || P.hidden || P.ulting || P.seq || !G.canHurt()) return false;
-    if (P.cast && P.cast.kind === 'guard' && !P.cast.thrown) { turned(srcX, src); return false; } // Eos was waiting for it
+    // Eos was waiting for it. (v3.1j) Not while nothing can hurt him anyway: struck a moment ago, he could raise
+    // the guard into the same blow, still in the air, and answer the hit he had just taken
+    if (P.cast && P.cast.kind === 'guard' && !P.cast.thrown && !(P.inv > 0)) { turned(srcX, src); return false; }
     if (P.iframes > 0) {
       if (!P.pdDone) { P.pdDone = true; perfect(); }
       return false;
