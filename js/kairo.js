@@ -443,6 +443,7 @@
     G.fx.cine.to = 0;
   };
   B.staggerWord = G.T('WINDED'); B.staggerMult = 1.6; B.staggerDur = 0.4; // short, but it bites
+  B.staggerAdd = 0.75; // (v3.1k: three quarters of a second longer, asked after the bot cleared him 0-25% at trial V)
   B.onStagger = function () {
     const b = B.body;
     b.pose = 'kneel'; b.air = false; b.hidden = false; b.open = 0; b.handHip = 0; b.hips = 0; b.orb = 0; b.sunK = 0; b.spin = 0; b.hurt = false;

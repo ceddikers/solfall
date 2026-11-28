@@ -12,6 +12,12 @@
     SEG: 100, SEGS: 3,
     GAIN_HIT: 8, GAIN_HEAVY: 16, GAIN_PERFECT: 34, GAIN_ORB: 6,
     LANCE_DMG: 42, LANCE_SPEED: 1700,
+    // (v3.1k) Vesper's Tethered Lance: the Star Lance stays in what it strikes for PIN_T seconds; each cut she lands
+    // on that foe charges it (up to PIN_MAX); the special again is the Starflight to it, for FLY_DMG[0] and [1] a charge
+    PIN_T: 7, PIN_MAX: 5, FLY_DMG: [10, 5], FLY_SPEED: 2600, // (first try 20 and 8: the bot won 23% faster with her)
+    // (v3.1k) Aster's Heat: heavy blows landed, and blows taken while she charges, heat the maul (up to HEAT_MAX);
+    // Starfall spends it all: HEAT_DMG more damage and HEAT_R more reach for each
+    HEAT_MAX: 6, HEAT_DMG: 0.15, HEAT_R: 0.08, // (first try 0.25: the bot won 21% faster with her)
     LANCE_WIND: 0.09, // Vesper draws her arm back with the lance before it flies
     ARROW_SPEED: 1350, ARROW_LIFE: 0.4, VOLLEY_DMG: 10,
     // (v3.1f) Lune's Moon Burst: every arrow that lands stays in the foe, and the special sets them all off
@@ -97,7 +103,7 @@
       recov: null, // how the weapon comes back to rest after the last attack (see recoverPose)
       fidget: null, idleT: 0, idleNext: 4, // (v2.6f) standing still: what the hero does with their hands (fidgetPose)
       // Eos: the stance she is holding, the Focus gathered in it, the draw carrying her, and the cuts made but not yet landed
-      hold: null, focus: 0, strung: 0, sun: 0, hangs: [], pin: null, stars: null, faults: [], drawT: 0, drawV: null, owed: [], arc2: null, hush: null,
+      hold: null, focus: 0, strung: 0, sun: 0, hangs: [], pin: null, fly: null, heat: 0, heatFx: 0, stars: null, faults: [], drawT: 0, drawV: null, owed: [], arc2: null, hush: null,
       pad: 0, grazeCd: 0, streakN: 0, streakT: 0, fallT: 0, edge: 0, fadeT: 0, castN: 0,
       grabbed: null, wraps: 0, wrapsHit: 0, // (held by Kairo; Sparring Wraps' blink and its blow)
       hiltT: 0, hiltUsed: false, hiltN: 0, // (the Offered Hilt's six seconds of echoes, once a fight: champion.js)
@@ -168,6 +174,8 @@
     if (P.ulting) { G.flow.ultStep(dt); return; }
     // (v3.1h) and so does the Still Moment, on the clock on the wall
     if (P.seq) { momentStep(G.rdt || dt); return; }
+    // (v3.1k) and Vesper's Starflight
+    if (P.fly) { flyStep(dt); return; }
     // and so does the finishing blow at the end of a fight (finish.js)
     if (P.finishing) { G.finish.step(dt); return; }
     // held (v2.4a, kairo.js: the spin throw's grip, the Last Wave's struggle): carried where the hold
@@ -443,7 +451,7 @@
       // Starfall lands
       P.plunge = false; P.squash = -0.3; P.iframes = Math.max(P.iframes, 0.12);
       P.cast = { kind: 'slam', t: 0.05, wind: 0, dur: 0.4, thrown: true };
-      starfallBlast(1.2, 1);
+      starfallBlast(1.2, 1, heatTake());
     } else if (landed && fallSpeed > 260) {
       // the longer the fall, the deeper the crouch, the more dust, and past a point the ground answers
       const k = G.clamp((fallSpeed - 260) / 1000 + (H.heavy ? 0.4 : 0), 0, 1); // the heavy hero always lands hard
@@ -533,7 +541,8 @@
     // --- special: costs one segment of Starlight
     if (P.flareBuf > 0 && free && P.dashT <= 0 && P.stun <= 0 && P.healT === 0) {
       P.flareBuf = 0;
-      if (P.ember >= C.SEG && (H.special !== 'burst' || (!P.burst && P.stuckN()))) {
+      if (H.special === 'lance' && P.pin) startFlight(); // (v3.1k) a lance is out: the special is the flight to it, and costs nothing
+      else if (P.ember >= C.SEG && (H.special !== 'burst' || (!P.burst && P.stuckN()))) {
         P.ember -= C.SEG; P.stats.lances++; P.castN++; // (castN tells one special from the next: sets.js)
         G.costumeFx('special', P.x, P.y - 34);
         const d = aim(mx, up, down, I.aim.flare);
@@ -828,7 +837,9 @@
           P.gain(a.heavy ? C.GAIN_HEAVY : C.GAIN_HIT);
           G.sets.hit(a.heavy ? 'finisher' : 'light', t, c.x, c.y);
           if (a.flick && !a.banked) { a.banked = true; P.strung = Math.min(3, (P.strung || 0) + 1); sheathUp(); } // (v3.1e: every cut that lands is a notch) // Eos: (v2.9e) a string whose finisher lands puts one in the sheath
-          if (a.heavy && !a.thrust && (G.boon('pinlance') || G.boon('stars'))) finisherLanded(t, c);
+          if (a.heavy && !a.thrust && G.boon('stars')) finisherLanded(t, c);
+          if (P.pin && P.pin.id === t.id && !a.pinned) { a.pinned = true; pinCharge(); } // (v3.1k: Vesper's Tethered Lance)
+          if (H.special === 'starfall' && !a.heated) { a.heated = true; heatUp((a.charge || 0) >= 1 ? 3 : 1); } // (v3.1k: Aster's Heat)
           // the freeze, the shake and the kick all scale with the blow; the maul's are heavier
           G.fx.stop((a.heavy ? 0.11 : a.thrust ? 0.06 : 0.032 * H.thick) + 0.07 * (a.charge || 0) + (a.sweep ? 0.02 : 0));
           G.fx.shake((a.heavy ? 9 : a.thrust ? 4.5 : 1.8 * H.thick) + 7 * (a.charge || 0) + (a.sweep ? 2 : 0));
@@ -1131,22 +1142,26 @@
   // Aster: on the ground the blast is immediate; in the air she plunges first.
   function castStarfall() {
     P.atk = null;
-    if (P.onGround) { P.cast = { kind: 'slam', t: 0, wind: 0, dur: 0.36, thrown: true }; starfallBlast(1, 1); return; }
+    if (P.onGround) { P.cast = { kind: 'slam', t: 0, wind: 0, dur: 0.36, thrown: true }; starfallBlast(1, 1, heatTake()); return; }
     P.plunge = true; P.pdDone = false; P.dashT = 0;
     G.audio.play('dash');
     G.fx.ring(P.x, P.y - 22, { r0: 50, r1: 14, life: 0.2, color: HOT, width: 4 });
   }
 
   // The blast around Aster's feet. scale grows the radius and damage; k is the damage share (Aftershock uses 0.5).
-  function starfallBlast(scale, k) {
-    const R = C.STARFALL_R * scale * (G.boon('starborn') ? 1.3 : 1), cx = P.x, cy = P.y - 20; // (v3.0d: Starborn reaches further)
+  // (v3.1k) heat: what the maul had gathered, spent on this one (more damage and reach for each; all six, and it
+  // staggers three times as hard)
+  function starfallBlast(scale, k, heat) {
+    heat = heat || 0;
+    const hot = heat >= C.HEAT_MAX;
+    const R = C.STARFALL_R * scale * (1 + C.HEAT_R * heat) * (G.boon('starborn') ? 1.3 : 1), cx = P.x, cy = P.y - 20; // (v3.0d: Starborn reaches further)
     let struck = false;
-    const dmg = Math.round(C.STARFALL_DMG * scale * k * G.dmgMult() * spec());
+    const dmg = Math.round(C.STARFALL_DMG * scale * k * (1 + C.HEAT_DMG * heat) * G.dmgMult() * spec());
     for (const t of G.boss.targets()) {
       const inside = t.r ? G.dist(cx, cy, t.cx, t.cy) < R + t.r : G.circleRect(cx, cy, R, t);
       if (!inside) continue;
       const hx = t.r ? t.cx : G.clamp(cx, t.cx - t.hw, t.cx + t.hw), hy = t.r ? t.cy + t.r * 0.6 : G.clamp(cy, t.cy - t.hh, t.cy + t.hh);
-      if (G.boss.damage(dmg, t, { x: hx, y: hy, heavy: true, finisher: k >= 1, lance: k >= 1, poise: H.poise, dir: G.sign(t.cx - cx) }) && k >= 1) { G.sets.hit('special', t, hx, hy, P.castN); struck = true; }
+      if (G.boss.damage(dmg, t, { x: hx, y: hy, heavy: true, finisher: k >= 1, lance: k >= 1, poise: H.poise * (hot ? 3 : 1), dir: G.sign(t.cx - cx) }) && k >= 1) { G.sets.hit('special', t, hx, hy, P.castN); struck = true; }
     }
     if (struck && G.boon('starborn')) { P.ember = Math.min(C.SEG * P.segs, P.ember + C.SEG * 0.5); P.emberFlash = 1; } // (v3.0d)
     for (const o of G.hazards.slashables()) if (G.dist(o.x, o.y, cx, cy) < R + o.r) o.slash();
@@ -1160,6 +1175,14 @@
     G.fx.lines(cx, P.y - 20, 14, HOT, { r0: 40 });
     G.fx.burst(cx, P.y - 6, { n: 12, color: STAR, speed: [20, 140], life: [0.8, 1.6], size: [1.5, 3], grav: -50, wob: 90, drag: 1.5, jitter: R * 0.4 });
     G.fx.burst(cx, P.y - 6, { n: 8, color: '22,18,32', speed: [150, 520], angle: -Math.PI / 2, spread: 2.2, life: [0.6, 1.1], size: [5, 10], kind: 'chunk', grav: 1500 });
+    if (heat > 0) {
+      // the heat let go: fire up out of the ground all round her, more of it the hotter she was
+      const HC = hot ? GOLD : '255,150,70';
+      G.fx.ring(cx, P.y - 4, { r0: 30, r1: R * 1.05, life: 0.5, color: HC, width: 5 + 2 * heat });
+      for (let i = 0; i < 3 + heat * 2; i++) { const fx = cx + G.rand(-R, R); G.fx.burst(fx, P.y - 4, { n: 5, color: HC, speed: [260, 620 + 90 * heat], angle: -Math.PI / 2, spread: 0.35, life: [0.25, 0.6], kind: 'spark', size: [2, 4.5], grav: 500 }); }
+      G.fx.shake(4 * heat); G.fx.light(cx, P.y - 20, R * 2.4, HC, 0.35, 0.6);
+      if (hot) { G.fx.impact(cx, P.y - 30, 0.09); G.fx.punch(0.03); G.fx.flash(GOLD, 0.2, 0.3); G.audio.play('boom'); G.fx.thud(cx, P.y, 2.4, { col: GOLD }); }
+    }
     if (k >= 1 && G.boon('aftershock')) { P.afterT = 0.3; P.afterScale = scale; }
   }
 
@@ -1365,6 +1388,12 @@
   // their own sounds
   {
     const S = G.audio.synth;
+    // (v3.1k) the maul taking heat: a low ring that climbs with each, and rings on at six
+    G.audio.define('heat', (o) => {
+      const n = (o && o.n) || 1, f = 150 * Math.pow(2, n / 6);
+      S.tone({ type: 'triangle', f0: f, f1: f * 1.04, dur: n >= 6 ? 0.5 : 0.16, vol: 0.07 });
+      S.tone({ type: 'sine', f0: f * 3, f1: f * 3.02, dur: n >= 6 ? 0.4 : 0.1, vol: 0.025 });
+    });
     // a star set on the foe: a small high chime
     G.audio.define('sigstar', () => {
       S.tone({ type: 'sine', f0: 1760, f1: 1800, dur: 0.18, vol: 0.06 });
@@ -1416,7 +1445,10 @@
   // how the hero plays rather than adding to a number.
   function sigStep(dt) {
     if (P.sun > 0) P.sun = Math.max(0, P.sun - dt);
-    if (P.pin && (P.pin.t -= dt) <= 0) P.pin = null;
+    if (P.pin && !P.fly) { pinAt(); if ((P.pin.t -= dt) <= 0) P.pin = null; }
+    if (P.heatFx > 0) P.heatFx = Math.max(0, P.heatFx - dt * 3);
+    // the maul sheds sparks while it is hot
+    if (P.heat > 0 && Math.random() < dt * 5 * P.heat) G.fx.spawn({ kind: 'spark', x: P.x + G.rand(-16, 16), y: P.y - G.rand(30, 70), vx: G.rand(-30, 30), vy: -G.rand(60, 200), life: G.rand(0.2, 0.5), size: G.rand(1.2, 2.4), color: P.heat >= C.HEAT_MAX ? GOLD : '255,150,70', grav: -80 });
     if (P.stars && (P.stars.t -= dt) <= 0) P.stars = null;
     // Eos's Hanging Cut: the line of a full draw stays in the air, shedding gold, and cuts again
     for (let i = P.hangs.length - 1; i >= 0; i--) {
@@ -1450,22 +1482,116 @@
       G.fx.burst(f.x, FLOOR - 4, { n: 8, color: '22,18,32', speed: [150, 460], angle: -Math.PI / 2, spread: 1.4, life: [0.5, 1], size: [5, 9], kind: 'chunk', grav: 1500 });
     }
   }
-  // Vesper's Pinning Lance: the lance that strikes stays fixed where it went in
-  function pinLance(s, t) {
-    P.pin = { id: t.id, ox: s.x - t.cx, oy: s.y - t.cy, ang: Math.atan2(s.vy, s.vx), t: 8 };
+  // (v3.1k) Vesper's Tethered Lance (asked: Vesper should "have her thing too like how lune and eos do"; picked:
+  // the lance sticks in whatever it hits, the special again flies her to it, each cut landed while it is
+  // planted makes the flight hit harder). The lance she throws stays where it first strikes: in a foe (it
+  // rides the foe), or in the floor or a wall. One lance of a throw pins, and only a thrown one (not a
+  // relic's or Mirror Step's).
+  function tethers(s) {
+    return s.lance && !s.wave && H.special === 'lance' && s.cast != null && s.cast >= 0 && !(P.pin && P.pin.cast === s.cast) && !P.fly;
   }
-  // A finisher of Vesper's that lands: a lance pinned in that foe bursts (Pinning Lance), and a star
-  // is set on it; the third links them and bursts (Constellation)
-  function finisherLanded(t, c) {
-    if (P.pin && P.pin.id === t.id && G.boon('pinlance')) {
-      const x = t.cx + P.pin.ox, y = t.cy + P.pin.oy;
-      P.pin = null;
-      G.boss.damage(Math.round(40 * G.dmgMult()), t, { x, y, heavy: true, lance: true, poise: H.poise });
-      G.audio.play('sigpin'); G.fx.shake(7);
-      G.fx.ring(x, y, { r0: 8, r1: 110, life: 0.3, color: HOT, width: 6 });
-      G.fx.lines(x, y, 10, HOT, { r0: 14 });
-      G.fx.burst(x, y, { n: 12, color: STAR, speed: [150, 600], life: [0.15, 0.45], kind: 'spark', size: [2, 4] });
+  function pinLance(s, t, wx, wy) {
+    const x = t ? s.x : wx, y = t ? s.y : wy;
+    P.pin = { id: t ? t.id : null, ox: t ? s.x - t.cx : 0, oy: t ? s.y - t.cy : 0, wx: x, wy: y, ang: Math.atan2(s.vy, s.vx), t: C.PIN_T, n: 0, cast: s.cast };
+    G.fx.glint(x, y, 26, HOT, 0.25);
+  }
+  // where the planted lance is now (it rides its foe; one whose foe is gone stays where it last was)
+  function pinAt() {
+    const p = P.pin;
+    if (p.id != null) { const t = G.boss.targets().find((q) => q.id === p.id); if (t) { p.wx = t.cx + p.ox; p.wy = t.cy + p.oy; } }
+    return p;
+  }
+  function pinCharge() {
+    const p = P.pin;
+    if (p.n >= C.PIN_MAX) return;
+    p.n++;
+    G.audio.play('sigstar', { pitch: 1 + 0.08 * p.n });
+    G.fx.glint(p.wx, p.wy, 16 + 4 * p.n, p.n >= C.PIN_MAX ? GOLD : HOT, 0.2);
+    if (p.n >= C.PIN_MAX) G.fx.ring(p.wx, p.wy, { r0: 6, r1: 60, life: 0.3, color: GOLD, width: 3 });
+  }
+  // The Starflight: she is carried along the line to her lance, through whatever is in the way, and
+  // arrives with a thrust at where it stands.
+  function startFlight() {
+    const p = pinAt(), dx = p.wx - P.x, dy = p.wy - (P.y - 34), d = Math.hypot(dx, dy) || 1;
+    P.fly = { t: 0, dur: G.clamp(d / C.FLY_SPEED, 0.07, 0.24), x0: P.x, y0: P.y, gt: 0 };
+    P.atk = null; P.cast = null; P.recov = null; P.dashT = 0; P.healT = 0; P.plunge = false; P.hold = null;
+    P.facing = G.sign(dx) || P.facing; P.onGround = false; P.plat = null; P.coyote = 0;
+    P.iframes = Math.max(P.iframes, P.fly.dur + 0.1); P.pdDone = false;
+    P.pin.t = Math.max(P.pin.t, 1);
+    G.audio.play('dash'); G.audio.play('whoosh');
+    G.fx.ring(P.x, P.y - 30, { r0: 40, r1: 8, life: 0.15, color: HOT, width: 3 });
+    G.fx.kick(dx / d * 5, dy / d * 5);
+  }
+  function flyStep(dt) {
+    const f = P.fly, p = pinAt();
+    f.t += dt;
+    // she stops a pace short of it, on the side she came from, feet no lower than the floor
+    const ax = p.wx - f.x0, ay = p.wy - (f.y0 - 34), d = Math.hypot(ax, ay) || 1, ux = ax / d, uy = ay / d;
+    const ex = G.clamp(p.wx - ux * 34, G.WALL_L + 16, G.WALL_R - 16), ey = Math.min(FLOOR, p.wy - uy * 34 + 34);
+    const k = Math.min(1, f.t / f.dur), q = k * k * (3 - 2 * k);
+    P.x = G.lerp(f.x0, ex, q); P.y = G.lerp(f.y0, ey, q); P.vx = 0; P.vy = 0;
+    P.iframes = Math.max(P.iframes, 0.08);
+    f.gt -= dt;
+    if (f.gt <= 0) { f.gt = 0.016; P.ghosts.push({ x: P.x, y: P.y, f: P.facing, life: 0.22 }); }
+    if (k >= 1) arrive(f, p, ux, uy);
+  }
+  function arrive(f, p, ux, uy) {
+    const B = G.boss, n = p.n, full = n >= C.PIN_MAX, ang = Math.atan2(uy, ux);
+    P.fly = null; P.pin = null;
+    // out of it she has her jumps and dashes again, and is thrown a little up and back if she is in the air
+    P.airJumps = P.maxAir; P.airDashes = P.maxDash; P.dashCd = 0;
+    P.onGround = P.y >= FLOOR - 1;
+    if (!P.onGround) { P.vy = -330; P.vx = -ux * 90; } else P.vx = ux * 80;
+    P.iframes = Math.max(P.iframes, 0.12);
+    P.recov = { kind: 'thrust', t: 0, dur: 0.24, at: 2 };
+    const hb = { cx: p.wx, cy: p.wy, hw: 46, hh: 46 }, dmg = Math.round((C.FLY_DMG[0] + C.FLY_DMG[1] * n) * G.dmgMult() * spec());
+    let hit = false;
+    for (const t of B.targets()) {
+      if (!touch(hb, t)) continue;
+      const c = contact(hb, t);
+      if (B.damage(dmg, t, { x: c.x, y: c.y, heavy: true, finisher: full, dir: G.sign(ux) || P.facing, poise: H.poise })) { hit = true; P.gain(C.GAIN_HEAVY); struck(t, c.x, c.y); }
     }
+    const len = G.dist(f.x0, f.y0 - 34, p.wx, p.wy), mx = (f.x0 + p.wx) / 2, my = (f.y0 - 34 + p.wy) / 2;
+    G.fx.cut(mx, my, ang, len + 60, 5 + n, STAR, HOT, 0.2);
+    G.fx.cut(mx, my, ang, len + 120, 1.4, HOT, HOT, 0.32);
+    G.audio.play('slash3'); G.audio.play(hit ? 'flareHit' : 'tink');
+    if (hit) {
+      G.fx.stop(0.06 + 0.012 * n); G.fx.shake(7 + 2 * n); G.fx.punch(0.012 + 0.004 * n);
+      G.fx.hit(p.wx, p.wy, ang, { heavy: true, thrust: true, power: 0.9 + 0.12 * n, col: full ? GOLD : STAR, hot: HOT });
+      G.fx.ring(p.wx, p.wy, { r0: 10, r1: 80 + 22 * n, life: 0.3, color: full ? GOLD : HOT, width: 4 + n });
+      G.fx.burst(p.wx, p.wy, { n: 8 + 3 * n, color: full ? GOLD : STAR, speed: [150, 640], life: [0.15, 0.45], kind: 'spark', size: [2, 4] });
+      if (full) { G.fx.impact(p.wx, p.wy, 0.07); G.fx.lines(p.wx, p.wy, 14, HOT, { r0: 20 }); G.audio.play('hitHeavy'); }
+    }
+    // Pinning Lance: the lance bursts as she reaches it, at everything near
+    if (G.boon('pinlance')) {
+      const R = 130, bd = Math.round(40 * G.dmgMult());
+      for (const t of B.targets()) {
+        const inside = t.r ? G.dist(p.wx, p.wy, t.cx, t.cy) < R + t.r : G.circleRect(p.wx, p.wy, R, t);
+        if (inside) B.damage(bd, t, { x: G.clamp(p.wx, t.cx - (t.hw || t.r), t.cx + (t.hw || t.r)), y: G.clamp(p.wy, t.cy - (t.hh || t.r), t.cy + (t.hh || t.r)), heavy: true, lance: true, poise: H.poise });
+      }
+      for (const o of G.hazards.slashables()) if (G.dist(o.x, o.y, p.wx, p.wy) < R + o.r) o.slash();
+      G.audio.play('sigpin'); G.fx.shake(7);
+      G.fx.ring(p.wx, p.wy, { r0: 8, r1: R, life: 0.3, color: HOT, width: 6 });
+      G.fx.lines(p.wx, p.wy, 10, HOT, { r0: 14 });
+    }
+  }
+
+  // (v3.1k) Aster's Heat (picked: heavy hits, and blows she takes while charging, heat the maul through six
+  // stages; Starfall spends it all for a bigger blast, and at full it staggers hard). A sweep or a smash that lands is one, a fully charged smash three; a blow taken braced is two. A blow that moves her costs two.
+  function heatUp(n) {
+    const was = P.heat || 0;
+    P.heat = Math.min(C.HEAT_MAX, was + n);
+    if (P.heat === was) return;
+    P.heatFx = 1;
+    const full = P.heat >= C.HEAT_MAX;
+    G.audio.play('heat', { n: P.heat });
+    if (full) { G.fx.ring(P.x, P.y - 40, { r0: 10, r1: 70, life: 0.3, color: GOLD, width: 4 }); G.fx.light(P.x, P.y - 40, 150, GOLD, 0.25, 0.5); }
+  }
+  function heatTake() { const n = P.heat || 0; P.heat = 0; return n; }
+
+  // A finisher of Vesper's that lands sets a star on the foe; the third links them and bursts (Constellation).
+  // (Until v3.1k it also burst a pinned lance: Pinning Lance, which now bursts it as she flies to it.)
+  function finisherLanded(t, c) {
     if (G.boon('stars')) {
       const st = P.stars && P.stars.id === t.id ? P.stars : (P.stars = { id: t.id, pts: [], t: 0 });
       const n = st.pts.length, rr = t.r ? t.r * 0.6 : Math.min(t.hw, t.hh) * 0.75, a = -Math.PI / 2 + n * G.TAU / 3;
@@ -1522,16 +1648,19 @@
     if (!P.pin && !P.stars) return;
     const ts = G.boss.targets();
     if (P.pin) {
-      const t = ts.find((q) => q.id === P.pin.id);
-      if (t) {
-        const x = t.cx + P.pin.ox, y = t.cy + P.pin.oy, k = Math.min(1, P.pin.t / 1.5);
-        ctx.save(); ctx.translate(x, y); ctx.rotate(P.pin.ang);
-        ctx.strokeStyle = G.rgba(HOT, 0.9 * k); ctx.lineWidth = 4;
-        ctx.beginPath(); ctx.moveTo(-34, 0); ctx.lineTo(-6, 0); ctx.stroke();
-        ctx.fillStyle = G.rgba(HOT, k); poly(ctx, [-6, -5, 8, 0, -6, 5]); ctx.fill();
-        ctx.restore();
-        ctx.drawImage(G.fx.glow(STAR), x - 22, y - 22, 44, 44);
-      }
+      const p = P.pin, x = p.wx, y = p.wy, k = Math.min(1, p.t / 1.2), full = p.n >= C.PIN_MAX;
+      // the tether: a thread of light from her hand to it
+      ctx.strokeStyle = G.rgba(full ? GOLD : STAR, (0.16 + 0.05 * p.n) * k); ctx.lineWidth = 1.2;
+      ctx.beginPath(); ctx.moveTo(P.x + P.facing * 8, P.y - 40); ctx.lineTo(x, y); ctx.stroke();
+      ctx.save(); ctx.translate(x, y); ctx.rotate(p.ang);
+      ctx.strokeStyle = G.rgba(full ? GOLD : HOT, 0.9 * k); ctx.lineWidth = 4;
+      ctx.beginPath(); ctx.moveTo(-40, 0); ctx.lineTo(-6, 0); ctx.stroke();
+      ctx.fillStyle = G.rgba(full ? GOLD : HOT, k); poly(ctx, [-6, -5, 8, 0, -6, 5]); ctx.fill();
+      // its charges: a light along the shaft for each cut landed
+      for (let i = 0; i < p.n; i++) { ctx.fillStyle = G.rgba(full ? GOLD : HOT, k); ctx.beginPath(); ctx.arc(-12 - i * 6, -6 - 1.5 * Math.sin(G.t * 8 + i), 2.1, 0, G.TAU); ctx.fill(); }
+      ctx.restore();
+      const g = 44 + 8 * p.n;
+      ctx.drawImage(G.fx.glow(full ? GOLD : STAR), x - g / 2, y - g / 2, g, g);
     }
     if (P.stars) {
       const t = ts.find((q) => q.id === P.stars.id);
@@ -1921,7 +2050,7 @@
   }
 
   P.tryHit = function (dmg, srcX, src) {
-    if (P.dead || P.hidden || P.ulting || P.seq || !G.canHurt()) return false;
+    if (P.dead || P.hidden || P.ulting || P.seq || P.fly || !G.canHurt()) return false;
     // Eos was waiting for it. (v3.1j) Not while nothing can hurt him anyway: struck a moment ago, he could raise
     // the guard into the same blow, still in the air, and answer the hit he had just taken
     if (P.cast && P.cast.kind === 'guard' && !P.cast.thrown && !(P.inv > 0)) { turned(srcX, src); return false; }
@@ -1966,6 +2095,8 @@
     P.inv = C.HURT_INV; P.dashT = 0; P.healT = 0; P.hurtFlash = 1; P.plunge = false;
     P.drawT = 0; if (!braced) { P.hold = null; P.focus = 0; P.edge = 0; P.strung = 0; P.sun = 0; } // and whatever Focus Eos had gathered is gone
     if (braced && G.boon('unbroken') && P.atk) unbroken(P.atk);
+    if (H.special === 'starfall') { if (braced && P.atk) heatUp(2); else P.heat = Math.max(0, (P.heat || 0) - 2); } // (v3.1k: Heat)
+    P.fly = null;
     P.streakT = 0;
     if (P.flT > 0) { P.flT = 0; P.flCd = 2; } // caught showing off
     G.feats.bump('hurt');
@@ -2072,7 +2203,7 @@
             G.fx.stop(0.03); G.audio.play('hit');
             G.fx.hit(s.x, s.y, Math.atan2(s.vy, s.vx), { thrust: true, col: STAR, hot: HOT });
           } else if (res) {
-            if (s.lance && G.boon('pinlance')) pinLance(s, t);
+            if (tethers(s)) pinLance(s, t);
             if (s.lance) G.sets.hit('special', t, s.x, s.y, s.cast);
             G.fx.stop(0.07); G.fx.shake(9);
             G.audio.play('flareHit');
@@ -2093,8 +2224,10 @@
         s.dead = true;
         G.fx.burst(s.x, FLOOR - 4, { n: s.arrow ? 5 : 14, color: STAR, speed: [100, 460], angle: -Math.PI / 2, spread: 2.4, life: [0.2, 0.5], kind: 'spark', size: [2, 4] });
         if (s.arrow) G.fx.dust(s.x, FLOOR, 2, { speed: [20, 80], size: [3, 6], a: 0.3 });
-        else if (!s.wave) { G.fx.thud(s.x, FLOOR, 0.8, { noCrack: true }); G.fx.scorch(s.x, 34, STAR); G.fx.shake(4); }
+        else if (!s.wave) { G.fx.thud(s.x, FLOOR, 0.8, { noCrack: true }); G.fx.scorch(s.x, 34, STAR); G.fx.shake(4); if (tethers(s)) pinLance(s, null, s.x, FLOOR - 6); }
       }
+      // (v3.1k) a Star Lance that has struck nothing stands in the wall it reaches
+      if (!s.dead && tethers(s) && (s.x < G.WALL_L + 10 || s.x > G.WALL_R - 10) && s.y > 30) { pinLance(s, null, G.clamp(s.x, G.WALL_L + 10, G.WALL_R - 10), s.y); s.dead = true; G.audio.play('tink'); }
       // gone once it leaves the view (the view moves in the camp)
       if (s.dead || s.x < G.cam.x - 100 || s.x > G.cam.x + G.W + 100 || s.y < -200 || s.t > (s.life || 2)) G.shots.splice(i, 1);
     }
@@ -2849,7 +2982,7 @@
     ctx.restore();
   }
 
-  function drawMaul(ctx, W, h, st, gold) {
+  function drawMaul(ctx, W, h, st, gold, heat, pop) {
     ctx.save();
     ctx.translate(W.fx, W.fy); ctx.rotate(W.ang);
     const L = W.len, c = gold ? GOLD : h.col;
@@ -2873,6 +3006,16 @@
     poly(ctx, [L + 0.5, -8, L + 4.4, 0, L + 0.5, 8, L - 3.4, 0]); ctx.fill();
     ctx.fillStyle = G.rgba(c, 1);
     poly(ctx, [L + 10, -4, L + 15.5, 0, L + 10, 4]); ctx.fill();
+    if (heat > 0) {
+      // (v3.1k) Heat: the head burns hotter for each, a coal for each along the haft, and gold when it is full
+      const full = heat >= C.HEAT_MAX, hc = full ? GOLD : '255,150,70', q = heat / C.HEAT_MAX;
+      ctx.globalCompositeOperation = 'lighter';
+      glowAt(ctx, hc, L + 2, 0, 22 + 26 * q + 16 * (pop || 0), 0.35 + 0.45 * q + 0.03 * Math.sin(G.t * 14));
+      ctx.fillStyle = G.rgba(hc, 0.55 + 0.4 * q);
+      poly(ctx, [L - 7, -12.5, L + 8, -12.5, L + 10, -9, L + 10, 9, L + 8, 12.5, L - 7, 12.5, L - 9, 9, L - 9, -9]); ctx.globalAlpha = 0.25 + 0.4 * q; ctx.fill(); ctx.globalAlpha = 1;
+      for (let i = 0; i < heat; i++) { ctx.fillStyle = G.rgba(hc, 0.95); ctx.beginPath(); ctx.arc(-12 + i * (L - 6) / C.HEAT_MAX, 0, 1.7, 0, G.TAU); ctx.fill(); }
+      ctx.globalCompositeOperation = 'source-over';
+    }
     ctx.restore();
   }
 
@@ -3492,7 +3635,7 @@
       else if (h.weapon === 'naginata') drawNaginata(ctx, W, h, st, gold);
       else if (h.weapon === 'crossbow') drawCrossbow(ctx, W, h, a, st, gold);
       else if (wk(h) === 'sword') drawSword(ctx, W, h, gold);
-      else if (wk(h) === 'maul') drawMaul(ctx, W, h, st, gold);
+      else if (wk(h) === 'maul') drawMaul(ctx, W, h, st, gold, s.heat || 0, s.heatFx || 0);
       else if (wk(h) === 'blade') { drawScabbard(ctx, W, h, st, s.hold ? focusMark(s.focus || 0) : 0, s.sheath || 0); drawKatana(ctx, W, h, gold); }
       else drawBow(ctx, W, h, a, gold);
     };
@@ -3632,7 +3775,7 @@
     if (blink) ctx.globalAlpha = 0.35;
     if (P.fadeT > 0) ctx.globalAlpha = 0.28 + 0.1 * Math.sin(G.t * 9); // Fade: half there
     P.primed = H.draw ? (P.sheath || 0) >= C.SHEATH_COMBOS : P.combo === (H.chain || 3) - 2 && P.comboT > 0 && !P.atk;
-    P.dash = P.dashT > 0;
+    P.dash = P.dashT > 0 || !!P.fly;
     if (!P.vanish) { drawTail(ctx, H, P.scarf); drawBody(ctx, H, P); }
     ctx.globalAlpha = 1;
     drawSlashes(ctx);

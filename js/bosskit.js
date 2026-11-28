@@ -352,7 +352,7 @@
     // it gets up), staggerMult (damage taken while down, 1.4 unless given) and staggerDur (a scale on
     // how long it lasts). The Knight is disarmed, the Veil is thrown into a wall, the Magus is grounded.
     function* staggerScript() {
-      const b = B.body, dur = G.diff().stagger * (B.staggerDur || 1) + G.relics.staggerAdd();
+      const b = B.body, dur = G.diff().stagger * (B.staggerDur || 1) + (B.staggerAdd || 0) + G.relics.staggerAdd(); // (staggerAdd: a boss's own seconds on top, Kairo's)
       b.ctrl = true; b.hidden = false;
       if (B.onStagger) B.onStagger();
       b.x = G.clamp(b.x, G.WALL_L + 90, G.WALL_R - 90);

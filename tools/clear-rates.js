@@ -29,9 +29,31 @@
 // Held in a struggle (Kairo's Last Wave), it mashes the attack at about eight presses a second.
 // It is a steady, mediocre player: read its clear rates as a comparison between bosses, heroes and
 // trials, not as what a person will see.
+//
+// (v3.1k) skills: ['poor', 'standard', 'human', 'bot'] to start() plays every fight at each of four levels
+// of play (asked: "average damage on poor/standard human/optimal human/optimal bot damage and clear rates").
+// With no skills given it plays as it always did. A level is four things:
+//   miss   the share of threats it never reacts to (rolled once for each thing thrown and each move)
+//   up     the share of the time it presses its attack at all (rolled every half second)
+//   mash   presses a second in a struggle (Kairo's Last Wave)
+//   kit    how much of the hero's own loop it uses: 0-1 the special whenever it can; 2-3 the loop played
+//          properly (Vesper cuts her planted lance to five before she flies, Aster saves Starfall for a
+//          hot maul, Eos meets the boss's own swings with Still Point: guard = how long before the blow
+//          the guard goes up, and how far that wanders; a late guard is the perfect one)
+// These are a model, not a measurement of people: read the levels against each other.
 (function () {
   'use strict';
   const I = G.input, P = G.player, D = 1 / 120, FLOOR = G.FLOOR, WL = G.WALL_L + 20, WR = G.WALL_R - 20;
+
+  const SKILLS = {
+    poor: { miss: 0.35, up: 0.55, mash: 5, kit: 0 },
+    standard: { miss: 0.15, up: 0.8, mash: 7, kit: 1 },
+    human: { miss: 0.04, up: 0.95, mash: 9, kit: 2, guard: [0.13, 0.1] },
+    bot: { miss: 0, up: 1, mash: 12, kit: 3, guard: [0.04, 0] },
+  };
+  let SK = null, guarding = false;
+  // a threat this level of play never reacts to (decided once, the first time it is looked at)
+  const blind = (h) => { if (!SK || !SK.miss) return false; if (h._bl == null) h._bl = Math.random() < SK.miss; return h._bl; };
 
   function hold(l, r) { I.down.left = !!l; I.down.right = !!r; }
   function press(a) { if (!I.down[a]) I.pressed[a] = true; I.down[a] = true; }
@@ -42,7 +64,8 @@
     const out = [], py = P.y - 22;
     for (const p of G.arena.pits || []) out.push([(p.l + p.r) / 2, (p.r - p.l) / 2 + 16, 0.1]);
     for (const h of G.hazards.list) {
-      if (h.dead) continue;
+      if (h.dead || blind(h)) continue;
+      if (guarding && h.kind === 'arc' && h.owner === B.body) continue; // (Eos means to meet this one, not leave it)
       switch (h.kind) {
         case 'strike': if (h.t < h.tele + h.active) out.push([h.x, h.w / 2 + 18, h.tele - h.t]); break;
         case 'zone': if (h.style !== 'tide' && h.t < h.tele + h.active) out.push([h.x + h.w / 2, h.w / 2 + 18, h.tele - h.t]); break;
@@ -114,13 +137,23 @@
   // ---------------------------------------------------------------- one step of the scripted player
   function act(st, B) {
     const b = B.body || { x: B.core ? B.core.x : G.W / 2, y: 0, hidden: true }, list = G.hazards.list, H = G.hero(), C = G.PLAYER;
+    // (v3.1k) the level of play: a move it never reacts to, and whether it is pressing its attack just now
+    let ba = false, idle = false;
+    if (SK) {
+      if (st.atkName !== B.attackName) { st.atkName = B.attackName; st.blindAtk = Math.random() < SK.miss; }
+      ba = st.blindAtk;
+      st.upT = (st.upT || 0) - D;
+      if (st.upT <= 0) { st.upT = 0.5; st.busy = Math.random() < SK.up; }
+      idle = !st.busy;
+    }
+    guarding = !!(SK && SK.guard && H.special === 'guard' && P.ember >= C.SEG && !(P.inv > 0));
     const ds = dangers(B);
     let lo = WL, hi = WR;
     if (G.bounds) { lo = G.bounds.l + 8; hi = G.bounds.r - 8; }
     let jump = false, stayDown = false, high = false;
 
     for (const h of list) {
-      if (h.dead) continue;
+      if (h.dead || blind(h)) continue;
       if (h.kind === 'wave') {
         const dx = P.x - h.x;
         if (dx * h.dir > 0 && Math.abs(dx) < 105) jump = true;
@@ -184,16 +217,16 @@
       if (!st.over && room < 150 && Math.abs(b.x - P.x) < 250) st.over = G.sign(b.x - P.x) || 1;
       if (st.over && (P.x - b.x) * st.over > 190) st.over = 0;
     } else st.over = 0;
-    let charging = b.hurt && !b.hidden && Math.abs(b.x - P.x) < 330 && Math.abs(b.y - FLOOR) < 4;
+    let charging = !ba && b.hurt && !b.hidden && Math.abs(b.x - P.x) < 330 && Math.abs(b.y - FLOOR) < 4;
     // the Champion's thrust and draw: the glint as he sets is the moment to jump (his body comes through)
-    if (B.id === 'champion' && b.set && Math.abs(b.x - P.x) < (b.pose === 'thrustC' || b.pose === 'thrustP' ? 470 : [0, 260, 380, 560][b.set] || 300) && (P.x - b.x) * b.face > -20) charging = true;
+    if (!ba && B.id === 'champion' && b.set && Math.abs(b.x - P.x) < (b.pose === 'thrustC' || b.pose === 'thrustP' ? 470 : [0, 260, 380, 560][b.set] || 300) && (P.x - b.x) * b.face > -20) charging = true;
     // the Warden's hands, borrowed: over them as they close
     for (const h of list) if (h.kind === 'clap' && !h.dead) { const c = h.t - h.follow - h.hold; if (c > -0.2 && c < 0.1 && Math.abs(P.x - h.cx) < h.gap + 20) { jump = true; high = true; } }
     if (charging) { jump = true; if (B.h > 100) high = true; }
     for (const c of (B.clones || [])) if (c.hurt && !c.echo && Math.abs(c.x - P.x) < 330 && Math.abs(c.y - P.y) < 30) jump = true;
     // (v3.1f) the Warden's charge: once its aim holds (the core trembles), step out of the line with a dash,
     // away from where the line meets the hero's height. The core itself is the danger, not a hazard.
-    if (B.id === 'warden' && B.attackName === 'charge' && B.core) {
+    if (!ba && B.id === 'warden' && B.attackName === 'charge' && B.core) {
       const c = B.core;
       if (c.jit > 0 && !st.wDodge) {
         const ax = -Math.cos(c.flA), ay = -Math.sin(c.flA), py = P.y - 22;
@@ -208,7 +241,7 @@
     }
     // Kairo's spin throw: he leaps low with open hands; dashing does not save you, jumping over him does
     // (the crouch before it is the moment: a double jump started then clears him every time)
-    if (B.id === 'kairo' && B.attackName === 'throw' && Math.abs(P.x - b.x) < 470) {
+    if (!ba && B.id === 'kairo' && B.attackName === 'throw' && Math.abs(P.x - b.x) < 470) {
       if (!st.kThrow) { st.kThrow = true; jump = true; high = true; }
       else if (!P.onGround) high = true;
       st.noDash = true;
@@ -331,9 +364,22 @@
     let cutting = null;
     for (const o of G.hazards.slashables()) if (Math.abs(o.x - P.x) < 74 + (bow ? 120 : 0) && Math.abs(o.y - (P.y - 24)) < 60 + (bow ? 80 : 0)) { cutting = o; break; }
     let inReach = tg && edge < reach && vgap < (bow ? 220 : 70);
+    // (v3.1k) Eos, played properly: the boss's own swing is met with Still Point. The guard goes up a little
+    // before the blow (how little is the level of play: late is the perfect one), and the string stops for it
+    let wait = false;
+    I.pressed.flare = false;
+    if (guarding) for (const h of list) {
+      if (h.kind !== 'arc' || h.dead || h.owner !== B.body || h._g || h.t >= h.tele + h.active || blind(h)) continue;
+      if (Math.hypot(P.x - h.x, (P.y - 22) - h.y) > h.r + 24) continue;
+      if (h._lead == null) h._lead = Math.max(0.02, SK.guard[0] + (Math.random() * 2 - 1) * SK.guard[1]);
+      const left = h.tele - h.t;
+      if (left < h._lead + 0.3) wait = true;
+      if (left <= h._lead && !P.cast) { I.pressed.flare = true; h._g = true; st.guards = (st.guards || 0) + 1; }
+    }
+    if (wait || idle) inReach = false;
     // the Champion's guard (all four dark, standing still): a blow on his front is turned, so wait it out
     if (B.guardOn && (P.x - b.x) * b.face > -6) inReach = false;
-    if (H.draw && st.draws && !cutting && eosDraw(st, tg, edge, vgap, inReach, danger || charging, soonest, aimAt)) {
+    if (H.draw && st.draws && !cutting && !wait && !idle && eosDraw(st, tg, edge, vgap, inReach, danger || charging, soonest, aimAt)) {
       // (Eos's string and draw: eosDraw below)
     } else if (cutting || inReach) {
       if (cutting) aimAt(cutting.x, cutting.y); else aimAt(tg.cx, G.clamp(P.y - 36, tg.cy - (tg.hh || tg.r || 0) * 0.7, tg.cy + (tg.hh || tg.r || 0) * 0.7));
@@ -345,15 +391,21 @@
     } else lift('attack');
 
     // ---- special, Dawnbreak, crown
-    I.pressed.flare = false;
     // (v2.6f) with Gloam, the special waits for the dark mark (it deals double), and goes at once when it is up
     const gl = G.run.setCount && G.run.setCount('gloam') > 0, markUp = gl && !!sst.mark;
     if (tg && !danger && segs >= (markUp ? 1 : P.hp < P.maxHp || gl ? 2 : 1) && H.special !== 'guard') {
       // (v3.1f) Lune's Moon Burst: at any range, once eight arrows stand in the foe (or some are about to fall out)
-      const ok = H.special === 'burst' ? P.stuckN() >= 8 || (P.stuckN() >= 3 && G.stuck.some((a) => a.life - a.t < 0.5))
+      let ok = H.special === 'burst' ? P.stuckN() >= 8 || (P.stuckN() >= 3 && G.stuck.some((a) => a.life - a.t < 0.5))
         : H.special === 'lance' ? vgap < 200 : H.special === 'starfall' ? edge < 60 && vgap < 60 : edge < 140 && vgap < 120;
+      // (v3.1k) the loop played properly: a planted lance is left in until it is charged; Starfall waits for a hot maul
+      const proper = SK && SK.kit >= 2;
+      if (proper && H.special === 'lance' && P.pin) ok = false;
+      if (proper && H.special === 'starfall' && (P.heat || 0) < 5 && segs < P.segs) ok = false;
+      if (idle) ok = false;
       if (ok && (st.flareCd || 0) <= 0) { aimAt(tg.cx, tg.cy); I.aim.flare = true; I.pressed.flare = true; st.flareCd = 0.8; }
     }
+    // Vesper's flight, played properly: once the lance has its five cuts, or is about to fade (it costs nothing)
+    if (SK && SK.kit >= 2 && H.special === 'lance' && P.pin && !danger && !idle && (P.pin.n >= C.PIN_MAX || P.pin.t < 1) && (st.flareCd || 0) <= 0) { I.pressed.flare = true; st.flareCd = 0.4; st.flights = (st.flights || 0) + 1; }
     st.flareCd = (st.flareCd || 0) - D;
     I.pressed.ult = !!(tg && P.ult >= 100 && !B.toppled);
     I.pressed.crown = !!(tg && edge < 300);
@@ -430,6 +482,7 @@
     // fights him at the trial asked, with omens (the v2.6c test of him after seven trials).
     if (job.boss === 'champion' && !job.champMax) { R.champFight = true; R.trial = Math.min(job.trial, 5); }
     G.startFight();
+    SK = job.skill ? SKILLS[job.skill] : null;
     const B = G.boss, st = { draws: job.draws };
     let t = 0, hits = 0, cause = {};
     P.tryHit = function (dmg, srcX, src) {
@@ -450,7 +503,7 @@
         } else if (P.grabbed && P.grabbed.mash) {
           // a struggle (Kairo's Last Wave): mash the attack at a person's pace, about eight presses a second
           st.mashT = (st.mashT || 0) - D;
-          if (st.mashT <= 0) { I.pressed.attack = true; I.down.attack = true; st.mashT = 0.125; } else I.down.attack = false;
+          if (st.mashT <= 0) { I.pressed.attack = true; I.down.attack = true; st.mashT = SK ? 1 / SK.mash : 0.125; } else I.down.attack = false;
           I.pressed.ult = P.ult >= 100;
         } else if (G.state === 'fight' && !P.dead) act(st, B);
         G.step(D); t += D;
@@ -459,10 +512,10 @@
         if (G.state === 'dead' || P.dead) { lost = true; break; }
       }
     } catch (e) { errors.push(job.boss + '/' + job.hero + '/T' + job.trial + ': ' + e.message); CLEAR.stacks = (CLEAR.stacks || []).concat([String(e.stack).slice(0, 700)]); lost = true; }
-    P.tryHit = realHit;
+    P.tryHit = realHit; SK = null; guarding = false;
     const killer = lost ? Object.keys(cause).sort((a, b2) => cause[b2] - cause[a])[0] : '';
     return {
-      boss: job.boss, hero: job.hero, trial: job.trial, won, timeout: !won && !lost,
+      boss: job.boss, hero: job.hero, trial: job.trial, skill: job.skill || '', dmg: Math.round(P.stats.dmg), guards: st.guards || 0, flights: st.flights || 0, won, timeout: !won && !lost,
       time: +G.time.toFixed(1), phase: maxPhase, bossLeft: B.maxHp ? +(B.hp / B.maxHp).toFixed(2) : 0,
       hpLeft: P.hp, maxHp: P.maxHp, hits, killer, cause, omens: (R.omens || []).slice(), boons: R.order.slice(), relic: R.relic,
       duo: R.duo && R.duo() ? R.duo().id : null, crown: R.crownSet ? R.crownSet() : null, awake: R.awake || 0,
@@ -502,8 +555,8 @@
       const runs = o.runs || 10;
       queue = []; results = []; errors.length = 0;
       // interleaved, so a partial run already covers every cell a little
-      for (let r = 0; r < runs; r++) for (const boss of bosses) for (const [hi, hero] of heroes.entries()) for (const trial of trials)
-        queue.push({ boss, hero, trial, diff: o.difficulty == null ? 1 : o.difficulty, maxT: o.maxT || 420, boons: o.boons !== false, god: !!o.god, draws: o.draws !== false, champMax: !!o.champMax,
+      for (let r = 0; r < runs; r++) for (const boss of bosses) for (const [hi, hero] of heroes.entries()) for (const trial of trials) for (const skill of (o.skills || [undefined]))
+        queue.push({ boss, hero, trial, skill, diff: o.difficulty == null ? 1 : o.difficulty, maxT: o.maxT || 420, boons: o.boons !== false, god: !!o.god, draws: o.draws !== false, champMax: !!o.champMax,
           build: o.build, awake: o.awake, relic: o.relic, duo: r, flip: (r + hi) % 2 === 1 });
       CLEAR.total = queue.length;
       running = true; started = performance.now();
@@ -524,6 +577,18 @@
       I.aim.attack = false; I.aim.flare = false;
       saved = null;
       G.toTitle();
+    },
+    // (v3.1k) by level of play and hero: fights, win rate, damage a second while the fight ran, damage dealt, blows taken
+    bySkill() {
+      const out = [];
+      for (const sk of [...new Set(results.map((r) => r.skill))]) for (const he of [...new Set(results.map((r) => r.hero))].concat(['all'])) {
+        const rs = results.filter((r) => r.skill === sk && (he === 'all' || r.hero === he));
+        if (!rs.length) continue;
+        const sum = (f) => rs.reduce((a, r) => a + f(r), 0);
+        out.push({ skill: sk, hero: he, n: rs.length, win: Math.round(100 * sum((r) => (r.won ? 1 : 0)) / rs.length), dps: +(sum((r) => r.dmg) / Math.max(1, sum((r) => r.time))).toFixed(1),
+          dmg: Math.round(sum((r) => r.dmg) / rs.length), hits: +(sum((r) => r.hits) / rs.length).toFixed(1), secs: Math.round(sum((r) => r.time) / rs.length) });
+      }
+      return out;
     },
     // win rate per boss (rows) and trial (columns), for one hero or all
     table(hero) {

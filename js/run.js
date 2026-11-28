@@ -24,12 +24,12 @@
       ],
       down: 11, special: 'lance', specialName: 'Star Lance', verb: 'lance',
       blurb: 'Balanced and quick. The one to learn the fight with.',
-      lines: ['Sword: a fast three-hit combo', 'Star Lance: a piercing shot at any range', 'A slash out of a dash becomes a thrust'],
+      lines: ['Sword: a fast three-hit combo', 'Star Lance: it sticks where it hits. Special again to fly to it', 'A slash out of a dash becomes a thrust'],
       how: {
         attack: 'Sword: cut (10), cut (12), finisher (26). Hold to keep cutting.',
         aim: 'Up cuts overhead. Down in the air strikes below and bounces, giving back your jump and dash.',
         dash: 'Attack straight out of a dash for a thrust: 40% more damage and reach.',
-        special: 'Star Lance: a piercing lance for 42 across the arena. Dash during the throw to send it at once.',
+        special: 'Star Lance: a piercing lance for 42. It stays where it hits for 7 seconds. Special again flies you to it through attacks, free, for 10 and 5 more for each cut you landed on that foe (35 at five). Dash during the throw to send it at once.',
         ult: 'Thousand Stars: eight cuts of 20, then one of 80.',
       },
     },
@@ -45,12 +45,12 @@
       ],
       down: 15, special: 'starfall', specialName: 'Starfall', verb: 'starfall',
       blurb: 'Slow, heavy and hard to kill. Every swing counts.',
-      lines: ['Maul: a wide sweep, then a smash you can hold to charge', 'Starfall: slam down for a blast around you, passing through attacks as you fall', 'One more health; she cannot be knocked back while charging'],
+      lines: ['Maul: a wide sweep, then a smash you can hold to charge', 'Starfall: a blast around you. It spends the maul\u2019s Heat to hit harder', 'One more health; she cannot be knocked back while charging'],
       how: {
         attack: 'Maul: sweep (18), then smash (36). Hold the smash to charge it to 65 with a floor wave (18); nothing knocks you back while you charge.',
         aim: 'Up swings overhead. Down in the air strikes below and bounces.',
         dash: 'Slower to start and stop. A sweep straight out of a dash hits 40% harder.',
-        special: 'Starfall: a blast of 42 at your feet. In the air you plunge first, through attacks.',
+        special: 'Starfall: a blast of 42 at your feet. In the air you plunge first, through attacks. It spends the maul\u2019s Heat: 15% more damage for each (80 at six), and at six it staggers hard. Heat: 1 for a blow landed, 3 for a full charge, 2 for a blow taken while charging.',
         ult: 'Worldbreaker: crash down for 250 and split the floor.',
       },
     },
@@ -179,7 +179,7 @@
     { id: 'dawn', name: 'Second Dawn', tag: 'Survival', max: 1, desc: 'Once per trial, a killing blow leaves you on 1 health.' },
     { id: 'glass', name: 'Glass Star', tag: 'Risk', max: 1, desc: 'All damage +25%, but one less health.' }, // (v2.9g: +35%)
     // signature boons (v2.2a): two for each hero that change how they play (player.js, "signature boons")
-    { id: 'pinlance', name: 'Pinning Lance', tag: 'Signature', max: 1, heroes: ['vesper'], desc: 'A Star Lance that strikes stays fixed in the foe. Your next finisher on it bursts the lance for 40.' },
+    { id: 'pinlance', name: 'Pinning Lance', tag: 'Signature', max: 1, heroes: ['vesper'], desc: 'When you fly to your Star Lance it bursts for 40 at everything near it.' },
     { id: 'stars', name: 'Constellation', tag: 'Signature', max: 1, heroes: ['vesper'], desc: 'Each finisher that lands sets a star on the foe. The third links them and bursts for 60.' },
     { id: 'fault', name: 'Fault Line', tag: 'Signature', max: 1, heroes: ['aster'], desc: 'A fully charged smash cracks the floor, and a second later the crack erupts for 45.' },
     { id: 'unbroken', name: 'Unbroken', tag: 'Signature', max: 1, heroes: ['aster'], desc: 'A blow taken while you charge the smash fills the charge at once, and the smash comes.' },

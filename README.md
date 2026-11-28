@@ -2,7 +2,7 @@
 
 A side-on boss rush for the browser: four heroes, seven three-phase bosses, played as a run of
 ever-harder trials. You pick a hero and a relic before the run and win a boon after each victory.
-Version 3.1j.
+Version 3.1k.
 
 This is an early slice of a planned boss-rush roguelite (short runs, a boon after each boss,
 bosses drawn from a pool). A run is seven trials, one for each boss, each harder than the last: the first boss
@@ -116,6 +116,73 @@ hero (`tools/feel-check.js`).
 - Settings, Reset progress erases Sunshards, upgrades, trophies and records (it has to be chosen twice).
 
 Not done: touch controls, a colour-blind alternative to red-orange warnings, gamepad rebinding.
+
+## Vesper's Tethered Lance and Aster's Heat (v3.1k)
+
+Asked: "i want vesper and aster to have their thing too like how lune and eos do". Three ideas each were offered;
+picked the Tethered Lance for Vesper and Heat for Aster. Both belong to the first weapon (the sword, the maul).
+
+**Vesper: the Tethered Lance**
+- The Star Lance stays in what it first strikes for 7 seconds: in the boss (it rides the boss), or in the floor
+  or a wall if it struck nothing. A thread of light runs from her hand to it.
+- **Right click again flies her to it**, through attacks, and costs nothing. She arrives with a thrust for 10.
+  She has her jumps and dashes back when she lands, so a lance in the Warden's eye is a way up to it.
+- **Each cut she lands on that foe while the lance is in it adds 5 to the flight**, up to five cuts (35). The
+  lance shows a light for each and turns gold at five.
+- While a lance is out, right click is the flight: she cannot throw a second one until she has flown or it fades.
+- **Pinning Lance** (her boon) is now: the lance bursts for 40 at everything near it as she reaches it.
+
+**Aster: Heat**
+- The maul heats as she fights, up to six: one for a blow that lands, three for a fully charged smash, two for a
+  blow she takes while charging. A blow that knocks her back cools it by two.
+- **Starfall spends it all**: 15% more damage and 8% more reach for each, so 80 at six (from 42). At six it also
+  fills the stagger bar three times as fast.
+- The head of the maul glows hotter with each, a coal lights along the haft, sparks rise off it, and it turns
+  gold at six. Its own sound climbs with each.
+
+**The numbers** came from the bot (unhurt, no boons, four bosses, three fights each). First try (flight 20 + 8,
+Heat 25%) had Vesper winning 23% faster than before and Aster 21% faster. As shipped: Vesper 124 s, Aster 134 s,
+Eos 129 s, Lune 147 s. Before this version: Vesper 141 s, Aster 156 s.
+
+**Kairo stays staggered 0.75 s longer** (asked after the trial V run below, where he was cleared least).
+
+Checked in the game: the lance in a boss, a wall and the Warden's eye, the flight, the lance fading; Heat from
+swings and its Starfall. Not played by a person, and the new sounds have not been heard.
+
+**Trial V at four levels of play** (asked after v3.1k: "new trial 5 runs with all of the chars and see average
+damage on poor/standard human/optimal human/optimal bot damage and clear rates"). `tools/clear-rates.js` took a
+`skills` option: a level is how many threats it never reacts to, how much of the time it attacks, how fast it
+mashes, and whether it plays the hero's loop properly. 448 fights: every hero against every boss, four each,
+Standard difficulty, with the four boons and the relic a run has by then.
+
+| Level | Misses | Attacks | Clear rate | Damage a second | Blows taken |
+|---|---|---|---|---|---|
+| Poor | 35% | 55% of the time | 1% | 48 | 9.0 |
+| Standard | 15% | 80% | 19% | 56 | 8.1 |
+| Optimal human | 4% | 95%, loop played properly | 45% | 64 | 7.3 |
+| Optimal bot | 0% | 100%, frame-perfect loop | 54% | 71 | 6.2 |
+
+| Clear rate (damage a second) | Vesper | Aster | Lune | Eos |
+|---|---|---|---|---|
+| Poor | 4% (43) | 0% (61) | 0% (34) | 0% (53) |
+| Standard | 21% (62) | 32% (61) | 7% (42) | 14% (57) |
+| Optimal human | 43% (68) | 50% (67) | 39% (50) | 46% (75) |
+| Optimal bot | 54% (78) | 68% (83) | 43% (56) | 50% (70) |
+
+| Clear rate by boss | Poor | Standard | Optimal human | Optimal bot |
+|---|---|---|---|---|
+| Magus | 0% | 50% | 88% | 69% |
+| Veil | 6% | 31% | 81% | 81% |
+| Knight | 0% | 6% | 56% | 75% |
+| Leviathan | 0% | 25% | 50% | 81% |
+| Warden | 0% | 0% | 25% | 31% |
+| Wolf | 0% | 19% | 13% | 13% |
+| Kairo | 0% | 0% | 0% | 25% |
+
+The levels are a model, not a measurement of people, and 16 fights a cell is a rough figure. "Optimal bot" is the
+script reacting to everything it has a rule for: it still takes about six blows a fight from moves it has no
+answer to (Kairo's sweeping beam, the Warden's sunspots, the Wolf's prowl), so it is a floor for perfect play,
+not the ceiling. Nothing was changed in the game from this.
 
 ## Eos: Still Point blocks everything, and answers only the boss itself (v3.1j)
 
